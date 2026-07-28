@@ -4,7 +4,7 @@
 
 Hobbyist and small-scale beekeepers need a practical way to use inspection photos to assess possible Varroa mite presence in their hives. Raw photos are hard to evaluate consistently, and a simple count alone is not enough unless the beekeeper can see the evidence behind it.
 
-The product should help the beekeeper organise apiaries, hives, inspections, and photos, then provide an AI-assisted estimate of likely Varroa presence from uploaded images. It must avoid overstating the result as a diagnosis, treatment recommendation, or official infestation measurement.
+The product should help a Beekeeper organise Workspace-owned apiaries, hives, inspections, and inspection photos, then provide an AI-assisted estimate of likely Varroa presence from uploaded images. It must avoid overstating the result as a diagnosis, treatment recommendation, or official infestation measurement.
 
 The project also needs to document how AI affects the software development lifecycle, so requirements, decisions, implementation, tests, and production evidence should remain traceable.
 
@@ -12,45 +12,53 @@ The project also needs to document how AI affects the software development lifec
 
 Build a web-first inspection support system for hobbyist and small-scale beekeepers.
 
-The user creates an apiary, creates hives within that apiary, creates an inspection event for a hive, uploads one or more photos, and reviews analysis results. The system estimates complete visible bees, tracks partial visible bees separately, detects likely Varroa mites on or near bees, calculates likely mites per 100 complete visible bees, and presents tagged-up photos showing the evidence behind the estimate.
+The Beekeeper works inside a Workspace, creates an apiary, creates hives within that apiary, creates an inspection for a hive, uploads one or more inspection photos, and reviews analysis results. The system estimates complete visible bees, tracks partial visible bees separately, detects likely Varroa mites on or near bees, calculates likely mites per 100 complete visible bees, and presents tagged photos showing the evidence behind the estimate.
 
-The user can optionally view all detected bees and can lightly correct results by marking false Varroa detections or missed likely Varroa locations. The system stores the original photo, structured annotation data, analysis results, and user corrections so tagged images can be re-rendered and model accuracy can be evaluated later.
+The Beekeeper can optionally view all detected bees and can lightly correct results by marking false Varroa detections or missed likely Varroa locations. The system stores the original inspection photo, structured annotation data, analysis results, and user corrections so tagged photos can be re-rendered and model accuracy can be evaluated later.
 
-Version one assumes a single user account or simple account-owned workspace. Collaboration, advisor access, and organisation-level permissions are deferred.
+Version one assumes a single Workspace with one primary Beekeeper actor. Collaboration, advisor access, and organisation-level permissions are deferred.
 
 ## Gherkin Scenarios
 
 Feature: Apiary and hive setup
 
+  Scenario: Beekeeper accepts the workspace data-use agreement
+    Given a Beekeeper is setting up a Workspace
+    When the Beekeeper accepts the current Workspace Data Use Agreement
+    Then upload and analysis features are enabled for that Workspace
+    And the accepted terms version is recorded
+
   Scenario: Beekeeper creates an apiary
-    Given a hobbyist beekeeper is using the system
+    Given a Beekeeper has an active Workspace
     When the beekeeper creates an apiary with a name
     Then the apiary is saved
-    And the beekeeper can use the apiary to organise hives by real-world location or grouping
+    And the apiary belongs to the Workspace
+    And the Beekeeper can use the apiary to organise hives by real-world location or grouping
 
   Scenario: Beekeeper creates a hive within an apiary
-    Given a hobbyist beekeeper has created an apiary
+    Given a Beekeeper has created an apiary
     When the beekeeper creates a hive within that apiary
     Then the hive is saved under the selected apiary
     And future inspections can be associated with that hive
 
 Feature: Hive inspection photo capture
 
-  Scenario: Beekeeper creates an inspection event for a hive
-    Given a hobbyist beekeeper has an apiary with at least one hive
-    When the beekeeper creates an inspection event for a selected hive
+  Scenario: Beekeeper creates an inspection for a hive
+    Given a Beekeeper has an apiary with at least one hive
+    When the Beekeeper creates an inspection for a selected hive
     Then the inspection is associated with that hive
     And the inspection can hold photos and analysis results
 
   Scenario: Beekeeper uploads multiple photos to an inspection
-    Given a hobbyist beekeeper has created an inspection event
-    When the beekeeper uploads one or more frame photos
+    Given a Beekeeper has created an inspection
+    And the Workspace has an accepted Workspace Data Use Agreement
+    When the Beekeeper uploads one or more inspection photos
     Then each photo is associated with the inspection
     And the original uploaded photo is preserved for later review
 
   Scenario: Beekeeper optionally labels photos from the same frame
-    Given a hobbyist beekeeper has uploaded multiple photos to an inspection
-    When the beekeeper labels two or more photos with the same frame label
+    Given a Beekeeper has uploaded multiple photos to an inspection
+    When the Beekeeper labels two or more photos with the same frame label
     Then the system records that those photos may represent the same frame
     And the system does not require full frame inventory management
 
@@ -149,42 +157,63 @@ Feature: Requirements traceability and AI-SDLC evidence
     Then the human action is recorded as AI-SDLC evidence
     And later project reviews can distinguish AI contribution from human judgment
 
-Feature: Model training consent and governance
+Feature: Workspace data-use agreement and model governance
 
-  Scenario: User photos are not automatically used for training
+  Scenario: Workspace data-use agreement is required for upload and analysis
+    Given a Workspace has not accepted the current Workspace Data Use Agreement
+    When a Beekeeper tries to upload inspection photos
+    Then the upload is blocked
+    And the system indicates that upload and analysis require accepted data-use terms
+
+  Scenario: Data-use withdrawal disables new upload and analysis
+    Given a Workspace previously accepted the Workspace Data Use Agreement
+    When the agreement is withdrawn
+    Then new inspection photo upload is disabled
+    And new analysis is disabled
+    And existing inspection history may remain viewable unless a deletion process applies
+
+  Scenario: User photos are not automatically trusted training data
     Given a beekeeper uploads photos for analysis
     When the system stores those photos and analysis results
-    Then the photos are not automatically added to model training data
+    Then the photos are not automatically treated as reviewed ground truth
     And the user corrections are stored as review candidates rather than trusted ground truth
 
-  Scenario: Consent status is stored before model improvement use
-    Given a beekeeper has uploaded photos or corrections
+  Scenario: Workspace data-use agreement status is checked before model improvement use
+    Given a Beekeeper has uploaded inspection photos or corrections
     When the system considers those photos or corrections for model improvement
-    Then the system checks consent status at photo or inspection level
-    And the system excludes photos or corrections without recorded consent
+    Then the system checks the Workspace Data Use Agreement status and terms version
+    And the system excludes photos or corrections when the Workspace does not have an active accepted agreement
 
   Scenario: Reviewed corrections become eligible for dataset use
-    Given a user has flagged a false positive or missed likely Varroa detection
+    Given a Beekeeper has flagged a false positive or missed likely Varroa detection
     When a human reviewer approves the correction
     Then the approved correction can be assigned to a training, validation, benchmark, or excluded dataset role
     And the dataset role is recorded for traceability
+
+  Scenario: Data deletion request is captured as a deferred privacy workflow
+    Given a Beekeeper asks to delete or purge Workspace-held data
+    When the request is recorded
+    Then the request is treated as a Data Deletion Request
+    And the project records that deletion behaviour for prior uploads, dataset versions, and already-trained model artifacts requires a policy decision
 
 ## Implementation Decisions
 
 - The first version targets hobbyist and small-scale beekeepers.
 - The first client is a web UI.
-- The first version assumes a single user account or simple account-owned workspace.
+- The first version assumes a single Workspace with one primary Beekeeper actor.
 - Android and Apple apps are future-facing concerns, not version-one delivery targets.
-- The core domain model should include apiary, hive, inspection event, photo, analysis result, annotation, and user correction.
+- The core domain model should include Workspace, Beekeeper, apiary, hive, inspection, inspection photo, analysis result, annotation, user correction, Workspace Data Use Agreement, Data Deletion Request, model version, dataset version, and benchmark evaluation.
 - Frame-level handling should be light in version one. Photos may have optional frame labels, but the system should not require full frame inventory management.
 - The analysis output should include estimated complete visible bee count, partial visible bee count where possible, likely Varroa count, Varroa association state, and likely mites per 100 complete visible bees.
 - The system should store original photos and structured annotation data rather than relying only on flattened annotated images.
 - Tagged-up photos should be rendered from original photos plus annotation data.
 - The first correction loop should support marking false Varroa detections and missed likely Varroa locations.
 - User corrections should be review candidates, not automatic training data.
-- The exact consent capture flow is deferred, but consent status must be traceable before model-improvement use.
+- Workspace Data Use Agreement acceptance is required before upload and analysis features can be used.
+- Workspace Data Use Agreement withdrawal disables new upload and analysis.
+- The privacy/deletion gap around prior uploads, dataset versions, and already-trained model artifacts is explicitly deferred and tracked.
 - Image upload formats and size limits should be configurable.
-- Model, dataset, training, evaluation, consent, and release-gate requirements are governed by the separate model requirements baseline.
+- Model, dataset, training, evaluation, data-use agreement, privacy/deletion, and release-gate requirements are governed by the separate model requirements baseline and domain model.
 - The product language must preserve the boundary that results are AI-assisted visual estimates, not diagnoses, treatment recommendations, or official infestation measurements.
 
 ## Testing Decisions
@@ -194,9 +223,11 @@ Feature: Model training consent and governance
 - Domain-level tests should cover infection-rate calculation as likely Varroa detections associated with complete visible bees per 100 estimated complete visible bees.
 - Data tests should verify that apiaries, hives, inspections, photos, annotations, analysis results, and corrections remain correctly associated.
 - Data tests should verify that user corrections do not become training or benchmark data without review and explicit dataset role assignment.
-- Data tests should verify that account-owned apiaries, hives, inspections, photos, analysis results, annotations, corrections, and consent records cannot be accessed across account boundaries.
+- Data tests should verify that Workspace-owned apiaries, hives, inspections, photos, analysis results, annotations, corrections, data-use agreements, and deletion requests cannot be accessed across Workspace boundaries.
 - Upload tests should verify accepted formats, rejected formats, size-limit handling, and original-photo preservation.
-- Consent tests should verify that photos and corrections without recorded consent cannot become model-improvement candidates.
+- Data-use agreement tests should verify that upload and analysis require an active accepted Workspace Data Use Agreement.
+- Data-use withdrawal tests should verify that withdrawal disables new upload and analysis.
+- Privacy tests should verify that Data Deletion Requests can be recorded even while deletion workflow details are deferred.
 - UI or acceptance tests should verify that result wording does not claim diagnosis, treatment guidance, or official infestation measurement.
 - Future model evaluation tests should measure false positives, missed detections, confidence, and correction rates against reviewed image sets.
 
@@ -212,6 +243,8 @@ Feature: Model training consent and governance
 - Validated colony-level infestation estimates.
 - Automatic use of user-submitted photos or corrections as training data.
 - Multi-user collaboration, advisor access, and organisation-level permissions in version one.
+- Continuing to upload or analyse new photos after Workspace Data Use Agreement withdrawal.
+- Full implementation of data deletion or purge workflows in version one.
 
 ## Further Notes
 
@@ -219,4 +252,4 @@ Multiple photos of the same frame are useful but risky for aggregation. Without 
 
 The annotation and correction loop is part of the product and part of the AI-SDLC evidence strategy. It gives users a way to inspect output quality while creating structured evidence for later model evaluation.
 
-Detailed model, dataset, consent, benchmark, and promotion requirements live in `model-requirements.md`.
+Detailed model, dataset, data-use agreement, privacy/deletion, benchmark, and promotion requirements live in `model-requirements.md` and `architecture/domain-model.md`.

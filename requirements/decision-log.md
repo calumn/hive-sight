@@ -121,15 +121,16 @@ Implications:
 
 ## 2026-07-28 Version-One Ownership Assumption
 
-Decision: Version one assumes a single user account or simple account-owned workspace.
+Decision: Version one uses Workspace as the canonical ownership boundary. A Beekeeper is a human actor or role, not the ownership container.
 
-Rationale: The first product needs a clear ownership boundary for apiaries, hives, inspections, photos, analysis results, annotations, corrections, and consent records, but does not yet need collaboration or organisation management.
+Rationale: The first product may target an individual beekeeper, but future versions may support small businesses, clubs, advisors, or multiple beekeepers. Workspace remains stable as the owner of apiaries, hives, inspections, photos, analysis results, annotations, corrections, data-use agreements, and deletion requests.
 
 Implications:
 
-- Domain modelling should include an owner or account boundary.
+- Domain modelling should use Workspace for ownership.
+- Domain modelling should use Beekeeper for the person performing inspections or reviewing results.
 - Multi-user collaboration, advisor access, and organisation-level permissions are out of scope for version one.
-- Tests should verify that account-owned records are not accessible across account boundaries.
+- Tests should verify that workspace-owned records are not accessible across workspace boundaries.
 
 ## 2026-07-28 Upload Limits Are Configurable
 
@@ -143,14 +144,28 @@ Implications:
 - The product must handle rejected files clearly.
 - Original uploaded photos remain part of the storage baseline.
 
-## 2026-07-28 Consent Flow Deferred But Consent Traceability Required
+## 2026-07-28 Workspace Data Use Agreement Required For Upload And Analysis
 
-Decision: The exact product flow for consent capture is deferred, but consent status must be traceable before photos or corrections become eligible for model improvement.
+Decision: Version one requires a workspace-level data-use agreement before upload and analysis features can be used.
 
-Rationale: Consent may be best captured at upload time, inspection level, account settings level, or model-review time. The correct user experience is not yet known, but the data requirement is already clear.
+Rationale: The intended product policy is that use of the service depends on accepting data-use terms for uploaded photos and corrections. Per-photo consent would add friction and does not match the intended version-one service model.
 
 Implications:
 
-- Consent status should be stored at photo or inspection level unless a later decision chooses a more specific model.
-- Photos and corrections without recorded consent must be excluded from training, validation, and benchmark candidate workflows.
-- Future product design must decide where the consent prompt appears.
+- A workspace without an accepted data-use agreement cannot upload new photos or receive new analysis.
+- If the agreement is withdrawn, new upload and analysis are disabled.
+- Existing inspection history may remain viewable unless a deletion process applies.
+- User corrections remain review candidates and do not automatically become ground truth or training data.
+
+## 2026-07-28 Data Withdrawal And Deletion Gap Captured
+
+Decision: The project will explicitly track the unresolved privacy gap around withdrawal, previously uploaded photos, data deletion, and already-trained model artifacts.
+
+Rationale: Inspection photos and metadata may be personally identifiable or sensitive because they can contain GPS metadata, timestamps, apiary names, business-sensitive hive health information, or incidental background detail. The project should not silently assume that withdrawal or deletion semantics are simple.
+
+Implications:
+
+- The domain model includes Data Deletion Request as a deferred concept.
+- Workspace data-use withdrawal stops future upload, analysis, and future model-improvement use from the point of withdrawal, subject to final policy.
+- The project still needs a policy/legal decision on whether previously uploaded photos can continue to be used after withdrawal.
+- The project still needs a policy/legal decision on whether already-created dataset versions or already-trained model artifacts can or must be affected by later withdrawal or deletion requests.

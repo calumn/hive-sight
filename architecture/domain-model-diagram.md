@@ -4,7 +4,7 @@ This diagram shows the conceptual domain model for BeehiveMonitor. It complement
 
 ```mermaid
 erDiagram
-    ACCOUNT ||--o{ APIARY : owns
+    WORKSPACE ||--o{ APIARY : owns
     APIARY ||--o{ HIVE : contains
     HIVE ||--o{ INSPECTION : has
     INSPECTION ||--o{ INSPECTION_PHOTO : contains
@@ -26,25 +26,30 @@ erDiagram
     BEE_ANNOTATION ||--o{ REVIEW_DECISION : reviewed_by
     VARROA_ANNOTATION ||--o{ REVIEW_DECISION : reviewed_by
 
-    ACCOUNT ||--o{ CONSENT_RECORD : records
-    INSPECTION ||--o{ CONSENT_RECORD : may_have
-    INSPECTION_PHOTO ||--o{ CONSENT_RECORD : may_have
-    USER_CORRECTION ||--o{ CONSENT_RECORD : may_have
+    WORKSPACE ||--o{ BEEKEEPER : has
+    WORKSPACE ||--o{ WORKSPACE_DATA_USE_AGREEMENT : accepts
+    WORKSPACE ||--o{ DATA_DELETION_REQUEST : may_request
 
     DATASET_VERSION ||--o{ REVIEW_DECISION : includes_approved_evidence
     DATASET_VERSION ||--o{ BENCHMARK_EVALUATION : used_by
     MODEL_VERSION ||--o{ BENCHMARK_EVALUATION : evaluated_by
     BENCHMARK_EVALUATION ||--o{ REVIEW_DECISION : approved_by
 
-    ACCOUNT {
+    WORKSPACE {
         string id
         string display_name
         string status
     }
 
+    BEEKEEPER {
+        string id
+        string workspace_id
+        string display_name
+    }
+
     APIARY {
         string id
-        string account_id
+        string workspace_id
         string name
         string status
     }
@@ -124,12 +129,17 @@ erDiagram
         string decision
     }
 
-    CONSENT_RECORD {
+    WORKSPACE_DATA_USE_AGREEMENT {
         string id
-        string subject_type
-        string subject_id
+        string workspace_id
         string status
-        string scope
+        string terms_version
+    }
+
+    DATA_DELETION_REQUEST {
+        string id
+        string workspace_id
+        string status
     }
 
     MODEL_VERSION {
@@ -154,8 +164,8 @@ erDiagram
 
 ## Reading The Diagram
 
-- The left side is the beekeeper workflow: account, apiary, hive, inspection, photos, and analysis.
+- The left side is the beekeeper workflow: workspace, apiary, hive, inspection, photos, and analysis.
 - The middle is the evidence layer: analysis results, bee annotations, Varroa annotations, summaries, and corrections.
-- The lower/right side is model governance: review decisions, consent records, dataset versions, model versions, and benchmark evaluations.
+- The lower/right side is model governance: review decisions, workspace data-use agreements, deletion requests, dataset versions, model versions, and benchmark evaluations.
 - `Inspection Summary` is derived from photo-level analysis results and should be recalculable.
-- `User Correction` is review evidence, not ground truth or training data until consent and review decisions allow it.
+- `User Correction` is review evidence, not ground truth or training data until the workspace data-use agreement and review decisions allow it.

@@ -6,9 +6,13 @@ BeehiveMonitor is a Varroa-focused inspection support system for hobbyist and sm
 
 ### Beekeeping Context
 
-**Account**:
-The version-one ownership boundary for a beekeeper's data.
-_Avoid_: User account when the boundary, not login identity, is the point.
+**Workspace**:
+The ownership boundary for apiaries, hives, inspections, photos, corrections, and model-use terms.
+_Avoid_: Account when the ownership container, not login identity, is the point.
+
+**Beekeeper**:
+A person who keeps bees and uses the workspace to record inspections or review analysis results.
+_Avoid_: Workspace when referring to the human actor.
 
 **Apiary**:
 A beekeeper-defined grouping or location that contains hives.
@@ -78,9 +82,13 @@ _Avoid_: Ground truth, training label.
 A human decision about whether a prediction, correction, annotation, or model release is approved, rejected, uncertain, excluded, or eligible for dataset use.
 _Avoid_: Approval when the exact decision status matters.
 
-**Consent Record**:
-A record of whether specific photos or corrections may be considered for model improvement.
-_Avoid_: Global consent when the consent applies to specific evidence.
+**Workspace Data Use Agreement**:
+A workspace-level acceptance of the service's data-use terms, required in version one before upload and analysis features can be used.
+_Avoid_: Consent record when referring to the service-level agreement.
+
+**Data Deletion Request**:
+A request to delete or purge workspace-held data.
+_Avoid_: Consent withdrawal when the user is asking for deletion rather than stopping future use.
 
 **Model Version**:
 A named version of the model or model pipeline that produced analysis output.

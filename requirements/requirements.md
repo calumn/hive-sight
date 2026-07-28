@@ -4,31 +4,31 @@ This document captures early candidate requirements. Requirement IDs are provisi
 
 Detailed AI model, dataset, training, evaluation, and release-gate requirements are captured separately in `model-requirements.md`.
 
-Version one assumes a single user account or simple account-owned workspace. Multi-user collaboration, advisor access, and organisation-level permissions are deferred unless explicitly brought into scope.
+Version one assumes a single Workspace with one primary Beekeeper actor. Multi-user collaboration, advisor access, and organisation-level permissions are deferred unless explicitly brought into scope.
 
 ## Functional Requirements
 
 ### FR-001 Apiary Management
 
-The system shall allow a user to define an apiary.
+The system shall allow a Beekeeper to define an apiary within a Workspace.
 
-Rationale: Photos and inspections need to be organised by real-world apiary location or grouping.
+Rationale: Photos and inspections need to be organised by Workspace-owned apiary location or grouping.
 
 ### FR-002 Hive Management
 
-The system shall allow a user to define hives within an apiary.
+The system shall allow a Beekeeper to define hives within an apiary.
 
-Rationale: Varroa assessment is meaningful at hive level, not only at account or apiary level.
+Rationale: Varroa assessment is meaningful at hive level, not only at Workspace or apiary level.
 
-### FR-003 Inspection Events
+### FR-003 Inspections
 
-The system shall allow a user to create an inspection event for an individual hive.
+The system shall allow a Beekeeper to create an inspection for an individual hive.
 
 Rationale: Photos, observations, and Varroa analysis need to be associated with a specific inspection.
 
 ### FR-004 Photo Association
 
-The system shall allow a user to associate one or more photos with a hive inspection event.
+The system shall allow a Beekeeper to associate one or more inspection photos with a hive inspection.
 
 Rationale: A single frame may have multiple photos, and one inspection may cover multiple frames.
 
@@ -64,7 +64,7 @@ Rationale: AI image analysis requires transparency to support user trust and cor
 
 ### FR-010 Tagged Photo Output
 
-The system shall present a tagged-up version of each analysed photo showing likely Varroa detections on bees.
+The system shall present a tagged photo for each analysed inspection photo showing likely Varroa detections on bees.
 
 Rationale: The user needs visual evidence behind the estimate to judge whether the model appears accurate.
 
@@ -86,15 +86,15 @@ The system shall store original photos, analysis results, and reusable annotatio
 
 Rationale: Original images and structured annotations are needed for auditability, re-rendering tagged images, and later model evaluation.
 
-### FR-016 User Data Consent For Model Improvement
+### FR-016 Workspace Data Use Agreement
 
-The system shall not automatically use uploaded photos or user corrections as model training data without explicit consent and review.
+The system shall require an accepted Workspace Data Use Agreement before upload and analysis features can be used.
 
-Rationale: Analysis use, correction review, and model-improvement use are separate concerns with different trust and privacy implications.
+Rationale: Version one treats the data-use agreement as a condition of service for analysis features.
 
 ### FR-017 Ownership And Access Boundary
 
-The system shall associate apiaries, hives, inspections, photos, analysis results, annotations, corrections, and consent records with a user account or simple account boundary.
+The system shall associate apiaries, hives, inspections, inspection photos, analysis results, annotations, corrections, workspace data-use agreements, and data deletion requests with a Workspace boundary.
 
 Rationale: Even a lightweight version needs a clear ownership model before storage, upload, and review workflows are implemented.
 
@@ -104,11 +104,23 @@ The system shall enforce configurable image format and upload size constraints.
 
 Rationale: Exact limits can change, but architecture and user experience must handle accepted formats, rejected files, and large original photo storage.
 
-### FR-019 Consent Flow Traceability
+### FR-019 Data Use Agreement Traceability
 
-The system shall store consent status at photo or inspection level before any user-submitted photo or correction becomes eligible for model improvement.
+The system shall store the accepted Workspace Data Use Agreement version and status before any inspection photo or user correction becomes eligible for model-improvement workflows.
 
-Rationale: The exact consent capture flow is deferred, but dataset eligibility must be traceable from the start.
+Rationale: Dataset eligibility must be traceable to the Workspace's accepted data-use terms.
+
+### FR-020 Data Use Withdrawal
+
+The system shall disable new upload and analysis features when a Workspace Data Use Agreement is not accepted or has been withdrawn.
+
+Rationale: Version one requires active accepted data-use terms for service use.
+
+### FR-021 Data Deletion Request Capture
+
+The system should recognise Data Deletion Request as a deferred domain concept for deleting or purging Workspace-held data.
+
+Rationale: Inspection photos and metadata may be personally identifiable or sensitive, and deletion semantics need explicit policy and architecture decisions before production use.
 
 ### FR-014 Web UI
 
@@ -144,7 +156,7 @@ Rationale: Version one is decision support and model-learning evidence, not a va
 
 ### NFR-003 Data Organisation
 
-The system shall preserve relationships between apiaries, hives, inspections, frames, photos, and analysis results.
+The system shall preserve relationships between Workspaces, apiaries, hives, inspections, frame labels, inspection photos, analysis results, annotations, user corrections, and model-governance records.
 
 Rationale: Historical inspection context is central to the product.
 
@@ -153,6 +165,12 @@ Rationale: Historical inspection context is central to the product.
 The system should separate core data and analysis capabilities from UI-specific implementation choices.
 
 Rationale: Future web, Android, and Apple clients should be able to share the same underlying data and analysis services.
+
+### NFR-007 Privacy Gap Traceability
+
+The project shall explicitly track unresolved policy decisions around Workspace Data Use Agreement withdrawal, prior uploads, existing dataset versions, already-trained model artifacts, and Data Deletion Requests.
+
+Rationale: Uploaded photos and metadata may be personally identifiable or sensitive; the project should not hide this risk behind generic consent language.
 
 ### NFR-006 Upload Configurability
 
@@ -168,5 +186,7 @@ Rationale: The project should be able to adjust limits as real inspection photos
 - What level of model confidence is needed before a detection is shown to the user?
 - Should the system support offline capture later?
 - What field evidence is needed to validate the Varroa detection approach?
-- Should consent be captured at upload time, inspection level, account settings level, or model-review time?
-- What user consent language is needed before photos or corrections can be used for model improvement?
+- What should the Workspace Data Use Agreement say, and how should accepted terms versions be tracked?
+- How should Workspace Data Use Agreement withdrawal affect previously uploaded photos, existing dataset versions, and already-trained model artifacts?
+- What Data Deletion Request or purge workflow is required before production use?
+- Are uploaded photos and inspection metadata legally or operationally personally identifiable or sensitive in the target markets?

@@ -14,12 +14,14 @@ Version one is a web-first inspection support system for hobbyist and small-scal
 
 In scope:
 
-- account-owned apiaries, hives, inspections, and inspection photos
+- workspace-owned apiaries, hives, inspections, and inspection photos
+- beekeeper as the primary human actor in version one
 - optional frame labels within an inspection
 - AI-assisted analysis of inspection photos
 - tagged photo review
 - lightweight user corrections
-- consent traceability for model improvement
+- workspace-level data-use agreement for upload, analysis, and model-improvement terms
+- explicit privacy/deletion gap capture
 - model version, dataset version, benchmark, and review concepts needed for model governance
 
 Out of scope:
@@ -31,14 +33,14 @@ Out of scope:
 - full frame inventory management
 - treatment recommendations
 - official Varroa diagnosis or certification
-- automatic use of user-submitted photos or corrections as training data
+- automatic use of user-submitted photos or corrections as training data without accepted workspace data-use terms and review
 
 ## Context Boundaries
 
 BeehiveMonitor currently has one product context with two closely related subdomains:
 
 - **Inspection Support**: apiaries, hives, inspections, photos, analysis output, and tagged review.
-- **Model Governance**: annotations, corrections, consent, reviewed data, dataset roles, model versions, benchmark evaluations, and release approval.
+- **Model Governance**: annotations, corrections, workspace data-use agreements, deletion requests, reviewed data, dataset roles, model versions, benchmark evaluations, and release approval.
 
 These subdomains share inspection photos and annotations, but their responsibilities differ:
 
@@ -47,7 +49,7 @@ These subdomains share inspection photos and annotations, but their responsibili
 
 ## Core Entities
 
-### Account
+### Workspace
 
 The version-one ownership boundary.
 
@@ -61,12 +63,36 @@ Essential fields:
 Relationships:
 
 - owns many apiaries
-- owns all downstream hives, inspections, photos, analysis results, annotations, corrections, and consent records through that boundary
+- owns all downstream hives, inspections, photos, analysis results, annotations, corrections, workspace data-use agreements, and deletion requests through that boundary
 
 Notes:
 
 - Version one does not model roles, memberships, teams, or advisors.
 - Future collaboration should extend this boundary rather than bypass it.
+
+### Beekeeper
+
+The primary human actor in version one.
+
+Essential fields:
+
+- id
+- workspace id
+- display name
+- contact identifier, if login or notification is needed
+
+Relationships:
+
+- belongs to one workspace in version one
+- creates inspections
+- uploads inspection photos
+- reviews tagged photos
+- creates user corrections
+
+Notes:
+
+- A workspace may later have many beekeepers, reviewers, admins, or advisors.
+- Beekeeper is an actor/role, not the ownership container.
 
 ### Apiary
 
@@ -75,7 +101,7 @@ A beekeeper-defined grouping or location containing hives.
 Essential fields:
 
 - id
-- account id
+- workspace id
 - name
 - optional location label
 - optional notes
@@ -85,7 +111,7 @@ Essential fields:
 
 Relationships:
 
-- belongs to one account
+- belongs to one workspace
 - contains many hives
 
 ### Hive
@@ -114,7 +140,7 @@ A dated review of one hive.
 Essential fields:
 
 - id
-- account id
+- workspace id
 - hive id
 - inspection date
 - optional notes
@@ -162,7 +188,7 @@ The original uploaded photo evidence for an inspection.
 Essential fields:
 
 - id
-- account id
+- workspace id
 - inspection id
 - optional frame label id
 - original file reference
@@ -180,7 +206,7 @@ Relationships:
 - may have many analysis results over time
 - may have many annotations through analysis results
 - may have many user corrections
-- may have consent records
+- inherits data-use eligibility from the workspace data-use agreement
 
 Rules:
 
@@ -309,7 +335,7 @@ A beekeeper flag about model output.
 Essential fields:
 
 - id
-- account id
+- workspace id
 - photo id
 - optional analysis result id
 - optional annotation id
@@ -341,7 +367,7 @@ A human decision about a prediction, correction, annotation, dataset item, or mo
 Essential fields:
 
 - id
-- reviewer account id
+- reviewer id
 - subject type
 - subject id
 - decision
@@ -360,48 +386,62 @@ Decision values:
 Rules:
 
 - Review decisions must preserve what was reviewed and by whom.
-- In version one, the reviewer may be the same person as the beekeeper/account owner.
+- In version one, the reviewer may be the same person as the beekeeper/workspace owner.
 
-### Consent Record
+### Workspace Data Use Agreement
 
-Evidence that a photo, inspection, or correction may or may not be considered for model improvement.
+A workspace-level acceptance of the service's data-use terms.
 
 Essential fields:
 
 - id
-- account id
-- subject type
-- subject id
+- workspace id
 - status
-- scope
-- recorded at
+- terms version
+- accepted at
 - withdrawn at
-
-Subject types:
-
-- `inspection_photo`
-- `inspection`
-- `user_correction`
 
 Statuses:
 
-- `not_requested`
-- `granted`
-- `denied`
+- `not_accepted`
+- `accepted`
 - `withdrawn`
-
-Scopes:
-
-- `analysis_only`
-- `model_improvement_candidate`
-- `training_candidate`
-- `evaluation_candidate`
 
 Rules:
 
-- Consent is not assumed to be global.
-- Consent is not assumed to be permanent.
-- Evidence without consent must not enter model-improvement candidate workflows.
+- Version one requires an active accepted agreement before upload and analysis features can be used.
+- If the agreement is withdrawn or not accepted, new upload and analysis are disabled.
+- Existing inspection history may remain viewable unless a deletion process applies.
+- Withdrawal stops future model-improvement use from the point of withdrawal, subject to the data-use terms.
+- The treatment of previously uploaded photos, existing dataset versions, and already-trained model artifacts is an explicit policy/legal gap.
+
+### Data Deletion Request
+
+A request to delete or purge workspace-held data.
+
+Essential fields:
+
+- id
+- workspace id
+- requester id
+- status
+- requested at
+- completed at
+- notes
+
+Statuses:
+
+- `requested`
+- `in_review`
+- `completed`
+- `rejected`
+- `partially_completed`
+
+Rules:
+
+- The operational workflow is deferred.
+- Uploaded photos and metadata should be treated as potentially personally identifiable or sensitive.
+- The project must decide how deletion interacts with existing dataset versions and already-trained model artifacts before production use.
 
 ### Model Version
 
@@ -478,7 +518,7 @@ Rules:
 
 ## Relationship Summary
 
-- Account owns many apiaries.
+- Workspace owns many apiaries.
 - Apiary contains many hives.
 - Hive has many inspections.
 - Inspection contains many inspection photos.
@@ -489,7 +529,8 @@ Rules:
 - Analysis result has many bee annotations and Varroa annotations.
 - Varroa annotation may reference one bee annotation.
 - User correction belongs to one inspection photo and may reference one annotation.
-- Consent record applies to one inspection, inspection photo, or user correction.
+- Workspace data-use agreement belongs to one workspace.
+- Data deletion request belongs to one workspace.
 - Review decision applies to one review subject.
 - Model version may have many benchmark evaluations.
 - Benchmark evaluation uses one dataset version.
@@ -534,12 +575,19 @@ Rules:
 - `rejected`
 - `excluded`
 
-### Consent Record
+### Workspace Data Use Agreement
 
-- `not_requested`
-- `granted`
-- `denied`
+- `not_accepted`
+- `accepted`
 - `withdrawn`
+
+### Data Deletion Request
+
+- `requested`
+- `in_review`
+- `completed`
+- `rejected`
+- `partially_completed`
 
 ### Model Version
 
@@ -551,7 +599,7 @@ Rules:
 
 ## Invariants
 
-- Every apiary belongs to exactly one account.
+- Every apiary belongs to exactly one workspace.
 - Every hive belongs to exactly one apiary.
 - Every inspection belongs to exactly one hive.
 - Every inspection photo belongs to exactly one inspection.
@@ -561,8 +609,9 @@ Rules:
 - Every annotation belongs to exactly one analysis result and one inspection photo.
 - Every user correction belongs to exactly one inspection photo.
 - A user correction is never ground truth without review.
-- A user correction is never training, validation, or benchmark data without consent and review.
-- Evidence without consent must not enter model-improvement candidate workflows.
+- A user correction is never training, validation, or benchmark data without an active workspace data-use agreement and review.
+- A workspace without an accepted workspace data-use agreement must not upload new photos or receive new analysis.
+- Workspace data-use agreement withdrawal disables new upload and analysis.
 - Benchmark data must not be used for training or routine threshold tuning.
 - The visible Varroa rate must not be presented as diagnosis, treatment advice, official infestation rate, or whole-hive measurement.
 - Tagged photos must be renderable from the original inspection photo plus annotation data.
@@ -595,24 +644,29 @@ The display wording should communicate: likely mites per 100 complete visible be
 
 Partial visible bees, Varroa detections associated with partial bees, and unassociated visible Varroa detections are additional evidence.
 
-## Ownership, Consent, And Privacy Boundaries
+## Ownership, Data Use, And Privacy Boundaries
 
-Version one uses account ownership as the access boundary.
+Version one uses workspace ownership as the access boundary.
 
 The model must preserve:
 
-- account ownership for apiaries, hives, inspections, photos, analysis results, annotations, corrections, and consent records
-- traceable consent before model-improvement eligibility
+- workspace ownership for apiaries, hives, inspections, photos, analysis results, annotations, corrections, workspace data-use agreements, and data deletion requests
+- an active workspace data-use agreement before upload and analysis features are used
 - metadata minimisation before training, evaluation, sharing, or publication
-- consent withdrawal for future training use
+- data-use withdrawal handling for future model-improvement use
+- the explicit gap around prior uploads, existing dataset versions, already-trained model artifacts, and deletion/purge rights
 
-Deferred consent decision:
+Deferred privacy decisions:
 
-- consent may be captured at upload time, inspection level, account settings level, or model-review time
+- exact wording and versioning of workspace data-use terms
+- whether withdrawal affects only future model-improvement use or also previously uploaded photos
+- whether and how users can purge workspace-held data
+- whether already-trained model artifacts can or must be affected by later withdrawal or deletion requests
+- what regulatory obligations apply to inspection photos and metadata
 
 ## Traceability
 
-- `Account` supports FR-017.
+- `Workspace` supports FR-017.
 - `Apiary` supports FR-001.
 - `Hive` supports FR-002.
 - `Inspection` supports FR-003.
@@ -623,7 +677,8 @@ Deferred consent decision:
 - `Inspection Summary` supports FR-008.
 - `Tagged Photo` rendering supports FR-009, FR-010, and FR-011.
 - `User Correction` and `Review Decision` support FR-012 and MR-013 to MR-014.
-- `Consent Record` supports FR-016, FR-019, and MR-019 to MR-023.
+- `Workspace Data Use Agreement` supports FR-016, FR-019, and MR-019 to MR-023 as revised by the domain decision.
+- `Data Deletion Request` captures the deferred deletion/privacy gap.
 - Upload status supports FR-018 and NFR-006.
 - `Model Version` supports MR-028.
 - `Dataset Version` supports MR-017 and MR-029.
@@ -635,8 +690,10 @@ Deferred consent decision:
 - Should photo analysis run synchronously for a prototype or always as a background job?
 - Where should original inspection photos be stored?
 - What initial image formats and upload size limits should be configured?
-- Where should consent be captured in the user workflow?
-- How should consent withdrawal affect existing dataset versions?
+- What should the workspace data-use agreement say, and how should accepted terms versions be tracked?
+- How should workspace data-use withdrawal affect previously uploaded photos, existing dataset versions, and already-trained model artifacts?
+- What data deletion or purge workflow is required before production use?
+- Are uploaded photos and inspection metadata legally or operationally personally identifiable or sensitive in the target markets?
 - Should frame labels affect v1 aggregation, or only provide warning context?
 - How should duplicate or near-duplicate inspection photos be detected?
 - What is the first model integration style: local model, hosted model service, or manual/mock analysis?
