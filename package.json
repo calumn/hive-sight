@@ -1,0 +1,12 @@
+{
+  "name": "beehive-monitor",
+  "private": true,
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:web": "pnpm --filter @beehive-monitor/web dev",
+    "build:web": "pnpm --filter @beehive-monitor/web build",
+    "check:web": "pnpm --filter @beehive-monitor/web check"
+  }
+}

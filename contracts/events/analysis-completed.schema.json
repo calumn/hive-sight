@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://beehivemonitor.local/contracts/events/analysis-completed.schema.json",
+  "title": "AnalysisCompleted",
+  "type": "object",
+  "required": [
+    "analysis_run_id",
+    "inspection_photo_id",
+    "model_version",
+    "status",
+    "completed_at"
+  ],
+  "properties": {
+    "analysis_run_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "inspection_photo_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "model_version": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "completed",
+        "failed"
+      ]
+    },
+    "complete_visible_bee_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "partial_visible_bee_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "likely_varroa_detections": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "tagged_image_object_key": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "completed_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "additionalProperties": false
+}
+

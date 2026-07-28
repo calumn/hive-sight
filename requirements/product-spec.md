@@ -18,6 +18,8 @@ The Beekeeper can optionally view all detected bees and can lightly correct resu
 
 Version one assumes a single Workspace with one primary Beekeeper actor. Collaboration, advisor access, and organisation-level permissions are deferred.
 
+A future acquisition workflow may allow a prospective user to submit a small number of trial photos before creating a Workspace. This is deferred from version one because it requires additional decisions around data-use terms, abuse prevention, rate limits, retention, deletion, and model-improvement eligibility.
+
 ## Gherkin Scenarios
 
 Feature: Apiary and hive setup
@@ -196,12 +198,37 @@ Feature: Workspace data-use agreement and model governance
     Then the request is treated as a Data Deletion Request
     And the project records that deletion behaviour for prior uploads, dataset versions, and already-trained model artifacts requires a policy decision
 
+Feature: Deferred guest trial analysis
+
+  Scenario: Prospective user submits a limited trial photo
+    Given guest trial analysis is enabled in a future version
+    And the prospective user has accepted the required trial data-use terms
+    And the prospective user has not exceeded the configured trial usage limit
+    When the prospective user uploads a photo for trial Varroa analysis
+    Then the system analyses the photo as an AI-assisted visual estimate
+    And the system returns tagged visual evidence and a visible Varroa estimate
+    And the system does not create a long-term inspection history unless the user later creates a Workspace and explicitly saves or imports the result
+
+  Scenario: Prospective user exceeds the trial photo limit
+    Given guest trial analysis is enabled in a future version
+    And the prospective user has already used the configured trial allowance
+    When the prospective user tries to upload another trial photo
+    Then the upload is blocked
+    And the system indicates that further analysis requires registration or a later allowed trial window
+
+  Scenario: Trial photo is excluded from model improvement by default
+    Given a prospective user uploads a trial photo
+    When the system stores the trial analysis result
+    Then the photo and result are excluded from model-improvement workflows by default
+    And any future model-improvement use requires an explicit policy, accepted terms, and human review
+
 ## Implementation Decisions
 
 - The first version targets hobbyist and small-scale beekeepers.
 - The first client is a web UI.
 - The first version assumes a single Workspace with one primary Beekeeper actor.
 - Android and Apple apps are future-facing concerns, not version-one delivery targets.
+- Guest or trial photo analysis is a deferred / V2 acquisition workflow, not a version-one delivery target.
 - The core domain model should include Workspace, Beekeeper, apiary, hive, inspection, inspection photo, analysis result, annotation, user correction, Workspace Data Use Agreement, Data Deletion Request, model version, dataset version, and benchmark evaluation.
 - Frame-level handling should be light in version one. Photos may have optional frame labels, but the system should not require full frame inventory management.
 - The analysis output should include estimated complete visible bee count, partial visible bee count where possible, likely Varroa count, Varroa association state, and likely mites per 100 complete visible bees.
@@ -238,6 +265,7 @@ Feature: Workspace data-use agreement and model governance
 - Full commercial apiary management.
 - Full frame inventory management.
 - Native Android or Apple applications in version one.
+- Guest or trial photo analysis before Workspace registration in version one.
 - Offline capture in version one.
 - A full image annotation studio.
 - Validated colony-level infestation estimates.
@@ -245,6 +273,7 @@ Feature: Workspace data-use agreement and model governance
 - Multi-user collaboration, advisor access, and organisation-level permissions in version one.
 - Continuing to upload or analyse new photos after Workspace Data Use Agreement withdrawal.
 - Full implementation of data deletion or purge workflows in version one.
+- Production rules for trial usage limits, abuse prevention, guest retention/deletion, and guest model-improvement eligibility.
 
 ## Further Notes
 

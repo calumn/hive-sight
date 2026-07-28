@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://beehivemonitor.local/contracts/events/analysis-requested.schema.json",
+  "title": "AnalysisRequested",
+  "type": "object",
+  "required": [
+    "analysis_run_id",
+    "workspace_id",
+    "inspection_photo_id",
+    "original_object_key",
+    "requested_at"
+  ],
+  "properties": {
+    "analysis_run_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "workspace_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "inspection_photo_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "original_object_key": {
+      "type": "string"
+    },
+    "requested_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "requested_model_version": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "additionalProperties": false
+}
+

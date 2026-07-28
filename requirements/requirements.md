@@ -134,6 +134,23 @@ The system should be designed so Android and Apple applications can be added lat
 
 Rationale: Mobile capture is likely valuable during real hive inspections.
 
+### FR-022 Deferred Trial Photo Analysis
+
+The system may later offer a limited guest or trial photo analysis workflow that allows a prospective user to upload a small number of photos without first creating a Workspace.
+
+Rationale: A constrained trial could help prospective users understand the value of tagged Varroa analysis before registering, while preserving version-one focus on authenticated Workspace-based inspection workflows.
+
+Version: Deferred / V2.
+
+Notes:
+
+- The trial workflow is not part of version one.
+- Trial use would still require accepted data-use terms before upload and analysis.
+- Trial photos should not create long-term inspection history unless the user later creates a Workspace and explicitly saves or imports the result.
+- Trial uploads should be constrained by configurable usage limits, such as a small number of images per user, browser, IP address, time window, or other abuse-prevention mechanism.
+- Trial photos and results should have explicit retention and deletion rules.
+- Trial photos and corrections should be excluded from model-improvement workflows unless a future policy explicitly allows them with appropriate agreement and review.
+
 ## Non-Functional Requirements
 
 ### NFR-001 Traceability
@@ -185,6 +202,8 @@ Rationale: The project should be able to adjust limits as real inspection photos
 - What exact image formats and maximum upload sizes should be supported initially?
 - What level of model confidence is needed before a detection is shown to the user?
 - Should the system support offline capture later?
+- Should the system support a deferred guest trial workflow with a limited number of photo analyses before Workspace registration?
+- What limits, abuse prevention, consent, retention, deletion, and model-improvement eligibility rules would apply to guest trial photos?
 - What field evidence is needed to validate the Varroa detection approach?
 - What should the Workspace Data Use Agreement say, and how should accepted terms versions be tracked?
 - How should Workspace Data Use Agreement withdrawal affect previously uploaded photos, existing dataset versions, and already-trained model artifacts?

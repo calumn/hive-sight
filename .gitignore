@@ -64,6 +64,13 @@ dist/
 *.egg-info/
 
 # -------------------------
+# Node / web
+# -------------------------
+node_modules/
+npm-debug.log*
+.vite/
+
+# -------------------------
 # Test reports
 # -------------------------
 test-results/
@@ -91,6 +98,7 @@ models/evaluations/*
 # -------------------------
 data/processed/
 data/cache/
+local-data/
 
 # -------------------------
 # Docker

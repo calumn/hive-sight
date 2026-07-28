@@ -185,3 +185,18 @@ Implications:
 - Analysis is asynchronous, and one Inspection Photo may have multiple preserved analysis runs.
 - Model training and evaluation remain separate from V1 runtime services.
 - The decision is captured in `architecture/adr/0001-service-oriented-architecture.md` and visualised in `architecture/system-context.md`.
+
+## 2026-07-28 Guest Trial Photo Analysis Deferred To V2
+
+Decision: The project will capture guest or trial photo analysis as a deferred / V2 acquisition workflow, not a version-one feature.
+
+Rationale: Letting a prospective user upload a small number of photos before registration could demonstrate the value of tagged Varroa analysis and reduce adoption friction. It also introduces policy and architecture questions around data-use terms, abuse prevention, usage limits, retention, deletion, and model-improvement eligibility.
+
+Implications:
+
+- Version one remains focused on authenticated Workspace-based inspection workflows.
+- A future trial workflow may allow a small number of photo analyses before Workspace registration.
+- Trial use must still require accepted data-use terms before upload and analysis.
+- Trial usage limits should be configurable and may consider image count, time window, user/browser/IP signals, or other abuse-prevention controls.
+- Trial photos and results should have explicit retention and deletion rules.
+- Trial photos and corrections should be excluded from model-improvement workflows by default unless future policy explicitly allows use with accepted terms and human review.
