@@ -1,0 +1,112 @@
+# -------------------------
+# Python
+# -------------------------
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.python-version
+
+# -------------------------
+# Jupyter
+# -------------------------
+.ipynb_checkpoints/
+
+# -------------------------
+# Pytest / coverage
+# -------------------------
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# -------------------------
+# Type checkers / linters
+# -------------------------
+.mypy_cache/
+.ruff_cache/
+.pytype/
+.pyre/
+
+# -------------------------
+# IDEs
+# -------------------------
+.vscode/
+!.vscode/extensions.json
+.idea/
+
+# -------------------------
+# Environment
+# -------------------------
+.env
+.env.*
+!.env.example
+
+# -------------------------
+# OS files
+# -------------------------
+.DS_Store
+Thumbs.db
+
+# -------------------------
+# Logs
+# -------------------------
+*.log
+logs/
+
+# -------------------------
+# Build artefacts
+# -------------------------
+build/
+dist/
+*.egg-info/
+
+# -------------------------
+# Test reports
+# -------------------------
+test-results/
+reports/
+junit*.xml
+
+# -------------------------
+# Model artefacts
+# -------------------------
+models/*.joblib
+models/*.pkl
+models/*.pickle
+models/packages/*
+!models/packages/legacy-bootstrap/
+!models/packages/legacy-bootstrap/**
+models/evaluations/*
+!models/evaluations/.gitkeep
+
+# Keep metadata/docs if present
+!models/README.md
+!models/metadata.json
+
+# -------------------------
+# Generated data
+# -------------------------
+data/processed/
+data/cache/
+
+# -------------------------
+# Docker
+# -------------------------
+*.tar
+
+# -------------------------
+# Local MLflow
+# -------------------------
+mlruns/
+
+# -------------------------
+# Temporary files
+# -------------------------
+tmp/
+temp/
+*.tmp
+*.zip
+.DS_Store
