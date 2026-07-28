@@ -59,7 +59,7 @@ Key concerns:
 
 ## Open Stakeholder Questions
 
-- Is the first target user a hobbyist beekeeper, commercial beekeeper, researcher, or advisor?
-- Will users share data across apiaries or keep all data private?
-- Who is allowed to edit apiaries, hives, inspections, and photos?
+- Are future versions expected to support commercial teams, advisors, or researchers as first-class users?
+- Will future users share data across apiaries, organisations, or advisory relationships?
+- What collaboration permissions are needed after the single-user or simple-account version?
 - Who validates whether Varroa detections are correct?

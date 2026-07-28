@@ -16,6 +16,8 @@ The user creates an apiary, creates hives within that apiary, creates an inspect
 
 The user can optionally view all detected bees and can lightly correct results by marking false Varroa detections or missed likely Varroa locations. The system stores the original photo, structured annotation data, analysis results, and user corrections so tagged images can be re-rendered and model accuracy can be evaluated later.
 
+Version one assumes a single user account or simple account-owned workspace. Collaboration, advisor access, and organisation-level permissions are deferred.
+
 ## Gherkin Scenarios
 
 Feature: Apiary and hive setup
@@ -68,7 +70,7 @@ Feature: Varroa image analysis
     And the system associates each likely Varroa detection with a complete bee, partial bee, or unassociated visible Varroa state where possible
     And the likely Varroa count is stored with the photo analysis result
 
-  Scenario: System calculates mites per 100 visible bees
+  Scenario: System calculates mites per 100 complete visible bees
     Given an inspection has analysed photos
     And the system has estimated complete visible bees
     And the system has counted likely Varroa detections
@@ -155,6 +157,12 @@ Feature: Model training consent and governance
     Then the photos are not automatically added to model training data
     And the user corrections are stored as review candidates rather than trusted ground truth
 
+  Scenario: Consent status is stored before model improvement use
+    Given a beekeeper has uploaded photos or corrections
+    When the system considers those photos or corrections for model improvement
+    Then the system checks consent status at photo or inspection level
+    And the system excludes photos or corrections without recorded consent
+
   Scenario: Reviewed corrections become eligible for dataset use
     Given a user has flagged a false positive or missed likely Varroa detection
     When a human reviewer approves the correction
@@ -165,6 +173,7 @@ Feature: Model training consent and governance
 
 - The first version targets hobbyist and small-scale beekeepers.
 - The first client is a web UI.
+- The first version assumes a single user account or simple account-owned workspace.
 - Android and Apple apps are future-facing concerns, not version-one delivery targets.
 - The core domain model should include apiary, hive, inspection event, photo, analysis result, annotation, and user correction.
 - Frame-level handling should be light in version one. Photos may have optional frame labels, but the system should not require full frame inventory management.
@@ -173,6 +182,8 @@ Feature: Model training consent and governance
 - Tagged-up photos should be rendered from original photos plus annotation data.
 - The first correction loop should support marking false Varroa detections and missed likely Varroa locations.
 - User corrections should be review candidates, not automatic training data.
+- The exact consent capture flow is deferred, but consent status must be traceable before model-improvement use.
+- Image upload formats and size limits should be configurable.
 - Model, dataset, training, evaluation, consent, and release-gate requirements are governed by the separate model requirements baseline.
 - The product language must preserve the boundary that results are AI-assisted visual estimates, not diagnoses, treatment recommendations, or official infestation measurements.
 
@@ -183,6 +194,9 @@ Feature: Model training consent and governance
 - Domain-level tests should cover infection-rate calculation as likely Varroa detections associated with complete visible bees per 100 estimated complete visible bees.
 - Data tests should verify that apiaries, hives, inspections, photos, annotations, analysis results, and corrections remain correctly associated.
 - Data tests should verify that user corrections do not become training or benchmark data without review and explicit dataset role assignment.
+- Data tests should verify that account-owned apiaries, hives, inspections, photos, analysis results, annotations, corrections, and consent records cannot be accessed across account boundaries.
+- Upload tests should verify accepted formats, rejected formats, size-limit handling, and original-photo preservation.
+- Consent tests should verify that photos and corrections without recorded consent cannot become model-improvement candidates.
 - UI or acceptance tests should verify that result wording does not claim diagnosis, treatment guidance, or official infestation measurement.
 - Future model evaluation tests should measure false positives, missed detections, confidence, and correction rates against reviewed image sets.
 
@@ -197,6 +211,7 @@ Feature: Model training consent and governance
 - A full image annotation studio.
 - Validated colony-level infestation estimates.
 - Automatic use of user-submitted photos or corrections as training data.
+- Multi-user collaboration, advisor access, and organisation-level permissions in version one.
 
 ## Further Notes
 

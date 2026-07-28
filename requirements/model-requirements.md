@@ -189,6 +189,8 @@ Consent status should be stored per photo or per inspection.
 
 Rationale: Dataset eligibility needs to be traceable at the level where images enter the model pipeline.
 
+The exact product flow for capturing consent is deferred. Candidate flows include upload-time consent, inspection-level consent, account settings, or model-review-time consent. Architecture should not assume that consent is global or permanent.
+
 ### MR-022 Consent Withdrawal
 
 The system should support withdrawal of consent for future training use.
@@ -311,3 +313,4 @@ Rationale: Premature thresholds may be arbitrary before the project has represen
 - What model family or service should be used for the first prototype?
 - How should duplicate or near-duplicate frame photos be detected?
 - How should model results be compared when a newer model re-analyses older photos?
+- Where should consent be captured in the product workflow?

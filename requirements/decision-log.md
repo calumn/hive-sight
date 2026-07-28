@@ -118,3 +118,39 @@ Implications:
 - A human reviewer can approve, reject, mark uncertain, exclude, or assign corrected annotations to training, validation, or benchmark roles.
 - User-submitted photos and corrections require explicit consent before model-improvement use.
 - Benchmark data should remain protected from training and routine threshold tuning.
+
+## 2026-07-28 Version-One Ownership Assumption
+
+Decision: Version one assumes a single user account or simple account-owned workspace.
+
+Rationale: The first product needs a clear ownership boundary for apiaries, hives, inspections, photos, analysis results, annotations, corrections, and consent records, but does not yet need collaboration or organisation management.
+
+Implications:
+
+- Domain modelling should include an owner or account boundary.
+- Multi-user collaboration, advisor access, and organisation-level permissions are out of scope for version one.
+- Tests should verify that account-owned records are not accessible across account boundaries.
+
+## 2026-07-28 Upload Limits Are Configurable
+
+Decision: Accepted image formats, upload size limits, and storage limits will be configurable rather than fixed in the requirements baseline.
+
+Rationale: Real inspection image sizes, formats, hosting costs, and model constraints are not yet known.
+
+Implications:
+
+- Architecture should include a configuration point for upload constraints.
+- The product must handle rejected files clearly.
+- Original uploaded photos remain part of the storage baseline.
+
+## 2026-07-28 Consent Flow Deferred But Consent Traceability Required
+
+Decision: The exact product flow for consent capture is deferred, but consent status must be traceable before photos or corrections become eligible for model improvement.
+
+Rationale: Consent may be best captured at upload time, inspection level, account settings level, or model-review time. The correct user experience is not yet known, but the data requirement is already clear.
+
+Implications:
+
+- Consent status should be stored at photo or inspection level unless a later decision chooses a more specific model.
+- Photos and corrections without recorded consent must be excluded from training, validation, and benchmark candidate workflows.
+- Future product design must decide where the consent prompt appears.

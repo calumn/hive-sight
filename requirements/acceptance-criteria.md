@@ -23,7 +23,8 @@ Acceptance criteria are provisional and will be refined as requirements are revi
 
 ## Bee Counting
 
-- For each submitted photo, the system produces an estimated visible bee count.
+- For each submitted photo, the system produces an estimated complete visible bee count.
+- For each submitted photo, the system reports partial visible bees separately where possible.
 - The bee count is stored with the image analysis result.
 - The user can see the bee count for each analysed image.
 - The user can optionally view detected bee markers on the image.
@@ -40,7 +41,8 @@ Acceptance criteria are provisional and will be refined as requirements are revi
 
 ## Infection-Rate Estimate
 
-- The system calculates a visible Varroa estimate as likely Varroa detections per 100 estimated visible bees.
+- The system calculates a visible Varroa estimate as likely Varroa detections associated with complete visible bees per 100 estimated complete visible bees.
+- The system reports likely Varroa detections associated with partial bees or unassociated visible Varroa as additional evidence.
 - The system presents an inspection-level estimate when multiple photos are associated with the inspection.
 - The system clearly indicates when the estimate is based on limited or low-confidence image data.
 - The system clearly states that the estimate is based only on bees visible in uploaded photos.
@@ -54,6 +56,23 @@ Acceptance criteria are provisional and will be refined as requirements are revi
 ## Web UI
 
 - A user can complete the first workflow in a browser: create apiary, create hive, create inspection, upload photos, view analysis results.
+
+## Ownership And Permissions
+
+- In version one, apiaries, hives, inspections, photos, analysis results, annotations, and corrections are owned by a single user account or simple account boundary.
+- The system prevents one user from viewing or modifying another user's apiaries, hives, inspections, photos, analysis results, annotations, or corrections.
+
+## Upload And Storage
+
+- The system accepts configurable image formats and upload size limits.
+- The system preserves original uploaded photos.
+- The system records when an upload is rejected because of unsupported format, excessive size, or unsuitable image evidence.
+
+## Consent For Model Improvement
+
+- The system does not automatically use uploaded photos or corrections for model improvement.
+- The system records consent status before photos or corrections become eligible for training, validation, or benchmark review.
+- The exact consent capture flow may be deferred, but consent eligibility must be traceable at photo or inspection level.
 
 ## Traceability and AI-SDLC Evidence
 

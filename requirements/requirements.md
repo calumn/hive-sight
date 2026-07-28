@@ -4,6 +4,8 @@ This document captures early candidate requirements. Requirement IDs are provisi
 
 Detailed AI model, dataset, training, evaluation, and release-gate requirements are captured separately in `model-requirements.md`.
 
+Version one assumes a single user account or simple account-owned workspace. Multi-user collaboration, advisor access, and organisation-level permissions are deferred unless explicitly brought into scope.
+
 ## Functional Requirements
 
 ### FR-001 Apiary Management
@@ -90,6 +92,24 @@ The system shall not automatically use uploaded photos or user corrections as mo
 
 Rationale: Analysis use, correction review, and model-improvement use are separate concerns with different trust and privacy implications.
 
+### FR-017 Ownership And Access Boundary
+
+The system shall associate apiaries, hives, inspections, photos, analysis results, annotations, corrections, and consent records with a user account or simple account boundary.
+
+Rationale: Even a lightweight version needs a clear ownership model before storage, upload, and review workflows are implemented.
+
+### FR-018 Image Upload Constraints
+
+The system shall enforce configurable image format and upload size constraints.
+
+Rationale: Exact limits can change, but architecture and user experience must handle accepted formats, rejected files, and large original photo storage.
+
+### FR-019 Consent Flow Traceability
+
+The system shall store consent status at photo or inspection level before any user-submitted photo or correction becomes eligible for model improvement.
+
+Rationale: The exact consent capture flow is deferred, but dataset eligibility must be traceable from the start.
+
 ### FR-014 Web UI
 
 The system shall provide a web user interface for the first version.
@@ -134,12 +154,19 @@ The system should separate core data and analysis capabilities from UI-specific 
 
 Rationale: Future web, Android, and Apple clients should be able to share the same underlying data and analysis services.
 
+### NFR-006 Upload Configurability
+
+Accepted image formats, upload size limits, and storage limits should be configurable rather than hard-coded.
+
+Rationale: The project should be able to adjust limits as real inspection photos and hosting constraints become clearer.
+
 ## Open Requirements Questions
 
 - Should infection rate be calculated per image, per frame, per inspection, or all three?
-- What wording should be used consistently for "mites per 100 visible bees"?
-- What image formats and maximum upload sizes should be supported?
+- What wording should be used consistently for "mites per 100 complete visible bees"?
+- What exact image formats and maximum upload sizes should be supported initially?
 - What level of model confidence is needed before a detection is shown to the user?
 - Should the system support offline capture later?
 - What field evidence is needed to validate the Varroa detection approach?
+- Should consent be captured at upload time, inspection level, account settings level, or model-review time?
 - What user consent language is needed before photos or corrections can be used for model improvement?

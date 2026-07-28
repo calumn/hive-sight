@@ -26,12 +26,12 @@ AI contribution:
 - Structured the input into initial vision, stakeholder, requirement, and acceptance-criteria documents.
 - Identified early open questions around image grouping, infection-rate calculation, manual correction, confidence, and validation evidence.
 
-Human judgment still required:
+Subsequent human decisions resolved:
 
-- Confirm the first target user type.
-- Confirm how infection rate should be calculated and displayed.
-- Confirm whether manual correction of detections is in scope.
-- Confirm whether the first version stores original images, annotated images, or both.
+- Version one targets hobbyist or small-scale beekeepers.
+- The headline metric uses likely Varroa detections associated with complete visible bees per 100 estimated complete visible bees.
+- Manual correction of false positives and missed likely Varroa detections is in scope.
+- Version one stores original photos plus reusable annotation data.
 
 ## Risks Noted
 
@@ -51,7 +51,7 @@ Human-confirmed decisions:
 - The output should include tagged-up photos showing potentially infected bees.
 - The output may optionally show all other detected bees.
 - Users should be able to correct false Varroa tags and mark missed likely Varroa.
-- The main first metric should be mites per 100 visible bees in uploaded photos.
+- The main first metric should be mites per 100 complete visible bees in uploaded photos.
 - Version one should store original photos plus reusable annotation data and render tagged images from that data.
 
 AI contribution:
