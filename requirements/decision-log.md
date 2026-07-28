@@ -4,13 +4,13 @@
 
 Decision: BeehiveMonitor will focus primarily on Varroa mite detection from hive inspection photos.
 
-Rationale: The user clarified that the core value is detecting Varroa mites, counting bees, and estimating infection rate from submitted frame photos.
+Rationale: The user clarified that the core value is detecting Varroa mites, counting bees, and estimating visible Varroa rate from submitted frame photos.
 
 Implications:
 
 - Image upload and analysis are central capabilities.
 - Apiary and hive management should support inspection context rather than become a full beekeeping management suite.
-- Requirements should prioritise inspection events, photo association, bee counting, Varroa detection, and infection-rate estimation.
+- Requirements should prioritise inspections, photo association, bee counting, Varroa detection, and visible Varroa rate estimation.
 
 ## 2026-07-28 Web UI First, Mobile Later
 
@@ -27,11 +27,11 @@ Implications:
 
 Decision: The system should include lightweight apiary management: apiaries, hives, inspections, and photo associations.
 
-Rationale: Varroa analysis needs to be tied to a specific hive and inspection event.
+Rationale: Varroa analysis needs to be tied to a specific hive and inspection.
 
 Implications:
 
-- The first data model should include apiary, hive, inspection event, photo, and analysis result entities.
+- The first data model should include apiary, hive, inspection, photo, and analysis result entities.
 - Full beekeeping operations management is not assumed for the first version.
 
 ## 2026-07-28 Version-One User Is Hobbyist Or Small-Scale Beekeeper
@@ -116,7 +116,7 @@ Rationale: Corrections are valuable evidence but may be wrong, uncertain, accide
 Implications:
 
 - A human reviewer can approve, reject, mark uncertain, exclude, or assign corrected annotations to training, validation, or benchmark roles.
-- User-submitted photos and corrections require explicit consent before model-improvement use.
+- User-submitted photos and corrections require an accepted Workspace Data Use Agreement and human review before model-improvement use.
 - Benchmark data should remain protected from training and routine threshold tuning.
 
 ## 2026-07-28 Version-One Ownership Assumption
@@ -169,3 +169,19 @@ Implications:
 - Workspace data-use withdrawal stops future upload, analysis, and future model-improvement use from the point of withdrawal, subject to final policy.
 - The project still needs a policy/legal decision on whether previously uploaded photos can continue to be used after withdrawal.
 - The project still needs a policy/legal decision on whether already-created dataset versions or already-trained model artifacts can or must be affected by later withdrawal or deletion requests.
+
+## 2026-07-28 Service-Oriented Architecture For V1
+
+Decision: Version one will use a service-oriented architecture in a monorepo, with a TypeScript web frontend, protected Python Core API, private Python Analysis Service, asynchronous queue, S3-compatible object storage, and a lightweight Model Registry.
+
+Rationale: The project needs separate frontend and backend evolution, future support for mobile clients, independent scaling of image analysis, and clean separation between product workflow and model/runtime concerns without prematurely splitting every domain concept into its own service.
+
+Implications:
+
+- The frontend and future mobile clients call the Core API through a protected API Gateway or edge layer.
+- The Core API is internet-reachable but not public-open; user-facing operations require user identity and Workspace authorization.
+- The Analysis Service is private and receives work through a queue or trusted service boundary.
+- Original photos and tagged images live in object storage, with short-lived object-scoped upload and view URLs as the target pattern.
+- Analysis is asynchronous, and one Inspection Photo may have multiple preserved analysis runs.
+- Model training and evaluation remain separate from V1 runtime services.
+- The decision is captured in `architecture/adr/0001-service-oriented-architecture.md` and visualised in `architecture/system-context.md`.
