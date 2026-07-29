@@ -4,7 +4,7 @@ This document captures requirements for the AI model and dataset side of HiveSig
 
 The product requirements define what the beekeeper-facing system should do. This document defines what evidence, data controls, annotations, evaluation, and release gates are needed before the model side of that capability can be trusted.
 
-AI-assisted annotation, initial dataset bootstrap, dataset split governance, training runs, and model candidate selection are detailed in `requirements/ai-assisted-annotation-and-model-training-baseline.md`.
+AI-assisted annotation, initial dataset bootstrap, dataset split governance, training runs, and model candidate selection are detailed in `requirements/ai-assisted-annotation-and-model-training-baseline.md` and `requirements/bee-annotation-repository-and-curriculum-training-baseline.md`.
 
 ## Scope
 
@@ -81,9 +81,15 @@ Rationale: The system should not pretend that ambiguous image evidence is cleane
 
 ### MR-008 Bee Annotation Shape
 
-Visible bees should be labelled with bounding boxes where practical.
+Visible bees shall be reviewed as oriented bee ellipses in the canonical annotation model.
 
-Rationale: Bee bounding boxes support counting, detected-bee overlays, and region-of-interest extraction for Varroa analysis.
+Rationale: Bees are elongated and appear at many rotations. Oriented ellipses better express human-reviewed bee evidence than axis-aligned rectangles.
+
+### MR-008A Bee Annotation Export Shape
+
+The project may export canonical oriented bee ellipses into model-specific training shapes such as oriented bounding boxes.
+
+Rationale: The first trainable detector baseline is expected to use YOLO OBB, which consumes oriented bounding boxes. That export format should not replace the canonical reviewed annotation shape.
 
 ### MR-009 Varroa Annotation Shape
 
@@ -188,6 +194,24 @@ Rationale: A reviewed annotation is not automatically training, validation, benc
 The project shall guard against duplicate or near-duplicate frame photos crossing training, validation, and benchmark splits.
 
 Rationale: Similar images of the same frame can make model evaluation look better than it really is.
+
+### MR-017C Training Crops
+
+The dataset workflow shall support Training Crops derived from original inspection photos.
+
+Rationale: Small, reviewed crops let the project bootstrap a bee detector before enough fully annotated frame-side photos exist.
+
+### MR-017D Curriculum Stages
+
+Dataset Items may record a Curriculum Stage such as `small_crop`, `medium_crop`, `large_crop`, `full_frame_region`, or `full_frame_side`.
+
+Rationale: The project should be able to grow model difficulty deliberately as the reviewed Bee Annotation Repository expands.
+
+### MR-017E First HiveSight Bee Detector Baseline
+
+The first trainable HiveSight Bee Detector should use oriented object detection, with YOLO OBB nano or small as the first candidate.
+
+Rationale: YOLO OBB gives a practical local baseline for rotated bee-like objects while preserving the option to change model family once better project data exists.
 
 ### MR-018 Protected Benchmark
 

@@ -528,6 +528,29 @@ label span {
   padding: 14px;
 }
 
+.prelabeler-panel {
+  background: #ffffff;
+  border: 1px solid #dce2d7;
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  padding: 14px;
+}
+
+.prelabeler-panel span {
+  color: #64705e;
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+
+.prelabeler-panel strong {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
 .metadata-panel {
   background: #f7f9f5;
   border: 1px solid #dce2d7;
@@ -608,7 +631,8 @@ label span {
   .result-grid,
   .metadata-panel,
   .review-panel,
-  .dataset-assignment-panel {
+  .dataset-assignment-panel,
+  .prelabeler-panel {
     grid-template-columns: 1fr;
   }
 

@@ -240,6 +240,7 @@ Essential fields:
 - hive id
 - optional created by user id
 - inspection date
+- intent
 - optional notes
 - status
 - created at
@@ -256,6 +257,12 @@ Canonical term:
 
 - Use `Inspection`.
 - Avoid `Inspection Event` in new architecture docs unless quoting older requirements.
+
+Rules:
+
+- Every Inspection has one explicit intent.
+- Initial intents are `training_data_collection` and `varroa_assessment`.
+- Dataset labelling workflows and beekeeper-facing Varroa assessment workflows must not be mixed inside the same Inspection.
 
 ### Frame Label
 
@@ -302,6 +309,7 @@ Relationships:
 - belongs to one inspection
 - may reference one frame label
 - may have many analysis results over time
+- may have many training crops
 - may have many annotations through analysis results
 - may have many user corrections
 - inherits data-use eligibility from the workspace data-use agreement
@@ -310,6 +318,41 @@ Rules:
 
 - Accepted original photos are preserved.
 - Tagged photos are rendered views, not replacements for the original.
+
+### Training Crop
+
+A bounded image region derived from an Inspection Photo for focused dataset annotation.
+
+Essential fields:
+
+- id
+- source inspection photo id
+- crop bounds in source-photo coordinates
+- crop image dimensions
+- curriculum stage
+- created by user id
+- review status
+- created at
+
+Curriculum stages:
+
+- `small_crop`
+- `medium_crop`
+- `large_crop`
+- `full_frame_region`
+- `full_frame_side`
+
+Relationships:
+
+- belongs to one inspection photo
+- may have many bee annotations
+- may become a dataset item after complete review and dataset role assignment
+
+Rules:
+
+- A Training Crop preserves provenance back to the original Inspection Photo.
+- A Training Crop is a review unit, not a replacement for the original photo.
+- Before a Training Crop becomes dataset-eligible, a Dataset Curator should mark all visible bees in the crop or explicitly exclude the crop.
 
 ### Analysis Result
 
@@ -379,7 +422,8 @@ Structured marker data identifying a visible bee.
 Essential fields:
 
 - id
-- analysis result id
+- optional analysis result id
+- optional training crop id
 - photo id
 - source
 - geometry
@@ -404,8 +448,10 @@ Sources:
 
 Rules:
 
+- The canonical reviewed geometry for bee annotations is an oriented bee ellipse.
 - AI-assisted Draft Annotations are not ground truth until human reviewed.
 - Reviewed Annotations still require Dataset Role assignment before dataset use.
+- Model-specific exports may project oriented ellipses into other shapes such as YOLO OBB labels.
 
 ### Varroa Annotation
 
@@ -563,9 +609,10 @@ Essential fields:
 
 - id
 - workspace id or source id
-- inspection photo id or external image reference
+- inspection photo id, training crop id, or external image reference
 - reviewed annotation references
 - dataset role
+- optional curriculum stage
 - provenance
 - permission status
 - exclusion reason
@@ -583,6 +630,7 @@ Rules:
 - A Dataset Item requires reviewed annotation evidence.
 - Benchmark Dataset Items must not be used for training or routine tuning.
 - Duplicate or near-duplicate frame photos must be handled before split assignment.
+- Model-specific training files are derived artifacts, not the canonical Dataset Item evidence.
 
 ### Training Run
 
@@ -605,6 +653,7 @@ Rules:
 
 - Training Runs must not use benchmark Dataset Items.
 - Training Runs should be repeatable enough to compare candidates.
+- The first bee detector baseline is expected to use YOLO OBB as a model-specific export from reviewed oriented bee ellipses.
 
 ### Model Candidate
 
@@ -719,8 +768,10 @@ Rules:
 - Inspection may define many frame labels.
 - Frame label may group many inspection photos within one inspection.
 - Inspection photo may have many analysis results.
+- Inspection photo may have many training crops.
 - Analysis result belongs to exactly one model version.
 - Analysis result has many bee annotations and Varroa annotations.
+- Training crop may have many bee annotations.
 - Varroa annotation may reference one bee annotation.
 - User correction belongs to one inspection photo and may reference one annotation.
 - Workspace data-use agreement belongs to one workspace and is accepted by an owner user in version one.
@@ -811,17 +862,23 @@ Rules:
 - Every apiary belongs to exactly one workspace.
 - Every hive belongs to exactly one apiary.
 - Every inspection belongs to exactly one hive.
+- Every inspection has exactly one intent.
+- An inspection must not mix training data collection and Varroa assessment intents.
 - Every inspection photo belongs to exactly one inspection.
+- Every training crop belongs to exactly one inspection photo.
 - Every accepted inspection photo has a preserved original file reference.
 - Every analysis result belongs to exactly one inspection photo.
 - Every analysis result records the model version that produced it.
-- Every annotation belongs to exactly one analysis result and one inspection photo.
+- Every runtime annotation belongs to exactly one analysis result and one inspection photo.
+- Every training crop annotation belongs to exactly one training crop and one inspection photo.
 - Every user correction belongs to exactly one inspection photo.
 - Every user correction records the user who created it once authentication exists.
 - A user correction is never ground truth without review.
 - A user correction is never training, validation, or benchmark data without an active workspace data-use agreement and review.
 - A Draft Annotation is never ground truth without human review.
 - A Reviewed Annotation is never training, validation, or benchmark data without Dataset Role assignment.
+- A reviewed bee annotation uses an oriented bee ellipse as its canonical geometry.
+- YOLO OBB labels are derived training exports, not canonical annotation evidence.
 - A Dataset Item must have exactly one Dataset Role.
 - Benchmark Dataset Items must not be used for training or routine tuning.
 - Workspace ownership does not grant internal dataset/model governance capability.
@@ -891,8 +948,10 @@ Deferred privacy decisions:
 - `Hive` supports FR-002.
 - `Inspection` supports FR-003.
 - `Inspection Photo` supports FR-004 and FR-013.
+- `Training Crop` supports the bee annotation repository and curriculum training baseline.
 - `Frame Label` supports FR-005.
 - `Bee Annotation` and `Analysis Result` support FR-006 and MR-001.
+- Oriented bee ellipse geometry supports MR-008, MR-008A, and ADR-0002.
 - `Varroa Annotation` and `Analysis Result` support FR-007 and MR-002.
 - `Inspection Summary` supports FR-008.
 - `Tagged Photo` rendering supports FR-009, FR-010, and FR-011.

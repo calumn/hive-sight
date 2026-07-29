@@ -29,7 +29,7 @@ And the Dataset Curator must still review, correct later, or reject the draft su
 ## Preconditions
 
 - Vertical Slice 0005 is implemented and demoable.
-- Vertical Slice 0006 may be implemented first if Dataset Item assignment remains the agreed order; Slice 7 itself does not require Dataset Items to run.
+- Vertical Slice 0006 is implemented. Slice 7 reuses labelling evidence projection, including optional `dataset_item` state, but does not require Dataset Items to run.
 - The caller is a registered User with internal `dataset_curator` capability.
 - The Workspace has accepted the Workspace Data Use Agreement.
 - The selected Inspection Photo belongs to the caller's Workspace.
@@ -62,6 +62,8 @@ The Core API selects the configured pre-labeller adapter through settings. Suppo
 Grounding DINO-specific details are recorded as pre-labeller provenance, not spread across the product workflow. At minimum the pre-labeller run records provider, adapter version, model/checkpoint identifier, prompt text, box threshold, text threshold, runtime mode, started/finished timestamps, status, and error details when relevant.
 
 For the first adapter slice, the UI does not need complex model controls. It should show which pre-labeller produced the suggestions and whether the run succeeded or failed. The Dataset Curator can still use the same review controls from Slice 5 to approve draft suggestions. The UI must not describe the suggestions as ground truth or as output from the future HiveSight trained product recognition model.
+
+The labelling evidence may include the optional `dataset_item` projection introduced in Slice 6, but Slice 7 must not create or assign a Dataset Item automatically. Dataset Role assignment remains a separate explicit curator action after reviewed evidence exists.
 
 If the Grounding DINO adapter returns no usable bee boxes, the labelling session can still be created with a successful pre-labeller run and zero Draft Annotations, but the UI and API should clearly show that no draft suggestions were produced. Human-from-scratch annotation remains out of scope, so that case is observable but not fixable inside this slice.
 
@@ -162,7 +164,8 @@ Minimum API shapes:
 - [ ] Grounding DINO-created Draft Annotations remain subject to human review before they can become Reviewed Annotations.
 - [ ] Pre-labeller run evidence records provider, adapter version, model/checkpoint, prompt, thresholds, runtime mode, status, timestamps, and suggestion count.
 - [ ] Grounding DINO runtime failure records `prelabel_failed` session evidence and does not silently fall back to deterministic success.
-- [ ] A successful run with zero suggestions is observable and does not create Reviewed Annotations or Dataset Items.
+- [ ] A successful run with zero suggestions is observable and does not create Reviewed Annotations.
+- [ ] Successful pre-labelling, with or without suggestions, does not create or auto-assign a Dataset Item.
 - [ ] Web UI shows the selected pre-labelling helper and run status on the dataset-labelling surface.
 - [ ] Web UI keeps machine suggestions labelled as Draft Annotations requiring curator review.
 - [ ] API-level BDD covers separate pre-labeller helper success and unavailable-helper failure.
@@ -179,12 +182,13 @@ Minimum API shapes:
 - Slice 7 is local-first and does not send images to hosted services.
 - Missing Grounding DINO runtime or model assets should produce visible failure evidence, not silent fake success.
 - Full local model inference may be environment-dependent; adapter mapping and workflow behaviour must still be testable without the real model.
+- The labelling evidence caveat should become provider-aware or provider-neutral; it must not call Grounding DINO suggestions deterministic test suggestions.
+- Local development keeps `deterministic` as the default provider; `grounding_dino` is opt-in through settings.
+- Slice 7 implements a Grounding DINO runner protocol, fake-runner mapping tests, unavailable-runtime failure tests, and a real Hugging Face Transformers local runner.
+- Model weights/checkpoints are local machine/cache assets and must not be committed.
+- The first real local runner targets `IDEA-Research/grounding-dino-tiny` through Hugging Face Transformers. It can be changed with `HIVESIGHT_GROUNDING_DINO_MODEL_ID`.
+- Initial configurable defaults are prompt `honey bee . partial honey bee`, box threshold `0.35`, and text threshold `0.25`.
 
 ## Open Questions
 
-- Should the default local development provider remain `deterministic`, with `grounding_dino` opt-in, or should dev startup try Grounding DINO when assets are present?
-- What exact Grounding DINO implementation/package/checkpoint should be the first target?
-- Where should local model weights live, and should they be gitignored/manual-download assets rather than committed files?
-- What initial prompt should we use: `bee`, `honey bee`, `honey bee . partial honey bee`, or something more brood-frame-specific?
-- What initial box/text thresholds should be configurable defaults?
-- Should Slice 7 include an installation note/script for Grounding DINO dependencies, or only define the adapter contract and fake-runner tests first?
+- Where should local model weights live on developer machines once real runtime installation is introduced?

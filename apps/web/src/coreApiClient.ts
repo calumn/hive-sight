@@ -96,7 +96,16 @@ export type PrelabelerRun = {
   prelabelerRunId: string;
   prelabelerName: string;
   prelabelerVersion: string;
+  provider: "deterministic" | "grounding_dino";
+  adapterVersion: string;
+  modelId: string | null;
+  checkpointId: string | null;
+  promptText: string | null;
+  boxThreshold: number | null;
+  textThreshold: number | null;
+  runtimeMode: "local";
   status: "succeeded" | "failed";
+  suggestionCount: number;
   startedAt: string;
   finishedAt: string | null;
   errorCode: string | null;
@@ -806,7 +815,16 @@ function parsePrelabelerRun(value: unknown): PrelabelerRun {
     prelabelerRunId: requireString(record.prelabeler_run_id, "prelabeler_run_id"),
     prelabelerName: requireString(record.prelabeler_name, "prelabeler_name"),
     prelabelerVersion: requireString(record.prelabeler_version, "prelabeler_version"),
+    provider: requirePrelabelerProvider(record.provider),
+    adapterVersion: requireString(record.adapter_version, "adapter_version"),
+    modelId: optionalString(record.model_id, "model_id"),
+    checkpointId: optionalString(record.checkpoint_id, "checkpoint_id"),
+    promptText: optionalString(record.prompt_text, "prompt_text"),
+    boxThreshold: optionalNumber(record.box_threshold, "box_threshold"),
+    textThreshold: optionalNumber(record.text_threshold, "text_threshold"),
+    runtimeMode: requireRuntimeMode(record.runtime_mode),
     status: requirePrelabelerRunStatus(record.status),
+    suggestionCount: requireNumber(record.suggestion_count, "suggestion_count"),
     startedAt: requireString(record.started_at, "started_at"),
     finishedAt: optionalString(record.finished_at, "finished_at"),
     errorCode: optionalString(record.error_code, "error_code"),
@@ -861,6 +879,13 @@ function requireNumber(value: unknown, field: string): number {
     throw new Error(`Core API response field ${field} was not a number`);
   }
   return value;
+}
+
+function optionalNumber(value: unknown, field: string): number | null {
+  if (value === null) {
+    return null;
+  }
+  return requireNumber(value, field);
 }
 
 function requireBoolean(value: unknown, field: string): boolean {
@@ -974,6 +999,20 @@ function requirePrelabelerRunStatus(value: unknown): "succeeded" | "failed" {
     return value;
   }
   throw new Error("Core API response had an unexpected prelabeler run status");
+}
+
+function requirePrelabelerProvider(value: unknown): "deterministic" | "grounding_dino" {
+  if (value === "deterministic" || value === "grounding_dino") {
+    return value;
+  }
+  throw new Error("Core API response had an unexpected prelabeler provider");
+}
+
+function requireRuntimeMode(value: unknown): "local" {
+  if (value === "local") {
+    return value;
+  }
+  throw new Error("Core API response had an unexpected runtime mode");
 }
 
 function requireReviewSubjectType(value: unknown): "annotation" {

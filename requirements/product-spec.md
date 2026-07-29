@@ -56,9 +56,16 @@ Feature: Hive inspection photo capture
 
   Scenario: Beekeeper creates an inspection for a hive
     Given a Beekeeper has an apiary with at least one hive
-    When the Beekeeper creates an inspection for a selected hive
+    When the Beekeeper creates an inspection for a selected hive with the Varroa assessment intent
     Then the inspection is associated with that hive
     And the inspection can hold photos and analysis results
+
+  Scenario: Beekeeper creates a training data collection inspection
+    Given a Beekeeper has an apiary with at least one hive
+    When the Beekeeper creates an inspection for a selected hive with the training data collection intent
+    Then the inspection is associated with that hive
+    And the inspection exposes dataset labelling workflows
+    And the inspection does not mix Varroa assessment results into the same inspection
 
   Scenario: Beekeeper uploads multiple photos to an inspection
     Given a person has registered as a User
@@ -70,6 +77,14 @@ Feature: Hive inspection photo capture
     When the Beekeeper uploads one or more inspection photos
     Then each photo is associated with the inspection
     And the original uploaded photo is preserved for later review
+
+  Scenario: Beekeeper uploads both sides of multiple frames to one inspection
+    Given a Beekeeper has created an inspection
+    And the Workspace has an accepted Workspace Data Use Agreement
+    When the Beekeeper uploads photos for multiple brood frames and frame sides
+    Then the inspection can contain all uploaded photos
+    And each photo remains separately reviewable
+    And optional frame labels may be used to describe which photos came from the same frame
 
   Scenario: Beekeeper optionally labels photos from the same frame
     Given a Beekeeper has uploaded multiple photos to an inspection
@@ -174,6 +189,14 @@ Feature: Requirements traceability and AI-SDLC evidence
 
 Feature: AI-assisted annotation and dataset bootstrap
 
+  Scenario: Dataset curator reviews a training crop with oriented bee ellipses
+    Given an original inspection photo is selected for dataset labelling
+    And a Dataset Curator creates a Training Crop from that photo
+    When the Dataset Curator marks each visible bee with an oriented ellipse
+    And the Dataset Curator completes the crop review
+    Then the reviewed oriented bee ellipses become reviewed annotation evidence
+    And the crop can become eligible for Dataset Role assignment
+
   Scenario: Reviewer creates reviewed bee annotations from AI-assisted draft annotations
     Given an original inspection photo is selected for dataset labelling
     When the system creates AI-assisted Draft Annotations for visible bees
@@ -207,6 +230,13 @@ Feature: AI-assisted annotation and dataset bootstrap
     When the project evaluates the candidate against a protected benchmark Dataset Version
     Then the Benchmark Evaluation records bee and Varroa metrics separately
     And a human reviewer must approve the candidate before it becomes user-facing
+
+  Scenario: Reviewed bee ellipses are exported for a YOLO OBB training run
+    Given a Training Crop has reviewed oriented bee ellipses
+    And the crop is assigned to a training Dataset Version
+    When the project prepares the first HiveSight Bee Detector training run
+    Then the reviewed ellipses are exported as oriented bounding boxes
+    And the exported YOLO OBB labels remain a model-specific projection of the reviewed evidence
 
 Feature: Workspace data-use agreement and model governance
 
@@ -276,16 +306,20 @@ Feature: Deferred guest trial analysis
 - The first version targets hobbyist and small-scale beekeepers.
 - The first client is a web UI.
 - The first version assumes one registered User, one default Workspace, one owner Workspace Membership, and that User acting as the primary Beekeeper.
+- Each inspection has an explicit intent. The initial intents are training data collection and Varroa assessment, and one inspection must not mix both.
 - Beekeeper is a product/persona term in version one, not a separate persisted entity.
 - Workspace Membership is persisted from version one, but only the `owner` role is supported.
 - Android and Apple apps are future-facing concerns, not version-one delivery targets.
 - Guest or trial photo analysis is a deferred / V2 acquisition workflow, not a version-one delivery target.
 - The core domain model should include User, Workspace, Workspace Membership, apiary, hive, inspection, inspection photo, analysis result, annotation, user correction, Workspace Data Use Agreement, Data Deletion Request, model version, dataset version, and benchmark evaluation.
 - Frame-level handling should be light in version one. Photos may have optional frame labels, but the system should not require full frame inventory management.
+- Inspections must support multiple photos so a beekeeper can capture several frames and both sides of a frame within one inspection.
 - The analysis output should include estimated complete visible bee count, partial visible bee count where possible, likely Varroa count, Varroa association state, and likely mites per 100 complete visible bees.
 - The system should store original photos and structured annotation data rather than relying only on flattened annotated images.
 - Tagged-up photos should be rendered from original photos plus annotation data.
 - AI-assisted annotation is the intended bootstrap path for the first reviewed datasets, but Draft Annotations require human review before they become Reviewed Annotations.
+- Canonical reviewed bee annotations use oriented bee ellipses. The first trainable bee detector baseline is YOLO OBB, using an exported oriented bounding-box projection derived from those ellipses.
+- The dataset bootstrap should start with small reviewed Training Crops and grow toward larger crops, frame regions, and full frame sides as model quality improves.
 - Dataset-labelling workflows and beekeeper product-feedback workflows may reuse UI components, but their provenance and dataset-governance records must remain distinct.
 - The first correction loop should support marking false Varroa detections and missed likely Varroa locations.
 - User corrections should be review candidates, not automatic training data.

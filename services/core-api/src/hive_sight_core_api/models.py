@@ -318,7 +318,16 @@ class PrelabelerRunResponse(BaseModel):
     prelabeler_run_id: UUID
     prelabeler_name: str
     prelabeler_version: str
+    provider: str
+    adapter_version: str
+    model_id: str | None = None
+    checkpoint_id: str | None = None
+    prompt_text: str | None = None
+    box_threshold: float | None = None
+    text_threshold: float | None = None
+    runtime_mode: str
     status: PrelabelerRunStatus
+    suggestion_count: int = 0
     started_at: datetime
     finished_at: datetime | None = None
     error_code: str | None = None

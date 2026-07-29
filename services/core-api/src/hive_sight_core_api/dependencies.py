@@ -12,6 +12,7 @@ from hive_sight_core_api.analysis_processing_workflow import (
 )
 from hive_sight_core_api.analysis_request_workflow import AnalysisRequestWorkflow
 from hive_sight_core_api.dataset_labelling_workflow import (
+    BeePrelabeler,
     DatasetLabellingWorkflow,
     DeterministicBeePrelabeler,
 )
@@ -23,6 +24,10 @@ from hive_sight_core_api.dev_store import (
     InMemoryProductDataStore,
     UploadPolicy,
     deterministic_id_factory,
+)
+from hive_sight_core_api.grounding_dino_prelabeler import (
+    GroundingDinoBeePrelabeler,
+    TransformersGroundingDinoRunner,
 )
 from hive_sight_core_api.inspection_photo_access import InspectionPhotoAccess
 from hive_sight_core_api.settings import Settings, load_settings
@@ -77,11 +82,34 @@ def get_analysis_processing_workflow(state: DevStateDep) -> AnalysisProcessingWo
 
 
 def get_dataset_labelling_workflow(state: DevStateDep) -> DatasetLabellingWorkflow:
+    settings = get_settings()
     return DatasetLabellingWorkflow(
         store=state.store,
-        prelabeler=DeterministicBeePrelabeler(),
+        prelabeler=build_bee_prelabeler(settings),
+        image_loader=state.object_storage.get_object,
         clock=state.store.clock,
     )
+
+
+def build_bee_prelabeler(settings: Settings) -> BeePrelabeler:
+    if settings.prelabeler == "deterministic":
+        return DeterministicBeePrelabeler()
+    if settings.prelabeler == "grounding_dino":
+        checkpoint_id = settings.grounding_dino_checkpoint or None
+        return GroundingDinoBeePrelabeler(
+            runner=TransformersGroundingDinoRunner(
+                model_id=settings.grounding_dino_model_id,
+                device=settings.grounding_dino_device,
+                local_files_only=settings.grounding_dino_local_files_only,
+            ),
+            model_id=settings.grounding_dino_model_id,
+            checkpoint_id=checkpoint_id,
+            prompt_text=settings.grounding_dino_prompt,
+            box_threshold=settings.grounding_dino_box_threshold,
+            text_threshold=settings.grounding_dino_text_threshold,
+            max_box_area_ratio=settings.grounding_dino_max_box_area_ratio,
+        )
+    raise ValueError(f"Unknown HiveSight pre-labeller provider: {settings.prelabeler}")
 
 
 def get_dataset_role_assignment_workflow(

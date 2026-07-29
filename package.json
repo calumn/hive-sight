@@ -6,7 +6,11 @@
   ],
   "scripts": {
     "dev:all": "node scripts/dev-servers.mjs start",
+    "dev:all:grounding-dino": "HIVESIGHT_PRELABELER=grounding_dino node scripts/dev-servers.mjs start",
+    "dev:bees": "HIVESIGHT_PRELABELER=grounding_dino HIVESIGHT_GROUNDING_DINO_BOX_THRESHOLD=0.1 HIVESIGHT_GROUNDING_DINO_TEXT_THRESHOLD=0.1 HIVESIGHT_GROUNDING_DINO_MAX_BOX_AREA_RATIO=0.04 node scripts/dev-servers.mjs start",
     "dev:lan": "node scripts/dev-servers.mjs start --lan",
+    "dev:lan:grounding-dino": "HIVESIGHT_PRELABELER=grounding_dino node scripts/dev-servers.mjs start --lan",
+    "dev:bees:lan": "HIVESIGHT_PRELABELER=grounding_dino HIVESIGHT_GROUNDING_DINO_BOX_THRESHOLD=0.1 HIVESIGHT_GROUNDING_DINO_TEXT_THRESHOLD=0.1 HIVESIGHT_GROUNDING_DINO_MAX_BOX_AREA_RATIO=0.04 node scripts/dev-servers.mjs start --lan",
     "dev:status": "node scripts/dev-servers.mjs status",
     "dev:status:lan": "node scripts/dev-servers.mjs status --lan",
     "dev:stop": "node scripts/dev-servers.mjs stop",

@@ -12,7 +12,8 @@ const checks = [
     command: "./.venv/bin/python -m pytest -p no:cacheprovider",
     cwd: "services/core-api",
     args: ["./.venv/bin/python", "-m", "pytest", "-p", "no:cacheprovider"],
-    note: "Includes API-level BDD scenarios."
+    note:
+      "Includes API-level BDD scenarios. Slice 7 covers Grounding DINO adapter mapping with fake/unavailable local runners; full local model inference is not executed."
   },
   {
     name: "Analysis Service tests",

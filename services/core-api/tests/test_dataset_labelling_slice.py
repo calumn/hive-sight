@@ -99,6 +99,48 @@ def test_start_labelling_is_idempotent_and_projects_draft_annotations() -> None:
         app.dependency_overrides.clear()
 
 
+def test_dataset_labelling_uses_uploaded_image_dimensions_for_evidence() -> None:
+    state = build_dev_state(
+        id_values=[
+            UUID("00000000-0000-0000-0000-000000001041"),
+            UUID("00000000-0000-0000-0000-000000001042"),
+            UUID("00000000-0000-0000-0000-000000001043"),
+            UUID("00000000-0000-0000-0000-000000001044"),
+            UUID("00000000-0000-0000-0000-000000001045"),
+            UUID("00000000-0000-0000-0000-000000001046"),
+            UUID("00000000-0000-0000-0000-000000001047"),
+            UUID("00000000-0000-0000-0000-000000001048"),
+        ],
+        clock=lambda: datetime(2026, 7, 29, 15, 15, tzinfo=UTC),
+    )
+    app.dependency_overrides[get_dev_state] = lambda: state
+    client = TestClient(app)
+
+    try:
+        workspace_id, inspection_photo_id = _upload_inspection_photo(
+            client,
+            body=_minimal_png(width=3264, height=1836),
+            content_type="image/png",
+            filename="real-frame.png",
+        )
+
+        session = _start_labelling(client, workspace_id, inspection_photo_id)
+        evidence = _get_labelling_evidence(client, workspace_id, session["labelling_session_id"])
+
+        assert evidence["inspection_photo"]["width"] == 3264
+        assert evidence["inspection_photo"]["height"] == 1836
+        assert all(
+            annotation["source_image_width_px"] == 3264
+            for annotation in evidence["draft_annotations"]
+        )
+        assert all(
+            annotation["source_image_height_px"] == 1836
+            for annotation in evidence["draft_annotations"]
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+
 def test_dataset_labelling_metadata_and_review_projection() -> None:
     state = build_dev_state(
         id_values=[
@@ -187,7 +229,12 @@ def test_dataset_curator_capability_is_required_for_labelling() -> None:
         app.dependency_overrides.clear()
 
 
-def _upload_inspection_photo(client: TestClient) -> tuple[str, str]:
+def _upload_inspection_photo(
+    client: TestClient,
+    body: bytes = b"fake-image-bytes",
+    content_type: str = "image/jpeg",
+    filename: str = "frame-1.jpg",
+) -> tuple[str, str]:
     workspace_id = client.get(
         "/v1/dev/session",
         headers={"x-hivesight-dev-user-id": str(CURATOR_USER_ID)},
@@ -215,11 +262,11 @@ def _upload_inspection_photo(client: TestClient) -> tuple[str, str]:
 
     intake_response = client.post(
         f"/v1/inspection-photos/intake?workspace_id={workspace_id}&inspection_id={inspection_id}",
-        content=b"fake-image-bytes",
+        content=body,
         headers={
-            "content-type": "image/jpeg",
+            "content-type": content_type,
             "x-hivesight-dev-user-id": str(CURATOR_USER_ID),
-            "x-hivesight-filename": "frame-1.jpg",
+            "x-hivesight-filename": filename,
         },
     )
     assert intake_response.status_code == 202
@@ -252,6 +299,16 @@ def _get_labelling_evidence(
     )
     assert response.status_code == 200
     return response.json()
+
+
+def _minimal_png(width: int, height: int) -> bytes:
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        b"\x00\x00\x00\rIHDR"
+        + width.to_bytes(4, "big")
+        + height.to_bytes(4, "big")
+        + b"\x08\x02\x00\x00\x00"
+    )
 
 
 def _approve_annotation(

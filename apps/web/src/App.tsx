@@ -872,6 +872,46 @@ function DatasetLabellingPanel({
 
       {evidence && imageUrl ? (
         <>
+          <div
+            className="prelabeler-panel"
+            aria-label="Pre-labelling helper provenance"
+            data-testid="prelabeler-provenance-panel"
+          >
+            <div>
+              <span>Helper</span>
+              <strong data-testid="prelabeler-provider">
+                {prelabelerProviderLabel(evidence.labellingSession.prelabelerRun.provider)}
+              </strong>
+            </div>
+            <div>
+              <span>Model</span>
+              <strong data-testid="prelabeler-model">
+                {evidence.labellingSession.prelabelerRun.modelId ?? "Not configured"}
+              </strong>
+            </div>
+            <div>
+              <span>Prompt</span>
+              <strong data-testid="prelabeler-prompt">
+                {evidence.labellingSession.prelabelerRun.promptText ?? "None"}
+              </strong>
+            </div>
+            <div>
+              <span>Status</span>
+              <strong data-testid="prelabeler-run-status">
+                {evidence.labellingSession.prelabelerRun.status} /{" "}
+                {evidence.labellingSession.prelabelerRun.suggestionCount} suggestions
+              </strong>
+            </div>
+          </div>
+          {evidence.labellingSession.prelabelerRun.status === "failed" ? (
+            <div className="outcome blocked" role="alert" data-testid="prelabeler-failure-state">
+              <CircleAlert size={20} />
+              <span>
+                {evidence.labellingSession.prelabelerRun.errorMessage ??
+                  "Pre-labelling helper failed before suggestions were created."}
+              </span>
+            </div>
+          ) : null}
           <div className="metadata-panel" aria-label="Labelling metadata">
             <label>
               <span>Source group key</span>
@@ -949,7 +989,7 @@ function DatasetLabellingPanel({
             </div>
             <p className="evidence-summary" data-testid="dataset-evidence-summary">
               {completeBeeCount} complete visible bee and {partialBeeCount} partial visible bee
-              draft suggestions from {evidence.labellingSession.prelabelerRun.prelabelerName}.
+              Draft Annotations from {evidence.labellingSession.prelabelerRun.prelabelerName}.
             </p>
           </section>
 
@@ -1310,6 +1350,10 @@ function annotationLabel(annotation: Annotation): string {
       ? "Complete visible bee"
       : "Partial visible bee";
   return `${type} / ${annotation.latestReviewDecision?.decision ?? "unreviewed"}`;
+}
+
+function prelabelerProviderLabel(provider: "deterministic" | "grounding_dino"): string {
+  return provider === "grounding_dino" ? "Grounding DINO" : "Deterministic";
 }
 
 function Metric({ label, value }: { label: string; value: number | string }) {

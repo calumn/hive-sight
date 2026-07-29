@@ -4,7 +4,7 @@
 
 HiveSight's product viability depends on whether the system can reliably identify bees and likely Varroa mites in real inspection photos. Before building a real recognition model, the project needs a practical way to create, review, split, train from, and evaluate labelled image data.
 
-This baseline defines the initial requirements for AI-assisted annotation, reviewed dataset creation, dataset role assignment, model training, model evaluation, and model candidate selection. It complements `requirements/model-requirements.md`; it does not replace the beekeeper-facing product specification.
+This baseline defines the initial requirements for AI-assisted annotation, reviewed dataset creation, dataset role assignment, model training, model evaluation, and model candidate selection. It complements `requirements/model-requirements.md` and is refined by `requirements/bee-annotation-repository-and-curriculum-training-baseline.md`; it does not replace the beekeeper-facing product specification.
 
 ## Core Principle
 
@@ -25,6 +25,8 @@ original inspection photo
 ```
 
 The same visual UI components may be reused across annotation labelling, reviewer workflows, and product correction workflows. The data provenance and dataset-governance records must remain separate.
+
+After the Grounding DINO pre-labelling spike, the intended bee bootstrap path is to build a HiveSight-owned trainable bee detector from reviewed HiveSight data. Grounding DINO remains an experimental helper and comparison point, not the main training strategy.
 
 ## Terminology
 
@@ -177,6 +179,34 @@ Candidate approaches may include:
 - a hybrid approach that starts hosted/manual and later moves local
 
 Rationale: Tool choice affects annotation format, dataset export, training workflow, cost, privacy, and repeatability.
+
+Decision: the first bee detector baseline should use oriented object detection, with Ultralytics YOLO OBB nano or small as the first implementation candidate.
+
+### AIA-014A Canonical Bee Geometry
+
+Reviewed bee annotations shall use oriented bee ellipses as the canonical domain geometry.
+
+Rationale: Bees are elongated and appear at many angles on a frame. Oriented ellipses better match human evidence than axis-aligned rectangles.
+
+### AIA-014B Model-Specific Export Projection
+
+The first YOLO OBB training baseline shall consume a model-specific export projection derived from reviewed oriented bee ellipses.
+
+Rationale: YOLO OBB expects oriented bounding boxes. HiveSight should support that format without making it the canonical reviewed annotation shape.
+
+### AIA-014C Curriculum Crop Bootstrap
+
+The first bee training dataset should start from reviewed Training Crops before moving to larger regions and full frame sides.
+
+Initial stages:
+
+- `small_crop`
+- `medium_crop`
+- `large_crop`
+- `full_frame_region`
+- `full_frame_side`
+
+Rationale: Small crops with a few bees are faster to review completely and give the first trainable detector a cleaner learning path.
 
 ### AIA-015 Training Run Records
 

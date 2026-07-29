@@ -264,3 +264,30 @@ Implications:
 - Workspace invitations and multi-user collaboration are deferred.
 - `Beekeeper` remains a product/persona term and is not a persisted version-one entity.
 - The Workspace owner accepts the Workspace Data Use Agreement on behalf of the Workspace in version one.
+
+## 2026-07-29 Bee Annotation Geometry And First Detector Baseline
+
+Decision: Human-reviewed bee annotations will use oriented bee ellipses as the canonical domain geometry. The first trainable HiveSight Bee Detector baseline will use YOLO OBB nano or small as a model-specific oriented object detection projection derived from those ellipses.
+
+Rationale: Bees are elongated and appear at many rotations. Axis-aligned boxes are a poor fit for dense frame photos, while segmentation masks are too costly for the first dataset bootstrap. YOLO OBB gives a practical local baseline that can learn rotated objects while preserving the option to change model family later.
+
+Implications:
+
+- Grounding DINO remains an experimental pre-labelling adapter and comparison point, not the primary model strategy.
+- Draft model output is never ground truth without human review.
+- The annotation UI must support fast creation and adjustment of rotated ellipses.
+- Dataset exports must distinguish canonical reviewed annotation evidence from model-specific training labels.
+- The first dataset bootstrap should start with small reviewed Training Crops and grow toward larger crops, frame regions, and full frame sides.
+
+## 2026-07-29 Inspection Intent And Multi-Photo Inspections
+
+Decision: Each Inspection will have one explicit intent. Initial intents are `training_data_collection` and `varroa_assessment`. An Inspection may contain multiple photos.
+
+Rationale: Dataset collection and beekeeper-facing Varroa assessment have different workflows, provenance, and statistical meaning. A real inspection may also involve many frame photos, including both sides of brood frames.
+
+Implications:
+
+- Dataset labelling workflows should appear for training-data collection inspections.
+- Varroa assessment workflows should appear for beekeeper-facing assessment inspections.
+- One Inspection must not mix training-data collection and Varroa assessment intent.
+- The photo intake model must support multiple photos per Inspection.
