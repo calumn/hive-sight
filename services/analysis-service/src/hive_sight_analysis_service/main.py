@@ -2,14 +2,14 @@ from typing import Annotated
 
 from fastapi import Depends, FastAPI
 
-from beehive_analysis_service.analysis_job_runner import AnalysisJobRunner
-from beehive_analysis_service.dependencies import get_analysis_job_runner
-from beehive_analysis_service.models import AnalysisJobRequest, AnalysisJobResult, HealthResponse
+from hive_sight_analysis_service.analysis_job_runner import AnalysisJobRunner
+from hive_sight_analysis_service.dependencies import get_analysis_job_runner
+from hive_sight_analysis_service.models import AnalysisJobRequest, AnalysisJobResult, HealthResponse
 
 app = FastAPI(
-    title="BeehiveMonitor Analysis Service",
+    title="HiveSight Analysis Service",
     version="0.1.0",
-    description="Private analysis runtime API for BeehiveMonitor.",
+    description="Private analysis runtime API for HiveSight.",
 )
 
 AnalysisJobRunnerDep = Annotated[AnalysisJobRunner, Depends(get_analysis_job_runner)]

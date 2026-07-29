@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document defines the skills needed during the requirements phase of the BeehiveMonitor project.
+This document defines the skills needed during the requirements phase of the HiveSight project.
 
 The project has two linked goals:
 
@@ -169,7 +169,7 @@ Activities:
 - Track time saved or new work introduced.
 - Capture lessons for later SDLC phases.
 
-## Initial BeehiveMonitor Requirement Categories
+## Initial HiveSight Requirement Categories
 
 - Apiary management.
 - Hive management.

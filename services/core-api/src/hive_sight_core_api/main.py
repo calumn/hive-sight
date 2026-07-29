@@ -4,14 +4,14 @@ from uuid import UUID
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from beehive_core_api.analysis_request_workflow import AnalysisRequestWorkflow
-from beehive_core_api.dependencies import (
+from hive_sight_core_api.analysis_request_workflow import AnalysisRequestWorkflow
+from hive_sight_core_api.dependencies import (
     get_analysis_request_workflow,
     get_inspection_photo_access,
     get_settings,
 )
-from beehive_core_api.inspection_photo_access import InspectionPhotoAccess
-from beehive_core_api.models import (
+from hive_sight_core_api.inspection_photo_access import InspectionPhotoAccess
+from hive_sight_core_api.models import (
     AnalysisRunRequest,
     AnalysisRunResponse,
     HealthResponse,
@@ -21,9 +21,9 @@ from beehive_core_api.models import (
 settings = get_settings()
 
 app = FastAPI(
-    title="BeehiveMonitor Core API",
+    title="HiveSight Core API",
     version="0.1.0",
-    description="Protected product-facing API for BeehiveMonitor.",
+    description="Protected product-facing API for HiveSight.",
 )
 
 app.add_middleware(

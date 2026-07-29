@@ -4,9 +4,25 @@ This document captures early candidate requirements. Requirement IDs are provisi
 
 Detailed AI model, dataset, training, evaluation, and release-gate requirements are captured separately in `model-requirements.md`.
 
-Version one assumes a single Workspace with one primary Beekeeper actor. Multi-user collaboration, advisor access, and organisation-level permissions are deferred unless explicitly brought into scope.
+Version one assumes one registered User, one default Workspace created at registration, one owner Workspace Membership, and that User acting as the primary Beekeeper. Multi-user collaboration, invitations, advisor access, and organisation-level permissions are deferred unless explicitly brought into scope.
 
 ## Functional Requirements
+
+### FR-023 User Registration And Default Workspace
+
+The system shall allow a User to register and shall create a default Workspace with an owner Workspace Membership for that User.
+
+Rationale: A User needs a login identity before upload and analysis can be authorized, while the Workspace remains the ownership boundary for apiaries, hives, inspections, photos, and data-use terms.
+
+Version: V1.
+
+### FR-024 Workspace Membership
+
+The system shall represent the relationship between a User and a Workspace as a Workspace Membership.
+
+Rationale: Version one only needs one owner membership, but the model should not hard-code a permanent one-user-one-workspace assumption.
+
+Version: V1 with only the `owner` role; additional roles and invitations are deferred.
 
 ### FR-001 Apiary Management
 
@@ -28,9 +44,9 @@ Rationale: Photos, observations, and Varroa analysis need to be associated with 
 
 ### FR-004 Photo Association
 
-The system shall allow a Beekeeper to associate one or more inspection photos with a hive inspection.
+The system shall allow an authenticated User acting as the primary Beekeeper to associate one or more inspection photos with a hive inspection only when the User has an active Workspace Membership and the Workspace has an accepted Workspace Data Use Agreement.
 
-Rationale: A single frame may have multiple photos, and one inspection may cover multiple frames.
+Rationale: A person must register, log in, be authorized for the Workspace, and accept the data-use terms before inspection photos can be uploaded. A single frame may have multiple photos, and one inspection may cover multiple frames.
 
 ### FR-005 Multiple Photos Per Frame
 
@@ -88,13 +104,13 @@ Rationale: Original images and structured annotations are needed for auditabilit
 
 ### FR-016 Workspace Data Use Agreement
 
-The system shall require an accepted Workspace Data Use Agreement before upload and analysis features can be used.
+The system shall require the Workspace owner to accept the Workspace Data Use Agreement before upload and analysis features can be used.
 
 Rationale: Version one treats the data-use agreement as a condition of service for analysis features.
 
 ### FR-017 Ownership And Access Boundary
 
-The system shall associate apiaries, hives, inspections, inspection photos, analysis results, annotations, corrections, workspace data-use agreements, and data deletion requests with a Workspace boundary.
+The system shall associate apiaries, hives, inspections, inspection photos, analysis results, annotations, corrections, workspace data-use agreements, and data deletion requests with a Workspace boundary, and shall authorize User access through Workspace Membership.
 
 Rationale: Even a lightweight version needs a clear ownership model before storage, upload, and review workflows are implemented.
 
@@ -173,7 +189,7 @@ Rationale: Version one is decision support and model-learning evidence, not a va
 
 ### NFR-003 Data Organisation
 
-The system shall preserve relationships between Workspaces, apiaries, hives, inspections, frame labels, inspection photos, analysis results, annotations, user corrections, and model-governance records.
+The system shall preserve relationships between Users, Workspace Memberships, Workspaces, apiaries, hives, inspections, frame labels, inspection photos, analysis results, annotations, user corrections, and model-governance records.
 
 Rationale: Historical inspection context is central to the product.
 
@@ -198,6 +214,8 @@ Rationale: The project should be able to adjust limits as real inspection photos
 ## Open Requirements Questions
 
 - Should infection rate be calculated per image, per frame, per inspection, or all three?
+- What exact registration, default workspace naming, and owner membership creation flow should version one use?
+- What future Workspace Membership roles and invitation lifecycle should be supported after version one?
 - What wording should be used consistently for "mites per 100 complete visible bees"?
 - What exact image formats and maximum upload sizes should be supported initially?
 - What level of model confidence is needed before a detection is shown to the user?

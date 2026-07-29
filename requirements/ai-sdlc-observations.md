@@ -6,7 +6,7 @@ This document records how AI contributes to the requirements phase and later SDL
 
 ### 2026-07-28 Requirements Scope Clarification
 
-Human input clarified that BeehiveMonitor is primarily focused on detecting Varroa mites rather than general hive telemetry.
+Human input clarified that HiveSight is primarily focused on detecting Varroa mites rather than general hive telemetry.
 
 Captured product concepts:
 

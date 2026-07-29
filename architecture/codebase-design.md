@@ -1,6 +1,6 @@
 # Codebase Design
 
-This note applies the `sdlc-architecture-codebase-design` skill to the initial BeehiveMonitor scaffold before persistence, queues, storage signing, or model inference are added.
+This note applies the `sdlc-architecture-codebase-design` skill to the initial HiveSight scaffold before persistence, queues, storage signing, or model inference are added.
 
 The goal is to avoid a service-oriented codebase made of shallow pass-through files. Each service should grow around deep modules: small interfaces with useful behaviour hidden behind them, tested through those interfaces.
 
@@ -162,7 +162,7 @@ Behaviour hidden behind the interface:
 
 - load model artifact
 - run the logical bee-detection and Varroa-detection pipeline
-- normalize detections into BeehiveMonitor annotation terms
+- normalize detections into HiveSight annotation terms
 - return model-version traceability and quality notes
 
 Dependencies:

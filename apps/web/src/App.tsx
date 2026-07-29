@@ -20,7 +20,7 @@ export function App() {
     <main className="app-shell">
       <section className="topbar" aria-label="Application status">
         <div>
-          <p className="eyebrow">BeehiveMonitor</p>
+          <p className="eyebrow">HiveSight</p>
           <h1>Inspection workspace</h1>
         </div>
         <StatusPill state={healthState} />

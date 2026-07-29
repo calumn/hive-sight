@@ -1,2 +1,0 @@
-"""BeehiveMonitor Core API."""
-

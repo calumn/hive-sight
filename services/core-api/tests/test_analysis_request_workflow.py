@@ -1,8 +1,8 @@
 from datetime import UTC, datetime
 from uuid import UUID
 
-from beehive_core_api.analysis_request_workflow import AnalysisRequestWorkflow
-from beehive_core_api.models import AnalysisRunRequest, AnalysisRunStatus
+from hive_sight_core_api.analysis_request_workflow import AnalysisRequestWorkflow
+from hive_sight_core_api.models import AnalysisRunRequest, AnalysisRunStatus
 
 
 def test_request_analysis_queues_analysis_run_at_workflow_seam() -> None:

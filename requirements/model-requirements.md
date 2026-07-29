@@ -1,6 +1,6 @@
 # Model Requirements
 
-This document captures requirements for the AI model and dataset side of BeehiveMonitor.
+This document captures requirements for the AI model and dataset side of HiveSight.
 
 The product requirements define what the beekeeper-facing system should do. This document defines what evidence, data controls, annotations, evaluation, and release gates are needed before the model side of that capability can be trusted.
 
@@ -185,11 +185,11 @@ Rationale: Uploaded images may contain metadata, location signals, private apiar
 
 ### MR-021 Consent Tracking
 
-Consent status should be stored per photo or per inspection.
+Workspace Data Use Agreement status, accepted terms version, and withdrawal status shall be tracked at the Workspace level and must be traceable to photos and corrections through Workspace ownership.
 
-Rationale: Dataset eligibility needs to be traceable at the level where images enter the model pipeline.
+Rationale: Version one treats consent as a Workspace-level condition of using upload and analysis features. Dataset eligibility still needs to be traceable for each photo and correction through its owning Workspace.
 
-The exact product flow for capturing consent is deferred. Candidate flows include upload-time consent, inspection-level consent, account settings, or model-review-time consent. Architecture should not assume that consent is global or permanent.
+The policy for withdrawal, prior uploads, dataset versions, already-trained model artifacts, and purge rights remains unresolved and must not be hidden behind the initial consent flow.
 
 ### MR-022 Consent Withdrawal
 

@@ -1,8 +1,36 @@
 # Decision Log
 
+## 2026-07-29 Inspection Photo Upload Preconditions
+
+Decision: Version one requires a person to register as a User, log in, have an active Workspace Membership, and have an accepted Workspace Data Use Agreement before uploading an inspection photo.
+
+Rationale: Uploading an inspection photo is not an anonymous action in version one. The system needs identity, Workspace authorization, and accepted data-use terms before storing photos for analysis.
+
+Implications:
+
+- Upload authorization should use User and Workspace Membership language.
+- Product copy may still describe the actor as a Beekeeper when the person is doing inspection work.
+- A Workspace without accepted data-use terms cannot upload photos or receive analysis.
+- Guest or trial upload remains deferred to V2 and would need its own explicit terms and limits.
+
+
+## 2026-07-29 Product Renamed To HiveSight
+
+Decision: The project and product name is now HiveSight, with hive-sight.com as the registered domain.
+
+Rationale: The new name is available and more product-like than the initial working title. Renaming early reduces future churn across documentation, package names, local service defaults, and user-facing copy.
+
+Implications:
+
+- User-facing product language should use HiveSight.
+- Technical package and workspace names should use `hive-sight` for JavaScript package names and `hive_sight_*` for Python import packages.
+- Domain terms such as apiary, hive, beehive, beekeeper, inspection, bee, and Varroa remain unchanged.
+- The current local folder may remain `BeehiveMonitor` until it is convenient to rename the physical workspace folder.
+
+
 ## 2026-07-28 Varroa Detection Is The Primary Product Focus
 
-Decision: BeehiveMonitor will focus primarily on Varroa mite detection from hive inspection photos.
+Decision: HiveSight will focus primarily on Varroa mite detection from hive inspection photos.
 
 Rationale: The user clarified that the core value is detecting Varroa mites, counting bees, and estimating visible Varroa rate from submitted frame photos.
 
@@ -121,14 +149,15 @@ Implications:
 
 ## 2026-07-28 Version-One Ownership Assumption
 
-Decision: Version one uses Workspace as the canonical ownership boundary. A Beekeeper is a human actor or role, not the ownership container.
+Decision: Version one uses Workspace as the canonical ownership boundary. A Beekeeper is a product persona/actor, not the ownership container or login identity.
 
 Rationale: The first product may target an individual beekeeper, but future versions may support small businesses, clubs, advisors, or multiple beekeepers. Workspace remains stable as the owner of apiaries, hives, inspections, photos, analysis results, annotations, corrections, data-use agreements, and deletion requests.
 
 Implications:
 
 - Domain modelling should use Workspace for ownership.
-- Domain modelling should use Beekeeper for the person performing inspections or reviewing results.
+- Domain modelling should use User for registration, authentication, and authorization.
+- Domain modelling should use Beekeeper for the persona performing beekeeping work such as inspections or result review.
 - Multi-user collaboration, advisor access, and organisation-level permissions are out of scope for version one.
 - Tests should verify that workspace-owned records are not accessible across workspace boundaries.
 
@@ -200,3 +229,21 @@ Implications:
 - Trial usage limits should be configurable and may consider image count, time window, user/browser/IP signals, or other abuse-prevention controls.
 - Trial photos and results should have explicit retention and deletion rules.
 - Trial photos and corrections should be excluded from model-improvement workflows by default unless future policy explicitly allows use with accepted terms and human review.
+
+## 2026-07-29 User, Workspace Membership, And Beekeeper Language
+
+Decision: The domain model will distinguish User, Workspace Membership, Workspace, and Beekeeper.
+
+Rationale: Registration, login, authentication, and authorization need a clear identity concept. Workspace remains the ownership boundary for apiaries, hives, inspections, photos, corrections, and data-use terms. Beekeeper remains useful product language for the person doing beekeeping work, but it should not carry login identity or ownership semantics.
+
+Implications:
+
+- `User` means registered login identity.
+- `Workspace Membership` connects a User to a Workspace with a role.
+- Version one registration creates one default Workspace and one `owner` Workspace Membership for the registered User.
+- Version one UI exposes one active/default Workspace and no workspace switcher.
+- Version one supports only the `owner` membership role.
+- Future roles such as `member`, `inspector`, `advisor`, and `reviewer` are deferred.
+- Workspace invitations and multi-user collaboration are deferred.
+- `Beekeeper` remains a product/persona term and is not a persisted version-one entity.
+- The Workspace owner accepts the Workspace Data Use Agreement on behalf of the Workspace in version one.

@@ -1,2 +1,0 @@
-"""BeehiveMonitor Analysis Service."""
-

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document defines the BeehiveMonitor domain model in technology-neutral terms. It should guide architecture, schema design, API design, acceptance tests, and traceability without choosing a framework, database, storage provider, or model implementation.
+This document defines the HiveSight domain model in technology-neutral terms. It should guide architecture, schema design, API design, acceptance tests, and traceability without choosing a framework, database, storage provider, or model implementation.
 
 The canonical project vocabulary lives in `CONTEXT.md`. This document uses that vocabulary and adds relationships, lifecycle states, invariants, and unresolved architecture questions.
 
@@ -15,7 +15,8 @@ Version one is a web-first inspection support system for hobbyist and small-scal
 In scope:
 
 - workspace-owned apiaries, hives, inspections, and inspection photos
-- beekeeper as the primary human actor in version one
+- registered user with a default workspace and owner workspace membership
+- beekeeper as the primary product persona in version one
 - optional frame labels within an inspection
 - AI-assisted analysis of inspection photos
 - tagged photo review
@@ -27,6 +28,7 @@ In scope:
 Out of scope:
 
 - multi-user collaboration
+- workspace invitations
 - advisor or organisation-level permissions
 - native mobile apps
 - full commercial apiary management
@@ -37,7 +39,7 @@ Out of scope:
 
 ## Context Boundaries
 
-BeehiveMonitor currently has one product context with two closely related subdomains:
+HiveSight currently has one product context with two closely related subdomains:
 
 - **Inspection Support**: apiaries, hives, inspections, photos, analysis output, and tagged review.
 - **Model Governance**: annotations, corrections, workspace data-use agreements, deletion requests, reviewed data, dataset roles, model versions, benchmark evaluations, and release approval.
@@ -62,37 +64,87 @@ Essential fields:
 
 Relationships:
 
+- has many workspace memberships
 - owns many apiaries
 - owns all downstream hives, inspections, photos, analysis results, annotations, corrections, workspace data-use agreements, and deletion requests through that boundary
 
 Notes:
 
-- Version one does not model roles, memberships, teams, or advisors.
-- Future collaboration should extend this boundary rather than bypass it.
+- Version one creates one default workspace during user registration.
+- Version one supports one active/default workspace in the UI.
+- Future collaboration should use workspace memberships rather than bypassing the workspace boundary.
 
-### Beekeeper
+### User
 
-The primary human actor in version one.
+A registered login identity.
 
 Essential fields:
 
 - id
-- workspace id
 - display name
-- contact identifier, if login or notification is needed
+- contact identifier
+- status
+- registered at
 
 Relationships:
 
-- belongs to one workspace in version one
-- creates inspections
-- uploads inspection photos
-- reviews tagged photos
-- creates user corrections
+- has many workspace memberships over time
+- acts in a workspace through one workspace membership
+- may create inspections, upload inspection photos, review tagged photos, and create user corrections when authorized through a workspace membership
+
+Rules:
+
+- User is the identity/authentication concept.
+- User is not the ownership boundary for apiaries, hives, inspections, photos, or analysis results.
+- Version one registration creates a default workspace and an owner workspace membership for the user.
+
+### Workspace Membership
+
+The relationship that grants a user access to a workspace.
+
+Essential fields:
+
+- id
+- user id
+- workspace id
+- role
+- status
+- created at
+
+Version-one roles:
+
+- `owner`
+
+Future roles:
+
+- `member`
+- `inspector`
+- `advisor`
+- `reviewer`
+
+Relationships:
+
+- belongs to one user
+- belongs to one workspace
+
+Rules:
+
+- Version one only supports `owner`.
+- Version one creates one owner membership for the registered user and default workspace.
+- Future multi-user collaboration, invitations, and workspace switching should extend this concept.
+
+### Beekeeper
+
+The product persona for a person doing beekeeping work.
 
 Notes:
 
-- A workspace may later have many beekeepers, reviewers, admins, or advisors.
-- Beekeeper is an actor/role, not the ownership container.
+- Beekeeper is not a persisted entity in version one.
+- In version one, the registered user with the owner workspace membership acts as the primary beekeeper.
+- Use Beekeeper in requirements, scenarios, and UI language when describing beekeeping work.
+- Use User when describing registration, authentication, login identity, or authorization.
+- A workspace may later have multiple users acting as beekeepers, advisors, reviewers, or admins.
+- Beekeeper is an actor/persona, not the ownership container.
 
 ### Apiary
 
@@ -142,6 +194,7 @@ Essential fields:
 - id
 - workspace id
 - hive id
+- optional created by user id
 - inspection date
 - optional notes
 - status
@@ -198,6 +251,7 @@ Essential fields:
 - upload status
 - image quality status
 - uploaded at
+- uploaded by user id
 
 Relationships:
 
@@ -336,6 +390,7 @@ Essential fields:
 
 - id
 - workspace id
+- created by user id
 - photo id
 - optional analysis result id
 - optional annotation id
@@ -358,7 +413,7 @@ Future correction types:
 Rules:
 
 - A user correction is review evidence, not ground truth.
-- A user correction is not training, validation, or benchmark data until consent and review decisions allow it.
+- A user correction is not training, validation, or benchmark data until the Workspace Data Use Agreement and review decisions allow it.
 
 ### Review Decision
 
@@ -400,6 +455,8 @@ Essential fields:
 - terms version
 - accepted at
 - withdrawn at
+- accepted by user id
+- withdrawn by user id
 
 Statuses:
 
@@ -409,7 +466,7 @@ Statuses:
 
 Rules:
 
-- Version one requires an active accepted agreement before upload and analysis features can be used.
+- Version one requires the workspace owner to accept the agreement before upload and analysis features can be used.
 - If the agreement is withdrawn or not accepted, new upload and analysis are disabled.
 - Existing inspection history may remain viewable unless a deletion process applies.
 - Withdrawal stops future model-improvement use from the point of withdrawal, subject to the data-use terms.
@@ -519,6 +576,9 @@ Rules:
 ## Relationship Summary
 
 - Workspace owns many apiaries.
+- User has many workspace memberships.
+- Workspace has many workspace memberships.
+- Workspace membership belongs to one user and one workspace.
 - Apiary contains many hives.
 - Hive has many inspections.
 - Inspection contains many inspection photos.
@@ -529,7 +589,7 @@ Rules:
 - Analysis result has many bee annotations and Varroa annotations.
 - Varroa annotation may reference one bee annotation.
 - User correction belongs to one inspection photo and may reference one annotation.
-- Workspace data-use agreement belongs to one workspace.
+- Workspace data-use agreement belongs to one workspace and is accepted by an owner user in version one.
 - Data deletion request belongs to one workspace.
 - Review decision applies to one review subject.
 - Model version may have many benchmark evaluations.
@@ -581,6 +641,12 @@ Rules:
 - `accepted`
 - `withdrawn`
 
+### Workspace Membership
+
+- `active`
+- `revoked`
+- `invited`
+
 ### Data Deletion Request
 
 - `requested`
@@ -599,6 +665,9 @@ Rules:
 
 ## Invariants
 
+- Every workspace membership belongs to exactly one user and one workspace.
+- Version one creates one default workspace and one owner workspace membership when a user registers.
+- Version one exposes one active/default workspace per user in the UI.
 - Every apiary belongs to exactly one workspace.
 - Every hive belongs to exactly one apiary.
 - Every inspection belongs to exactly one hive.
@@ -608,8 +677,10 @@ Rules:
 - Every analysis result records the model version that produced it.
 - Every annotation belongs to exactly one analysis result and one inspection photo.
 - Every user correction belongs to exactly one inspection photo.
+- Every user correction records the user who created it once authentication exists.
 - A user correction is never ground truth without review.
 - A user correction is never training, validation, or benchmark data without an active workspace data-use agreement and review.
+- A user must be registered, logged in, and authorized through an active workspace membership before uploading inspection photos.
 - A workspace without an accepted workspace data-use agreement must not upload new photos or receive new analysis.
 - Workspace data-use agreement withdrawal disables new upload and analysis.
 - Benchmark data must not be used for training or routine threshold tuning.
@@ -650,6 +721,8 @@ Version one uses workspace ownership as the access boundary.
 
 The model must preserve:
 
+- user identity for registration, authentication, and authorization
+- workspace membership as the relationship between users and workspaces
 - workspace ownership for apiaries, hives, inspections, photos, analysis results, annotations, corrections, workspace data-use agreements, and data deletion requests
 - an active workspace data-use agreement before upload and analysis features are used
 - metadata minimisation before training, evaluation, sharing, or publication
@@ -658,6 +731,7 @@ The model must preserve:
 
 Deferred privacy decisions:
 
+- exact future roles and permissions for invited workspace members
 - exact wording and versioning of workspace data-use terms
 - whether withdrawal affects only future model-improvement use or also previously uploaded photos
 - whether and how users can purge workspace-held data
@@ -666,7 +740,7 @@ Deferred privacy decisions:
 
 ## Traceability
 
-- `Workspace` supports FR-017.
+- `User`, `Workspace`, and `Workspace Membership` support registration, authorization, and FR-017.
 - `Apiary` supports FR-001.
 - `Hive` supports FR-002.
 - `Inspection` supports FR-003.
@@ -686,6 +760,8 @@ Deferred privacy decisions:
 
 ## Open Architecture Questions
 
+- What exact registration and default workspace creation flow should version one use?
+- What future workspace roles and invitation lifecycle are needed after version one?
 - Should inspection summaries be stored snapshots, calculated on demand, or both?
 - Should photo analysis run synchronously for a prototype or always as a background job?
 - Where should original inspection photos be stored?

@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from uuid import UUID
 
-from beehive_core_api.models import UploadUrlResponse
+from hive_sight_core_api.models import UploadUrlResponse
 
 
 @dataclass(frozen=True)

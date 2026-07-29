@@ -2,8 +2,12 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
-from beehive_analysis_service.model_runtime import ModelRuntime
-from beehive_analysis_service.models import AnalysisJobRequest, AnalysisJobResult, AnalysisJobStatus
+from hive_sight_analysis_service.model_runtime import ModelRuntime
+from hive_sight_analysis_service.models import (
+    AnalysisJobRequest,
+    AnalysisJobResult,
+    AnalysisJobStatus,
+)
 
 
 @dataclass(frozen=True)

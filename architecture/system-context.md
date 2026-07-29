@@ -1,10 +1,10 @@
 # System Context
 
-This document shows the first BeehiveMonitor system boundary. It is intentionally higher level than a deployment diagram: it names the actors, applications, services, stores, and trust boundaries needed to support the V1 architecture.
+This document shows the first HiveSight system boundary. It is intentionally higher level than a deployment diagram: it names the actors, applications, services, stores, and trust boundaries needed to support the V1 architecture.
 
 ## Context
 
-BeehiveMonitor is a Varroa-focused inspection support system for hobbyist and small-scale beekeepers. Version one is web-first, but the backend must be suitable for future Android and Apple applications.
+HiveSight is a Varroa-focused inspection support system for hobbyist and small-scale beekeepers. Version one is web-first, but the backend must be suitable for future Android and Apple applications.
 
 The Core API is the product-facing service boundary. It owns Workspace-scoped product data and authorization decisions. The Analysis Service is private and owns analysis execution, detailed model outputs, tagged analysis artifacts, and model-version traceability. Image analysis is asynchronous.
 

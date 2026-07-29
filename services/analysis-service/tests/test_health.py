@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from beehive_analysis_service.main import app
+from hive_sight_analysis_service.main import app
 
 
 def test_healthz_returns_analysis_service_boundary() -> None:

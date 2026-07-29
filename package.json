@@ -1,12 +1,12 @@
 {
-  "name": "beehive-monitor",
+  "name": "hive-sight",
   "private": true,
   "workspaces": [
     "apps/*"
   ],
   "scripts": {
-    "dev:web": "pnpm --filter @beehive-monitor/web dev",
-    "build:web": "pnpm --filter @beehive-monitor/web build",
-    "check:web": "pnpm --filter @beehive-monitor/web check"
+    "dev:web": "pnpm --filter @hive-sight/web dev",
+    "build:web": "pnpm --filter @hive-sight/web build",
+    "check:web": "pnpm --filter @hive-sight/web check"
   }
 }

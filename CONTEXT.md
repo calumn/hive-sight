@@ -1,18 +1,26 @@
-# BeehiveMonitor
+# HiveSight
 
-BeehiveMonitor is a Varroa-focused inspection support system for hobbyist and small-scale beekeepers. This glossary defines the project language used across requirements, architecture, tests, and future implementation.
+HiveSight is a Varroa-focused inspection support system for hobbyist and small-scale beekeepers. The registered product domain is hive-sight.com. This glossary defines the project language used across requirements, architecture, tests, and future implementation.
 
 ## Language
 
 ### Beekeeping Context
 
+**User**:
+A registered login identity that can authenticate and be authorized to act in one or more workspaces.
+_Avoid_: Beekeeper when the point is login, registration, authentication, or identity.
+
 **Workspace**:
 The ownership boundary for apiaries, hives, inspections, photos, corrections, and model-use terms.
 _Avoid_: Account when the ownership container, not login identity, is the point.
 
+**Workspace Membership**:
+The relationship that gives a User access to a Workspace with a role. Version one supports a single `owner` membership created during registration.
+_Avoid_: User ownership when the relationship between identity and workspace is meant.
+
 **Beekeeper**:
-A person who keeps bees and uses the workspace to record inspections or review analysis results.
-_Avoid_: Workspace when referring to the human actor.
+A beekeeping actor or persona who records inspections or reviews analysis results. In version one, the registered User with the owner Workspace Membership acts as the primary Beekeeper.
+_Avoid_: User when the point is beekeeping work rather than login identity.
 
 **Apiary**:
 A beekeeper-defined grouping or location that contains hives.

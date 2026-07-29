@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
-from beehive_core_api.models import AnalysisRunRequest, AnalysisRunResponse, AnalysisRunStatus
+from hive_sight_core_api.models import AnalysisRunRequest, AnalysisRunResponse, AnalysisRunStatus
 
 
 @dataclass(frozen=True)

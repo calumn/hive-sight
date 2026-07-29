@@ -2,7 +2,7 @@
 
 Status: accepted
 
-BeehiveMonitor will start as a service-oriented system in a monorepo, with separately deployable applications and services rather than a single tightly coupled application. The first application boundary is a TypeScript web frontend calling a protected Core API. The Core API owns the beekeeper-facing product workflow: Workspaces, apiaries, hives, inspections, inspection photos, Workspace Data Use Agreement state, and user-facing authorization.
+HiveSight will start as a service-oriented system in a monorepo, with separately deployable applications and services rather than a single tightly coupled application. The first application boundary is a TypeScript web frontend calling a protected Core API. The Core API owns the beekeeper-facing product workflow: Workspaces, apiaries, hives, inspections, inspection photos, Workspace Data Use Agreement state, and user-facing authorization.
 
 Image analysis will run behind a separate private Analysis Service. The Core API will submit analysis work asynchronously through a queue, and the Analysis Service will own detailed analysis job state, detections, analysis runs, generated tagged outputs, and model-version traceability. The frontend will read analysis status and results through the Core API rather than calling the Analysis Service directly.
 

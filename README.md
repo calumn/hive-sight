@@ -1,6 +1,6 @@
-# BeehiveMonitor
+# HiveSight
 
-BeehiveMonitor is a Varroa-focused inspection support system for hobbyist and small-scale beekeepers.
+HiveSight is a Varroa-focused inspection support system for hobbyist and small-scale beekeepers. The registered product domain is hive-sight.com.
 
 The first codebase follows [ADR-0001](architecture/adr/0001-service-oriented-architecture.md): a service-oriented monorepo with a TypeScript web app, Python Core API, private Python Analysis Service, asynchronous analysis boundary, and S3-compatible object storage.
 
@@ -20,8 +20,8 @@ Install dependencies for each surface, then run them in separate terminals:
 
 ```sh
 docker compose up -d
-cd services/core-api && python -m venv .venv && source .venv/bin/activate && pip install -e ".[dev]" && uvicorn beehive_core_api.main:app --reload --port 8000
-cd services/analysis-service && python -m venv .venv && source .venv/bin/activate && pip install -e ".[dev]" && uvicorn beehive_analysis_service.main:app --reload --port 8100
+cd services/core-api && python -m venv .venv && source .venv/bin/activate && pip install -e ".[dev]" && uvicorn hive_sight_core_api.main:app --reload --port 8000
+cd services/analysis-service && python -m venv .venv && source .venv/bin/activate && pip install -e ".[dev]" && uvicorn hive_sight_analysis_service.main:app --reload --port 8100
 pnpm install
 pnpm dev:web
 ```

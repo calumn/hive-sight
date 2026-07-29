@@ -1,9 +1,9 @@
 from datetime import UTC, datetime
 from uuid import UUID
 
-from beehive_analysis_service.analysis_job_runner import AnalysisJobRunner
-from beehive_analysis_service.model_runtime import ModelRuntime
-from beehive_analysis_service.models import AnalysisJobRequest, AnalysisJobStatus
+from hive_sight_analysis_service.analysis_job_runner import AnalysisJobRunner
+from hive_sight_analysis_service.model_runtime import ModelRuntime
+from hive_sight_analysis_service.models import AnalysisJobRequest, AnalysisJobStatus
 
 
 def test_run_analysis_job_returns_stubbed_model_result_at_runner_seam() -> None:

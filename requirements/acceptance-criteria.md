@@ -4,19 +4,24 @@ Acceptance criteria are provisional and will be refined as requirements are revi
 
 ## Apiary and Hive Management
 
-- A user can create an apiary with a name.
-- A user can create a hive associated with an apiary.
-- A user can view hives grouped by apiary.
+- A registered User receives a default Workspace and owner Workspace Membership during onboarding.
+- A User acting as the primary Beekeeper can create an apiary with a name.
+- A User acting as the primary Beekeeper can create a hive associated with an apiary.
+- A User acting as the primary Beekeeper can view hives grouped by apiary.
 
-## Inspection Events
+## Inspections
 
-- A user can create an inspection event for a selected hive.
-- An inspection event records at least the hive, date, and associated photos.
+- A User acting as the primary Beekeeper can create an inspection for a selected hive.
+- An inspection records at least the hive, date, and associated photos.
 - A user can return to an inspection and see its uploaded photos and analysis status.
 
 ## Photo Upload and Association
 
-- A user can upload one or more photos to an inspection event.
+- A person must be registered as a User before uploading an inspection photo.
+- A registered User must be logged in before uploading an inspection photo.
+- The logged-in User must have an active Workspace Membership for the Workspace that owns the inspection.
+- The Workspace must have an accepted Workspace Data Use Agreement before upload is allowed.
+- A User acting as the primary Beekeeper can upload one or more photos to an inspection.
 - The system preserves the association between each photo and its inspection.
 - The system supports multiple photos for the same inspection.
 - The system can distinguish, or later allow the user to distinguish, photos that belong to the same frame.
@@ -59,8 +64,10 @@ Acceptance criteria are provisional and will be refined as requirements are revi
 
 ## Ownership And Permissions
 
-- In version one, apiaries, hives, inspections, photos, analysis results, annotations, and corrections are owned by a single user account or simple account boundary.
-- The system prevents one user from viewing or modifying another user's apiaries, hives, inspections, photos, analysis results, annotations, or corrections.
+- In version one, apiaries, hives, inspections, photos, analysis results, annotations, and corrections are owned by a Workspace.
+- User access to a Workspace is authorized through Workspace Membership.
+- Version one creates one owner Workspace Membership for the registered User and does not expose invitations or non-owner roles.
+- The system prevents a User without the relevant Workspace Membership from viewing or modifying another Workspace's apiaries, hives, inspections, photos, analysis results, annotations, or corrections.
 
 ## Upload And Storage
 
@@ -68,11 +75,12 @@ Acceptance criteria are provisional and will be refined as requirements are revi
 - The system preserves original uploaded photos.
 - The system records when an upload is rejected because of unsupported format, excessive size, or unsuitable image evidence.
 
-## Consent For Model Improvement
+## Workspace Data Use Agreement And Model Improvement
 
 - The system does not automatically use uploaded photos or corrections for model improvement.
-- The system records consent status before photos or corrections become eligible for training, validation, or benchmark review.
-- The exact consent capture flow may be deferred, but consent eligibility must be traceable at photo or inspection level.
+- The Workspace owner must accept the Workspace Data Use Agreement before upload and analysis features can be used.
+- The system records Workspace Data Use Agreement status and terms version before photos or corrections become eligible for training, validation, or benchmark review.
+- Workspace Data Use Agreement eligibility must be traceable through the Workspace boundary.
 
 ## Traceability and AI-SDLC Evidence
 

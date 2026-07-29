@@ -1,9 +1,11 @@
 # Domain Model Diagram
 
-This diagram shows the conceptual domain model for BeehiveMonitor. It complements `domain-model.md` and uses the canonical language in `CONTEXT.md`.
+This diagram shows the conceptual domain model for HiveSight. It complements `domain-model.md` and uses the canonical language in `CONTEXT.md`.
 
 ```mermaid
 erDiagram
+    USER ||--o{ WORKSPACE_MEMBERSHIP : has
+    WORKSPACE ||--o{ WORKSPACE_MEMBERSHIP : grants_access
     WORKSPACE ||--o{ APIARY : owns
     APIARY ||--o{ HIVE : contains
     HIVE ||--o{ INSPECTION : has
@@ -26,7 +28,6 @@ erDiagram
     BEE_ANNOTATION ||--o{ REVIEW_DECISION : reviewed_by
     VARROA_ANNOTATION ||--o{ REVIEW_DECISION : reviewed_by
 
-    WORKSPACE ||--o{ BEEKEEPER : has
     WORKSPACE ||--o{ WORKSPACE_DATA_USE_AGREEMENT : accepts
     WORKSPACE ||--o{ DATA_DELETION_REQUEST : may_request
 
@@ -41,11 +42,28 @@ erDiagram
         string status
     }
 
-    BEEKEEPER {
+    USER {
         string id
-        string workspace_id
         string display_name
+        string contact_identifier
+        string status
     }
+
+    WORKSPACE_MEMBERSHIP {
+        string id
+        string user_id
+        string workspace_id
+        string role
+        string status
+    }
+
+    BEEKEEPER_PERSONA {
+        string note
+        string persisted_entity
+        string v1_user_role
+    }
+
+    USER ||..|| BEEKEEPER_PERSONA : acts_as
 
     APIARY {
         string id
@@ -132,6 +150,7 @@ erDiagram
     WORKSPACE_DATA_USE_AGREEMENT {
         string id
         string workspace_id
+        string accepted_by_user_id
         string status
         string terms_version
     }
@@ -164,8 +183,9 @@ erDiagram
 
 ## Reading The Diagram
 
-- The left side is the beekeeper workflow: workspace, apiary, hive, inspection, photos, and analysis.
+- The left side is the identity and beekeeper workflow: registered user, workspace membership, workspace, apiary, hive, inspection, photos, and analysis.
 - The middle is the evidence layer: analysis results, bee annotations, Varroa annotations, summaries, and corrections.
 - The lower/right side is model governance: review decisions, workspace data-use agreements, deletion requests, dataset versions, model versions, and benchmark evaluations.
+- `User` is the login identity. `Workspace Membership` grants access to a workspace. `Beekeeper` remains a persona/product actor, not a persisted version-one entity.
 - `Inspection Summary` is derived from photo-level analysis results and should be recalculable.
 - `User Correction` is review evidence, not ground truth or training data until the workspace data-use agreement and review decisions allow it.

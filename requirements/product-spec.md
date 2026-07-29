@@ -1,6 +1,8 @@
-# BeehiveMonitor Product Spec
+# HiveSight Product Spec
 
 ## Problem Statement
+
+HiveSight is the product name, with hive-sight.com as the registered domain.
 
 Hobbyist and small-scale beekeepers need a practical way to use inspection photos to assess possible Varroa mite presence in their hives. Raw photos are hard to evaluate consistently, and a simple count alone is not enough unless the beekeeper can see the evidence behind it.
 
@@ -12,11 +14,11 @@ The project also needs to document how AI affects the software development lifec
 
 Build a web-first inspection support system for hobbyist and small-scale beekeepers.
 
-The Beekeeper works inside a Workspace, creates an apiary, creates hives within that apiary, creates an inspection for a hive, uploads one or more inspection photos, and reviews analysis results. The system estimates complete visible bees, tracks partial visible bees separately, detects likely Varroa mites on or near bees, calculates likely mites per 100 complete visible bees, and presents tagged photos showing the evidence behind the estimate.
+The User registers, receives a default Workspace, and receives an owner Workspace Membership. Acting as the primary Beekeeper, that User creates an apiary, creates hives within that apiary, creates an inspection for a hive, uploads one or more inspection photos, and reviews analysis results. The system estimates complete visible bees, tracks partial visible bees separately, detects likely Varroa mites on or near bees, calculates likely mites per 100 complete visible bees, and presents tagged photos showing the evidence behind the estimate.
 
 The Beekeeper can optionally view all detected bees and can lightly correct results by marking false Varroa detections or missed likely Varroa locations. The system stores the original inspection photo, structured annotation data, analysis results, and user corrections so tagged photos can be re-rendered and model accuracy can be evaluated later.
 
-Version one assumes a single Workspace with one primary Beekeeper actor. Collaboration, advisor access, and organisation-level permissions are deferred.
+Version one assumes one registered User, one default Workspace, one owner Workspace Membership, and that User acting as the primary Beekeeper. Collaboration, invitations, advisor access, workspace switching, and organisation-level permissions are deferred.
 
 A future acquisition workflow may allow a prospective user to submit a small number of trial photos before creating a Workspace. This is deferred from version one because it requires additional decisions around data-use terms, abuse prevention, rate limits, retention, deletion, and model-improvement eligibility.
 
@@ -24,21 +26,28 @@ A future acquisition workflow may allow a prospective user to submit a small num
 
 Feature: Apiary and hive setup
 
+  Scenario: User registers and receives a default workspace
+    Given a prospective Beekeeper has not registered
+    When the person registers as a User
+    Then the system creates a default Workspace
+    And the system creates an owner Workspace Membership for that User
+    And the User can act as the primary Beekeeper in that Workspace
+
   Scenario: Beekeeper accepts the workspace data-use agreement
-    Given a Beekeeper is setting up a Workspace
-    When the Beekeeper accepts the current Workspace Data Use Agreement
+    Given a User has an owner Workspace Membership
+    When the User accepts the current Workspace Data Use Agreement for the Workspace
     Then upload and analysis features are enabled for that Workspace
     And the accepted terms version is recorded
 
   Scenario: Beekeeper creates an apiary
-    Given a Beekeeper has an active Workspace
+    Given a User is acting as the primary Beekeeper in an active Workspace
     When the beekeeper creates an apiary with a name
     Then the apiary is saved
     And the apiary belongs to the Workspace
     And the Beekeeper can use the apiary to organise hives by real-world location or grouping
 
   Scenario: Beekeeper creates a hive within an apiary
-    Given a Beekeeper has created an apiary
+    Given a User acting as the primary Beekeeper has created an apiary
     When the beekeeper creates a hive within that apiary
     Then the hive is saved under the selected apiary
     And future inspections can be associated with that hive
@@ -52,7 +61,11 @@ Feature: Hive inspection photo capture
     And the inspection can hold photos and analysis results
 
   Scenario: Beekeeper uploads multiple photos to an inspection
-    Given a Beekeeper has created an inspection
+    Given a person has registered as a User
+    And the User is logged in
+    And the User has an active owner Workspace Membership
+    And the User is acting as the primary Beekeeper in that Workspace
+    And the Beekeeper has created an inspection
     And the Workspace has an accepted Workspace Data Use Agreement
     When the Beekeeper uploads one or more inspection photos
     Then each photo is associated with the inspection
@@ -163,7 +176,7 @@ Feature: Workspace data-use agreement and model governance
 
   Scenario: Workspace data-use agreement is required for upload and analysis
     Given a Workspace has not accepted the current Workspace Data Use Agreement
-    When a Beekeeper tries to upload inspection photos
+    When a User with an owner Workspace Membership tries to upload inspection photos
     Then the upload is blocked
     And the system indicates that upload and analysis require accepted data-use terms
 
@@ -226,10 +239,12 @@ Feature: Deferred guest trial analysis
 
 - The first version targets hobbyist and small-scale beekeepers.
 - The first client is a web UI.
-- The first version assumes a single Workspace with one primary Beekeeper actor.
+- The first version assumes one registered User, one default Workspace, one owner Workspace Membership, and that User acting as the primary Beekeeper.
+- Beekeeper is a product/persona term in version one, not a separate persisted entity.
+- Workspace Membership is persisted from version one, but only the `owner` role is supported.
 - Android and Apple apps are future-facing concerns, not version-one delivery targets.
 - Guest or trial photo analysis is a deferred / V2 acquisition workflow, not a version-one delivery target.
-- The core domain model should include Workspace, Beekeeper, apiary, hive, inspection, inspection photo, analysis result, annotation, user correction, Workspace Data Use Agreement, Data Deletion Request, model version, dataset version, and benchmark evaluation.
+- The core domain model should include User, Workspace, Workspace Membership, apiary, hive, inspection, inspection photo, analysis result, annotation, user correction, Workspace Data Use Agreement, Data Deletion Request, model version, dataset version, and benchmark evaluation.
 - Frame-level handling should be light in version one. Photos may have optional frame labels, but the system should not require full frame inventory management.
 - The analysis output should include estimated complete visible bee count, partial visible bee count where possible, likely Varroa count, Varroa association state, and likely mites per 100 complete visible bees.
 - The system should store original photos and structured annotation data rather than relying only on flattened annotated images.
@@ -271,6 +286,7 @@ Feature: Deferred guest trial analysis
 - Validated colony-level infestation estimates.
 - Automatic use of user-submitted photos or corrections as training data.
 - Multi-user collaboration, advisor access, and organisation-level permissions in version one.
+- Workspace invitations, workspace switching, and non-owner Workspace Membership roles in version one.
 - Continuing to upload or analyse new photos after Workspace Data Use Agreement withdrawal.
 - Full implementation of data deletion or purge workflows in version one.
 - Production rules for trial usage limits, abuse prevention, guest retention/deletion, and guest model-improvement eligibility.

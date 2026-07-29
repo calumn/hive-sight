@@ -1,6 +1,6 @@
 # Vision
 
-BeehiveMonitor is a Varroa-focused inspection support system for beekeepers.
+HiveSight is a Varroa-focused inspection support system for beekeepers.
 
 The primary product goal is to help a hobbyist or small-scale beekeeper assess possible Varroa mite presence from photos of brood frames, super frames, or other inspected hive material. The system should support uploading one or more photos from an inspection, estimating the number of visible bees, detecting likely Varroa mites on bees, and producing an understandable photo-visible infection-rate estimate for that inspection context.
 

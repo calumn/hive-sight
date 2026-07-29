@@ -16,14 +16,14 @@ def load_settings() -> Settings:
         allowed_origins=_csv_env("CORE_API_ALLOWED_ORIGINS", "http://localhost:5173"),
         database_url=os.getenv(
             "CORE_API_DATABASE_URL",
-            "postgresql://beehive:beehive@localhost:5432/beehive_core",
+            "postgresql://hive_sight:hive_sight@localhost:5432/hive_sight_core",
         ),
         redis_url=os.getenv("CORE_API_REDIS_URL", "redis://localhost:6379/0"),
         object_storage_endpoint=os.getenv(
             "CORE_API_OBJECT_STORAGE_ENDPOINT",
             "http://localhost:9000",
         ),
-        object_storage_bucket=os.getenv("CORE_API_OBJECT_STORAGE_BUCKET", "beehive-monitor-local"),
+        object_storage_bucket=os.getenv("CORE_API_OBJECT_STORAGE_BUCKET", "hive-sight-local"),
     )
 
 

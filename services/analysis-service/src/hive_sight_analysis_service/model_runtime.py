@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from beehive_analysis_service.models import ModelAnalysis
+from hive_sight_analysis_service.models import ModelAnalysis
 
 
 @dataclass(frozen=True)

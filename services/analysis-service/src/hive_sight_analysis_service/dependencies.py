@@ -1,8 +1,8 @@
 from functools import lru_cache
 
-from beehive_analysis_service.analysis_job_runner import AnalysisJobRunner
-from beehive_analysis_service.model_runtime import ModelRuntime
-from beehive_analysis_service.settings import Settings, load_settings
+from hive_sight_analysis_service.analysis_job_runner import AnalysisJobRunner
+from hive_sight_analysis_service.model_runtime import ModelRuntime
+from hive_sight_analysis_service.settings import Settings, load_settings
 
 
 @lru_cache

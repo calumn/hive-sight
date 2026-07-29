@@ -1,8 +1,8 @@
 from functools import lru_cache
 
-from beehive_core_api.analysis_request_workflow import AnalysisRequestWorkflow
-from beehive_core_api.inspection_photo_access import InspectionPhotoAccess
-from beehive_core_api.settings import Settings, load_settings
+from hive_sight_core_api.analysis_request_workflow import AnalysisRequestWorkflow
+from hive_sight_core_api.inspection_photo_access import InspectionPhotoAccess
+from hive_sight_core_api.settings import Settings, load_settings
 
 
 @lru_cache

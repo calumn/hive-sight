@@ -1,6 +1,6 @@
 # Contracts
 
-This folder holds shared contracts between BeehiveMonitor services and clients.
+This folder holds shared contracts between HiveSight services and clients.
 
 Initial contract discipline:
 
