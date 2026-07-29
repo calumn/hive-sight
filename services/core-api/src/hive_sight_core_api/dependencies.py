@@ -11,6 +11,10 @@ from hive_sight_core_api.analysis_processing_workflow import (
     DeterministicStubAnalysisExecutor,
 )
 from hive_sight_core_api.analysis_request_workflow import AnalysisRequestWorkflow
+from hive_sight_core_api.dataset_labelling_workflow import (
+    DatasetLabellingWorkflow,
+    DeterministicBeePrelabeler,
+)
 from hive_sight_core_api.dev_store import (
     DevState,
     InMemoryEventRecorder,
@@ -67,6 +71,14 @@ def get_analysis_processing_workflow(state: DevStateDep) -> AnalysisProcessingWo
     return AnalysisProcessingWorkflow(
         store=state.store,
         executor=DeterministicStubAnalysisExecutor(clock=state.store.clock),
+        clock=state.store.clock,
+    )
+
+
+def get_dataset_labelling_workflow(state: DevStateDep) -> DatasetLabellingWorkflow:
+    return DatasetLabellingWorkflow(
+        store=state.store,
+        prelabeler=DeterministicBeePrelabeler(),
         clock=state.store.clock,
     )
 

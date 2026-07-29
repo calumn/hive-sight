@@ -20,9 +20,12 @@ import {
   createReviewDecision,
   fetchAnalysisEvidence,
   fetchCoreHealth,
+  fetchDatasetLabellingEvidence,
   fetchDevSession,
   fetchInspectionPhotoObjectUrl,
   processAnalysisRun,
+  startDatasetLabellingSession,
+  updateDatasetLabellingSessionMetadata,
   uploadInspectionPhoto,
   type AnalysisEvidence,
   type AnalysisRunDetail,
@@ -32,6 +35,8 @@ import {
   type DevSession,
   type HealthResponse,
   type Hive,
+  type DatasetLabellingEvidence,
+  type ImageQualityStatus,
   type Inspection,
   type PhotoIntake,
   type ReviewDecisionValue
@@ -60,9 +65,15 @@ export function App() {
   const [analysisDetail, setAnalysisDetail] = useState<AnalysisRunDetail | null>(null);
   const [analysisEvidence, setAnalysisEvidence] = useState<AnalysisEvidence | null>(null);
   const [evidenceImageUrl, setEvidenceImageUrl] = useState<string | null>(null);
+  const [labellingEvidence, setLabellingEvidence] = useState<DatasetLabellingEvidence | null>(null);
+  const [labellingImageUrl, setLabellingImageUrl] = useState<string | null>(null);
   const [reviewState, setReviewState] = useState<{ kind: "idle" | "working" | "done" } | null>(
     null
   );
+  const [labellingState, setLabellingState] = useState<{
+    kind: "idle" | "working" | "done";
+    label?: string;
+  } | null>(null);
   const [apiaryName, setApiaryName] = useState("Home apiary");
   const [hiveName, setHiveName] = useState("Hive A");
   const [inspectionDate, setInspectionDate] = useState(new Date().toISOString().slice(0, 10));
@@ -79,8 +90,11 @@ export function App() {
       if (evidenceImageUrl) {
         URL.revokeObjectURL(evidenceImageUrl);
       }
+      if (labellingImageUrl) {
+        URL.revokeObjectURL(labellingImageUrl);
+      }
     };
-  }, [evidenceImageUrl]);
+  }, [evidenceImageUrl, labellingImageUrl]);
 
   const session = loadState.kind === "ready" ? loadState.session : null;
   const termsAccepted = session?.workspaceDataUseAgreementStatus === "accepted";
@@ -134,6 +148,7 @@ export function App() {
       setInspection(null);
       setAnalysisDetail(null);
       clearEvidenceImage();
+      clearLabellingImage();
     });
   }
 
@@ -148,6 +163,7 @@ export function App() {
       setInspection(null);
       setAnalysisDetail(null);
       clearEvidenceImage();
+      clearLabellingImage();
     });
   }
 
@@ -165,6 +181,7 @@ export function App() {
       setInspection(created);
       setAnalysisDetail(null);
       clearEvidenceImage();
+      clearLabellingImage();
     });
   }
 
@@ -183,6 +200,7 @@ export function App() {
       await refreshSession();
       setAnalysisDetail(null);
       clearEvidenceImage();
+      clearLabellingImage();
       setActionState({ kind: "accepted", intake });
     });
   }
@@ -256,9 +274,121 @@ export function App() {
     }
   }
 
+  async function onStartDatasetLabelling() {
+    if (!session || actionState.kind !== "accepted") {
+      return;
+    }
+    setLabellingState({ kind: "working", label: "Starting dataset labelling" });
+    try {
+      const labellingSession = await startDatasetLabellingSession({
+        devUserId,
+        workspaceId: session.workspaceId,
+        inspectionPhotoId: actionState.intake.inspectionPhoto.inspectionPhotoId
+      });
+      const evidence = await fetchDatasetLabellingEvidence({
+        devUserId,
+        workspaceId: session.workspaceId,
+        labellingSessionId: labellingSession.labellingSessionId
+      });
+      const nextImageUrl = await fetchInspectionPhotoObjectUrl({
+        devUserId,
+        viewUrl: evidence.inspectionPhoto.viewUrl
+      });
+      setLabellingEvidence(evidence);
+      setLabellingImageUrl((current) => {
+        if (current) {
+          URL.revokeObjectURL(current);
+        }
+        return nextImageUrl;
+      });
+      setLabellingState({ kind: "done" });
+    } catch (error) {
+      const apiError = toApiError(error);
+      setLabellingState(null);
+      setActionState({ kind: "blocked", code: apiError.code, message: apiError.message });
+    }
+  }
+
+  async function onUpdateDatasetLabellingMetadata({
+    labellingSessionId,
+    sourceGroupKey,
+    imageQualityStatus
+  }: {
+    labellingSessionId: string;
+    sourceGroupKey: string;
+    imageQualityStatus: ImageQualityStatus;
+  }) {
+    if (!session) {
+      return;
+    }
+    setLabellingState({ kind: "working", label: "Saving labelling metadata" });
+    try {
+      const updatedSession = await updateDatasetLabellingSessionMetadata({
+        devUserId,
+        workspaceId: session.workspaceId,
+        labellingSessionId,
+        sourceGroupKey,
+        imageQualityStatus
+      });
+      setLabellingEvidence((current) =>
+        current ? { ...current, labellingSession: updatedSession } : current
+      );
+      setLabellingState({ kind: "done" });
+    } catch (error) {
+      const apiError = toApiError(error);
+      setLabellingState(null);
+      setActionState({ kind: "blocked", code: apiError.code, message: apiError.message });
+    }
+  }
+
+  async function onSubmitDatasetLabellingReview({
+    annotationId,
+    decision,
+    notes
+  }: {
+    annotationId: string;
+    decision: ReviewDecisionValue;
+    notes: string;
+  }) {
+    if (!session || !labellingEvidence) {
+      return;
+    }
+    setLabellingState({ kind: "working", label: "Recording labelling review" });
+    try {
+      await createReviewDecision({
+        devUserId,
+        workspaceId: session.workspaceId,
+        subjectId: annotationId,
+        decision,
+        notes
+      });
+      const refreshedEvidence = await fetchDatasetLabellingEvidence({
+        devUserId,
+        workspaceId: session.workspaceId,
+        labellingSessionId: labellingEvidence.labellingSession.labellingSessionId
+      });
+      setLabellingEvidence(refreshedEvidence);
+      setLabellingState({ kind: "done" });
+    } catch (error) {
+      const apiError = toApiError(error);
+      setLabellingState(null);
+      setActionState({ kind: "blocked", code: apiError.code, message: apiError.message });
+    }
+  }
+
   function clearEvidenceImage() {
     setAnalysisEvidence(null);
     setEvidenceImageUrl((current) => {
+      if (current) {
+        URL.revokeObjectURL(current);
+      }
+      return null;
+    });
+  }
+
+  function clearLabellingImage() {
+    setLabellingEvidence(null);
+    setLabellingImageUrl((current) => {
       if (current) {
         URL.revokeObjectURL(current);
       }
@@ -409,17 +539,29 @@ export function App() {
 
             <Outcome state={actionState} analysisDetail={analysisDetail} />
             {actionState.kind === "accepted" ? (
-              <AnalysisPanel
-                analysisRunId={actionState.intake.analysisRun.analysisRunId}
-                queuedStatus={actionState.intake.analysisRun.status}
-                detail={analysisDetail}
-                evidence={analysisEvidence}
-                imageUrl={evidenceImageUrl}
-                reviewerCapability={loadState.session.reviewerCapability}
-                reviewState={reviewState}
-                onProcessAnalysis={onProcessAnalysis}
-                onSubmitReviewDecision={onSubmitReviewDecision}
-              />
+              <>
+                <AnalysisPanel
+                  analysisRunId={actionState.intake.analysisRun.analysisRunId}
+                  queuedStatus={actionState.intake.analysisRun.status}
+                  detail={analysisDetail}
+                  evidence={analysisEvidence}
+                  imageUrl={evidenceImageUrl}
+                  reviewerCapability={loadState.session.reviewerCapability}
+                  reviewState={reviewState}
+                  onProcessAnalysis={onProcessAnalysis}
+                  onSubmitReviewDecision={onSubmitReviewDecision}
+                />
+                {loadState.session.datasetCuratorCapability ? (
+                  <DatasetLabellingPanel
+                    evidence={labellingEvidence}
+                    imageUrl={labellingImageUrl}
+                    labellingState={labellingState}
+                    onStartDatasetLabelling={onStartDatasetLabelling}
+                    onUpdateMetadata={onUpdateDatasetLabellingMetadata}
+                    onSubmitReviewDecision={onSubmitDatasetLabellingReview}
+                  />
+                ) : null}
+              </>
             ) : null}
           </section>
         </section>
@@ -575,6 +717,238 @@ function AnalysisPanel({
           AI-assisted Varroa estimate.
         </p>
       )}
+    </section>
+  );
+}
+
+function DatasetLabellingPanel({
+  evidence,
+  imageUrl,
+  labellingState,
+  onStartDatasetLabelling,
+  onUpdateMetadata,
+  onSubmitReviewDecision
+}: {
+  evidence: DatasetLabellingEvidence | null;
+  imageUrl: string | null;
+  labellingState: { kind: "idle" | "working" | "done"; label?: string } | null;
+  onStartDatasetLabelling: () => void;
+  onUpdateMetadata: (request: {
+    labellingSessionId: string;
+    sourceGroupKey: string;
+    imageQualityStatus: ImageQualityStatus;
+  }) => Promise<void>;
+  onSubmitReviewDecision: (request: {
+    annotationId: string;
+    decision: ReviewDecisionValue;
+    notes: string;
+  }) => Promise<void>;
+}) {
+  const [selectedAnnotationId, setSelectedAnnotationId] = useState<string | null>(null);
+  const [sourceGroupKey, setSourceGroupKey] = useState("");
+  const [imageQualityStatus, setImageQualityStatus] =
+    useState<ImageQualityStatus>("unassessed");
+  const [notes, setNotes] = useState("Accepted for dataset labelling evidence.");
+
+  useEffect(() => {
+    if (!evidence) {
+      return;
+    }
+    setSourceGroupKey(evidence.labellingSession.sourceGroupKey ?? "");
+    setImageQualityStatus(evidence.labellingSession.imageQualityStatus);
+  }, [evidence]);
+
+  const selectedAnnotation = evidence?.draftAnnotations.find(
+    (annotation) => annotation.annotationId === selectedAnnotationId
+  );
+  const completeBeeCount =
+    evidence?.draftAnnotations.filter(
+      (annotation) => annotation.annotationType === "complete_visible_bee"
+    ).length ?? 0;
+  const partialBeeCount =
+    evidence?.draftAnnotations.filter(
+      (annotation) => annotation.annotationType === "partial_visible_bee"
+    ).length ?? 0;
+
+  return (
+    <section
+      className="analysis-panel dataset-labelling-panel"
+      aria-label="Dataset labelling"
+      data-testid="dataset-labelling-panel"
+    >
+      <div className="analysis-header">
+        <PanelHeading icon={<FlaskConical size={20} />} title="Dataset labelling" />
+        <span className={`analysis-status status-${evidence?.labellingSession.status ?? "queued"}`}>
+          {evidence?.labellingSession.status ?? "not started"}
+        </span>
+      </div>
+      <p className="analysis-caveat">
+        Internal dataset-labelling workflow. Machine suggestions require curator review and do not
+        assign dataset use.
+      </p>
+      <button
+        type="button"
+        onClick={onStartDatasetLabelling}
+        disabled={labellingState?.kind === "working"}
+        data-testid="start-dataset-labelling-button"
+      >
+        <FlaskConical size={18} />
+        {evidence ? "Reload dataset labelling" : "Start dataset labelling"}
+      </button>
+
+      {labellingState?.kind === "working" ? (
+        <div className="outcome working" role="status">
+          <LoaderCircle className="spin" size={20} />
+          <span>{labellingState.label}</span>
+        </div>
+      ) : null}
+
+      {evidence && imageUrl ? (
+        <>
+          <div className="metadata-panel" aria-label="Labelling metadata">
+            <label>
+              <span>Source group key</span>
+              <input
+                value={sourceGroupKey}
+                maxLength={100}
+                onChange={(event) => setSourceGroupKey(event.target.value)}
+                placeholder="Optional"
+                data-testid="source-group-key-input"
+              />
+            </label>
+            <label>
+              <span>Image quality</span>
+              <select
+                value={imageQualityStatus}
+                onChange={(event) => setImageQualityStatus(event.target.value as ImageQualityStatus)}
+                data-testid="image-quality-select"
+              >
+                <option value="unassessed">Unassessed</option>
+                <option value="usable">Usable</option>
+                <option value="poor_quality">Poor quality</option>
+                <option value="exclude">Exclude</option>
+              </select>
+            </label>
+            <button
+              type="button"
+              onClick={() =>
+                void onUpdateMetadata({
+                  labellingSessionId: evidence.labellingSession.labellingSessionId,
+                  sourceGroupKey,
+                  imageQualityStatus
+                })
+              }
+              disabled={labellingState?.kind === "working"}
+              data-testid="save-labelling-metadata-button"
+            >
+              <Check size={18} />
+              Save metadata
+            </button>
+          </div>
+
+          <section
+            className="evidence-panel"
+            aria-label="AI-assisted draft annotations"
+            data-testid="dataset-evidence-panel"
+          >
+            <div className="evidence-heading">
+              <PanelHeading icon={<Image size={20} />} title="Draft suggestions" />
+              <div className="evidence-legend" aria-label="Dataset overlay legend">
+                <span className="legend-item complete">Complete visible bee</span>
+                <span className="legend-item partial">Partial visible bee</span>
+              </div>
+            </div>
+            <div
+              className="photo-evidence"
+              style={{
+                aspectRatio: `${evidence.inspectionPhoto.width} / ${evidence.inspectionPhoto.height}`
+              }}
+              data-testid="dataset-photo-evidence"
+            >
+              <img
+                src={imageUrl}
+                alt={evidence.inspectionPhoto.filename}
+                data-testid="dataset-evidence-image"
+              />
+              {evidence.draftAnnotations.map((annotation) => (
+                <AnnotationBox
+                  key={annotation.annotationId}
+                  annotation={annotation}
+                  selected={annotation.annotationId === selectedAnnotationId}
+                  reviewerCapability
+                  onSelect={() => setSelectedAnnotationId(annotation.annotationId)}
+                />
+              ))}
+            </div>
+            <p className="evidence-summary" data-testid="dataset-evidence-summary">
+              {completeBeeCount} complete visible bee and {partialBeeCount} partial visible bee
+              draft suggestions from {evidence.labellingSession.prelabelerRun.prelabelerName}.
+            </p>
+          </section>
+
+          <form
+            className="review-panel"
+            aria-label="Dataset labelling review decision"
+            data-testid="dataset-review-controls"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (!selectedAnnotationId) {
+                return;
+              }
+              void onSubmitReviewDecision({
+                annotationId: selectedAnnotationId,
+                decision: "approved",
+                notes
+              });
+            }}
+          >
+            <div>
+              <strong>Curator review</strong>
+              <p>Approve draft bee suggestions as reviewed annotation evidence only.</p>
+            </div>
+            <label>
+              <span>Selected draft</span>
+              <select
+                value={selectedAnnotationId ?? ""}
+                onChange={(event) => setSelectedAnnotationId(event.target.value || null)}
+                data-testid="dataset-review-annotation-select"
+              >
+                <option value="">Choose a draft annotation</option>
+                {evidence.draftAnnotations.map((annotation, index) => (
+                  <option key={annotation.annotationId} value={annotation.annotationId}>
+                    {index + 1}. {annotationLabel(annotation)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <span>Notes</span>
+              <textarea
+                value={notes}
+                maxLength={500}
+                onChange={(event) => setNotes(event.target.value)}
+                data-testid="dataset-review-notes-input"
+              />
+            </label>
+            <button
+              type="submit"
+              disabled={!selectedAnnotationId || labellingState?.kind === "working"}
+              data-testid="submit-dataset-review-decision-button"
+            >
+              <Check size={18} />
+              Approve draft
+            </button>
+            <p className="review-state" data-testid="dataset-review-state">
+              {selectedAnnotation?.latestReviewDecision
+                ? `Latest decision: ${selectedAnnotation.latestReviewDecision.decision}`
+                : `${evidence.reviewedAnnotations.length} reviewed annotations`}
+            </p>
+          </form>
+          <p className="analysis-caveat" data-testid="dataset-evidence-caveat">
+            {evidence.caveat}
+          </p>
+        </>
+      ) : null}
     </section>
   );
 }

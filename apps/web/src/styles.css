@@ -518,6 +518,24 @@ label span {
   padding: 14px;
 }
 
+.metadata-panel {
+  background: #f7f9f5;
+  border: 1px solid #dce2d7;
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 240px) minmax(150px, 190px);
+  padding: 14px;
+}
+
+.metadata-panel button {
+  align-self: end;
+}
+
+.dataset-labelling-panel {
+  border-color: #cfd8c9;
+}
+
 .review-panel > div,
 .review-panel .review-state {
   grid-column: 1 / -1;
@@ -573,6 +591,7 @@ label span {
   .form-grid,
   .upload-panel,
   .result-grid,
+  .metadata-panel,
   .review-panel {
     grid-template-columns: 1fr;
   }

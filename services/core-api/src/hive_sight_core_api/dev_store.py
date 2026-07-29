@@ -9,12 +9,18 @@ from hive_sight_core_api.models import (
     AnalysisRunStatus,
     AnnotationCreate,
     AnnotationResponse,
+    AnnotationType,
+    AnnotationWorkflowType,
     ApiaryResponse,
+    DatasetLabellingSessionResponse,
+    DatasetLabellingSessionStatus,
     DataUseAgreementStatus,
     DevSessionResponse,
     HiveResponse,
+    ImageQualityStatus,
     InspectionPhotoResponse,
     InspectionResponse,
+    PrelabelerRunResponse,
     ReviewDecisionResponse,
     ReviewDecisionValue,
     ReviewSubjectType,
@@ -23,6 +29,7 @@ from hive_sight_core_api.models import (
 )
 
 DEFAULT_DEV_REVIEWER_USER_ID = UUID("00000000-0000-0000-0000-000000000101")
+DEFAULT_DEV_DATASET_CURATOR_USER_ID = UUID("00000000-0000-0000-0000-000000000101")
 
 
 @dataclass(frozen=True)
@@ -80,8 +87,14 @@ class InMemoryProductDataStore:
     analysis_results: dict[UUID, AnalysisResultResponse] = field(default_factory=dict)
     annotations: dict[UUID, AnnotationResponse] = field(default_factory=dict)
     review_decisions: dict[UUID, ReviewDecisionResponse] = field(default_factory=dict)
+    dataset_labelling_sessions: dict[UUID, DatasetLabellingSessionResponse] = field(
+        default_factory=dict
+    )
     reviewer_user_ids: set[UUID] = field(
         default_factory=lambda: {DEFAULT_DEV_REVIEWER_USER_ID}
+    )
+    dataset_curator_user_ids: set[UUID] = field(
+        default_factory=lambda: {DEFAULT_DEV_DATASET_CURATOR_USER_ID}
     )
 
     def ensure_dev_session(self, user_id: UUID) -> DevSessionResponse:
@@ -99,6 +112,7 @@ class InMemoryProductDataStore:
             workspace_id=workspace.workspace_id,
             role=membership.role,
             reviewer_capability=user_id in self.reviewer_user_ids,
+            dataset_curator_capability=user_id in self.dataset_curator_user_ids,
             workspace_data_use_agreement_status=workspace.data_use_agreement_status,
             workspace_data_use_agreement_terms_version=workspace.data_use_agreement_terms_version,
         )
@@ -318,6 +332,8 @@ class InMemoryProductDataStore:
                 workspace_id=analysis_run.workspace_id,
                 inspection_photo_id=analysis_run.inspection_photo_id,
                 analysis_result_id=result.analysis_result_id,
+                labelling_session_id=None,
+                workflow_type=AnnotationWorkflowType.analysis_result,
                 annotation_type=annotation.annotation_type,
                 x=annotation.x,
                 y=annotation.y,
@@ -377,6 +393,22 @@ class InMemoryProductDataStore:
             if annotation.analysis_result_id == analysis_result_id
         ]
 
+    def get_annotations_for_labelling_session(
+        self,
+        labelling_session_id: UUID,
+    ) -> list[AnnotationResponse]:
+        return [
+            annotation.model_copy(
+                update={
+                    "latest_review_decision": self.latest_review_decision_for_subject(
+                        annotation.annotation_id
+                    )
+                }
+            )
+            for annotation in self.annotations.values()
+            if annotation.labelling_session_id == labelling_session_id
+        ]
+
     def record_review_decision(
         self,
         user: UserContext,
@@ -388,11 +420,10 @@ class InMemoryProductDataStore:
     ) -> ReviewDecisionResponse:
         self.require_workspace_access(user, workspace_id)
         self.require_data_use_agreement(workspace_id)
-        self.require_reviewer_capability(user)
         if subject_type != ReviewSubjectType.annotation:
             raise DomainError(
                 "invalid_review_subject",
-                "Slice 4 Review Decisions can only be recorded for Annotations.",
+                "Review Decisions can only be recorded for Annotations.",
                 422,
             )
         annotation = self.annotations.get(subject_id)
@@ -402,6 +433,10 @@ class InMemoryProductDataStore:
                 "The requested Annotation was not found in this Workspace.",
                 404,
             )
+        if annotation.workflow_type == AnnotationWorkflowType.dataset_labelling:
+            self.require_dataset_curator_capability(user)
+        else:
+            self.require_reviewer_capability(user)
         review_decision = ReviewDecisionResponse(
             review_decision_id=self.id_factory(),
             workspace_id=workspace_id,
@@ -413,6 +448,8 @@ class InMemoryProductDataStore:
             created_at=self.clock(),
         )
         self.review_decisions[review_decision.review_decision_id] = review_decision
+        if annotation.labelling_session_id is not None:
+            self.mark_labelling_session_review_in_progress(annotation.labelling_session_id)
         return review_decision
 
     def latest_review_decision_for_subject(
@@ -444,6 +481,167 @@ class InMemoryProductDataStore:
             "Internal reviewer capability is required to record Review Decisions.",
             403,
         )
+
+    def require_dataset_curator_capability(self, user: UserContext) -> None:
+        if user.user_id in self.dataset_curator_user_ids:
+            return
+        raise DomainError(
+            "dataset_curator_access_required",
+            "Internal dataset curator capability is required for dataset labelling.",
+            403,
+        )
+
+    def require_inspection_photo_for_labelling(
+        self,
+        user: UserContext,
+        workspace_id: UUID,
+        inspection_photo_id: UUID,
+    ) -> InspectionPhotoResponse:
+        self.require_workspace_access(user, workspace_id)
+        self.require_data_use_agreement(workspace_id)
+        photo = self.inspection_photos.get(inspection_photo_id)
+        if photo is None or photo.workspace_id != workspace_id:
+            raise DomainError(
+                "inspection_photo_not_found",
+                "The requested Inspection Photo was not found in this Workspace.",
+                404,
+            )
+        return photo
+
+    def existing_labelling_session_for_photo(
+        self,
+        workspace_id: UUID,
+        inspection_photo_id: UUID,
+    ) -> DatasetLabellingSessionResponse | None:
+        for session in self.dataset_labelling_sessions.values():
+            if (
+                session.workspace_id == workspace_id
+                and session.inspection_photo_id == inspection_photo_id
+            ):
+                return session
+        return None
+
+    def record_dataset_labelling_session(
+        self,
+        workspace_id: UUID,
+        inspection_photo_id: UUID,
+        created_by_user_id: UUID,
+        prelabeler_run: PrelabelerRunResponse,
+        created_at: datetime,
+    ) -> DatasetLabellingSessionResponse:
+        status = (
+            DatasetLabellingSessionStatus.draft_ready
+            if prelabeler_run.status == "succeeded"
+            else DatasetLabellingSessionStatus.prelabel_failed
+        )
+        session = DatasetLabellingSessionResponse(
+            labelling_session_id=self.id_factory(),
+            workspace_id=workspace_id,
+            inspection_photo_id=inspection_photo_id,
+            created_by_user_id=created_by_user_id,
+            status=status,
+            source_group_key=None,
+            image_quality_status=ImageQualityStatus.unassessed,
+            prelabeler_run=prelabeler_run,
+            created_at=created_at,
+            updated_at=created_at,
+        )
+        self.dataset_labelling_sessions[session.labelling_session_id] = session
+        return session
+
+    def record_dataset_labelling_annotation(
+        self,
+        workspace_id: UUID,
+        inspection_photo_id: UUID,
+        labelling_session_id: UUID,
+        annotation: AnnotationCreate,
+        created_at: datetime,
+    ) -> AnnotationResponse:
+        if annotation.annotation_type not in {
+            AnnotationType.complete_visible_bee,
+            AnnotationType.partial_visible_bee,
+        }:
+            raise DomainError(
+                "unsupported_annotation_type",
+                "Slice 5 dataset labelling supports complete and partial visible bee annotations.",
+                422,
+            )
+        annotation_record = AnnotationResponse(
+            annotation_id=self.id_factory(),
+            workspace_id=workspace_id,
+            inspection_photo_id=inspection_photo_id,
+            analysis_result_id=None,
+            labelling_session_id=labelling_session_id,
+            workflow_type=AnnotationWorkflowType.dataset_labelling,
+            annotation_type=annotation.annotation_type,
+            x=annotation.x,
+            y=annotation.y,
+            width=annotation.width,
+            height=annotation.height,
+            coordinate_space=annotation.coordinate_space,
+            source_image_width_px=annotation.source_image_width_px,
+            source_image_height_px=annotation.source_image_height_px,
+            confidence=annotation.confidence,
+            source=annotation.source,
+            created_at=created_at,
+        )
+        self.annotations[annotation_record.annotation_id] = annotation_record
+        return annotation_record
+
+    def require_labelling_session(
+        self,
+        user: UserContext,
+        workspace_id: UUID,
+        labelling_session_id: UUID,
+    ) -> DatasetLabellingSessionResponse:
+        self.require_workspace_access(user, workspace_id)
+        self.require_data_use_agreement(workspace_id)
+        self.require_dataset_curator_capability(user)
+        session = self.dataset_labelling_sessions.get(labelling_session_id)
+        if session is None or session.workspace_id != workspace_id:
+            raise DomainError(
+                "labelling_session_not_found",
+                "The requested Dataset Labelling Session was not found in this Workspace.",
+                404,
+            )
+        return session
+
+    def update_labelling_session_metadata(
+        self,
+        user: UserContext,
+        workspace_id: UUID,
+        labelling_session_id: UUID,
+        source_group_key: str | None,
+        image_quality_status: ImageQualityStatus,
+    ) -> DatasetLabellingSessionResponse:
+        session = self.require_labelling_session(user, workspace_id, labelling_session_id)
+        cleaned_group_key = source_group_key.strip() if source_group_key else None
+        updated = session.model_copy(
+            update={
+                "source_group_key": cleaned_group_key or None,
+                "image_quality_status": image_quality_status,
+                "updated_at": self.clock(),
+            }
+        )
+        self.dataset_labelling_sessions[updated.labelling_session_id] = updated
+        return updated
+
+    def mark_labelling_session_review_in_progress(
+        self,
+        labelling_session_id: UUID,
+    ) -> None:
+        session = self.dataset_labelling_sessions.get(labelling_session_id)
+        if session is None or session.status == DatasetLabellingSessionStatus.prelabel_failed:
+            return
+        if session.status == DatasetLabellingSessionStatus.review_in_progress:
+            return
+        updated = session.model_copy(
+            update={
+                "status": DatasetLabellingSessionStatus.review_in_progress,
+                "updated_at": self.clock(),
+            }
+        )
+        self.dataset_labelling_sessions[updated.labelling_session_id] = updated
 
     def require_inspection_photo_for_view(
         self,

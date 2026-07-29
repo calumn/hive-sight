@@ -7,10 +7,12 @@ from fastapi.responses import JSONResponse, Response
 
 from hive_sight_core_api.analysis_processing_workflow import AnalysisProcessingWorkflow
 from hive_sight_core_api.analysis_request_workflow import AnalysisRequestWorkflow
+from hive_sight_core_api.dataset_labelling_workflow import DatasetLabellingWorkflow
 from hive_sight_core_api.dependencies import (
     DevStateDep,
     get_analysis_processing_workflow,
     get_analysis_request_workflow,
+    get_dataset_labelling_workflow,
     get_inspection_photo_access,
     get_settings,
 )
@@ -23,6 +25,8 @@ from hive_sight_core_api.models import (
     AnalysisRunResponse,
     ApiaryCreateRequest,
     ApiaryResponse,
+    DatasetLabellingEvidenceResponse,
+    DatasetLabellingSessionResponse,
     DevSessionResponse,
     ErrorResponse,
     HealthResponse,
@@ -34,6 +38,8 @@ from hive_sight_core_api.models import (
     ProcessAnalysisRunRequest,
     ReviewDecisionCreateRequest,
     ReviewDecisionResponse,
+    StartDatasetLabellingRequest,
+    UpdateDatasetLabellingSessionRequest,
     UploadUrlResponse,
     WorkspaceDataUseAgreementAcceptanceRequest,
     WorkspaceDataUseAgreementAcceptanceResponse,
@@ -64,6 +70,10 @@ AnalysisRequestWorkflowDep = Annotated[
 AnalysisProcessingWorkflowDep = Annotated[
     AnalysisProcessingWorkflow,
     Depends(get_analysis_processing_workflow),
+]
+DatasetLabellingWorkflowDep = Annotated[
+    DatasetLabellingWorkflow,
+    Depends(get_dataset_labelling_workflow),
 ]
 DevUserIdHeader = Annotated[str | None, Header(alias="x-hivesight-dev-user-id")]
 
@@ -268,6 +278,59 @@ def create_review_decision(
         subject_id=request.subject_id,
         decision=request.decision,
         notes=request.notes,
+    )
+
+
+@app.post(
+    "/v1/dataset-labelling-sessions",
+    response_model=DatasetLabellingSessionResponse,
+    status_code=201,
+)
+def start_dataset_labelling(
+    request: StartDatasetLabellingRequest,
+    user: AuthenticatedUserDep,
+    workflow: DatasetLabellingWorkflowDep,
+) -> DatasetLabellingSessionResponse:
+    return workflow.start_labelling(
+        user=user,
+        workspace_id=request.workspace_id,
+        inspection_photo_id=request.inspection_photo_id,
+    )
+
+
+@app.patch(
+    "/v1/dataset-labelling-sessions/{labelling_session_id}",
+    response_model=DatasetLabellingSessionResponse,
+)
+def update_dataset_labelling_session(
+    labelling_session_id: UUID,
+    request: UpdateDatasetLabellingSessionRequest,
+    user: AuthenticatedUserDep,
+    workflow: DatasetLabellingWorkflowDep,
+) -> DatasetLabellingSessionResponse:
+    return workflow.update_session_metadata(
+        user=user,
+        workspace_id=request.workspace_id,
+        labelling_session_id=labelling_session_id,
+        source_group_key=request.source_group_key,
+        image_quality_status=request.image_quality_status,
+    )
+
+
+@app.get(
+    "/v1/dataset-labelling-sessions/{labelling_session_id}/evidence",
+    response_model=DatasetLabellingEvidenceResponse,
+)
+def get_dataset_labelling_evidence(
+    labelling_session_id: UUID,
+    workspace_id: UUID,
+    user: AuthenticatedUserDep,
+    workflow: DatasetLabellingWorkflowDep,
+) -> DatasetLabellingEvidenceResponse:
+    return workflow.get_labelling_evidence(
+        user=user,
+        workspace_id=workspace_id,
+        labelling_session_id=labelling_session_id,
     )
 
 

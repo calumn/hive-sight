@@ -9,6 +9,7 @@ export type DevSession = {
   workspaceId: string;
   role: string;
   reviewerCapability: boolean;
+  datasetCuratorCapability: boolean;
   workspaceDataUseAgreementStatus: "missing" | "accepted";
   workspaceDataUseAgreementTermsVersion: string | null;
 };
@@ -73,6 +74,37 @@ export type AnnotationType = "complete_visible_bee" | "partial_visible_bee" | "l
 
 export type ReviewDecisionValue = "approved" | "rejected" | "uncertain" | "excluded";
 
+export type ImageQualityStatus = "unassessed" | "usable" | "poor_quality" | "exclude";
+
+export type DatasetLabellingSessionStatus =
+  | "draft_ready"
+  | "review_in_progress"
+  | "prelabel_failed";
+
+export type PrelabelerRun = {
+  prelabelerRunId: string;
+  prelabelerName: string;
+  prelabelerVersion: string;
+  status: "succeeded" | "failed";
+  startedAt: string;
+  finishedAt: string | null;
+  errorCode: string | null;
+  errorMessage: string | null;
+};
+
+export type DatasetLabellingSession = {
+  labellingSessionId: string;
+  workspaceId: string;
+  inspectionPhotoId: string;
+  createdByUserId: string;
+  status: DatasetLabellingSessionStatus;
+  sourceGroupKey: string | null;
+  imageQualityStatus: ImageQualityStatus;
+  prelabelerRun: PrelabelerRun;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type ReviewDecision = {
   reviewDecisionId: string;
   workspaceId: string;
@@ -88,7 +120,9 @@ export type Annotation = {
   annotationId: string;
   workspaceId: string;
   inspectionPhotoId: string;
-  analysisResultId: string;
+  analysisResultId: string | null;
+  labellingSessionId: string | null;
+  workflowType: "analysis_result" | "dataset_labelling";
   annotationType: AnnotationType;
   x: number;
   y: number;
@@ -103,21 +137,32 @@ export type Annotation = {
   latestReviewDecision: ReviewDecision | null;
 };
 
+export type InspectionPhotoEvidence = {
+  inspectionPhotoId: string;
+  filename: string;
+  contentType: string;
+  viewUrl: string;
+  width: number;
+  height: number;
+};
+
 export type AnalysisEvidence = {
   analysisRunId: string;
   analysisResultId: string;
-  inspectionPhoto: {
-    inspectionPhotoId: string;
-    filename: string;
-    contentType: string;
-    viewUrl: string;
-    width: number;
-    height: number;
-  };
+  inspectionPhoto: InspectionPhotoEvidence;
   analysisResult: AnalysisResult;
   annotations: Annotation[];
   resultKind: "deterministic_stub";
   modelVersion: string;
+  caveat: string;
+};
+
+export type DatasetLabellingEvidence = {
+  inspectionPhoto: InspectionPhotoEvidence;
+  labellingSession: DatasetLabellingSession;
+  draftAnnotations: Annotation[];
+  reviewedAnnotations: Annotation[];
+  latestReviewDecisions: ReviewDecision[];
   caveat: string;
 };
 
@@ -353,6 +398,70 @@ export async function createReviewDecision({
   return parseReviewDecision(await response.json());
 }
 
+export async function startDatasetLabellingSession({
+  devUserId,
+  workspaceId,
+  inspectionPhotoId
+}: {
+  devUserId: string;
+  workspaceId: string;
+  inspectionPhotoId: string;
+}): Promise<DatasetLabellingSession> {
+  const response = await fetch(`${coreApiUrl}/v1/dataset-labelling-sessions`, {
+    method: "POST",
+    headers: jsonHeaders(devUserId),
+    body: JSON.stringify({ workspace_id: workspaceId, inspection_photo_id: inspectionPhotoId })
+  });
+  await ensureOk(response);
+  return parseDatasetLabellingSession(await response.json());
+}
+
+export async function updateDatasetLabellingSessionMetadata({
+  devUserId,
+  workspaceId,
+  labellingSessionId,
+  sourceGroupKey,
+  imageQualityStatus
+}: {
+  devUserId: string;
+  workspaceId: string;
+  labellingSessionId: string;
+  sourceGroupKey: string;
+  imageQualityStatus: ImageQualityStatus;
+}): Promise<DatasetLabellingSession> {
+  const response = await fetch(`${coreApiUrl}/v1/dataset-labelling-sessions/${labellingSessionId}`, {
+    method: "PATCH",
+    headers: jsonHeaders(devUserId),
+    body: JSON.stringify({
+      workspace_id: workspaceId,
+      source_group_key: sourceGroupKey.trim().length > 0 ? sourceGroupKey.trim() : null,
+      image_quality_status: imageQualityStatus
+    })
+  });
+  await ensureOk(response);
+  return parseDatasetLabellingSession(await response.json());
+}
+
+export async function fetchDatasetLabellingEvidence({
+  devUserId,
+  workspaceId,
+  labellingSessionId
+}: {
+  devUserId: string;
+  workspaceId: string;
+  labellingSessionId: string;
+}): Promise<DatasetLabellingEvidence> {
+  const params = new URLSearchParams({ workspace_id: workspaceId });
+  const response = await fetch(
+    `${coreApiUrl}/v1/dataset-labelling-sessions/${labellingSessionId}/evidence?${params}`,
+    {
+      headers: devAuthHeaders(devUserId)
+    }
+  );
+  await ensureOk(response);
+  return parseDatasetLabellingEvidence(await response.json());
+}
+
 function devAuthHeaders(devUserId: string): HeadersInit {
   return { "x-hivesight-dev-user-id": devUserId };
 }
@@ -400,6 +509,10 @@ function parseDevSession(value: unknown): DevSession {
     workspaceId: requireString(record.workspace_id, "workspace_id"),
     role: requireString(record.role, "role"),
     reviewerCapability: requireBoolean(record.reviewer_capability, "reviewer_capability"),
+    datasetCuratorCapability: requireBoolean(
+      record.dataset_curator_capability,
+      "dataset_curator_capability"
+    ),
     workspaceDataUseAgreementStatus: requireAgreementStatus(
       record.workspace_data_use_agreement_status
     ),
@@ -515,24 +628,47 @@ function parseAnalysisResult(value: unknown): AnalysisResult {
 
 function parseAnalysisEvidence(value: unknown): AnalysisEvidence {
   const record = requireRecord(value, "Analysis evidence response");
-  const photo = requireRecord(record.inspection_photo, "Inspection photo evidence response");
   const annotations = requireArray(record.annotations, "annotations").map(parseAnnotation);
   return {
     analysisRunId: requireString(record.analysis_run_id, "analysis_run_id"),
     analysisResultId: requireString(record.analysis_result_id, "analysis_result_id"),
-    inspectionPhoto: {
-      inspectionPhotoId: requireString(photo.inspection_photo_id, "inspection_photo_id"),
-      filename: requireString(photo.filename, "filename"),
-      contentType: requireString(photo.content_type, "content_type"),
-      viewUrl: requireString(photo.view_url, "view_url"),
-      width: requireNumber(photo.width, "width"),
-      height: requireNumber(photo.height, "height")
-    },
+    inspectionPhoto: parseInspectionPhotoEvidence(record.inspection_photo),
     analysisResult: parseAnalysisResult(record.analysis_result),
     annotations,
     resultKind: requireResultKind(record.result_kind),
     modelVersion: requireString(record.model_version, "model_version"),
     caveat: requireString(record.caveat, "caveat")
+  };
+}
+
+function parseDatasetLabellingEvidence(value: unknown): DatasetLabellingEvidence {
+  const record = requireRecord(value, "Dataset labelling evidence response");
+  return {
+    inspectionPhoto: parseInspectionPhotoEvidence(record.inspection_photo),
+    labellingSession: parseDatasetLabellingSession(record.labelling_session),
+    draftAnnotations: requireArray(record.draft_annotations, "draft_annotations").map(
+      parseAnnotation
+    ),
+    reviewedAnnotations: requireArray(record.reviewed_annotations, "reviewed_annotations").map(
+      parseAnnotation
+    ),
+    latestReviewDecisions: requireArray(
+      record.latest_review_decisions,
+      "latest_review_decisions"
+    ).map(parseReviewDecision),
+    caveat: requireString(record.caveat, "caveat")
+  };
+}
+
+function parseInspectionPhotoEvidence(value: unknown): InspectionPhotoEvidence {
+  const photo = requireRecord(value, "Inspection photo evidence response");
+  return {
+    inspectionPhotoId: requireString(photo.inspection_photo_id, "inspection_photo_id"),
+    filename: requireString(photo.filename, "filename"),
+    contentType: requireString(photo.content_type, "content_type"),
+    viewUrl: requireString(photo.view_url, "view_url"),
+    width: requireNumber(photo.width, "width"),
+    height: requireNumber(photo.height, "height")
   };
 }
 
@@ -542,7 +678,9 @@ function parseAnnotation(value: unknown): Annotation {
     annotationId: requireString(record.annotation_id, "annotation_id"),
     workspaceId: requireString(record.workspace_id, "workspace_id"),
     inspectionPhotoId: requireString(record.inspection_photo_id, "inspection_photo_id"),
-    analysisResultId: requireString(record.analysis_result_id, "analysis_result_id"),
+    analysisResultId: optionalString(record.analysis_result_id, "analysis_result_id"),
+    labellingSessionId: optionalString(record.labelling_session_id, "labelling_session_id"),
+    workflowType: requireAnnotationWorkflowType(record.workflow_type),
     annotationType: requireAnnotationType(record.annotation_type),
     x: requireNumber(record.x, "x"),
     y: requireNumber(record.y, "y"),
@@ -558,6 +696,36 @@ function parseAnnotation(value: unknown): Annotation {
       record.latest_review_decision === null
         ? null
         : parseReviewDecision(record.latest_review_decision)
+  };
+}
+
+function parseDatasetLabellingSession(value: unknown): DatasetLabellingSession {
+  const record = requireRecord(value, "Dataset labelling session response");
+  return {
+    labellingSessionId: requireString(record.labelling_session_id, "labelling_session_id"),
+    workspaceId: requireString(record.workspace_id, "workspace_id"),
+    inspectionPhotoId: requireString(record.inspection_photo_id, "inspection_photo_id"),
+    createdByUserId: requireString(record.created_by_user_id, "created_by_user_id"),
+    status: requireDatasetLabellingSessionStatus(record.status),
+    sourceGroupKey: optionalString(record.source_group_key, "source_group_key"),
+    imageQualityStatus: requireImageQualityStatus(record.image_quality_status),
+    prelabelerRun: parsePrelabelerRun(record.prelabeler_run),
+    createdAt: requireString(record.created_at, "created_at"),
+    updatedAt: requireString(record.updated_at, "updated_at")
+  };
+}
+
+function parsePrelabelerRun(value: unknown): PrelabelerRun {
+  const record = requireRecord(value, "Prelabeler run response");
+  return {
+    prelabelerRunId: requireString(record.prelabeler_run_id, "prelabeler_run_id"),
+    prelabelerName: requireString(record.prelabeler_name, "prelabeler_name"),
+    prelabelerVersion: requireString(record.prelabeler_version, "prelabeler_version"),
+    status: requirePrelabelerRunStatus(record.status),
+    startedAt: requireString(record.started_at, "started_at"),
+    finishedAt: optionalString(record.finished_at, "finished_at"),
+    errorCode: optionalString(record.error_code, "error_code"),
+    errorMessage: optionalString(record.error_message, "error_message")
   };
 }
 
@@ -661,6 +829,39 @@ function requireCoordinateSpace(value: unknown): "normalized" {
     return value;
   }
   throw new Error("Core API response had an unexpected coordinate space");
+}
+
+function requireAnnotationWorkflowType(value: unknown): "analysis_result" | "dataset_labelling" {
+  if (value === "analysis_result" || value === "dataset_labelling") {
+    return value;
+  }
+  throw new Error("Core API response had an unexpected annotation workflow type");
+}
+
+function requireDatasetLabellingSessionStatus(value: unknown): DatasetLabellingSessionStatus {
+  if (value === "draft_ready" || value === "review_in_progress" || value === "prelabel_failed") {
+    return value;
+  }
+  throw new Error("Core API response had an unexpected dataset labelling session status");
+}
+
+function requireImageQualityStatus(value: unknown): ImageQualityStatus {
+  if (
+    value === "unassessed" ||
+    value === "usable" ||
+    value === "poor_quality" ||
+    value === "exclude"
+  ) {
+    return value;
+  }
+  throw new Error("Core API response had an unexpected image quality status");
+}
+
+function requirePrelabelerRunStatus(value: unknown): "succeeded" | "failed" {
+  if (value === "succeeded" || value === "failed") {
+    return value;
+  }
+  throw new Error("Core API response had an unexpected prelabeler run status");
 }
 
 function requireReviewSubjectType(value: unknown): "annotation" {

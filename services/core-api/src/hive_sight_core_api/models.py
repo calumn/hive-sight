@@ -42,6 +42,29 @@ class ReviewSubjectType(StrEnum):
     annotation = "annotation"
 
 
+class AnnotationWorkflowType(StrEnum):
+    analysis_result = "analysis_result"
+    dataset_labelling = "dataset_labelling"
+
+
+class DatasetLabellingSessionStatus(StrEnum):
+    draft_ready = "draft_ready"
+    review_in_progress = "review_in_progress"
+    prelabel_failed = "prelabel_failed"
+
+
+class ImageQualityStatus(StrEnum):
+    unassessed = "unassessed"
+    usable = "usable"
+    poor_quality = "poor_quality"
+    exclude = "exclude"
+
+
+class PrelabelerRunStatus(StrEnum):
+    succeeded = "succeeded"
+    failed = "failed"
+
+
 class HealthResponse(BaseModel):
     service: str
     status: str
@@ -89,6 +112,7 @@ class DevSessionResponse(BaseModel):
     workspace_id: UUID
     role: str
     reviewer_capability: bool
+    dataset_curator_capability: bool
     workspace_data_use_agreement_status: DataUseAgreementStatus
     workspace_data_use_agreement_terms_version: str | None
 
@@ -200,7 +224,9 @@ class AnnotationResponse(BaseModel):
     annotation_id: UUID
     workspace_id: UUID
     inspection_photo_id: UUID
-    analysis_result_id: UUID
+    analysis_result_id: UUID | None = None
+    labelling_session_id: UUID | None = None
+    workflow_type: AnnotationWorkflowType = AnnotationWorkflowType.analysis_result
     annotation_type: AnnotationType
     x: float
     y: float
@@ -258,6 +284,50 @@ class ReviewDecisionCreateRequest(BaseModel):
     subject_id: UUID
     decision: ReviewDecisionValue
     notes: str | None = Field(default=None, max_length=500)
+
+
+class StartDatasetLabellingRequest(BaseModel):
+    workspace_id: UUID
+    inspection_photo_id: UUID
+
+
+class UpdateDatasetLabellingSessionRequest(BaseModel):
+    workspace_id: UUID
+    source_group_key: str | None = Field(default=None, max_length=100)
+    image_quality_status: ImageQualityStatus
+
+
+class PrelabelerRunResponse(BaseModel):
+    prelabeler_run_id: UUID
+    prelabeler_name: str
+    prelabeler_version: str
+    status: PrelabelerRunStatus
+    started_at: datetime
+    finished_at: datetime | None = None
+    error_code: str | None = None
+    error_message: str | None = None
+
+
+class DatasetLabellingSessionResponse(BaseModel):
+    labelling_session_id: UUID
+    workspace_id: UUID
+    inspection_photo_id: UUID
+    created_by_user_id: UUID
+    status: DatasetLabellingSessionStatus
+    source_group_key: str | None = None
+    image_quality_status: ImageQualityStatus = ImageQualityStatus.unassessed
+    prelabeler_run: PrelabelerRunResponse
+    created_at: datetime
+    updated_at: datetime
+
+
+class DatasetLabellingEvidenceResponse(BaseModel):
+    inspection_photo: InspectionPhotoEvidenceResponse
+    labelling_session: DatasetLabellingSessionResponse
+    draft_annotations: list[AnnotationResponse]
+    reviewed_annotations: list[AnnotationResponse]
+    latest_review_decisions: list[ReviewDecisionResponse]
+    caveat: str
 
 
 class ProcessAnalysisRunRequest(BaseModel):
