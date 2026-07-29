@@ -42,7 +42,7 @@ Out of scope:
 HiveSight currently has one product context with two closely related subdomains:
 
 - **Inspection Support**: apiaries, hives, inspections, photos, analysis output, and tagged review.
-- **Model Governance**: annotations, corrections, workspace data-use agreements, deletion requests, reviewed data, dataset roles, model versions, benchmark evaluations, and release approval.
+- **Model Governance**: annotations, corrections, workspace data-use agreements, deletion requests, reviewed data, dataset items, dataset roles, training runs, model candidates, model versions, benchmark evaluations, and release approval.
 
 These subdomains share inspection photos and annotations, but their responsibilities differ:
 
@@ -89,6 +89,7 @@ Essential fields:
 Relationships:
 
 - has many workspace memberships over time
+- may have internal capabilities for dataset/model governance workflows
 - acts in a workspace through one workspace membership
 - may create inspections, upload inspection photos, review tagged photos, and create user corrections when authorized through a workspace membership
 
@@ -97,6 +98,7 @@ Rules:
 - User is the identity/authentication concept.
 - User is not the ownership boundary for apiaries, hives, inspections, photos, or analysis results.
 - Version one registration creates a default workspace and an owner workspace membership for the user.
+- Dataset/model governance actors reuse User identity rather than a separate login system.
 
 ### Workspace Membership
 
@@ -132,6 +134,48 @@ Rules:
 - Version one only supports `owner`.
 - Version one creates one owner membership for the registered user and default workspace.
 - Future multi-user collaboration, invitations, and workspace switching should extend this concept.
+- Workspace Membership roles do not automatically grant internal dataset/model governance capabilities.
+
+### Internal Capability
+
+An authorization grant for internal dataset/model governance workflows.
+
+Essential fields:
+
+- id
+- user id
+- capability
+- status
+- granted at
+- revoked at
+
+Capabilities:
+
+- `annotation_reviewer`
+- `dataset_curator`
+- `model_reviewer`
+- `model_approver`
+
+Relationships:
+
+- belongs to one user
+
+Rules:
+
+- Internal capabilities are separate from Workspace Membership roles.
+- Workspace ownership does not grant dataset curation, benchmark curation, model review, or model approval.
+- Internal capabilities preserve one auditable User identity across product, dataset, and model-governance workflows.
+
+### Dataset Curator
+
+The internal actor/persona for dataset labelling and model-governance preparation.
+
+Notes:
+
+- Dataset Curator is not a separate login identity.
+- A Dataset Curator is a User with the relevant internal capability.
+- Use Dataset Curator when the actor is labelling data, assigning Dataset Roles, curating Dataset Versions, or preparing model-governance evidence.
+- Use Beekeeper when the actor is doing ordinary inspection-support work in a Workspace.
 
 ### Beekeeper
 
@@ -351,9 +395,17 @@ Visibility classes:
 
 Sources:
 
+- `human_from_scratch`
+- `ai_assisted_draft`
 - `model_suggested`
 - `user_corrected`
+- `reviewer_corrected`
 - `reviewed`
+
+Rules:
+
+- AI-assisted Draft Annotations are not ground truth until human reviewed.
+- Reviewed Annotations still require Dataset Role assignment before dataset use.
 
 ### Varroa Annotation
 
@@ -381,6 +433,8 @@ Rules:
 
 - Only likely Varroa detections associated with complete visible bees contribute to the headline numerator.
 - Partial or unassociated Varroa detections are additional evidence.
+- AI-assisted Draft Annotations are not ground truth until human reviewed.
+- Reviewed Annotations still require Dataset Role assignment before dataset use.
 
 ### User Correction
 
@@ -442,6 +496,7 @@ Rules:
 
 - Review decisions must preserve what was reviewed and by whom.
 - In version one, the reviewer may be the same person as the beekeeper/workspace owner.
+- Review approval does not by itself assign training, validation, or benchmark use.
 
 ### Workspace Data Use Agreement
 
@@ -499,6 +554,83 @@ Rules:
 - The operational workflow is deferred.
 - Uploaded photos and metadata should be treated as potentially personally identifiable or sensitive.
 - The project must decide how deletion interacts with existing dataset versions and already-trained model artifacts before production use.
+
+### Dataset Item
+
+A reviewed image-and-annotation unit assigned to a dataset role.
+
+Essential fields:
+
+- id
+- workspace id or source id
+- inspection photo id or external image reference
+- reviewed annotation references
+- dataset role
+- provenance
+- permission status
+- exclusion reason
+- created at
+
+Dataset roles:
+
+- `training`
+- `validation`
+- `benchmark`
+- `excluded`
+
+Rules:
+
+- A Dataset Item requires reviewed annotation evidence.
+- Benchmark Dataset Items must not be used for training or routine tuning.
+- Duplicate or near-duplicate frame photos must be handled before split assignment.
+
+### Training Run
+
+A recorded execution that trains or fine-tunes a model candidate.
+
+Essential fields:
+
+- id
+- model candidate id
+- training dataset version id
+- validation dataset version id
+- training settings summary
+- code or artifact reference
+- status
+- started at
+- completed at
+- outcome summary
+
+Rules:
+
+- Training Runs must not use benchmark Dataset Items.
+- Training Runs should be repeatable enough to compare candidates.
+
+### Model Candidate
+
+A model or model pipeline version under evaluation before user-facing approval.
+
+Essential fields:
+
+- id
+- name
+- candidate label
+- model family or service
+- training run id
+- release status
+- created at
+
+Release statuses:
+
+- `draft`
+- `training_complete`
+- `benchmark_pending`
+- `approved_for_user_facing_analysis`
+- `rejected`
+
+Rules:
+
+- A Model Candidate becomes user-facing only after Benchmark Evaluation and human approval.
 
 ### Model Version
 
@@ -577,8 +709,10 @@ Rules:
 
 - Workspace owns many apiaries.
 - User has many workspace memberships.
+- User may have many internal capabilities.
 - Workspace has many workspace memberships.
 - Workspace membership belongs to one user and one workspace.
+- Internal capability belongs to one user.
 - Apiary contains many hives.
 - Hive has many inspections.
 - Inspection contains many inspection photos.
@@ -592,6 +726,11 @@ Rules:
 - Workspace data-use agreement belongs to one workspace and is accepted by an owner user in version one.
 - Data deletion request belongs to one workspace.
 - Review decision applies to one review subject.
+- Dataset item references reviewed image and annotation evidence.
+- Dataset version contains many dataset items.
+- Training run uses training and validation dataset versions.
+- Training run produces or updates one model candidate.
+- Model candidate may become a model version after benchmark evaluation and human approval.
 - Model version may have many benchmark evaluations.
 - Benchmark evaluation uses one dataset version.
 
@@ -666,6 +805,7 @@ Rules:
 ## Invariants
 
 - Every workspace membership belongs to exactly one user and one workspace.
+- Every internal capability belongs to exactly one user.
 - Version one creates one default workspace and one owner workspace membership when a user registers.
 - Version one exposes one active/default workspace per user in the UI.
 - Every apiary belongs to exactly one workspace.
@@ -680,6 +820,11 @@ Rules:
 - Every user correction records the user who created it once authentication exists.
 - A user correction is never ground truth without review.
 - A user correction is never training, validation, or benchmark data without an active workspace data-use agreement and review.
+- A Draft Annotation is never ground truth without human review.
+- A Reviewed Annotation is never training, validation, or benchmark data without Dataset Role assignment.
+- A Dataset Item must have exactly one Dataset Role.
+- Benchmark Dataset Items must not be used for training or routine tuning.
+- Workspace ownership does not grant internal dataset/model governance capability.
 - A user must be registered, logged in, and authorized through an active workspace membership before uploading inspection photos.
 - A workspace without an accepted workspace data-use agreement must not upload new photos or receive new analysis.
 - Workspace data-use agreement withdrawal disables new upload and analysis.
@@ -741,6 +886,7 @@ Deferred privacy decisions:
 ## Traceability
 
 - `User`, `Workspace`, and `Workspace Membership` support registration, authorization, and FR-017.
+- `Internal Capability` and `Dataset Curator` support the AI-assisted annotation baseline's dataset/model governance actor model.
 - `Apiary` supports FR-001.
 - `Hive` supports FR-002.
 - `Inspection` supports FR-003.
@@ -755,7 +901,9 @@ Deferred privacy decisions:
 - `Data Deletion Request` captures the deferred deletion/privacy gap.
 - Upload status supports FR-018 and NFR-006.
 - `Model Version` supports MR-028.
+- `Dataset Item` supports MR-017, MR-017A, and the AI-assisted annotation baseline.
 - `Dataset Version` supports MR-017 and MR-029.
+- `Training Run` and `Model Candidate` support MR-029A, MR-029B, and the AI-assisted annotation baseline.
 - `Benchmark Evaluation` supports MR-030 and MR-031.
 
 ## Open Architecture Questions

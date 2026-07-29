@@ -172,6 +172,42 @@ Feature: Requirements traceability and AI-SDLC evidence
     Then the human action is recorded as AI-SDLC evidence
     And later project reviews can distinguish AI contribution from human judgment
 
+Feature: AI-assisted annotation and dataset bootstrap
+
+  Scenario: Reviewer creates reviewed bee annotations from AI-assisted draft annotations
+    Given an original inspection photo is selected for dataset labelling
+    When the system creates AI-assisted Draft Annotations for visible bees
+    And a human reviewer corrects and approves the useful annotations
+    Then the approved annotations become Reviewed Annotations
+    And the system records the Annotation Source for each annotation
+    And the reviewed annotations are not automatically assigned to training, validation, or benchmark data
+
+  Scenario: Reviewer marks an ambiguous bee as uncertain
+    Given an inspection photo has an ambiguous bee-like object
+    When the reviewer cannot confidently classify it as complete or partial
+    Then the reviewer can mark the annotation as an uncertain bee
+    And the uncertain bee is excluded from the complete visible bee denominator
+    And the uncertainty is preserved for future model evaluation
+
+  Scenario: Reviewed annotations are assigned to dataset roles
+    Given an inspection photo has Reviewed Annotations
+    When a dataset curator assigns the reviewed image and annotations to a Dataset Role
+    Then the system records a Dataset Item
+    And the Dataset Item role is training, validation, benchmark, or excluded
+    And the Dataset Item can be included in a traceable Dataset Version
+
+  Scenario: Benchmark data is protected from model training
+    Given a Dataset Item has been assigned to the benchmark role
+    When the project trains, tunes, or selects a Model Candidate
+    Then the benchmark Dataset Item is excluded from training and routine tuning
+    And the benchmark item is used only for protected Benchmark Evaluation
+
+  Scenario: Model candidate is evaluated before product use
+    Given a Training Run has produced a Model Candidate
+    When the project evaluates the candidate against a protected benchmark Dataset Version
+    Then the Benchmark Evaluation records bee and Varroa metrics separately
+    And a human reviewer must approve the candidate before it becomes user-facing
+
 Feature: Workspace data-use agreement and model governance
 
   Scenario: Workspace data-use agreement is required for upload and analysis
@@ -249,6 +285,8 @@ Feature: Deferred guest trial analysis
 - The analysis output should include estimated complete visible bee count, partial visible bee count where possible, likely Varroa count, Varroa association state, and likely mites per 100 complete visible bees.
 - The system should store original photos and structured annotation data rather than relying only on flattened annotated images.
 - Tagged-up photos should be rendered from original photos plus annotation data.
+- AI-assisted annotation is the intended bootstrap path for the first reviewed datasets, but Draft Annotations require human review before they become Reviewed Annotations.
+- Dataset-labelling workflows and beekeeper product-feedback workflows may reuse UI components, but their provenance and dataset-governance records must remain distinct.
 - The first correction loop should support marking false Varroa detections and missed likely Varroa locations.
 - User corrections should be review candidates, not automatic training data.
 - Workspace Data Use Agreement acceptance is required before upload and analysis features can be used.

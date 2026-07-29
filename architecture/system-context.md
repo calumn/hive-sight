@@ -13,7 +13,7 @@ The Core API is the product-facing service boundary. It owns Workspace-scoped pr
 ```mermaid
 flowchart LR
     beekeeper["Beekeeper"]
-    reviewer["Model Reviewer<br/>(deferred/internal)"]
+    reviewer["Model Reviewer / Dataset Curator<br/>(internal)"]
     web["Web App<br/>(V1)"]
     mobile["Mobile Apps<br/>(future)"]
 
@@ -21,7 +21,8 @@ flowchart LR
     core["Core API<br/>Workspaces, apiaries, hives,<br/>inspections, photos, authorization"]
     queue["Analysis Queue"]
     analysis["Private Analysis Service<br/>analysis jobs, detections,<br/>tagged outputs, model traceability"]
-    training["Offline Model Development Pipeline<br/>(deferred/runtime separate)"]
+    labeling["AI-Assisted Annotation Workflow<br/>draft labels, human review,<br/>dataset role assignment"]
+    training["Offline Model Development Pipeline<br/>training runs, candidates,<br/>benchmark evaluation"]
 
     coredb[("Core API Data Store<br/>Workspace product metadata")]
     analysisdb[("Analysis Store<br/>analysis runs, detections,<br/>review evidence")]
@@ -45,7 +46,10 @@ flowchart LR
     analysis --> registry
     analysis -. status/events .-> core
 
-    reviewer -. manual review .-> analysisdb
+    reviewer -. label/review .-> labeling
+    labeling -. draft/reviewed annotations .-> analysisdb
+    labeling -. dataset items .-> objects
+    labeling -. dataset versions .-> registry
     reviewer -. promotion decisions .-> registry
     training -. approved datasets .-> objects
     training -. produces candidates .-> registry
@@ -94,7 +98,7 @@ A local prototype may proxy image upload or delivery through the Core API, but t
 
 ### Model Governance Boundary
 
-The runtime system and the offline model-development pipeline are separate. Runtime services run approved model versions and capture evidence. The model-development pipeline curates reviewed data, trains candidate models, evaluates against protected benchmarks, and promotes model versions through human approval.
+The runtime system, AI-assisted annotation workflow, and offline model-development pipeline are separate concerns. Runtime services run approved model versions and capture evidence. The annotation workflow may use AI-assisted Draft Annotations to accelerate labelling, but human review is required before annotations become trusted reviewed evidence. The model-development pipeline curates Dataset Items, creates Dataset Versions, runs Training Runs, evaluates Model Candidates against protected benchmarks, and promotes Model Versions through human approval.
 
 The main V1 web UI should focus on the beekeeper product workflow. Model governance and review can be handled through internal/manual workflows first, while preserving the backend concepts needed for later tooling.
 
@@ -107,4 +111,3 @@ The main V1 web UI should focus on the beekeeper product workflow. Model governa
 - Which S3-compatible storage provider should be used beyond local MinIO?
 - What exact upload size and image format limits should the edge layer enforce?
 - What deployment platform should host the first production-like environment?
-

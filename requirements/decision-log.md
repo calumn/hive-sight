@@ -1,5 +1,22 @@
 # Decision Log
 
+## 2026-07-29 AI-Assisted Annotation Is The Initial Dataset Bootstrap Path
+
+Decision: HiveSight will use AI-assisted annotation as the intended bootstrap path for creating the first reviewed bee and Varroa datasets. A model, hosted vision service, generative AI tool, or other pre-labelling mechanism may create Draft Annotations, but those Draft Annotations are not ground truth until a human reviewer checks, corrects, approves, rejects, marks uncertain, or excludes them.
+
+Rationale: Manually drawing every bee and Varroa annotation from scratch across the initial dataset would be too slow and would make model viability hard to explore. AI-assisted pre-labelling can reduce annotation effort while preserving human review as the trust boundary.
+
+Implications:
+
+- Dataset-labelling workflows and beekeeper product-feedback workflows may reuse UI components, but their provenance and dataset-governance records must remain distinct.
+- Original photos plus structured annotations are the model inputs; rendered overlay images are for human review and should not be used as training pixels.
+- Reviewed Annotations require explicit Dataset Role assignment before they enter training, validation, or benchmark Dataset Versions.
+- Benchmark Dataset Items must be protected from training, routine tuning, prompt iteration, threshold adjustment, and pre-labelling optimisation.
+- The first model-oriented work should focus on bee-detection viability before full Varroa detection.
+- Dataset Curators and model reviewers are registered Users with internal capabilities, not a separate identity system.
+- Internal dataset/model governance capabilities are separate from ordinary Workspace Membership roles.
+- The new requirements baseline is captured in `requirements/ai-assisted-annotation-and-model-training-baseline.md`.
+
 ## 2026-07-29 Inspection Photo Upload Preconditions
 
 Decision: Version one requires a person to register as a User, log in, have an active Workspace Membership, and have an accepted Workspace Data Use Agreement before uploading an inspection photo.

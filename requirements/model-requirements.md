@@ -4,6 +4,8 @@ This document captures requirements for the AI model and dataset side of HiveSig
 
 The product requirements define what the beekeeper-facing system should do. This document defines what evidence, data controls, annotations, evaluation, and release gates are needed before the model side of that capability can be trusted.
 
+AI-assisted annotation, initial dataset bootstrap, dataset split governance, training runs, and model candidate selection are detailed in `requirements/ai-assisted-annotation-and-model-training-baseline.md`.
+
 ## Scope
 
 The first model capability is object detection on hive inspection photos.
@@ -109,6 +111,18 @@ Ground truth shall require human-reviewed annotations.
 
 Rationale: AI-generated labels and user corrections are useful signals, but they should not become trusted ground truth without review.
 
+### MR-012A AI-Assisted Draft Labels Are Allowed
+
+The project may use AI-assisted Draft Annotations to accelerate initial dataset creation.
+
+Rationale: Pre-labelling can make the first bee and Varroa datasets practical to create.
+
+### MR-012B Draft Labels Are Not Ground Truth
+
+Draft Annotations shall remain distinct from Reviewed Annotations until a human reviewer checks or corrects them.
+
+Rationale: AI assistance should reduce annotation effort without creating circular or unverified labels.
+
 ### MR-013 User Corrections As Review Candidates
 
 User corrections shall be stored as review candidates, not automatically used as training data.
@@ -162,6 +176,18 @@ Allowed roles:
 - `excluded`
 
 Rationale: Training, tuning, and honest evaluation require separated datasets.
+
+### MR-017A Dataset Items
+
+Dataset use shall be tracked at the Dataset Item level, connecting reviewed image/annotation evidence to one Dataset Role.
+
+Rationale: A reviewed annotation is not automatically training, validation, benchmark, or excluded data.
+
+### MR-017B Dataset Split Leakage Prevention
+
+The project shall guard against duplicate or near-duplicate frame photos crossing training, validation, and benchmark splits.
+
+Rationale: Similar images of the same frame can make model evaluation look better than it really is.
 
 ### MR-018 Protected Benchmark
 
@@ -285,6 +311,18 @@ Every benchmark evaluation shall record the dataset version used.
 
 Rationale: Model comparisons are only meaningful when the evaluation data is known.
 
+### MR-029A Training Run Records
+
+Every model training or fine-tuning execution shall record the Dataset Versions, model candidate, training settings, code/artifact reference, and outcome.
+
+Rationale: Model candidates must be reproducible and comparable.
+
+### MR-029B Model Candidate Records
+
+Trained or configured models shall be tracked as Model Candidates until they pass benchmark evaluation and human promotion approval.
+
+Rationale: Experimental candidates must remain distinct from approved user-facing Model Versions.
+
 ### MR-030 Benchmark Evaluation Before Promotion
 
 A model version shall pass a documented benchmark evaluation before it is promoted for user-facing Varroa estimates.
@@ -307,10 +345,12 @@ Rationale: Premature thresholds may be arbitrary before the project has represen
 
 - Which public or externally sourced datasets are legally usable for bootstrapping?
 - What annotation tool should be used for the first reviewed dataset?
+- Which AI-assisted pre-labelling approach should be used first?
 - What minimum image quality guidance should be given to users?
 - Should user corrections ever be used for training without a second reviewer, or is one reviewer enough for this project?
 - How large should the first protected benchmark set be?
 - What model family or service should be used for the first prototype?
+- Should dataset splits happen at photo, frame, inspection, hive, workspace, or source level?
 - How should duplicate or near-duplicate frame photos be detected?
 - How should model results be compared when a newer model re-analyses older photos?
 - Where should consent be captured in the product workflow?
