@@ -518,6 +518,16 @@ label span {
   padding: 14px;
 }
 
+.dataset-assignment-panel {
+  background: #f7f9f5;
+  border: 1px solid #dce2d7;
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(170px, 220px) minmax(0, 1fr) minmax(150px, 190px);
+  padding: 14px;
+}
+
 .metadata-panel {
   background: #f7f9f5;
   border: 1px solid #dce2d7;
@@ -537,22 +547,27 @@ label span {
 }
 
 .review-panel > div,
-.review-panel .review-state {
+.review-panel .review-state,
+.dataset-assignment-panel > div,
+.dataset-assignment-panel .review-state {
   grid-column: 1 / -1;
 }
 
-.review-panel strong {
+.review-panel strong,
+.dataset-assignment-panel strong {
   display: block;
   margin-bottom: 4px;
 }
 
-.review-panel p {
+.review-panel p,
+.dataset-assignment-panel p {
   color: #515b4c;
   line-height: 1.4;
   margin-bottom: 0;
 }
 
-.review-panel button {
+.review-panel button,
+.dataset-assignment-panel button {
   align-self: end;
 }
 
@@ -592,7 +607,8 @@ label span {
   .upload-panel,
   .result-grid,
   .metadata-panel,
-  .review-panel {
+  .review-panel,
+  .dataset-assignment-panel {
     grid-template-columns: 1fr;
   }
 

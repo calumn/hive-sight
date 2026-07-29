@@ -17,6 +17,7 @@ import {
   createApiary,
   createHive,
   createInspection,
+  createDatasetItem,
   createReviewDecision,
   fetchAnalysisEvidence,
   fetchCoreHealth,
@@ -36,6 +37,8 @@ import {
   type HealthResponse,
   type Hive,
   type DatasetLabellingEvidence,
+  type DatasetExclusionReason,
+  type DatasetRole,
   type ImageQualityStatus,
   type Inspection,
   type PhotoIntake,
@@ -376,6 +379,44 @@ export function App() {
     }
   }
 
+  async function onAssignDatasetRole({
+    labellingSessionId,
+    datasetRole,
+    assignmentNote,
+    exclusionReason
+  }: {
+    labellingSessionId: string;
+    datasetRole: DatasetRole;
+    assignmentNote: string;
+    exclusionReason: DatasetExclusionReason | null;
+  }) {
+    if (!session) {
+      return;
+    }
+    setLabellingState({ kind: "working", label: "Assigning dataset role" });
+    try {
+      await createDatasetItem({
+        devUserId,
+        workspaceId: session.workspaceId,
+        labellingSessionId,
+        datasetRole,
+        assignmentNote,
+        exclusionReason
+      });
+      const refreshedEvidence = await fetchDatasetLabellingEvidence({
+        devUserId,
+        workspaceId: session.workspaceId,
+        labellingSessionId
+      });
+      setLabellingEvidence(refreshedEvidence);
+      setLabellingState({ kind: "done" });
+    } catch (error) {
+      const apiError = toApiError(error);
+      setLabellingState(null);
+      setActionState({ kind: "blocked", code: apiError.code, message: apiError.message });
+    }
+  }
+
   function clearEvidenceImage() {
     setAnalysisEvidence(null);
     setEvidenceImageUrl((current) => {
@@ -559,6 +600,7 @@ export function App() {
                     onStartDatasetLabelling={onStartDatasetLabelling}
                     onUpdateMetadata={onUpdateDatasetLabellingMetadata}
                     onSubmitReviewDecision={onSubmitDatasetLabellingReview}
+                    onAssignDatasetRole={onAssignDatasetRole}
                   />
                 ) : null}
               </>
@@ -727,7 +769,8 @@ function DatasetLabellingPanel({
   labellingState,
   onStartDatasetLabelling,
   onUpdateMetadata,
-  onSubmitReviewDecision
+  onSubmitReviewDecision,
+  onAssignDatasetRole
 }: {
   evidence: DatasetLabellingEvidence | null;
   imageUrl: string | null;
@@ -743,12 +786,22 @@ function DatasetLabellingPanel({
     decision: ReviewDecisionValue;
     notes: string;
   }) => Promise<void>;
+  onAssignDatasetRole: (request: {
+    labellingSessionId: string;
+    datasetRole: DatasetRole;
+    assignmentNote: string;
+    exclusionReason: DatasetExclusionReason | null;
+  }) => Promise<void>;
 }) {
   const [selectedAnnotationId, setSelectedAnnotationId] = useState<string | null>(null);
   const [sourceGroupKey, setSourceGroupKey] = useState("");
   const [imageQualityStatus, setImageQualityStatus] =
     useState<ImageQualityStatus>("unassessed");
   const [notes, setNotes] = useState("Accepted for dataset labelling evidence.");
+  const [datasetRole, setDatasetRole] = useState<DatasetRole>("training");
+  const [assignmentNote, setAssignmentNote] = useState("");
+  const [exclusionReason, setExclusionReason] =
+    useState<DatasetExclusionReason>("poor_image_quality");
 
   useEffect(() => {
     if (!evidence) {
@@ -756,6 +809,11 @@ function DatasetLabellingPanel({
     }
     setSourceGroupKey(evidence.labellingSession.sourceGroupKey ?? "");
     setImageQualityStatus(evidence.labellingSession.imageQualityStatus);
+    if (evidence.datasetItem) {
+      setDatasetRole(evidence.datasetItem.datasetRole);
+      setAssignmentNote(evidence.datasetItem.assignmentNote ?? "");
+      setExclusionReason(evidence.datasetItem.exclusionReason ?? "poor_image_quality");
+    }
   }, [evidence]);
 
   const selectedAnnotation = evidence?.draftAnnotations.find(
@@ -769,6 +827,15 @@ function DatasetLabellingPanel({
     evidence?.draftAnnotations.filter(
       (annotation) => annotation.annotationType === "partial_visible_bee"
     ).length ?? 0;
+  const datasetItem = evidence?.datasetItem ?? null;
+  const hasReviewedAnnotations = (evidence?.reviewedAnnotations.length ?? 0) > 0;
+  const assignmentRequiresNote = datasetRole === "excluded" && exclusionReason === "other";
+  const canAssignDatasetRole =
+    Boolean(evidence) &&
+    hasReviewedAnnotations &&
+    !datasetItem &&
+    labellingState?.kind !== "working" &&
+    (!assignmentRequiresNote || assignmentNote.trim().length > 0);
 
   return (
     <section
@@ -942,6 +1009,95 @@ function DatasetLabellingPanel({
               {selectedAnnotation?.latestReviewDecision
                 ? `Latest decision: ${selectedAnnotation.latestReviewDecision.decision}`
                 : `${evidence.reviewedAnnotations.length} reviewed annotations`}
+            </p>
+          </form>
+          <form
+            className="dataset-assignment-panel"
+            aria-label="Dataset role assignment"
+            data-testid="dataset-role-assignment-controls"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (!evidence || !canAssignDatasetRole) {
+                return;
+              }
+              void onAssignDatasetRole({
+                labellingSessionId: evidence.labellingSession.labellingSessionId,
+                datasetRole,
+                assignmentNote,
+                exclusionReason: datasetRole === "excluded" ? exclusionReason : null
+              });
+            }}
+          >
+            <div>
+              <strong>Dataset assignment</strong>
+              <p>
+                Assign reviewed bee evidence to a dataset role once curator review is complete
+                enough for this frame.
+              </p>
+            </div>
+            <label>
+              <span>Dataset role</span>
+              <select
+                value={datasetRole}
+                onChange={(event) => setDatasetRole(event.target.value as DatasetRole)}
+                disabled={Boolean(datasetItem)}
+                data-testid="dataset-role-select"
+              >
+                <option value="training">Training</option>
+                <option value="validation">Validation</option>
+                <option value="benchmark">Benchmark</option>
+                <option value="excluded">Excluded</option>
+              </select>
+            </label>
+            {datasetRole === "excluded" ? (
+              <label>
+                <span>Exclusion reason</span>
+                <select
+                  value={exclusionReason}
+                  onChange={(event) =>
+                    setExclusionReason(event.target.value as DatasetExclusionReason)
+                  }
+                  disabled={Boolean(datasetItem)}
+                  data-testid="dataset-exclusion-reason-select"
+                >
+                  <option value="poor_image_quality">Poor image quality</option>
+                  <option value="ambiguous_subject">Ambiguous subject</option>
+                  <option value="duplicate_or_near_duplicate">Duplicate or near duplicate</option>
+                  <option value="privacy_concern">Privacy concern</option>
+                  <option value="unsuitable_crop">Unsuitable crop</option>
+                  <option value="insufficient_review_confidence">
+                    Insufficient review confidence
+                  </option>
+                  <option value="other">Other</option>
+                </select>
+              </label>
+            ) : null}
+            <label>
+              <span>Assignment note</span>
+              <textarea
+                value={assignmentNote}
+                maxLength={500}
+                onChange={(event) => setAssignmentNote(event.target.value)}
+                disabled={Boolean(datasetItem)}
+                data-testid="dataset-assignment-note-input"
+              />
+            </label>
+            <button
+              type="submit"
+              disabled={!canAssignDatasetRole}
+              data-testid="assign-dataset-role-button"
+            >
+              <ShieldCheck size={18} />
+              Assign role
+            </button>
+            <p className="review-state" data-testid="dataset-item-state">
+              {datasetItem
+                ? `Dataset item: ${datasetItem.datasetRole}${
+                    datasetItem.benchmarkProtected ? " / protected benchmark" : ""
+                  } / ${datasetItem.reviewedAnnotationIds.length} reviewed annotations`
+                : hasReviewedAnnotations
+                  ? `${evidence.reviewedAnnotations.length} reviewed annotations ready`
+                  : "Review at least one bee suggestion before assignment"}
             </p>
           </form>
           <p className="analysis-caveat" data-testid="dataset-evidence-caveat">

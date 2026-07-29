@@ -240,6 +240,7 @@ class DatasetLabellingWorkflow:
             draft_annotations=annotations,
             reviewed_annotations=reviewed_annotations,
             latest_review_decisions=latest_review_decisions,
+            dataset_item=self.store.get_dataset_item_for_labelling_session(labelling_session_id),
             caveat=(
                 "AI-assisted draft annotations are deterministic test suggestions for dataset "
                 "labelling. Dataset use is not assigned in this slice."

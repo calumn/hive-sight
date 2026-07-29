@@ -8,11 +8,13 @@ from fastapi.responses import JSONResponse, Response
 from hive_sight_core_api.analysis_processing_workflow import AnalysisProcessingWorkflow
 from hive_sight_core_api.analysis_request_workflow import AnalysisRequestWorkflow
 from hive_sight_core_api.dataset_labelling_workflow import DatasetLabellingWorkflow
+from hive_sight_core_api.dataset_role_assignment_workflow import DatasetRoleAssignmentWorkflow
 from hive_sight_core_api.dependencies import (
     DevStateDep,
     get_analysis_processing_workflow,
     get_analysis_request_workflow,
     get_dataset_labelling_workflow,
+    get_dataset_role_assignment_workflow,
     get_inspection_photo_access,
     get_settings,
 )
@@ -25,6 +27,8 @@ from hive_sight_core_api.models import (
     AnalysisRunResponse,
     ApiaryCreateRequest,
     ApiaryResponse,
+    DatasetItemCreateRequest,
+    DatasetItemResponse,
     DatasetLabellingEvidenceResponse,
     DatasetLabellingSessionResponse,
     DevSessionResponse,
@@ -74,6 +78,10 @@ AnalysisProcessingWorkflowDep = Annotated[
 DatasetLabellingWorkflowDep = Annotated[
     DatasetLabellingWorkflow,
     Depends(get_dataset_labelling_workflow),
+]
+DatasetRoleAssignmentWorkflowDep = Annotated[
+    DatasetRoleAssignmentWorkflow,
+    Depends(get_dataset_role_assignment_workflow),
 ]
 DevUserIdHeader = Annotated[str | None, Header(alias="x-hivesight-dev-user-id")]
 
@@ -278,6 +286,22 @@ def create_review_decision(
         subject_id=request.subject_id,
         decision=request.decision,
         notes=request.notes,
+    )
+
+
+@app.post("/v1/dataset-items", response_model=DatasetItemResponse, status_code=201)
+def create_dataset_item(
+    request: DatasetItemCreateRequest,
+    user: AuthenticatedUserDep,
+    workflow: DatasetRoleAssignmentWorkflowDep,
+) -> DatasetItemResponse:
+    return workflow.create_dataset_item(
+        user=user,
+        workspace_id=request.workspace_id,
+        labelling_session_id=request.labelling_session_id,
+        dataset_role=request.dataset_role,
+        assignment_note=request.assignment_note,
+        exclusion_reason=request.exclusion_reason,
     )
 
 

@@ -15,6 +15,7 @@ from hive_sight_core_api.dataset_labelling_workflow import (
     DatasetLabellingWorkflow,
     DeterministicBeePrelabeler,
 )
+from hive_sight_core_api.dataset_role_assignment_workflow import DatasetRoleAssignmentWorkflow
 from hive_sight_core_api.dev_store import (
     DevState,
     InMemoryEventRecorder,
@@ -81,6 +82,12 @@ def get_dataset_labelling_workflow(state: DevStateDep) -> DatasetLabellingWorkfl
         prelabeler=DeterministicBeePrelabeler(),
         clock=state.store.clock,
     )
+
+
+def get_dataset_role_assignment_workflow(
+    state: DevStateDep,
+) -> DatasetRoleAssignmentWorkflow:
+    return DatasetRoleAssignmentWorkflow(store=state.store)
 
 
 def get_inspection_photo_access(state: DevStateDep) -> InspectionPhotoAccess:

@@ -140,6 +140,7 @@ Minimum API shapes:
 - [ ] Dataset Role assignment is blocked for unsupported Dataset Role values.
 - [ ] `excluded` requires an exclusion reason.
 - [ ] Non-`excluded` roles reject exclusion reason.
+- [ ] `other` exclusion reason requires an assignment note.
 - [ ] Assigning the same Dataset Labelling Session twice is rejected for Slice 6.
 - [ ] Dataset Item preserves `source_group_key` when present.
 - [ ] Dataset Item preserves session-level `image_quality_status`.
@@ -158,14 +159,11 @@ Minimum API shapes:
 - Slice 6 assigns Dataset Roles at photo/labelling-session level, not per annotation.
 - Dataset Role assignment creates a Dataset Item.
 - Dataset Item creation requires at least one Reviewed Annotation.
+- One Reviewed Annotation is enough for Slice 6 because this slice proves the traceable role-assignment mechanism, not dataset quality thresholds.
 - Dataset Item creation is append-only for Slice 6; reassignment is deferred.
 - `source_group_key` is preserved for future leakage handling but not automatically enforced yet.
 - `image_quality_status = exclude` is metadata and does not replace explicit Dataset Role assignment.
+- Assignment notes use the same 500 character limit as Review Decision notes.
+- `exclusion_reason = other` requires an assignment note.
 - Benchmark protection begins as a persisted Dataset Item flag; later training/export slices must enforce it.
 - Slice 7 should focus on a separate, vaguely real pre-labelling helper before heavy annotation-editor UI.
-
-## Open Questions
-
-- Should Slice 6 require a minimum number of reviewed annotations before assigning `training`, `validation`, or `benchmark`, or is one reviewed annotation enough for the tracer?
-- Should assignment notes keep the same 500 character limit as Review Decision notes?
-- Should `other` exclusion reason require a note?

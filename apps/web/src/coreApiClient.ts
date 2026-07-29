@@ -76,6 +76,17 @@ export type ReviewDecisionValue = "approved" | "rejected" | "uncertain" | "exclu
 
 export type ImageQualityStatus = "unassessed" | "usable" | "poor_quality" | "exclude";
 
+export type DatasetRole = "training" | "validation" | "benchmark" | "excluded";
+
+export type DatasetExclusionReason =
+  | "poor_image_quality"
+  | "ambiguous_subject"
+  | "duplicate_or_near_duplicate"
+  | "privacy_concern"
+  | "unsuitable_crop"
+  | "insufficient_review_confidence"
+  | "other";
+
 export type DatasetLabellingSessionStatus =
   | "draft_ready"
   | "review_in_progress"
@@ -114,6 +125,22 @@ export type ReviewDecision = {
   decision: ReviewDecisionValue;
   notes: string | null;
   createdAt: string;
+};
+
+export type DatasetItem = {
+  datasetItemId: string;
+  workspaceId: string;
+  inspectionPhotoId: string;
+  labellingSessionId: string;
+  datasetRole: DatasetRole;
+  reviewedAnnotationIds: string[];
+  sourceGroupKey: string | null;
+  imageQualityStatus: ImageQualityStatus;
+  assignedByUserId: string;
+  assignedAt: string;
+  assignmentNote: string | null;
+  exclusionReason: DatasetExclusionReason | null;
+  benchmarkProtected: boolean;
 };
 
 export type Annotation = {
@@ -163,6 +190,7 @@ export type DatasetLabellingEvidence = {
   draftAnnotations: Annotation[];
   reviewedAnnotations: Annotation[];
   latestReviewDecisions: ReviewDecision[];
+  datasetItem: DatasetItem | null;
   caveat: string;
 };
 
@@ -462,6 +490,37 @@ export async function fetchDatasetLabellingEvidence({
   return parseDatasetLabellingEvidence(await response.json());
 }
 
+export async function createDatasetItem({
+  devUserId,
+  workspaceId,
+  labellingSessionId,
+  datasetRole,
+  assignmentNote,
+  exclusionReason
+}: {
+  devUserId: string;
+  workspaceId: string;
+  labellingSessionId: string;
+  datasetRole: DatasetRole;
+  assignmentNote: string;
+  exclusionReason: DatasetExclusionReason | null;
+}): Promise<DatasetItem> {
+  const trimmedNote = assignmentNote.trim();
+  const response = await fetch(`${coreApiUrl}/v1/dataset-items`, {
+    method: "POST",
+    headers: jsonHeaders(devUserId),
+    body: JSON.stringify({
+      workspace_id: workspaceId,
+      labelling_session_id: labellingSessionId,
+      dataset_role: datasetRole,
+      assignment_note: trimmedNote.length > 0 ? trimmedNote : null,
+      exclusion_reason: exclusionReason
+    })
+  });
+  await ensureOk(response);
+  return parseDatasetItem(await response.json());
+}
+
 function devAuthHeaders(devUserId: string): HeadersInit {
   return { "x-hivesight-dev-user-id": devUserId };
 }
@@ -656,7 +715,33 @@ function parseDatasetLabellingEvidence(value: unknown): DatasetLabellingEvidence
       record.latest_review_decisions,
       "latest_review_decisions"
     ).map(parseReviewDecision),
+    datasetItem: record.dataset_item === null ? null : parseDatasetItem(record.dataset_item),
     caveat: requireString(record.caveat, "caveat")
+  };
+}
+
+function parseDatasetItem(value: unknown): DatasetItem {
+  const record = requireRecord(value, "Dataset item response");
+  return {
+    datasetItemId: requireString(record.dataset_item_id, "dataset_item_id"),
+    workspaceId: requireString(record.workspace_id, "workspace_id"),
+    inspectionPhotoId: requireString(record.inspection_photo_id, "inspection_photo_id"),
+    labellingSessionId: requireString(record.labelling_session_id, "labelling_session_id"),
+    datasetRole: requireDatasetRole(record.dataset_role),
+    reviewedAnnotationIds: requireArray(
+      record.reviewed_annotation_ids,
+      "reviewed_annotation_ids"
+    ).map((annotationId) => requireString(annotationId, "reviewed_annotation_ids[]")),
+    sourceGroupKey: optionalString(record.source_group_key, "source_group_key"),
+    imageQualityStatus: requireImageQualityStatus(record.image_quality_status),
+    assignedByUserId: requireString(record.assigned_by_user_id, "assigned_by_user_id"),
+    assignedAt: requireString(record.assigned_at, "assigned_at"),
+    assignmentNote: optionalString(record.assignment_note, "assignment_note"),
+    exclusionReason:
+      record.exclusion_reason === null
+        ? null
+        : requireDatasetExclusionReason(record.exclusion_reason),
+    benchmarkProtected: requireBoolean(record.benchmark_protected, "benchmark_protected")
   };
 }
 
@@ -855,6 +940,33 @@ function requireImageQualityStatus(value: unknown): ImageQualityStatus {
     return value;
   }
   throw new Error("Core API response had an unexpected image quality status");
+}
+
+function requireDatasetRole(value: unknown): DatasetRole {
+  if (
+    value === "training" ||
+    value === "validation" ||
+    value === "benchmark" ||
+    value === "excluded"
+  ) {
+    return value;
+  }
+  throw new Error("Core API response had an unexpected dataset role");
+}
+
+function requireDatasetExclusionReason(value: unknown): DatasetExclusionReason {
+  if (
+    value === "poor_image_quality" ||
+    value === "ambiguous_subject" ||
+    value === "duplicate_or_near_duplicate" ||
+    value === "privacy_concern" ||
+    value === "unsuitable_crop" ||
+    value === "insufficient_review_confidence" ||
+    value === "other"
+  ) {
+    return value;
+  }
+  throw new Error("Core API response had an unexpected dataset exclusion reason");
 }
 
 function requirePrelabelerRunStatus(value: unknown): "succeeded" | "failed" {

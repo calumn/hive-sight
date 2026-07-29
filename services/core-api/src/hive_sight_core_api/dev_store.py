@@ -12,8 +12,11 @@ from hive_sight_core_api.models import (
     AnnotationType,
     AnnotationWorkflowType,
     ApiaryResponse,
+    DatasetExclusionReason,
+    DatasetItemResponse,
     DatasetLabellingSessionResponse,
     DatasetLabellingSessionStatus,
+    DatasetRole,
     DataUseAgreementStatus,
     DevSessionResponse,
     HiveResponse,
@@ -90,6 +93,7 @@ class InMemoryProductDataStore:
     dataset_labelling_sessions: dict[UUID, DatasetLabellingSessionResponse] = field(
         default_factory=dict
     )
+    dataset_items: dict[UUID, DatasetItemResponse] = field(default_factory=dict)
     reviewer_user_ids: set[UUID] = field(
         default_factory=lambda: {DEFAULT_DEV_REVIEWER_USER_ID}
     )
@@ -409,6 +413,15 @@ class InMemoryProductDataStore:
             if annotation.labelling_session_id == labelling_session_id
         ]
 
+    def get_dataset_item_for_labelling_session(
+        self,
+        labelling_session_id: UUID,
+    ) -> DatasetItemResponse | None:
+        for dataset_item in self.dataset_items.values():
+            if dataset_item.labelling_session_id == labelling_session_id:
+                return dataset_item
+        return None
+
     def record_review_decision(
         self,
         user: UserContext,
@@ -642,6 +655,42 @@ class InMemoryProductDataStore:
             }
         )
         self.dataset_labelling_sessions[updated.labelling_session_id] = updated
+
+    def record_dataset_item(
+        self,
+        user: UserContext,
+        workspace_id: UUID,
+        labelling_session_id: UUID,
+        dataset_role: DatasetRole,
+        reviewed_annotation_ids: list[UUID],
+        assignment_note: str | None,
+        exclusion_reason: DatasetExclusionReason | None,
+    ) -> DatasetItemResponse:
+        session = self.require_labelling_session(user, workspace_id, labelling_session_id)
+        existing = self.get_dataset_item_for_labelling_session(labelling_session_id)
+        if existing is not None:
+            raise DomainError(
+                "dataset_item_already_assigned",
+                "This Dataset Labelling Session has already been assigned to a Dataset Item.",
+                409,
+            )
+        dataset_item = DatasetItemResponse(
+            dataset_item_id=self.id_factory(),
+            workspace_id=workspace_id,
+            inspection_photo_id=session.inspection_photo_id,
+            labelling_session_id=labelling_session_id,
+            dataset_role=dataset_role,
+            reviewed_annotation_ids=reviewed_annotation_ids,
+            source_group_key=session.source_group_key,
+            image_quality_status=session.image_quality_status,
+            assigned_by_user_id=user.user_id,
+            assigned_at=self.clock(),
+            assignment_note=assignment_note,
+            exclusion_reason=exclusion_reason,
+            benchmark_protected=dataset_role == DatasetRole.benchmark,
+        )
+        self.dataset_items[dataset_item.dataset_item_id] = dataset_item
+        return dataset_item
 
     def require_inspection_photo_for_view(
         self,

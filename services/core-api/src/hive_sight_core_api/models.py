@@ -65,6 +65,23 @@ class PrelabelerRunStatus(StrEnum):
     failed = "failed"
 
 
+class DatasetRole(StrEnum):
+    training = "training"
+    validation = "validation"
+    benchmark = "benchmark"
+    excluded = "excluded"
+
+
+class DatasetExclusionReason(StrEnum):
+    poor_image_quality = "poor_image_quality"
+    ambiguous_subject = "ambiguous_subject"
+    duplicate_or_near_duplicate = "duplicate_or_near_duplicate"
+    privacy_concern = "privacy_concern"
+    unsuitable_crop = "unsuitable_crop"
+    insufficient_review_confidence = "insufficient_review_confidence"
+    other = "other"
+
+
 class HealthResponse(BaseModel):
     service: str
     status: str
@@ -327,7 +344,32 @@ class DatasetLabellingEvidenceResponse(BaseModel):
     draft_annotations: list[AnnotationResponse]
     reviewed_annotations: list[AnnotationResponse]
     latest_review_decisions: list[ReviewDecisionResponse]
+    dataset_item: "DatasetItemResponse | None" = None
     caveat: str
+
+
+class DatasetItemCreateRequest(BaseModel):
+    workspace_id: UUID
+    labelling_session_id: UUID
+    dataset_role: DatasetRole
+    assignment_note: str | None = Field(default=None, max_length=500)
+    exclusion_reason: DatasetExclusionReason | None = None
+
+
+class DatasetItemResponse(BaseModel):
+    dataset_item_id: UUID
+    workspace_id: UUID
+    inspection_photo_id: UUID
+    labelling_session_id: UUID
+    dataset_role: DatasetRole
+    reviewed_annotation_ids: list[UUID]
+    source_group_key: str | None = None
+    image_quality_status: ImageQualityStatus
+    assigned_by_user_id: UUID
+    assigned_at: datetime
+    assignment_note: str | None = None
+    exclusion_reason: DatasetExclusionReason | None = None
+    benchmark_protected: bool
 
 
 class ProcessAnalysisRunRequest(BaseModel):
