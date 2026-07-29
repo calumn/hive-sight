@@ -16,9 +16,8 @@ class ModelRuntime:
 
         return ModelAnalysis(
             model_version=model_version,
-            complete_visible_bee_count=0,
-            partial_visible_bee_count=0,
-            likely_varroa_detections=0,
+            complete_visible_bee_count=48,
+            partial_visible_bee_count=3,
+            likely_varroa_detections=1,
             tagged_image_object_key=None,
         )
-

@@ -4,7 +4,9 @@ from datetime import UTC, date, datetime
 from uuid import UUID, uuid4
 
 from hive_sight_core_api.models import (
+    AnalysisResultResponse,
     AnalysisRunResponse,
+    AnalysisRunStatus,
     ApiaryResponse,
     DataUseAgreementStatus,
     DevSessionResponse,
@@ -65,6 +67,7 @@ class InMemoryProductDataStore:
     inspections: dict[UUID, InspectionResponse] = field(default_factory=dict)
     inspection_photos: dict[UUID, InspectionPhotoResponse] = field(default_factory=dict)
     analysis_runs: dict[UUID, AnalysisRunResponse] = field(default_factory=dict)
+    analysis_results: dict[UUID, AnalysisResultResponse] = field(default_factory=dict)
 
     def ensure_dev_session(self, user_id: UUID) -> DevSessionResponse:
         self.users.add(user_id)
@@ -220,6 +223,110 @@ class InMemoryProductDataStore:
 
     def get_analysis_run(self, analysis_run_id: UUID) -> AnalysisRunResponse | None:
         return self.analysis_runs.get(analysis_run_id)
+
+    def require_analysis_run(
+        self,
+        user: UserContext,
+        workspace_id: UUID,
+        analysis_run_id: UUID,
+    ) -> AnalysisRunResponse:
+        self.require_workspace_access(user, workspace_id)
+        self.require_data_use_agreement(workspace_id)
+        analysis_run = self.analysis_runs.get(analysis_run_id)
+        if analysis_run is None or analysis_run.workspace_id != workspace_id:
+            raise DomainError(
+                "analysis_run_not_found",
+                "The requested Analysis Run was not found in this Workspace.",
+                404,
+            )
+        return analysis_run
+
+    def require_queued_analysis_run(
+        self,
+        user: UserContext,
+        workspace_id: UUID,
+        analysis_run_id: UUID,
+    ) -> AnalysisRunResponse:
+        analysis_run = self.require_analysis_run(user, workspace_id, analysis_run_id)
+        if analysis_run.status != AnalysisRunStatus.queued:
+            raise DomainError(
+                "analysis_run_not_queued",
+                "Only queued Analysis Runs can be processed by this demo action.",
+                409,
+            )
+        return analysis_run
+
+    def mark_analysis_running(
+        self,
+        analysis_run: AnalysisRunResponse,
+        started_at: datetime,
+    ) -> AnalysisRunResponse:
+        updated = analysis_run.model_copy(
+            update={
+                "status": AnalysisRunStatus.running,
+                "started_at": started_at,
+                "message": "Analysis is being processed by the private Analysis Service.",
+            }
+        )
+        self.analysis_runs[updated.analysis_run_id] = updated
+        return updated
+
+    def complete_analysis_run(
+        self,
+        analysis_run: AnalysisRunResponse,
+        model_version: str,
+        complete_visible_bee_count: int,
+        partial_visible_bee_count: int,
+        likely_varroa_detections: int,
+        tagged_image_object_key: str | None,
+        completed_at: datetime,
+    ) -> AnalysisRunResponse:
+        result = AnalysisResultResponse(
+            analysis_result_id=self.id_factory(),
+            analysis_run_id=analysis_run.analysis_run_id,
+            inspection_photo_id=analysis_run.inspection_photo_id,
+            workspace_id=analysis_run.workspace_id,
+            model_version=model_version,
+            complete_visible_bee_count=complete_visible_bee_count,
+            partial_visible_bee_count=partial_visible_bee_count,
+            likely_varroa_detections=likely_varroa_detections,
+            tagged_image_object_key=tagged_image_object_key,
+            result_kind="deterministic_stub",
+            completed_at=completed_at,
+        )
+        self.analysis_results[analysis_run.analysis_run_id] = result
+        updated = analysis_run.model_copy(
+            update={
+                "status": AnalysisRunStatus.completed,
+                "completed_at": completed_at,
+                "model_version": model_version,
+                "message": "Analysis completed with a deterministic stub result.",
+            }
+        )
+        self.analysis_runs[updated.analysis_run_id] = updated
+        return updated
+
+    def fail_analysis_run(
+        self,
+        analysis_run: AnalysisRunResponse,
+        failure_code: str,
+        failure_message: str,
+        failed_at: datetime,
+    ) -> AnalysisRunResponse:
+        updated = analysis_run.model_copy(
+            update={
+                "status": AnalysisRunStatus.failed,
+                "failed_at": failed_at,
+                "failure_code": failure_code,
+                "failure_message": failure_message,
+                "message": failure_message,
+            }
+        )
+        self.analysis_runs[updated.analysis_run_id] = updated
+        return updated
+
+    def get_analysis_result(self, analysis_run_id: UUID) -> AnalysisResultResponse | None:
+        return self.analysis_results.get(analysis_run_id)
 
     def _active_membership_for_user(self, user_id: UUID) -> WorkspaceMembershipRecord | None:
         for membership in self.memberships:

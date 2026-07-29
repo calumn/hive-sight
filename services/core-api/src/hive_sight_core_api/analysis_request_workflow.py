@@ -17,9 +17,11 @@ class AnalysisRequestWorkflow:
     def request_analysis(self, request: AnalysisRunRequest) -> AnalysisRunResponse:
         analysis_run = AnalysisRunResponse(
             analysis_run_id=self.id_factory(),
+            workspace_id=request.workspace_id,
             inspection_photo_id=request.inspection_photo_id,
             status=AnalysisRunStatus.queued,
             queued_at=self.clock(),
+            requested_model_version=request.requested_model_version,
             message="Analysis request queued for the private Analysis Service.",
         )
         if self.store is not None:
@@ -36,6 +38,7 @@ class AnalysisRequestWorkflow:
 
         return AnalysisRunResponse(
             analysis_run_id=analysis_run_id,
+            workspace_id=self.id_factory(),
             inspection_photo_id=self.id_factory(),
             status=AnalysisRunStatus.queued,
             queued_at=self.clock(),

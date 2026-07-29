@@ -6,6 +6,10 @@ from uuid import UUID
 
 from fastapi import Depends
 
+from hive_sight_core_api.analysis_processing_workflow import (
+    AnalysisProcessingWorkflow,
+    DeterministicStubAnalysisExecutor,
+)
 from hive_sight_core_api.analysis_request_workflow import AnalysisRequestWorkflow
 from hive_sight_core_api.dev_store import (
     DevState,
@@ -55,6 +59,14 @@ def get_analysis_request_workflow(state: DevStateDep) -> AnalysisRequestWorkflow
         store=state.store,
         event_recorder=state.event_recorder,
         id_factory=state.store.id_factory,
+        clock=state.store.clock,
+    )
+
+
+def get_analysis_processing_workflow(state: DevStateDep) -> AnalysisProcessingWorkflow:
+    return AnalysisProcessingWorkflow(
+        store=state.store,
+        executor=DeterministicStubAnalysisExecutor(clock=state.store.clock),
         clock=state.store.clock,
     )
 

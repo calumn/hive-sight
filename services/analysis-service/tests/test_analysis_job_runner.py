@@ -24,8 +24,7 @@ def test_run_analysis_job_returns_stubbed_model_result_at_runner_seam() -> None:
     assert result.inspection_photo_id == request.inspection_photo_id
     assert result.model_version == "stub-varroa-detector-0.1.0"
     assert result.status == AnalysisJobStatus.completed
-    assert result.complete_visible_bee_count == 0
-    assert result.partial_visible_bee_count == 0
-    assert result.likely_varroa_detections == 0
+    assert result.complete_visible_bee_count == 48
+    assert result.partial_visible_bee_count == 3
+    assert result.likely_varroa_detections == 1
     assert result.completed_at == completed_at
-

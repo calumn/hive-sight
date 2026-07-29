@@ -5,9 +5,11 @@ from fastapi import Depends, FastAPI, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from hive_sight_core_api.analysis_processing_workflow import AnalysisProcessingWorkflow
 from hive_sight_core_api.analysis_request_workflow import AnalysisRequestWorkflow
 from hive_sight_core_api.dependencies import (
     DevStateDep,
+    get_analysis_processing_workflow,
     get_analysis_request_workflow,
     get_inspection_photo_access,
     get_settings,
@@ -15,6 +17,7 @@ from hive_sight_core_api.dependencies import (
 from hive_sight_core_api.dev_store import DomainError, UserContext
 from hive_sight_core_api.inspection_photo_access import InspectionPhotoAccess
 from hive_sight_core_api.models import (
+    AnalysisRunDetailResponse,
     AnalysisRunRequest,
     AnalysisRunResponse,
     ApiaryCreateRequest,
@@ -27,6 +30,7 @@ from hive_sight_core_api.models import (
     InspectionCreateRequest,
     InspectionResponse,
     PhotoIntakeResponse,
+    ProcessAnalysisRunRequest,
     UploadUrlResponse,
     WorkspaceDataUseAgreementAcceptanceRequest,
     WorkspaceDataUseAgreementAcceptanceResponse,
@@ -53,6 +57,10 @@ InspectionPhotoAccessDep = Annotated[InspectionPhotoAccess, Depends(get_inspecti
 AnalysisRequestWorkflowDep = Annotated[
     AnalysisRequestWorkflow,
     Depends(get_analysis_request_workflow),
+]
+AnalysisProcessingWorkflowDep = Annotated[
+    AnalysisProcessingWorkflow,
+    Depends(get_analysis_processing_workflow),
 ]
 DevUserIdHeader = Annotated[str | None, Header(alias="x-hivesight-dev-user-id")]
 
@@ -189,3 +197,35 @@ def get_analysis_run(
     workflow: AnalysisRequestWorkflowDep,
 ) -> AnalysisRunResponse:
     return workflow.get_analysis_status(analysis_run_id)
+
+
+@app.get("/v1/analysis-runs/{analysis_run_id}/detail", response_model=AnalysisRunDetailResponse)
+def get_analysis_run_detail(
+    analysis_run_id: UUID,
+    workspace_id: UUID,
+    user: AuthenticatedUserDep,
+    workflow: AnalysisProcessingWorkflowDep,
+) -> AnalysisRunDetailResponse:
+    return workflow.get_analysis_run_detail(
+        user=user,
+        workspace_id=workspace_id,
+        analysis_run_id=analysis_run_id,
+    )
+
+
+@app.post(
+    "/v1/analysis-runs/{analysis_run_id}/process",
+    response_model=AnalysisRunDetailResponse,
+    status_code=202,
+)
+def process_analysis_run(
+    analysis_run_id: UUID,
+    request: ProcessAnalysisRunRequest,
+    user: AuthenticatedUserDep,
+    workflow: AnalysisProcessingWorkflowDep,
+) -> AnalysisRunDetailResponse:
+    return workflow.process_queued_analysis(
+        user=user,
+        workspace_id=request.workspace_id,
+        analysis_run_id=analysis_run_id,
+    )

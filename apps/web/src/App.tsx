@@ -1,10 +1,13 @@
 import {
+  Activity,
   Check,
   CircleAlert,
   CloudUpload,
   FileImage,
+  FlaskConical,
   LoaderCircle,
   Plus,
+  RefreshCw,
   ShieldCheck
 } from "lucide-react";
 import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
@@ -15,7 +18,9 @@ import {
   createInspection,
   fetchCoreHealth,
   fetchDevSession,
+  processAnalysisRun,
   uploadInspectionPhoto,
+  type AnalysisRunDetail,
   type Apiary,
   type ApiError,
   type DevSession,
@@ -45,6 +50,7 @@ export function App() {
   const [apiary, setApiary] = useState<Apiary | null>(null);
   const [hive, setHive] = useState<Hive | null>(null);
   const [inspection, setInspection] = useState<Inspection | null>(null);
+  const [analysisDetail, setAnalysisDetail] = useState<AnalysisRunDetail | null>(null);
   const [apiaryName, setApiaryName] = useState("Home apiary");
   const [hiveName, setHiveName] = useState("Hive A");
   const [inspectionDate, setInspectionDate] = useState(new Date().toISOString().slice(0, 10));
@@ -106,6 +112,7 @@ export function App() {
       setApiary(created);
       setHive(null);
       setInspection(null);
+      setAnalysisDetail(null);
     });
   }
 
@@ -118,6 +125,7 @@ export function App() {
       const created = await createHive({ devUserId, apiaryId: apiary.apiaryId, name: hiveName });
       setHive(created);
       setInspection(null);
+      setAnalysisDetail(null);
     });
   }
 
@@ -133,6 +141,7 @@ export function App() {
         inspectionDate
       });
       setInspection(created);
+      setAnalysisDetail(null);
     });
   }
 
@@ -149,7 +158,24 @@ export function App() {
         file
       });
       await refreshSession();
+      setAnalysisDetail(null);
       setActionState({ kind: "accepted", intake });
+    });
+  }
+
+  async function onProcessAnalysis() {
+    if (!session || actionState.kind !== "accepted") {
+      return;
+    }
+    const acceptedIntake = actionState.intake;
+    await runAction("Processing analysis", async () => {
+      const detail = await processAnalysisRun({
+        devUserId,
+        workspaceId: session.workspaceId,
+        analysisRunId: acceptedIntake.analysisRun.analysisRunId
+      });
+      setAnalysisDetail(detail);
+      setActionState({ kind: "accepted", intake: acceptedIntake });
     });
   }
 
@@ -279,7 +305,15 @@ export function App() {
               </button>
             </form>
 
-            <Outcome state={actionState} />
+            <Outcome state={actionState} analysisDetail={analysisDetail} />
+            {actionState.kind === "accepted" ? (
+              <AnalysisPanel
+                analysisRunId={actionState.intake.analysisRun.analysisRunId}
+                queuedStatus={actionState.intake.analysisRun.status}
+                detail={analysisDetail}
+                onProcessAnalysis={onProcessAnalysis}
+              />
+            ) : null}
           </section>
         </section>
       ) : (
@@ -319,7 +353,13 @@ function RecordBadge({ value }: { value: string | undefined }) {
   );
 }
 
-function Outcome({ state }: { state: ActionState }) {
+function Outcome({
+  state,
+  analysisDetail
+}: {
+  state: ActionState;
+  analysisDetail: AnalysisRunDetail | null;
+}) {
   if (state.kind === "working") {
     return (
       <div className="outcome working" role="status">
@@ -347,13 +387,73 @@ function Outcome({ state }: { state: ActionState }) {
         <Check size={20} />
         <div>
           <strong>{state.intake.inspectionPhoto.uploadStatus}</strong>
-          <p>Analysis {state.intake.analysisRun.status}</p>
+          <p>Analysis {analysisDetail?.status ?? state.intake.analysisRun.status}</p>
         </div>
       </div>
     );
   }
 
   return null;
+}
+
+function AnalysisPanel({
+  analysisRunId,
+  queuedStatus,
+  detail,
+  onProcessAnalysis
+}: {
+  analysisRunId: string;
+  queuedStatus: string;
+  detail: AnalysisRunDetail | null;
+  onProcessAnalysis: () => void;
+}) {
+  const status = detail?.status ?? queuedStatus;
+  const result = detail?.analysisResult ?? null;
+
+  return (
+    <section className="analysis-panel" aria-label="Analysis result">
+      <div className="analysis-header">
+        <PanelHeading icon={<Activity size={20} />} title="Analysis" />
+        <span className={`analysis-status status-${status}`}>{status}</span>
+      </div>
+      <p className="run-id">Run {analysisRunId}</p>
+      <button
+        type="button"
+        onClick={onProcessAnalysis}
+        disabled={status !== "queued"}
+      >
+        {status === "queued" ? <FlaskConical size={18} /> : <RefreshCw size={18} />}
+        Process stub analysis
+      </button>
+
+      {result ? (
+        <div className="result-grid">
+          <Metric label="Complete visible bees" value={result.completeVisibleBeeCount} />
+          <Metric label="Partial visible bees" value={result.partialVisibleBeeCount} />
+          <Metric label="Likely Varroa detections" value={result.likelyVarroaDetections} />
+          <Metric label="Model version" value={result.modelVersion} />
+        </div>
+      ) : null}
+
+      {detail?.failureMessage ? (
+        <p className="analysis-caveat failed">{detail.failureMessage}</p>
+      ) : (
+        <p className="analysis-caveat">
+          Completed results in this slice are deterministic stubs for handoff testing, not a real
+          AI-assisted Varroa estimate.
+        </p>
+      )}
+    </section>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: number | string }) {
+  return (
+    <div className="metric">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
 }
 
 function toApiError(error: unknown): ApiError {

@@ -54,6 +54,37 @@ export type PhotoIntake = {
   };
 };
 
+export type AnalysisResult = {
+  analysisResultId: string;
+  analysisRunId: string;
+  inspectionPhotoId: string;
+  workspaceId: string;
+  modelVersion: string;
+  completeVisibleBeeCount: number;
+  partialVisibleBeeCount: number;
+  likelyVarroaDetections: number;
+  taggedImageObjectKey: string | null;
+  resultKind: "deterministic_stub";
+  completedAt: string;
+};
+
+export type AnalysisRunDetail = {
+  analysisRunId: string;
+  workspaceId: string;
+  inspectionPhotoId: string;
+  status: "queued" | "running" | "completed" | "failed";
+  queuedAt: string;
+  startedAt: string | null;
+  completedAt: string | null;
+  failedAt: string | null;
+  failureCode: string | null;
+  failureMessage: string | null;
+  requestedModelVersion: string | null;
+  modelVersion: string | null;
+  message: string;
+  analysisResult: AnalysisResult | null;
+};
+
 export type ApiError = {
   code: string;
   message: string;
@@ -173,6 +204,41 @@ export async function uploadInspectionPhoto({
   return parsePhotoIntake(await response.json());
 }
 
+export async function fetchAnalysisRunDetail({
+  devUserId,
+  workspaceId,
+  analysisRunId
+}: {
+  devUserId: string;
+  workspaceId: string;
+  analysisRunId: string;
+}): Promise<AnalysisRunDetail> {
+  const params = new URLSearchParams({ workspace_id: workspaceId });
+  const response = await fetch(`${coreApiUrl}/v1/analysis-runs/${analysisRunId}/detail?${params}`, {
+    headers: devAuthHeaders(devUserId)
+  });
+  await ensureOk(response);
+  return parseAnalysisRunDetail(await response.json());
+}
+
+export async function processAnalysisRun({
+  devUserId,
+  workspaceId,
+  analysisRunId
+}: {
+  devUserId: string;
+  workspaceId: string;
+  analysisRunId: string;
+}): Promise<AnalysisRunDetail> {
+  const response = await fetch(`${coreApiUrl}/v1/analysis-runs/${analysisRunId}/process`, {
+    method: "POST",
+    headers: jsonHeaders(devUserId),
+    body: JSON.stringify({ workspace_id: workspaceId })
+  });
+  await ensureOk(response);
+  return parseAnalysisRunDetail(await response.json());
+}
+
 function devAuthHeaders(devUserId: string): HeadersInit {
   return { "x-hivesight-dev-user-id": devUserId };
 }
@@ -285,6 +351,53 @@ function parsePhotoIntake(value: unknown): PhotoIntake {
   };
 }
 
+function parseAnalysisRunDetail(value: unknown): AnalysisRunDetail {
+  const record = requireRecord(value, "Analysis run detail response");
+  return {
+    analysisRunId: requireString(record.analysis_run_id, "analysis_run_id"),
+    workspaceId: requireString(record.workspace_id, "workspace_id"),
+    inspectionPhotoId: requireString(record.inspection_photo_id, "inspection_photo_id"),
+    status: requireAnalysisStatus(record.status),
+    queuedAt: requireString(record.queued_at, "queued_at"),
+    startedAt: optionalString(record.started_at, "started_at"),
+    completedAt: optionalString(record.completed_at, "completed_at"),
+    failedAt: optionalString(record.failed_at, "failed_at"),
+    failureCode: optionalString(record.failure_code, "failure_code"),
+    failureMessage: optionalString(record.failure_message, "failure_message"),
+    requestedModelVersion: optionalString(record.requested_model_version, "requested_model_version"),
+    modelVersion: optionalString(record.model_version, "model_version"),
+    message: requireString(record.message, "message"),
+    analysisResult:
+      record.analysis_result === null ? null : parseAnalysisResult(record.analysis_result)
+  };
+}
+
+function parseAnalysisResult(value: unknown): AnalysisResult {
+  const record = requireRecord(value, "Analysis result response");
+  return {
+    analysisResultId: requireString(record.analysis_result_id, "analysis_result_id"),
+    analysisRunId: requireString(record.analysis_run_id, "analysis_run_id"),
+    inspectionPhotoId: requireString(record.inspection_photo_id, "inspection_photo_id"),
+    workspaceId: requireString(record.workspace_id, "workspace_id"),
+    modelVersion: requireString(record.model_version, "model_version"),
+    completeVisibleBeeCount: requireNumber(
+      record.complete_visible_bee_count,
+      "complete_visible_bee_count"
+    ),
+    partialVisibleBeeCount: requireNumber(
+      record.partial_visible_bee_count,
+      "partial_visible_bee_count"
+    ),
+    likelyVarroaDetections: requireNumber(
+      record.likely_varroa_detections,
+      "likely_varroa_detections"
+    ),
+    taggedImageObjectKey: optionalString(record.tagged_image_object_key, "tagged_image_object_key"),
+    resultKind: requireResultKind(record.result_kind),
+    completedAt: requireString(record.completed_at, "completed_at")
+  };
+}
+
 function requireRecord(value: unknown, label: string): Record<string, unknown> {
   if (!isRecord(value)) {
     throw new Error(`${label} was not an object`);
@@ -332,6 +445,13 @@ function requireAnalysisStatus(value: unknown): PhotoIntake["analysisRun"]["stat
     return value;
   }
   throw new Error("Core API response had an unexpected analysis status");
+}
+
+function requireResultKind(value: unknown): "deterministic_stub" {
+  if (value === "deterministic_stub") {
+    return value;
+  }
+  throw new Error("Core API response had an unexpected analysis result kind");
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

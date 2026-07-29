@@ -44,9 +44,17 @@ class AnalysisRunRequest(BaseModel):
 
 class AnalysisRunResponse(BaseModel):
     analysis_run_id: UUID
+    workspace_id: UUID
     inspection_photo_id: UUID
     status: AnalysisRunStatus
     queued_at: datetime
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    failed_at: datetime | None = None
+    failure_code: str | None = None
+    failure_message: str | None = None
+    requested_model_version: str | None = None
+    model_version: str | None = None
     message: str
 
 
@@ -126,3 +134,38 @@ class InspectionPhotoResponse(BaseModel):
 class PhotoIntakeResponse(BaseModel):
     inspection_photo: InspectionPhotoResponse
     analysis_run: AnalysisRunResponse
+
+
+class AnalysisResultResponse(BaseModel):
+    analysis_result_id: UUID
+    analysis_run_id: UUID
+    inspection_photo_id: UUID
+    workspace_id: UUID
+    model_version: str
+    complete_visible_bee_count: int
+    partial_visible_bee_count: int
+    likely_varroa_detections: int
+    tagged_image_object_key: str | None
+    result_kind: str
+    completed_at: datetime
+
+
+class AnalysisRunDetailResponse(BaseModel):
+    analysis_run_id: UUID
+    workspace_id: UUID
+    inspection_photo_id: UUID
+    status: AnalysisRunStatus
+    queued_at: datetime
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    failed_at: datetime | None = None
+    failure_code: str | None = None
+    failure_message: str | None = None
+    requested_model_version: str | None = None
+    model_version: str | None = None
+    message: str
+    analysis_result: AnalysisResultResponse | None = None
+
+
+class ProcessAnalysisRunRequest(BaseModel):
+    workspace_id: UUID
