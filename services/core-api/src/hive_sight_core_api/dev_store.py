@@ -1,0 +1,263 @@
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from datetime import UTC, date, datetime
+from uuid import UUID, uuid4
+
+from hive_sight_core_api.models import (
+    AnalysisRunResponse,
+    ApiaryResponse,
+    DataUseAgreementStatus,
+    DevSessionResponse,
+    HiveResponse,
+    InspectionPhotoResponse,
+    InspectionResponse,
+    UploadStatus,
+    WorkspaceDataUseAgreementAcceptanceResponse,
+)
+
+
+@dataclass(frozen=True)
+class UserContext:
+    user_id: UUID
+
+
+@dataclass(frozen=True)
+class WorkspaceRecord:
+    workspace_id: UUID
+    data_use_agreement_status: DataUseAgreementStatus = DataUseAgreementStatus.missing
+    data_use_agreement_terms_version: str | None = None
+    data_use_agreement_accepted_at: datetime | None = None
+
+
+@dataclass(frozen=True)
+class WorkspaceMembershipRecord:
+    user_id: UUID
+    workspace_id: UUID
+    role: str = "owner"
+    status: str = "active"
+
+
+@dataclass
+class InMemoryObjectStorage:
+    objects: dict[str, bytes] = field(default_factory=dict)
+
+    def put_object(self, object_key: str, body: bytes) -> None:
+        self.objects[object_key] = body
+
+
+@dataclass
+class InMemoryEventRecorder:
+    analysis_requested: list[AnalysisRunResponse] = field(default_factory=list)
+
+    def record_analysis_requested(self, analysis_run: AnalysisRunResponse) -> None:
+        self.analysis_requested.append(analysis_run)
+
+
+@dataclass
+class InMemoryProductDataStore:
+    id_factory: Callable[[], UUID] = uuid4
+    clock: Callable[[], datetime] = lambda: datetime.now(UTC)
+    users: set[UUID] = field(default_factory=set)
+    workspaces: dict[UUID, WorkspaceRecord] = field(default_factory=dict)
+    memberships: list[WorkspaceMembershipRecord] = field(default_factory=list)
+    apiaries: dict[UUID, ApiaryResponse] = field(default_factory=dict)
+    hives: dict[UUID, HiveResponse] = field(default_factory=dict)
+    inspections: dict[UUID, InspectionResponse] = field(default_factory=dict)
+    inspection_photos: dict[UUID, InspectionPhotoResponse] = field(default_factory=dict)
+    analysis_runs: dict[UUID, AnalysisRunResponse] = field(default_factory=dict)
+
+    def ensure_dev_session(self, user_id: UUID) -> DevSessionResponse:
+        self.users.add(user_id)
+        membership = self._active_membership_for_user(user_id)
+        if membership is None:
+            workspace_id = self.id_factory()
+            self.workspaces[workspace_id] = WorkspaceRecord(workspace_id=workspace_id)
+            membership = WorkspaceMembershipRecord(user_id=user_id, workspace_id=workspace_id)
+            self.memberships.append(membership)
+
+        workspace = self.workspaces[membership.workspace_id]
+        return DevSessionResponse(
+            user_id=user_id,
+            workspace_id=workspace.workspace_id,
+            role=membership.role,
+            workspace_data_use_agreement_status=workspace.data_use_agreement_status,
+            workspace_data_use_agreement_terms_version=workspace.data_use_agreement_terms_version,
+        )
+
+    def accept_data_use_agreement(
+        self,
+        user: UserContext,
+        workspace_id: UUID,
+        terms_version: str,
+    ) -> WorkspaceDataUseAgreementAcceptanceResponse:
+        self.require_workspace_access(user, workspace_id)
+        accepted_at = self.clock()
+        self.workspaces[workspace_id] = WorkspaceRecord(
+            workspace_id=workspace_id,
+            data_use_agreement_status=DataUseAgreementStatus.accepted,
+            data_use_agreement_terms_version=terms_version,
+            data_use_agreement_accepted_at=accepted_at,
+        )
+        return WorkspaceDataUseAgreementAcceptanceResponse(
+            workspace_id=workspace_id,
+            status=DataUseAgreementStatus.accepted,
+            terms_version=terms_version,
+            accepted_at=accepted_at,
+        )
+
+    def create_apiary(self, user: UserContext, workspace_id: UUID, name: str) -> ApiaryResponse:
+        self.require_workspace_access(user, workspace_id)
+        apiary = ApiaryResponse(
+            apiary_id=self.id_factory(),
+            workspace_id=workspace_id,
+            name=name,
+        )
+        self.apiaries[apiary.apiary_id] = apiary
+        return apiary
+
+    def create_hive(self, user: UserContext, apiary_id: UUID, name: str) -> HiveResponse:
+        apiary = self.apiaries.get(apiary_id)
+        if apiary is None:
+            raise DomainError("inspection_not_found", "The requested apiary was not found.", 404)
+        self.require_workspace_access(user, apiary.workspace_id)
+        hive = HiveResponse(
+            hive_id=self.id_factory(),
+            apiary_id=apiary_id,
+            workspace_id=apiary.workspace_id,
+            name=name,
+        )
+        self.hives[hive.hive_id] = hive
+        return hive
+
+    def create_inspection(
+        self,
+        user: UserContext,
+        hive_id: UUID,
+        inspection_date: date,
+    ) -> InspectionResponse:
+        hive = self.hives.get(hive_id)
+        if hive is None:
+            raise DomainError("inspection_not_found", "The requested hive was not found.", 404)
+        self.require_workspace_access(user, hive.workspace_id)
+        inspection = InspectionResponse(
+            inspection_id=self.id_factory(),
+            hive_id=hive_id,
+            workspace_id=hive.workspace_id,
+            inspection_date=inspection_date,
+        )
+        self.inspections[inspection.inspection_id] = inspection
+        return inspection
+
+    def require_workspace_access(self, user: UserContext, workspace_id: UUID) -> None:
+        if workspace_id not in self.workspaces:
+            raise DomainError(
+                "workspace_access_denied",
+                "The current User does not have access to this Workspace.",
+                403,
+            )
+        for membership in self.memberships:
+            if (
+                membership.user_id == user.user_id
+                and membership.workspace_id == workspace_id
+                and membership.status == "active"
+                and membership.role == "owner"
+            ):
+                return
+        raise DomainError(
+            "workspace_access_denied",
+            "The current User does not have access to this Workspace.",
+            403,
+        )
+
+    def require_data_use_agreement(self, workspace_id: UUID) -> None:
+        workspace = self.workspaces[workspace_id]
+        if workspace.data_use_agreement_status != DataUseAgreementStatus.accepted:
+            raise DomainError(
+                "data_use_agreement_required",
+                "Accept the Workspace Data Use Agreement before uploading inspection photos.",
+                403,
+            )
+
+    def require_inspection(self, workspace_id: UUID, inspection_id: UUID) -> InspectionResponse:
+        inspection = self.inspections.get(inspection_id)
+        if inspection is None or inspection.workspace_id != workspace_id:
+            raise DomainError(
+                "inspection_not_found",
+                "The requested Inspection was not found in this Workspace.",
+                404,
+            )
+        return inspection
+
+    def record_inspection_photo(
+        self,
+        inspection_photo_id: UUID,
+        workspace_id: UUID,
+        inspection_id: UUID,
+        original_object_key: str,
+        filename: str,
+        content_type: str,
+        size_bytes: int,
+        uploaded_by_user_id: UUID,
+    ) -> InspectionPhotoResponse:
+        photo = InspectionPhotoResponse(
+            inspection_photo_id=inspection_photo_id,
+            inspection_id=inspection_id,
+            workspace_id=workspace_id,
+            original_object_key=original_object_key,
+            filename=filename,
+            content_type=content_type,
+            size_bytes=size_bytes,
+            upload_status=UploadStatus.accepted,
+            uploaded_by_user_id=uploaded_by_user_id,
+            uploaded_at=self.clock(),
+        )
+        self.inspection_photos[inspection_photo_id] = photo
+        return photo
+
+    def record_analysis_run(self, analysis_run: AnalysisRunResponse) -> AnalysisRunResponse:
+        self.analysis_runs[analysis_run.analysis_run_id] = analysis_run
+        return analysis_run
+
+    def get_analysis_run(self, analysis_run_id: UUID) -> AnalysisRunResponse | None:
+        return self.analysis_runs.get(analysis_run_id)
+
+    def _active_membership_for_user(self, user_id: UUID) -> WorkspaceMembershipRecord | None:
+        for membership in self.memberships:
+            if membership.user_id == user_id and membership.status == "active":
+                return membership
+        return None
+
+
+@dataclass(frozen=True)
+class UploadPolicy:
+    allowed_content_types: frozenset[str] = frozenset(
+        {"image/jpeg", "image/png", "image/webp"}
+    )
+    max_size_bytes: int = 15 * 1024 * 1024
+
+
+@dataclass
+class DevState:
+    store: InMemoryProductDataStore
+    object_storage: InMemoryObjectStorage
+    event_recorder: InMemoryEventRecorder
+    upload_policy: UploadPolicy
+
+
+class DomainError(Exception):
+    def __init__(self, code: str, message: str, status_code: int) -> None:
+        self.code = code
+        self.message = message
+        self.status_code = status_code
+        super().__init__(message)
+
+
+def deterministic_id_factory(id_values: list[UUID]) -> Callable[[], UUID]:
+    values = list(id_values)
+
+    def next_id() -> UUID:
+        if not values:
+            return uuid4()
+        return values.pop(0)
+
+    return next_id

@@ -1,21 +1,35 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from hive_sight_core_api.analysis_request_workflow import AnalysisRequestWorkflow
 from hive_sight_core_api.dependencies import (
+    DevStateDep,
     get_analysis_request_workflow,
     get_inspection_photo_access,
     get_settings,
 )
+from hive_sight_core_api.dev_store import DomainError, UserContext
 from hive_sight_core_api.inspection_photo_access import InspectionPhotoAccess
 from hive_sight_core_api.models import (
     AnalysisRunRequest,
     AnalysisRunResponse,
+    ApiaryCreateRequest,
+    ApiaryResponse,
+    DevSessionResponse,
+    ErrorResponse,
     HealthResponse,
+    HiveCreateRequest,
+    HiveResponse,
+    InspectionCreateRequest,
+    InspectionResponse,
+    PhotoIntakeResponse,
     UploadUrlResponse,
+    WorkspaceDataUseAgreementAcceptanceRequest,
+    WorkspaceDataUseAgreementAcceptanceResponse,
 )
 
 settings = get_settings()
@@ -40,6 +54,35 @@ AnalysisRequestWorkflowDep = Annotated[
     AnalysisRequestWorkflow,
     Depends(get_analysis_request_workflow),
 ]
+DevUserIdHeader = Annotated[str | None, Header(alias="x-hivesight-dev-user-id")]
+
+
+def get_dev_user_context(x_hivesight_dev_user_id: DevUserIdHeader = None) -> UserContext:
+    if x_hivesight_dev_user_id is None:
+        raise DomainError(
+            "not_authenticated",
+            "Sign in before using Workspace inspection workflows.",
+            401,
+        )
+    try:
+        return UserContext(user_id=UUID(x_hivesight_dev_user_id))
+    except ValueError as exc:
+        raise DomainError(
+            "not_authenticated",
+            "The dev authentication header was not a valid User id.",
+            401,
+        ) from exc
+
+
+AuthenticatedUserDep = Annotated[UserContext, Depends(get_dev_user_context)]
+
+
+@app.exception_handler(DomainError)
+def handle_domain_error(_: Request, error: DomainError) -> JSONResponse:
+    return JSONResponse(
+        status_code=error.status_code,
+        content={"detail": ErrorResponse(code=error.code, message=error.message).model_dump()},
+    )
 
 
 @app.get("/healthz", response_model=HealthResponse)
@@ -51,12 +94,85 @@ def healthz() -> HealthResponse:
     )
 
 
+@app.get("/v1/dev/session", response_model=DevSessionResponse)
+def get_dev_session(user: AuthenticatedUserDep, state: DevStateDep) -> DevSessionResponse:
+    return state.store.ensure_dev_session(user.user_id)
+
+
+@app.post(
+    "/v1/workspace-data-use-agreements/acceptances",
+    response_model=WorkspaceDataUseAgreementAcceptanceResponse,
+)
+def accept_workspace_data_use_agreement(
+    request: WorkspaceDataUseAgreementAcceptanceRequest,
+    user: AuthenticatedUserDep,
+    state: DevStateDep,
+) -> WorkspaceDataUseAgreementAcceptanceResponse:
+    return state.store.accept_data_use_agreement(
+        user=user,
+        workspace_id=request.workspace_id,
+        terms_version=request.terms_version,
+    )
+
+
+@app.post("/v1/apiaries", response_model=ApiaryResponse, status_code=201)
+def create_apiary(
+    request: ApiaryCreateRequest,
+    user: AuthenticatedUserDep,
+    state: DevStateDep,
+) -> ApiaryResponse:
+    return state.store.create_apiary(user=user, workspace_id=request.workspace_id, name=request.name)
+
+
+@app.post("/v1/hives", response_model=HiveResponse, status_code=201)
+def create_hive(
+    request: HiveCreateRequest,
+    user: AuthenticatedUserDep,
+    state: DevStateDep,
+) -> HiveResponse:
+    return state.store.create_hive(user=user, apiary_id=request.apiary_id, name=request.name)
+
+
+@app.post("/v1/inspections", response_model=InspectionResponse, status_code=201)
+def create_inspection(
+    request: InspectionCreateRequest,
+    user: AuthenticatedUserDep,
+    state: DevStateDep,
+) -> InspectionResponse:
+    return state.store.create_inspection(
+        user=user,
+        hive_id=request.hive_id,
+        inspection_date=request.inspection_date,
+    )
+
+
 @app.get("/v1/inspection-photos/{inspection_photo_id}/upload-url", response_model=UploadUrlResponse)
 def create_upload_url(
     inspection_photo_id: UUID,
     photo_access: InspectionPhotoAccessDep,
 ) -> UploadUrlResponse:
     return photo_access.create_upload_access(inspection_photo_id)
+
+
+@app.post("/v1/inspection-photos/intake", response_model=PhotoIntakeResponse, status_code=202)
+async def accept_inspection_photo(
+    workspace_id: UUID,
+    inspection_id: UUID,
+    request: Request,
+    user: AuthenticatedUserDep,
+    photo_access: InspectionPhotoAccessDep,
+    x_hivesight_filename: Annotated[str | None, Header(alias="x-hivesight-filename")] = None,
+) -> PhotoIntakeResponse:
+    content_type = request.headers.get("content-type", "")
+    filename = x_hivesight_filename or "inspection-photo"
+    return photo_access.accept_photo_for_analysis(
+        user=user,
+        workspace_id=workspace_id,
+        inspection_id=inspection_id,
+        filename=filename,
+        content_type=content_type,
+        body=await request.body(),
+    )
 
 
 @app.post("/v1/analysis-runs", response_model=AnalysisRunResponse, status_code=202)
@@ -73,4 +189,3 @@ def get_analysis_run(
     workflow: AnalysisRequestWorkflowDep,
 ) -> AnalysisRunResponse:
     return workflow.get_analysis_status(analysis_run_id)
-
