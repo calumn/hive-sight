@@ -15,7 +15,9 @@ body {
 }
 
 button,
-input {
+input,
+select,
+textarea {
   font: inherit;
 }
 
@@ -40,7 +42,9 @@ button:disabled {
   opacity: 0.65;
 }
 
-input {
+input,
+select,
+textarea {
   background: #ffffff;
   border: 1px solid #ccd5c8;
   border-radius: 6px;
@@ -48,6 +52,11 @@ input {
   min-height: 42px;
   padding: 8px 10px;
   width: 100%;
+}
+
+textarea {
+  min-height: 72px;
+  resize: vertical;
 }
 
 .app-shell {
@@ -461,13 +470,26 @@ label span {
 }
 
 .annotation-box {
+  background: rgba(255, 255, 255, 0.06);
   border: 3px solid;
   border-radius: 5px;
   box-shadow:
     0 0 0 1px rgba(255, 255, 255, 0.78),
     0 6px 18px rgba(0, 0, 0, 0.28);
+  min-height: 0;
+  padding: 0;
   pointer-events: auto;
   position: absolute;
+}
+
+.annotation-box:hover,
+.annotation-box:focus-visible,
+.annotation-box.selected {
+  box-shadow:
+    0 0 0 3px rgba(255, 255, 255, 0.9),
+    0 0 0 6px rgba(47, 128, 237, 0.55),
+    0 6px 18px rgba(0, 0, 0, 0.28);
+  outline: none;
 }
 
 .annotation-box.complete {
@@ -484,6 +506,45 @@ label span {
   font-weight: 800;
   line-height: 1.35;
   margin-bottom: 0;
+}
+
+.review-panel {
+  background: #f7f9f5;
+  border: 1px solid #dce2d7;
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(160px, 220px);
+  padding: 14px;
+}
+
+.review-panel > div,
+.review-panel .review-state {
+  grid-column: 1 / -1;
+}
+
+.review-panel strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.review-panel p {
+  color: #515b4c;
+  line-height: 1.4;
+  margin-bottom: 0;
+}
+
+.review-panel button {
+  align-self: end;
+}
+
+.review-state {
+  background: #ffffff;
+  border: 1px solid #dce2d7;
+  border-radius: 6px;
+  font-weight: 800;
+  min-height: 38px;
+  padding: 9px;
 }
 
 .loading-panel {
@@ -511,7 +572,8 @@ label span {
   .intake-layout,
   .form-grid,
   .upload-panel,
-  .result-grid {
+  .result-grid,
+  .review-panel {
     grid-template-columns: 1fr;
   }
 

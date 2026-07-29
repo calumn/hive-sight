@@ -133,6 +133,264 @@ def test_analysis_evidence_returns_original_photo_reference_and_bee_annotations(
         app.dependency_overrides.clear()
 
 
+def test_reviewer_records_review_decision_and_evidence_projects_latest_state() -> None:
+    state = build_dev_state(
+        id_values=[
+            UUID("00000000-0000-0000-0000-000000000061"),
+            UUID("00000000-0000-0000-0000-000000000062"),
+            UUID("00000000-0000-0000-0000-000000000063"),
+            UUID("00000000-0000-0000-0000-000000000064"),
+            UUID("00000000-0000-0000-0000-000000000065"),
+            UUID("00000000-0000-0000-0000-000000000066"),
+            UUID("00000000-0000-0000-0000-000000000067"),
+            UUID("00000000-0000-0000-0000-000000000068"),
+            UUID("00000000-0000-0000-0000-000000000069"),
+            UUID("00000000-0000-0000-0000-000000000070"),
+            UUID("00000000-0000-0000-0000-000000000071"),
+            UUID("00000000-0000-0000-0000-000000000072"),
+        ],
+        clock=lambda: datetime(2026, 7, 29, 12, 30, tzinfo=UTC),
+    )
+    app.dependency_overrides[get_dev_state] = lambda: state
+    client = TestClient(app)
+
+    try:
+        workspace_id, analysis_run_id = _create_queued_analysis_run(client)
+        client.post(
+            f"/v1/analysis-runs/{analysis_run_id}/process",
+            json={"workspace_id": workspace_id},
+            headers={"x-hivesight-dev-user-id": str(USER_ID)},
+        )
+        evidence = client.get(
+            f"/v1/analysis-runs/{analysis_run_id}/evidence?workspace_id={workspace_id}",
+            headers={"x-hivesight-dev-user-id": str(USER_ID)},
+        ).json()
+        annotation_id = evidence["annotations"][0]["annotation_id"]
+
+        approved_response = client.post(
+            "/v1/review-decisions",
+            json={
+                "workspace_id": workspace_id,
+                "subject_type": "annotation",
+                "subject_id": annotation_id,
+                "decision": "approved",
+                "notes": "Accepted as a complete visible bee.",
+            },
+            headers={"x-hivesight-dev-user-id": str(USER_ID)},
+        )
+        rejected_response = client.post(
+            "/v1/review-decisions",
+            json={
+                "workspace_id": workspace_id,
+                "subject_type": "annotation",
+                "subject_id": annotation_id,
+                "decision": "rejected",
+                "notes": "Changed after closer review.",
+            },
+            headers={"x-hivesight-dev-user-id": str(USER_ID)},
+        )
+        reviewed_evidence_response = client.get(
+            f"/v1/analysis-runs/{analysis_run_id}/evidence?workspace_id={workspace_id}",
+            headers={"x-hivesight-dev-user-id": str(USER_ID)},
+        )
+
+        assert approved_response.status_code == 201
+        assert rejected_response.status_code == 201
+        assert len(state.store.review_decisions) == 2
+        approved = approved_response.json()
+        assert approved["reviewer_id"] == str(USER_ID)
+        assert approved["subject_type"] == "annotation"
+        assert approved["subject_id"] == annotation_id
+        assert approved["decision"] == "approved"
+        assert approved["notes"] == "Accepted as a complete visible bee."
+        reviewed_evidence = reviewed_evidence_response.json()
+        reviewed_annotation = reviewed_evidence["annotations"][0]
+        assert reviewed_annotation["latest_review_decision"]["decision"] == "rejected"
+        assert reviewed_annotation["latest_review_decision"]["notes"] == "Changed after closer review."
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_review_decision_requires_internal_reviewer_capability() -> None:
+    state = build_dev_state(
+        id_values=[
+            UUID("00000000-0000-0000-0000-000000000081"),
+            UUID("00000000-0000-0000-0000-000000000082"),
+            UUID("00000000-0000-0000-0000-000000000083"),
+            UUID("00000000-0000-0000-0000-000000000084"),
+            UUID("00000000-0000-0000-0000-000000000085"),
+            UUID("00000000-0000-0000-0000-000000000086"),
+            UUID("00000000-0000-0000-0000-000000000087"),
+            UUID("00000000-0000-0000-0000-000000000088"),
+            UUID("00000000-0000-0000-0000-000000000089"),
+            UUID("00000000-0000-0000-0000-000000000090"),
+        ],
+    )
+    app.dependency_overrides[get_dev_state] = lambda: state
+    client = TestClient(app)
+
+    try:
+        workspace_id, analysis_run_id = _create_queued_analysis_run(client)
+        client.post(
+            f"/v1/analysis-runs/{analysis_run_id}/process",
+            json={"workspace_id": workspace_id},
+            headers={"x-hivesight-dev-user-id": str(USER_ID)},
+        )
+        evidence = client.get(
+            f"/v1/analysis-runs/{analysis_run_id}/evidence?workspace_id={workspace_id}",
+            headers={"x-hivesight-dev-user-id": str(USER_ID)},
+        ).json()
+        annotation_id = evidence["annotations"][0]["annotation_id"]
+
+        response = client.post(
+            "/v1/review-decisions",
+            json={
+                "workspace_id": workspace_id,
+                "subject_type": "annotation",
+                "subject_id": annotation_id,
+                "decision": "approved",
+            },
+            headers={"x-hivesight-dev-user-id": str(OTHER_USER_ID)},
+        )
+
+        assert response.status_code == 403
+        assert response.json()["detail"]["code"] == "workspace_access_denied"
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_review_decision_rejects_non_reviewer_with_workspace_access() -> None:
+    state = build_dev_state(
+        id_values=[
+            UUID("00000000-0000-0000-0000-000000000091"),
+            UUID("00000000-0000-0000-0000-000000000092"),
+            UUID("00000000-0000-0000-0000-000000000093"),
+            UUID("00000000-0000-0000-0000-000000000094"),
+            UUID("00000000-0000-0000-0000-000000000095"),
+            UUID("00000000-0000-0000-0000-000000000096"),
+            UUID("00000000-0000-0000-0000-000000000097"),
+            UUID("00000000-0000-0000-0000-000000000098"),
+            UUID("00000000-0000-0000-0000-000000000099"),
+            UUID("00000000-0000-0000-0000-000000000100"),
+        ],
+    )
+    state.store.reviewer_user_ids.clear()
+    app.dependency_overrides[get_dev_state] = lambda: state
+    client = TestClient(app)
+
+    try:
+        workspace_id, analysis_run_id = _create_queued_analysis_run(client)
+        client.post(
+            f"/v1/analysis-runs/{analysis_run_id}/process",
+            json={"workspace_id": workspace_id},
+            headers={"x-hivesight-dev-user-id": str(USER_ID)},
+        )
+        evidence = client.get(
+            f"/v1/analysis-runs/{analysis_run_id}/evidence?workspace_id={workspace_id}",
+            headers={"x-hivesight-dev-user-id": str(USER_ID)},
+        ).json()
+        annotation_id = evidence["annotations"][0]["annotation_id"]
+
+        response = client.post(
+            "/v1/review-decisions",
+            json={
+                "workspace_id": workspace_id,
+                "subject_type": "annotation",
+                "subject_id": annotation_id,
+                "decision": "approved",
+            },
+            headers={"x-hivesight-dev-user-id": str(USER_ID)},
+        )
+
+        assert response.status_code == 403
+        assert response.json()["detail"]["code"] == "reviewer_access_required"
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_review_decision_requires_accepted_workspace_data_use_agreement() -> None:
+    state = build_dev_state(
+        id_values=[
+            UUID("00000000-0000-0000-0000-000000000111"),
+            UUID("00000000-0000-0000-0000-000000000112"),
+        ],
+    )
+    app.dependency_overrides[get_dev_state] = lambda: state
+    client = TestClient(app)
+
+    try:
+        workspace_id = client.get(
+            "/v1/dev/session",
+            headers={"x-hivesight-dev-user-id": str(USER_ID)},
+        ).json()["workspace_id"]
+
+        response = client.post(
+            "/v1/review-decisions",
+            json={
+                "workspace_id": workspace_id,
+                "subject_type": "annotation",
+                "subject_id": "00000000-0000-0000-0000-000000000999",
+                "decision": "approved",
+            },
+            headers={"x-hivesight-dev-user-id": str(USER_ID)},
+        )
+
+        assert response.status_code == 403
+        assert response.json()["detail"]["code"] == "data_use_agreement_required"
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_review_decision_rejects_missing_annotation_and_long_notes() -> None:
+    state = build_dev_state(
+        id_values=[
+            UUID("00000000-0000-0000-0000-000000000121"),
+            UUID("00000000-0000-0000-0000-000000000122"),
+        ],
+    )
+    app.dependency_overrides[get_dev_state] = lambda: state
+    client = TestClient(app)
+
+    try:
+        workspace_id = client.get(
+            "/v1/dev/session",
+            headers={"x-hivesight-dev-user-id": str(USER_ID)},
+        ).json()["workspace_id"]
+        client.post(
+            "/v1/workspace-data-use-agreements/acceptances",
+            json={"workspace_id": workspace_id, "terms_version": "2026-07-29"},
+            headers={"x-hivesight-dev-user-id": str(USER_ID)},
+        )
+
+        missing_response = client.post(
+            "/v1/review-decisions",
+            json={
+                "workspace_id": workspace_id,
+                "subject_type": "annotation",
+                "subject_id": "00000000-0000-0000-0000-000000000999",
+                "decision": "approved",
+            },
+            headers={"x-hivesight-dev-user-id": str(USER_ID)},
+        )
+        long_notes_response = client.post(
+            "/v1/review-decisions",
+            json={
+                "workspace_id": workspace_id,
+                "subject_type": "annotation",
+                "subject_id": "00000000-0000-0000-0000-000000000999",
+                "decision": "approved",
+                "notes": "x" * 501,
+            },
+            headers={"x-hivesight-dev-user-id": str(USER_ID)},
+        )
+
+        assert missing_response.status_code == 404
+        assert missing_response.json()["detail"]["code"] == "annotation_not_found"
+        assert long_notes_response.status_code == 422
+    finally:
+        app.dependency_overrides.clear()
+
+
 def test_analysis_evidence_is_not_visible_across_workspaces() -> None:
     state = build_dev_state(
         id_values=[

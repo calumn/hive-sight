@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 
 const fixtureImagePath = fileURLToPath(new URL("../fixtures/bee-frame-test.png", import.meta.url));
 
-test("Beekeeper completes photo intake and sees annotation evidence", async ({ page }) => {
+test("Reviewer records an annotation Review Decision", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByText("core-api online")).toBeVisible();
 
@@ -51,6 +51,14 @@ test("Beekeeper completes photo intake and sees annotation evidence", async ({ p
   ).toHaveCount(1);
 
   expect(await annotationBoxesAreInsidePhoto(page)).toBe(true);
+
+  await page.getByTestId("review-annotation-select").selectOption({ index: 1 });
+  await page.getByTestId("review-decision-select").selectOption("approved");
+  await page.getByTestId("review-notes-input").fill("Accepted as a complete visible bee.");
+  await page.getByTestId("submit-review-decision-button").click();
+  await expect(page.getByTestId("review-state")).toContainText("Latest decision: approved");
+  await expect(page.locator('[data-testid="annotation-box"][data-review-decision="approved"]')).toHaveCount(1);
+  await expect(page.getByText("Review evidence only. Dataset use is not assigned in this slice.")).toBeVisible();
 
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await annotationBoxesAreInsidePhoto(page)).toBe(true);

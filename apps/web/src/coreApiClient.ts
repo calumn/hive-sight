@@ -8,6 +8,7 @@ export type DevSession = {
   userId: string;
   workspaceId: string;
   role: string;
+  reviewerCapability: boolean;
   workspaceDataUseAgreementStatus: "missing" | "accepted";
   workspaceDataUseAgreementTermsVersion: string | null;
 };
@@ -70,6 +71,19 @@ export type AnalysisResult = {
 
 export type AnnotationType = "complete_visible_bee" | "partial_visible_bee" | "likely_varroa_detection";
 
+export type ReviewDecisionValue = "approved" | "rejected" | "uncertain" | "excluded";
+
+export type ReviewDecision = {
+  reviewDecisionId: string;
+  workspaceId: string;
+  reviewerId: string;
+  subjectType: "annotation";
+  subjectId: string;
+  decision: ReviewDecisionValue;
+  notes: string | null;
+  createdAt: string;
+};
+
 export type Annotation = {
   annotationId: string;
   workspaceId: string;
@@ -86,6 +100,7 @@ export type Annotation = {
   confidence: number;
   source: string;
   createdAt: string;
+  latestReviewDecision: ReviewDecision | null;
 };
 
 export type AnalysisEvidence = {
@@ -309,6 +324,35 @@ export async function fetchInspectionPhotoObjectUrl({
   return URL.createObjectURL(blob);
 }
 
+export async function createReviewDecision({
+  devUserId,
+  workspaceId,
+  subjectId,
+  decision,
+  notes
+}: {
+  devUserId: string;
+  workspaceId: string;
+  subjectId: string;
+  decision: ReviewDecisionValue;
+  notes: string;
+}): Promise<ReviewDecision> {
+  const trimmedNotes = notes.trim();
+  const response = await fetch(`${coreApiUrl}/v1/review-decisions`, {
+    method: "POST",
+    headers: jsonHeaders(devUserId),
+    body: JSON.stringify({
+      workspace_id: workspaceId,
+      subject_type: "annotation",
+      subject_id: subjectId,
+      decision,
+      notes: trimmedNotes.length > 0 ? trimmedNotes : null
+    })
+  });
+  await ensureOk(response);
+  return parseReviewDecision(await response.json());
+}
+
 function devAuthHeaders(devUserId: string): HeadersInit {
   return { "x-hivesight-dev-user-id": devUserId };
 }
@@ -355,6 +399,7 @@ function parseDevSession(value: unknown): DevSession {
     userId: requireString(record.user_id, "user_id"),
     workspaceId: requireString(record.workspace_id, "workspace_id"),
     role: requireString(record.role, "role"),
+    reviewerCapability: requireBoolean(record.reviewer_capability, "reviewer_capability"),
     workspaceDataUseAgreementStatus: requireAgreementStatus(
       record.workspace_data_use_agreement_status
     ),
@@ -508,6 +553,24 @@ function parseAnnotation(value: unknown): Annotation {
     sourceImageHeightPx: requireNumber(record.source_image_height_px, "source_image_height_px"),
     confidence: requireNumber(record.confidence, "confidence"),
     source: requireString(record.source, "source"),
+    createdAt: requireString(record.created_at, "created_at"),
+    latestReviewDecision:
+      record.latest_review_decision === null
+        ? null
+        : parseReviewDecision(record.latest_review_decision)
+  };
+}
+
+function parseReviewDecision(value: unknown): ReviewDecision {
+  const record = requireRecord(value, "Review decision response");
+  return {
+    reviewDecisionId: requireString(record.review_decision_id, "review_decision_id"),
+    workspaceId: requireString(record.workspace_id, "workspace_id"),
+    reviewerId: requireString(record.reviewer_id, "reviewer_id"),
+    subjectType: requireReviewSubjectType(record.subject_type),
+    subjectId: requireString(record.subject_id, "subject_id"),
+    decision: requireReviewDecisionValue(record.decision),
+    notes: optionalString(record.notes, "notes"),
     createdAt: requireString(record.created_at, "created_at")
   };
 }
@@ -543,6 +606,13 @@ function optionalString(value: unknown, field: string): string | null {
 function requireNumber(value: unknown, field: string): number {
   if (typeof value !== "number") {
     throw new Error(`Core API response field ${field} was not a number`);
+  }
+  return value;
+}
+
+function requireBoolean(value: unknown, field: string): boolean {
+  if (typeof value !== "boolean") {
+    throw new Error(`Core API response field ${field} was not a boolean`);
   }
   return value;
 }
@@ -591,6 +661,25 @@ function requireCoordinateSpace(value: unknown): "normalized" {
     return value;
   }
   throw new Error("Core API response had an unexpected coordinate space");
+}
+
+function requireReviewSubjectType(value: unknown): "annotation" {
+  if (value === "annotation") {
+    return value;
+  }
+  throw new Error("Core API response had an unexpected review subject type");
+}
+
+function requireReviewDecisionValue(value: unknown): ReviewDecisionValue {
+  if (
+    value === "approved" ||
+    value === "rejected" ||
+    value === "uncertain" ||
+    value === "excluded"
+  ) {
+    return value;
+  }
+  throw new Error("Core API response had an unexpected review decision");
 }
 
 function toCoreApiUrl(pathOrUrl: string): string {

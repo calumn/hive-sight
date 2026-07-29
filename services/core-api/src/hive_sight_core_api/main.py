@@ -32,6 +32,8 @@ from hive_sight_core_api.models import (
     InspectionResponse,
     PhotoIntakeResponse,
     ProcessAnalysisRunRequest,
+    ReviewDecisionCreateRequest,
+    ReviewDecisionResponse,
     UploadUrlResponse,
     WorkspaceDataUseAgreementAcceptanceRequest,
     WorkspaceDataUseAgreementAcceptanceResponse,
@@ -251,6 +253,22 @@ def get_inspection_photo_content(
             404,
         )
     return Response(content=body, media_type=photo.content_type)
+
+
+@app.post("/v1/review-decisions", response_model=ReviewDecisionResponse, status_code=201)
+def create_review_decision(
+    request: ReviewDecisionCreateRequest,
+    user: AuthenticatedUserDep,
+    state: DevStateDep,
+) -> ReviewDecisionResponse:
+    return state.store.record_review_decision(
+        user=user,
+        workspace_id=request.workspace_id,
+        subject_type=request.subject_type,
+        subject_id=request.subject_id,
+        decision=request.decision,
+        notes=request.notes,
+    )
 
 
 @app.post(

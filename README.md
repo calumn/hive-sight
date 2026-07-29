@@ -14,15 +14,87 @@ The first codebase follows [ADR-0001](architecture/adr/0001-service-oriented-arc
 - `architecture`: architecture decisions and diagrams.
 - `requirements`: requirements and product specification artifacts.
 
-## Local Start
+## Clean Machine Setup
 
-Install dependencies for each surface, then run them in separate terminals:
+Install these prerequisites first:
+
+- Python 3.12.
+- Node.js 26 or newer.
+- pnpm.
+
+On macOS with Homebrew, that is typically:
 
 ```sh
-docker compose up -d
-cd services/core-api && python -m venv .venv && source .venv/bin/activate && pip install -e ".[dev]" && uvicorn hive_sight_core_api.main:app --reload --port 8000
-cd services/analysis-service && python -m venv .venv && source .venv/bin/activate && pip install -e ".[dev]" && uvicorn hive_sight_analysis_service.main:app --reload --port 8100
+brew install python@3.12 node pnpm
+```
+
+From a fresh clone, install HiveSight dependencies from the repo root:
+
+```sh
+cd ~/Projects/hive-sight
+python3.12 -m venv services/core-api/.venv
+services/core-api/.venv/bin/python -m pip install -e "services/core-api[dev]"
+python3.12 -m venv services/analysis-service/.venv
+services/analysis-service/.venv/bin/python -m pip install -e "services/analysis-service[dev]"
 pnpm install
+pnpm --filter @hive-sight/web exec playwright install chromium
+```
+
+Docker is not required for the current in-memory vertical slices. It will become useful when local infrastructure such as databases, queues, or object storage are added.
+
+## Daily Local Start
+
+Start the local stack from the repo root:
+
+```sh
+pnpm dev:all
+```
+
+Start the local stack so other devices on the same network can access it:
+
+```sh
+pnpm dev:lan
+```
+
+Check whether the local servers are already running:
+
+```sh
+pnpm dev:status
+```
+
+Check the LAN URLs:
+
+```sh
+pnpm dev:status:lan
+```
+
+Stop the local servers:
+
+```sh
+pnpm dev:stop
+```
+
+Open the Web UI at:
+
+```text
+http://127.0.0.1:5173/
+```
+
+When using `pnpm dev:lan`, the terminal prints the LAN Web UI URL, for example:
+
+```text
+http://192.168.1.42:5173/
+```
+
+Open that URL from another device on the same Wi-Fi network. Your Mac firewall may ask whether to allow incoming connections for Python or Node/Vite; allow them for local testing.
+
+`pnpm dev:all` starts the Core API on `http://127.0.0.1:8000`, the Analysis Service on `http://127.0.0.1:8100`, and the Web UI on `http://127.0.0.1:5173`. Press `Ctrl+C` in that terminal to stop them, or run `pnpm dev:stop` from another terminal.
+
+`pnpm dev:lan` binds the Web UI and Core API to your local network address. This is for trusted home-network testing only. Some browser camera APIs require HTTPS on non-localhost origins, so LAN testing is enough for checking responsive behaviour and photo/file selection, but direct camera integration may need an HTTPS dev setup later.
+
+If you want to run just the Web UI in a separate terminal, use:
+
+```sh
 pnpm dev:web
 ```
 

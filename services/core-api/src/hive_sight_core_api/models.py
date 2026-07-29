@@ -31,6 +31,17 @@ class CoordinateSpace(StrEnum):
     normalized = "normalized"
 
 
+class ReviewDecisionValue(StrEnum):
+    approved = "approved"
+    rejected = "rejected"
+    uncertain = "uncertain"
+    excluded = "excluded"
+
+
+class ReviewSubjectType(StrEnum):
+    annotation = "annotation"
+
+
 class HealthResponse(BaseModel):
     service: str
     status: str
@@ -77,6 +88,7 @@ class DevSessionResponse(BaseModel):
     user_id: UUID
     workspace_id: UUID
     role: str
+    reviewer_capability: bool
     workspace_data_use_agreement_status: DataUseAgreementStatus
     workspace_data_use_agreement_terms_version: str | None
 
@@ -173,6 +185,17 @@ class AnnotationCreate(BaseModel):
     source: str
 
 
+class ReviewDecisionResponse(BaseModel):
+    review_decision_id: UUID
+    workspace_id: UUID
+    reviewer_id: UUID
+    subject_type: ReviewSubjectType
+    subject_id: UUID
+    decision: ReviewDecisionValue
+    notes: str | None = None
+    created_at: datetime
+
+
 class AnnotationResponse(BaseModel):
     annotation_id: UUID
     workspace_id: UUID
@@ -189,6 +212,7 @@ class AnnotationResponse(BaseModel):
     confidence: float
     source: str
     created_at: datetime
+    latest_review_decision: ReviewDecisionResponse | None = None
 
 
 class AnalysisRunDetailResponse(BaseModel):
@@ -226,6 +250,14 @@ class AnalysisEvidenceResponse(BaseModel):
     result_kind: str
     model_version: str
     caveat: str
+
+
+class ReviewDecisionCreateRequest(BaseModel):
+    workspace_id: UUID
+    subject_type: ReviewSubjectType
+    subject_id: UUID
+    decision: ReviewDecisionValue
+    notes: str | None = Field(default=None, max_length=500)
 
 
 class ProcessAnalysisRunRequest(BaseModel):

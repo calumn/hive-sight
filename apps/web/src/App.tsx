@@ -17,6 +17,7 @@ import {
   createApiary,
   createHive,
   createInspection,
+  createReviewDecision,
   fetchAnalysisEvidence,
   fetchCoreHealth,
   fetchDevSession,
@@ -32,7 +33,8 @@ import {
   type HealthResponse,
   type Hive,
   type Inspection,
-  type PhotoIntake
+  type PhotoIntake,
+  type ReviewDecisionValue
 } from "./coreApiClient";
 
 const devUserId = "00000000-0000-0000-0000-000000000101";
@@ -58,6 +60,9 @@ export function App() {
   const [analysisDetail, setAnalysisDetail] = useState<AnalysisRunDetail | null>(null);
   const [analysisEvidence, setAnalysisEvidence] = useState<AnalysisEvidence | null>(null);
   const [evidenceImageUrl, setEvidenceImageUrl] = useState<string | null>(null);
+  const [reviewState, setReviewState] = useState<{ kind: "idle" | "working" | "done" } | null>(
+    null
+  );
   const [apiaryName, setApiaryName] = useState("Home apiary");
   const [hiveName, setHiveName] = useState("Hive A");
   const [inspectionDate, setInspectionDate] = useState(new Date().toISOString().slice(0, 10));
@@ -214,6 +219,41 @@ export function App() {
       }
       setActionState({ kind: "accepted", intake: acceptedIntake });
     });
+  }
+
+  async function onSubmitReviewDecision({
+    annotationId,
+    decision,
+    notes
+  }: {
+    annotationId: string;
+    decision: ReviewDecisionValue;
+    notes: string;
+  }) {
+    if (!session || !analysisEvidence) {
+      return;
+    }
+    setReviewState({ kind: "working" });
+    try {
+      await createReviewDecision({
+        devUserId,
+        workspaceId: session.workspaceId,
+        subjectId: annotationId,
+        decision,
+        notes
+      });
+      const refreshedEvidence = await fetchAnalysisEvidence({
+        devUserId,
+        workspaceId: session.workspaceId,
+        analysisRunId: analysisEvidence.analysisRunId
+      });
+      setAnalysisEvidence(refreshedEvidence);
+      setReviewState({ kind: "done" });
+    } catch (error) {
+      const apiError = toApiError(error);
+      setReviewState(null);
+      setActionState({ kind: "blocked", code: apiError.code, message: apiError.message });
+    }
   }
 
   function clearEvidenceImage() {
@@ -375,7 +415,10 @@ export function App() {
                 detail={analysisDetail}
                 evidence={analysisEvidence}
                 imageUrl={evidenceImageUrl}
+                reviewerCapability={loadState.session.reviewerCapability}
+                reviewState={reviewState}
                 onProcessAnalysis={onProcessAnalysis}
+                onSubmitReviewDecision={onSubmitReviewDecision}
               />
             ) : null}
           </section>
@@ -466,14 +509,24 @@ function AnalysisPanel({
   detail,
   evidence,
   imageUrl,
-  onProcessAnalysis
+  reviewerCapability,
+  reviewState,
+  onProcessAnalysis,
+  onSubmitReviewDecision
 }: {
   analysisRunId: string;
   queuedStatus: string;
   detail: AnalysisRunDetail | null;
   evidence: AnalysisEvidence | null;
   imageUrl: string | null;
+  reviewerCapability: boolean;
+  reviewState: { kind: "idle" | "working" | "done" } | null;
   onProcessAnalysis: () => void;
+  onSubmitReviewDecision: (request: {
+    annotationId: string;
+    decision: ReviewDecisionValue;
+    notes: string;
+  }) => Promise<void>;
 }) {
   const status = detail?.status ?? queuedStatus;
   const result = detail?.analysisResult ?? null;
@@ -505,7 +558,13 @@ function AnalysisPanel({
       ) : null}
 
       {evidence && imageUrl ? (
-        <EvidencePanel evidence={evidence} imageUrl={imageUrl} />
+        <EvidencePanel
+          evidence={evidence}
+          imageUrl={imageUrl}
+          reviewerCapability={reviewerCapability}
+          reviewState={reviewState}
+          onSubmitReviewDecision={onSubmitReviewDecision}
+        />
       ) : null}
 
       {detail?.failureMessage ? (
@@ -520,13 +579,35 @@ function AnalysisPanel({
   );
 }
 
-function EvidencePanel({ evidence, imageUrl }: { evidence: AnalysisEvidence; imageUrl: string }) {
+function EvidencePanel({
+  evidence,
+  imageUrl,
+  reviewerCapability,
+  reviewState,
+  onSubmitReviewDecision
+}: {
+  evidence: AnalysisEvidence;
+  imageUrl: string;
+  reviewerCapability: boolean;
+  reviewState: { kind: "idle" | "working" | "done" } | null;
+  onSubmitReviewDecision: (request: {
+    annotationId: string;
+    decision: ReviewDecisionValue;
+    notes: string;
+  }) => Promise<void>;
+}) {
+  const [selectedAnnotationId, setSelectedAnnotationId] = useState<string | null>(null);
+  const [decision, setDecision] = useState<ReviewDecisionValue>("approved");
+  const [notes, setNotes] = useState("");
   const completeBeeCount = evidence.annotations.filter(
     (annotation) => annotation.annotationType === "complete_visible_bee"
   ).length;
   const partialBeeCount = evidence.annotations.filter(
     (annotation) => annotation.annotationType === "partial_visible_bee"
   ).length;
+  const selectedAnnotation = evidence.annotations.find(
+    (annotation) => annotation.annotationId === selectedAnnotationId
+  );
 
   return (
     <section className="evidence-panel" aria-label="Annotation evidence" data-testid="evidence-panel">
@@ -544,13 +625,91 @@ function EvidencePanel({ evidence, imageUrl }: { evidence: AnalysisEvidence; ima
       >
         <img src={imageUrl} alt={evidence.inspectionPhoto.filename} data-testid="evidence-image" />
         {evidence.annotations.map((annotation) => (
-          <AnnotationBox key={annotation.annotationId} annotation={annotation} />
+          <AnnotationBox
+            key={annotation.annotationId}
+            annotation={annotation}
+            selected={annotation.annotationId === selectedAnnotationId}
+            reviewerCapability={reviewerCapability}
+            onSelect={() => setSelectedAnnotationId(annotation.annotationId)}
+          />
         ))}
       </div>
       <p className="evidence-summary" data-testid="evidence-summary">
         {completeBeeCount} complete visible bees and {partialBeeCount} partial visible bee are
         shown from deterministic stub evidence.
       </p>
+      {reviewerCapability ? (
+        <form
+          className="review-panel"
+          aria-label="Annotation review decision"
+          data-testid="annotation-review-controls"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!selectedAnnotationId) {
+              return;
+            }
+            void onSubmitReviewDecision({ annotationId: selectedAnnotationId, decision, notes });
+          }}
+        >
+          <div>
+            <strong>Annotation review</strong>
+            <p>Review evidence only. Dataset use is not assigned in this slice.</p>
+          </div>
+          <label>
+            <span>Selected annotation</span>
+            <select
+              value={selectedAnnotationId ?? ""}
+              onChange={(event) => setSelectedAnnotationId(event.target.value || null)}
+              data-testid="review-annotation-select"
+            >
+              <option value="">Choose an annotation</option>
+              {evidence.annotations.map((annotation, index) => (
+                <option key={annotation.annotationId} value={annotation.annotationId}>
+                  {index + 1}. {annotationLabel(annotation)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>Decision</span>
+            <select
+              value={decision}
+              onChange={(event) => setDecision(event.target.value as ReviewDecisionValue)}
+              data-testid="review-decision-select"
+            >
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+              <option value="uncertain">Uncertain</option>
+              <option value="excluded">Excluded</option>
+            </select>
+          </label>
+          <label>
+            <span>Notes</span>
+            <textarea
+              value={notes}
+              maxLength={500}
+              onChange={(event) => setNotes(event.target.value)}
+              placeholder="Optional"
+              data-testid="review-notes-input"
+            />
+          </label>
+          <button
+            type="submit"
+            disabled={!selectedAnnotationId || reviewState?.kind === "working"}
+            data-testid="submit-review-decision-button"
+          >
+            <Check size={18} />
+            {reviewState?.kind === "working" ? "Recording review" : "Record decision"}
+          </button>
+          <p className="review-state" data-testid="review-state">
+            {selectedAnnotation?.latestReviewDecision
+              ? `Latest decision: ${selectedAnnotation.latestReviewDecision.decision}`
+              : reviewState?.kind === "done"
+                ? "Review decision recorded"
+                : "Selected annotation is unreviewed"}
+          </p>
+        </form>
+      ) : null}
       <p className="analysis-caveat" data-testid="evidence-caveat">
         {evidence.caveat}
       </p>
@@ -558,7 +717,17 @@ function EvidencePanel({ evidence, imageUrl }: { evidence: AnalysisEvidence; ima
   );
 }
 
-function AnnotationBox({ annotation }: { annotation: Annotation }) {
+function AnnotationBox({
+  annotation,
+  selected,
+  reviewerCapability,
+  onSelect
+}: {
+  annotation: Annotation;
+  selected: boolean;
+  reviewerCapability: boolean;
+  onSelect: () => void;
+}) {
   const className =
     annotation.annotationType === "complete_visible_bee"
       ? "annotation-box complete"
@@ -568,21 +737,49 @@ function AnnotationBox({ annotation }: { annotation: Annotation }) {
       ? "Complete visible bee"
       : "Partial visible bee";
 
+  const style = {
+    left: `${annotation.x * 100}%`,
+    top: `${annotation.y * 100}%`,
+    width: `${annotation.width * 100}%`,
+    height: `${annotation.height * 100}%`
+  };
+  const title = `${label}, confidence ${Math.round(annotation.confidence * 100)}%`;
+
+  if (!reviewerCapability) {
+    return (
+      <span
+        className={className}
+        data-testid="annotation-box"
+        data-annotation-type={annotation.annotationType}
+        data-review-decision={annotation.latestReviewDecision?.decision ?? "unreviewed"}
+        style={style}
+        title={title}
+        aria-label={label}
+      />
+    );
+  }
+
   return (
-    <span
-      className={className}
+    <button
+      type="button"
+      className={`${className} ${selected ? "selected" : ""}`}
       data-testid="annotation-box"
       data-annotation-type={annotation.annotationType}
-      style={{
-        left: `${annotation.x * 100}%`,
-        top: `${annotation.y * 100}%`,
-        width: `${annotation.width * 100}%`,
-        height: `${annotation.height * 100}%`
-      }}
-      title={`${label}, confidence ${Math.round(annotation.confidence * 100)}%`}
-      aria-label={label}
+      data-review-decision={annotation.latestReviewDecision?.decision ?? "unreviewed"}
+      style={style}
+      title={title}
+      aria-label={`${label}. ${annotation.latestReviewDecision?.decision ?? "Unreviewed"}`}
+      onClick={onSelect}
     />
   );
+}
+
+function annotationLabel(annotation: Annotation): string {
+  const type =
+    annotation.annotationType === "complete_visible_bee"
+      ? "Complete visible bee"
+      : "Partial visible bee";
+  return `${type} / ${annotation.latestReviewDecision?.decision ?? "unreviewed"}`;
 }
 
 function Metric({ label, value }: { label: string; value: number | string }) {

@@ -15,9 +15,14 @@ from hive_sight_core_api.models import (
     HiveResponse,
     InspectionPhotoResponse,
     InspectionResponse,
+    ReviewDecisionResponse,
+    ReviewDecisionValue,
+    ReviewSubjectType,
     UploadStatus,
     WorkspaceDataUseAgreementAcceptanceResponse,
 )
+
+DEFAULT_DEV_REVIEWER_USER_ID = UUID("00000000-0000-0000-0000-000000000101")
 
 
 @dataclass(frozen=True)
@@ -74,6 +79,10 @@ class InMemoryProductDataStore:
     analysis_runs: dict[UUID, AnalysisRunResponse] = field(default_factory=dict)
     analysis_results: dict[UUID, AnalysisResultResponse] = field(default_factory=dict)
     annotations: dict[UUID, AnnotationResponse] = field(default_factory=dict)
+    review_decisions: dict[UUID, ReviewDecisionResponse] = field(default_factory=dict)
+    reviewer_user_ids: set[UUID] = field(
+        default_factory=lambda: {DEFAULT_DEV_REVIEWER_USER_ID}
+    )
 
     def ensure_dev_session(self, user_id: UUID) -> DevSessionResponse:
         self.users.add(user_id)
@@ -89,6 +98,7 @@ class InMemoryProductDataStore:
             user_id=user_id,
             workspace_id=workspace.workspace_id,
             role=membership.role,
+            reviewer_capability=user_id in self.reviewer_user_ids,
             workspace_data_use_agreement_status=workspace.data_use_agreement_status,
             workspace_data_use_agreement_terms_version=workspace.data_use_agreement_terms_version,
         )
@@ -356,10 +366,84 @@ class InMemoryProductDataStore:
 
     def get_annotations_for_result(self, analysis_result_id: UUID) -> list[AnnotationResponse]:
         return [
-            annotation
+            annotation.model_copy(
+                update={
+                    "latest_review_decision": self.latest_review_decision_for_subject(
+                        annotation.annotation_id
+                    )
+                }
+            )
             for annotation in self.annotations.values()
             if annotation.analysis_result_id == analysis_result_id
         ]
+
+    def record_review_decision(
+        self,
+        user: UserContext,
+        workspace_id: UUID,
+        subject_type: ReviewSubjectType,
+        subject_id: UUID,
+        decision: ReviewDecisionValue,
+        notes: str | None,
+    ) -> ReviewDecisionResponse:
+        self.require_workspace_access(user, workspace_id)
+        self.require_data_use_agreement(workspace_id)
+        self.require_reviewer_capability(user)
+        if subject_type != ReviewSubjectType.annotation:
+            raise DomainError(
+                "invalid_review_subject",
+                "Slice 4 Review Decisions can only be recorded for Annotations.",
+                422,
+            )
+        annotation = self.annotations.get(subject_id)
+        if annotation is None or annotation.workspace_id != workspace_id:
+            raise DomainError(
+                "annotation_not_found",
+                "The requested Annotation was not found in this Workspace.",
+                404,
+            )
+        review_decision = ReviewDecisionResponse(
+            review_decision_id=self.id_factory(),
+            workspace_id=workspace_id,
+            reviewer_id=user.user_id,
+            subject_type=subject_type,
+            subject_id=subject_id,
+            decision=decision,
+            notes=notes,
+            created_at=self.clock(),
+        )
+        self.review_decisions[review_decision.review_decision_id] = review_decision
+        return review_decision
+
+    def latest_review_decision_for_subject(
+        self,
+        subject_id: UUID,
+    ) -> ReviewDecisionResponse | None:
+        decisions = []
+        for index, review_decision in enumerate(self.review_decisions.values()):
+            if (
+                review_decision.subject_type == ReviewSubjectType.annotation
+                and review_decision.subject_id == subject_id
+            ):
+                decisions.append((index, review_decision))
+        if not decisions:
+            return None
+        return max(
+            decisions,
+            key=lambda indexed_decision: (
+                indexed_decision[1].created_at,
+                indexed_decision[0],
+            ),
+        )[1]
+
+    def require_reviewer_capability(self, user: UserContext) -> None:
+        if user.user_id in self.reviewer_user_ids:
+            return
+        raise DomainError(
+            "reviewer_access_required",
+            "Internal reviewer capability is required to record Review Decisions.",
+            403,
+        )
 
     def require_inspection_photo_for_view(
         self,
