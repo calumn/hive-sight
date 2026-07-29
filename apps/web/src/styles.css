@@ -395,6 +395,97 @@ label span {
   color: #842d21;
 }
 
+.evidence-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.evidence-heading {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.evidence-heading .panel-heading {
+  margin-bottom: 0;
+}
+
+.evidence-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.legend-item {
+  align-items: center;
+  color: #384034;
+  display: inline-flex;
+  font-size: 0.82rem;
+  font-weight: 800;
+  gap: 6px;
+}
+
+.legend-item::before {
+  border: 3px solid;
+  border-radius: 4px;
+  content: "";
+  display: inline-block;
+  height: 14px;
+  width: 14px;
+}
+
+.legend-item.complete::before {
+  border-color: #2f80ed;
+}
+
+.legend-item.partial::before {
+  border-color: #d9822b;
+}
+
+.photo-evidence {
+  background: #151812;
+  border: 1px solid #dce2d7;
+  border-radius: 8px;
+  overflow: hidden;
+  position: relative;
+  width: 100%;
+}
+
+.photo-evidence img {
+  display: block;
+  height: 100%;
+  object-fit: contain;
+  width: 100%;
+}
+
+.annotation-box {
+  border: 3px solid;
+  border-radius: 5px;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.78),
+    0 6px 18px rgba(0, 0, 0, 0.28);
+  pointer-events: auto;
+  position: absolute;
+}
+
+.annotation-box.complete {
+  border-color: #2f80ed;
+}
+
+.annotation-box.partial {
+  border-color: #d9822b;
+  border-style: dashed;
+}
+
+.evidence-summary {
+  color: #485144;
+  font-weight: 800;
+  line-height: 1.35;
+  margin-bottom: 0;
+}
+
 .loading-panel {
   align-items: center;
   display: flex;
@@ -422,6 +513,15 @@ label span {
   .upload-panel,
   .result-grid {
     grid-template-columns: 1fr;
+  }
+
+  .evidence-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .evidence-legend {
+    justify-content: flex-start;
   }
 }
 

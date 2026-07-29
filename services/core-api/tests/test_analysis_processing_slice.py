@@ -41,9 +41,9 @@ def test_process_queued_analysis_completes_stub_result_through_core_api() -> Non
         assert body["status"] == "completed"
         assert body["analysis_result"]["result_kind"] == "deterministic_stub"
         assert body["analysis_result"]["model_version"] == "stub-varroa-detector-0.1.0"
-        assert body["analysis_result"]["complete_visible_bee_count"] == 48
-        assert body["analysis_result"]["partial_visible_bee_count"] == 3
-        assert body["analysis_result"]["likely_varroa_detections"] == 1
+        assert body["analysis_result"]["complete_visible_bee_count"] == 3
+        assert body["analysis_result"]["partial_visible_bee_count"] == 1
+        assert body["analysis_result"]["likely_varroa_detections"] == 0
         assert "stub" in body["message"].lower()
     finally:
         app.dependency_overrides.clear()
@@ -73,6 +73,134 @@ def test_analysis_result_detail_is_not_visible_across_workspaces() -> None:
 
         assert response.status_code == 403
         assert response.json()["detail"]["code"] == "workspace_access_denied"
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_analysis_evidence_returns_original_photo_reference_and_bee_annotations() -> None:
+    state = build_dev_state(
+        id_values=[
+            UUID("00000000-0000-0000-0000-000000000031"),
+            UUID("00000000-0000-0000-0000-000000000032"),
+            UUID("00000000-0000-0000-0000-000000000033"),
+            UUID("00000000-0000-0000-0000-000000000034"),
+            UUID("00000000-0000-0000-0000-000000000035"),
+            UUID("00000000-0000-0000-0000-000000000036"),
+            UUID("00000000-0000-0000-0000-000000000037"),
+            UUID("00000000-0000-0000-0000-000000000038"),
+            UUID("00000000-0000-0000-0000-000000000039"),
+            UUID("00000000-0000-0000-0000-000000000040"),
+        ],
+        clock=lambda: datetime(2026, 7, 29, 12, 0, tzinfo=UTC),
+    )
+    app.dependency_overrides[get_dev_state] = lambda: state
+    client = TestClient(app)
+
+    try:
+        workspace_id, analysis_run_id = _create_queued_analysis_run(client)
+        client.post(
+            f"/v1/analysis-runs/{analysis_run_id}/process",
+            json={"workspace_id": workspace_id},
+            headers={"x-hivesight-dev-user-id": str(USER_ID)},
+        )
+
+        response = client.get(
+            f"/v1/analysis-runs/{analysis_run_id}/evidence?workspace_id={workspace_id}",
+            headers={"x-hivesight-dev-user-id": str(USER_ID)},
+        )
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["analysis_run_id"] == analysis_run_id
+        assert body["analysis_result"]["complete_visible_bee_count"] == 3
+        assert body["analysis_result"]["partial_visible_bee_count"] == 1
+        assert body["analysis_result"]["likely_varroa_detections"] == 0
+        assert body["inspection_photo"]["filename"] == "frame-1.jpg"
+        assert body["inspection_photo"]["view_url"].startswith("/v1/inspection-photos/")
+        assert body["caveat"].startswith("Deterministic stub")
+        assert [annotation["annotation_type"] for annotation in body["annotations"]] == [
+            "complete_visible_bee",
+            "complete_visible_bee",
+            "complete_visible_bee",
+            "partial_visible_bee",
+        ]
+        assert len(state.store.annotations) == 4
+        assert body["annotations"][0]["coordinate_space"] == "normalized"
+        assert body["annotations"][0]["source_image_width_px"] == 1600
+        assert body["annotations"][0]["source_image_height_px"] == 1200
+        assert body["annotations"][0]["confidence"] == 0.92
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_analysis_evidence_is_not_visible_across_workspaces() -> None:
+    state = build_dev_state(
+        id_values=[
+            UUID("00000000-0000-0000-0000-000000000041"),
+            UUID("00000000-0000-0000-0000-000000000042"),
+            UUID("00000000-0000-0000-0000-000000000043"),
+            UUID("00000000-0000-0000-0000-000000000044"),
+            UUID("00000000-0000-0000-0000-000000000045"),
+            UUID("00000000-0000-0000-0000-000000000046"),
+        ],
+    )
+    app.dependency_overrides[get_dev_state] = lambda: state
+    client = TestClient(app)
+
+    try:
+        workspace_id, analysis_run_id = _create_queued_analysis_run(client)
+        client.post(
+            f"/v1/analysis-runs/{analysis_run_id}/process",
+            json={"workspace_id": workspace_id},
+            headers={"x-hivesight-dev-user-id": str(USER_ID)},
+        )
+
+        response = client.get(
+            f"/v1/analysis-runs/{analysis_run_id}/evidence?workspace_id={workspace_id}",
+            headers={"x-hivesight-dev-user-id": str(OTHER_USER_ID)},
+        )
+
+        assert response.status_code == 403
+        assert response.json()["detail"]["code"] == "workspace_access_denied"
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_original_photo_content_requires_workspace_access() -> None:
+    state = build_dev_state(
+        id_values=[
+            UUID("00000000-0000-0000-0000-000000000051"),
+            UUID("00000000-0000-0000-0000-000000000052"),
+            UUID("00000000-0000-0000-0000-000000000053"),
+            UUID("00000000-0000-0000-0000-000000000054"),
+            UUID("00000000-0000-0000-0000-000000000055"),
+            UUID("00000000-0000-0000-0000-000000000056"),
+        ],
+    )
+    app.dependency_overrides[get_dev_state] = lambda: state
+    client = TestClient(app)
+
+    try:
+        workspace_id, analysis_run_id = _create_queued_analysis_run(client)
+        analysis_run = state.store.get_analysis_run(UUID(analysis_run_id))
+        assert analysis_run is not None
+
+        visible = client.get(
+            f"/v1/inspection-photos/{analysis_run.inspection_photo_id}/content"
+            f"?workspace_id={workspace_id}",
+            headers={"x-hivesight-dev-user-id": str(USER_ID)},
+        )
+        blocked = client.get(
+            f"/v1/inspection-photos/{analysis_run.inspection_photo_id}/content"
+            f"?workspace_id={workspace_id}",
+            headers={"x-hivesight-dev-user-id": str(OTHER_USER_ID)},
+        )
+
+        assert visible.status_code == 200
+        assert visible.content == b"fake-image-bytes"
+        assert visible.headers["content-type"] == "image/jpeg"
+        assert blocked.status_code == 403
+        assert blocked.json()["detail"]["code"] == "workspace_access_denied"
     finally:
         app.dependency_overrides.clear()
 

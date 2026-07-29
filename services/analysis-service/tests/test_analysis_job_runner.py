@@ -24,7 +24,17 @@ def test_run_analysis_job_returns_stubbed_model_result_at_runner_seam() -> None:
     assert result.inspection_photo_id == request.inspection_photo_id
     assert result.model_version == "stub-varroa-detector-0.1.0"
     assert result.status == AnalysisJobStatus.completed
-    assert result.complete_visible_bee_count == 48
-    assert result.partial_visible_bee_count == 3
-    assert result.likely_varroa_detections == 1
+    assert result.complete_visible_bee_count == 3
+    assert result.partial_visible_bee_count == 1
+    assert result.likely_varroa_detections == 0
     assert result.completed_at == completed_at
+    assert [annotation.annotation_type for annotation in result.annotations] == [
+        "complete_visible_bee",
+        "complete_visible_bee",
+        "complete_visible_bee",
+        "partial_visible_bee",
+    ]
+    assert all(annotation.coordinate_space == "normalized" for annotation in result.annotations)
+    assert all(annotation.source_image_width_px == 1600 for annotation in result.annotations)
+    assert all(annotation.source_image_height_px == 1200 for annotation in result.annotations)
+    assert result.annotations[0].confidence == 0.92

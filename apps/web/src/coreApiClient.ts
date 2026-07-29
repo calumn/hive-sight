@@ -68,6 +68,44 @@ export type AnalysisResult = {
   completedAt: string;
 };
 
+export type AnnotationType = "complete_visible_bee" | "partial_visible_bee" | "likely_varroa_detection";
+
+export type Annotation = {
+  annotationId: string;
+  workspaceId: string;
+  inspectionPhotoId: string;
+  analysisResultId: string;
+  annotationType: AnnotationType;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  coordinateSpace: "normalized";
+  sourceImageWidthPx: number;
+  sourceImageHeightPx: number;
+  confidence: number;
+  source: string;
+  createdAt: string;
+};
+
+export type AnalysisEvidence = {
+  analysisRunId: string;
+  analysisResultId: string;
+  inspectionPhoto: {
+    inspectionPhotoId: string;
+    filename: string;
+    contentType: string;
+    viewUrl: string;
+    width: number;
+    height: number;
+  };
+  analysisResult: AnalysisResult;
+  annotations: Annotation[];
+  resultKind: "deterministic_stub";
+  modelVersion: string;
+  caveat: string;
+};
+
 export type AnalysisRunDetail = {
   analysisRunId: string;
   workspaceId: string;
@@ -239,6 +277,38 @@ export async function processAnalysisRun({
   return parseAnalysisRunDetail(await response.json());
 }
 
+export async function fetchAnalysisEvidence({
+  devUserId,
+  workspaceId,
+  analysisRunId
+}: {
+  devUserId: string;
+  workspaceId: string;
+  analysisRunId: string;
+}): Promise<AnalysisEvidence> {
+  const params = new URLSearchParams({ workspace_id: workspaceId });
+  const response = await fetch(`${coreApiUrl}/v1/analysis-runs/${analysisRunId}/evidence?${params}`, {
+    headers: devAuthHeaders(devUserId)
+  });
+  await ensureOk(response);
+  return parseAnalysisEvidence(await response.json());
+}
+
+export async function fetchInspectionPhotoObjectUrl({
+  devUserId,
+  viewUrl
+}: {
+  devUserId: string;
+  viewUrl: string;
+}): Promise<string> {
+  const response = await fetch(toCoreApiUrl(viewUrl), {
+    headers: devAuthHeaders(devUserId)
+  });
+  await ensureOk(response);
+  const blob = await response.blob();
+  return URL.createObjectURL(blob);
+}
+
 function devAuthHeaders(devUserId: string): HeadersInit {
   return { "x-hivesight-dev-user-id": devUserId };
 }
@@ -398,9 +468,60 @@ function parseAnalysisResult(value: unknown): AnalysisResult {
   };
 }
 
+function parseAnalysisEvidence(value: unknown): AnalysisEvidence {
+  const record = requireRecord(value, "Analysis evidence response");
+  const photo = requireRecord(record.inspection_photo, "Inspection photo evidence response");
+  const annotations = requireArray(record.annotations, "annotations").map(parseAnnotation);
+  return {
+    analysisRunId: requireString(record.analysis_run_id, "analysis_run_id"),
+    analysisResultId: requireString(record.analysis_result_id, "analysis_result_id"),
+    inspectionPhoto: {
+      inspectionPhotoId: requireString(photo.inspection_photo_id, "inspection_photo_id"),
+      filename: requireString(photo.filename, "filename"),
+      contentType: requireString(photo.content_type, "content_type"),
+      viewUrl: requireString(photo.view_url, "view_url"),
+      width: requireNumber(photo.width, "width"),
+      height: requireNumber(photo.height, "height")
+    },
+    analysisResult: parseAnalysisResult(record.analysis_result),
+    annotations,
+    resultKind: requireResultKind(record.result_kind),
+    modelVersion: requireString(record.model_version, "model_version"),
+    caveat: requireString(record.caveat, "caveat")
+  };
+}
+
+function parseAnnotation(value: unknown): Annotation {
+  const record = requireRecord(value, "Annotation response");
+  return {
+    annotationId: requireString(record.annotation_id, "annotation_id"),
+    workspaceId: requireString(record.workspace_id, "workspace_id"),
+    inspectionPhotoId: requireString(record.inspection_photo_id, "inspection_photo_id"),
+    analysisResultId: requireString(record.analysis_result_id, "analysis_result_id"),
+    annotationType: requireAnnotationType(record.annotation_type),
+    x: requireNumber(record.x, "x"),
+    y: requireNumber(record.y, "y"),
+    width: requireNumber(record.width, "width"),
+    height: requireNumber(record.height, "height"),
+    coordinateSpace: requireCoordinateSpace(record.coordinate_space),
+    sourceImageWidthPx: requireNumber(record.source_image_width_px, "source_image_width_px"),
+    sourceImageHeightPx: requireNumber(record.source_image_height_px, "source_image_height_px"),
+    confidence: requireNumber(record.confidence, "confidence"),
+    source: requireString(record.source, "source"),
+    createdAt: requireString(record.created_at, "created_at")
+  };
+}
+
 function requireRecord(value: unknown, label: string): Record<string, unknown> {
   if (!isRecord(value)) {
     throw new Error(`${label} was not an object`);
+  }
+  return value;
+}
+
+function requireArray(value: unknown, field: string): unknown[] {
+  if (!Array.isArray(value)) {
+    throw new Error(`Core API response field ${field} was not an array`);
   }
   return value;
 }
@@ -452,6 +573,31 @@ function requireResultKind(value: unknown): "deterministic_stub" {
     return value;
   }
   throw new Error("Core API response had an unexpected analysis result kind");
+}
+
+function requireAnnotationType(value: unknown): AnnotationType {
+  if (
+    value === "complete_visible_bee" ||
+    value === "partial_visible_bee" ||
+    value === "likely_varroa_detection"
+  ) {
+    return value;
+  }
+  throw new Error("Core API response had an unexpected annotation type");
+}
+
+function requireCoordinateSpace(value: unknown): "normalized" {
+  if (value === "normalized") {
+    return value;
+  }
+  throw new Error("Core API response had an unexpected coordinate space");
+}
+
+function toCoreApiUrl(pathOrUrl: string): string {
+  if (pathOrUrl.startsWith("http://") || pathOrUrl.startsWith("https://")) {
+    return pathOrUrl;
+  }
+  return `${coreApiUrl}${pathOrUrl}`;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

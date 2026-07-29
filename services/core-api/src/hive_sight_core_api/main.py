@@ -3,7 +3,7 @@ from uuid import UUID
 
 from fastapi import Depends, FastAPI, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 
 from hive_sight_core_api.analysis_processing_workflow import AnalysisProcessingWorkflow
 from hive_sight_core_api.analysis_request_workflow import AnalysisRequestWorkflow
@@ -17,6 +17,7 @@ from hive_sight_core_api.dependencies import (
 from hive_sight_core_api.dev_store import DomainError, UserContext
 from hive_sight_core_api.inspection_photo_access import InspectionPhotoAccess
 from hive_sight_core_api.models import (
+    AnalysisEvidenceResponse,
     AnalysisRunDetailResponse,
     AnalysisRunRequest,
     AnalysisRunResponse,
@@ -211,6 +212,45 @@ def get_analysis_run_detail(
         workspace_id=workspace_id,
         analysis_run_id=analysis_run_id,
     )
+
+
+@app.get(
+    "/v1/analysis-runs/{analysis_run_id}/evidence",
+    response_model=AnalysisEvidenceResponse,
+)
+def get_analysis_evidence(
+    analysis_run_id: UUID,
+    workspace_id: UUID,
+    user: AuthenticatedUserDep,
+    workflow: AnalysisProcessingWorkflowDep,
+) -> AnalysisEvidenceResponse:
+    return workflow.get_analysis_evidence(
+        user=user,
+        workspace_id=workspace_id,
+        analysis_run_id=analysis_run_id,
+    )
+
+
+@app.get("/v1/inspection-photos/{inspection_photo_id}/content")
+def get_inspection_photo_content(
+    inspection_photo_id: UUID,
+    workspace_id: UUID,
+    user: AuthenticatedUserDep,
+    state: DevStateDep,
+) -> Response:
+    photo = state.store.require_inspection_photo_for_view(
+        user=user,
+        workspace_id=workspace_id,
+        inspection_photo_id=inspection_photo_id,
+    )
+    body = state.object_storage.get_object(photo.original_object_key)
+    if body is None:
+        raise DomainError(
+            "photo_view_unavailable",
+            "The requested Inspection Photo content is not available.",
+            404,
+        )
+    return Response(content=body, media_type=photo.content_type)
 
 
 @app.post(

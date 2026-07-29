@@ -7,6 +7,8 @@ from hive_sight_core_api.models import (
     AnalysisResultResponse,
     AnalysisRunResponse,
     AnalysisRunStatus,
+    AnnotationCreate,
+    AnnotationResponse,
     ApiaryResponse,
     DataUseAgreementStatus,
     DevSessionResponse,
@@ -46,6 +48,9 @@ class InMemoryObjectStorage:
     def put_object(self, object_key: str, body: bytes) -> None:
         self.objects[object_key] = body
 
+    def get_object(self, object_key: str) -> bytes | None:
+        return self.objects.get(object_key)
+
 
 @dataclass
 class InMemoryEventRecorder:
@@ -68,6 +73,7 @@ class InMemoryProductDataStore:
     inspection_photos: dict[UUID, InspectionPhotoResponse] = field(default_factory=dict)
     analysis_runs: dict[UUID, AnalysisRunResponse] = field(default_factory=dict)
     analysis_results: dict[UUID, AnalysisResultResponse] = field(default_factory=dict)
+    annotations: dict[UUID, AnnotationResponse] = field(default_factory=dict)
 
     def ensure_dev_session(self, user_id: UUID) -> DevSessionResponse:
         self.users.add(user_id)
@@ -279,6 +285,7 @@ class InMemoryProductDataStore:
         partial_visible_bee_count: int,
         likely_varroa_detections: int,
         tagged_image_object_key: str | None,
+        annotations: list[AnnotationCreate],
         completed_at: datetime,
     ) -> AnalysisRunResponse:
         result = AnalysisResultResponse(
@@ -295,6 +302,25 @@ class InMemoryProductDataStore:
             completed_at=completed_at,
         )
         self.analysis_results[analysis_run.analysis_run_id] = result
+        for annotation in annotations:
+            annotation_record = AnnotationResponse(
+                annotation_id=self.id_factory(),
+                workspace_id=analysis_run.workspace_id,
+                inspection_photo_id=analysis_run.inspection_photo_id,
+                analysis_result_id=result.analysis_result_id,
+                annotation_type=annotation.annotation_type,
+                x=annotation.x,
+                y=annotation.y,
+                width=annotation.width,
+                height=annotation.height,
+                coordinate_space=annotation.coordinate_space,
+                source_image_width_px=annotation.source_image_width_px,
+                source_image_height_px=annotation.source_image_height_px,
+                confidence=annotation.confidence,
+                source=annotation.source,
+                created_at=completed_at,
+            )
+            self.annotations[annotation_record.annotation_id] = annotation_record
         updated = analysis_run.model_copy(
             update={
                 "status": AnalysisRunStatus.completed,
@@ -327,6 +353,30 @@ class InMemoryProductDataStore:
 
     def get_analysis_result(self, analysis_run_id: UUID) -> AnalysisResultResponse | None:
         return self.analysis_results.get(analysis_run_id)
+
+    def get_annotations_for_result(self, analysis_result_id: UUID) -> list[AnnotationResponse]:
+        return [
+            annotation
+            for annotation in self.annotations.values()
+            if annotation.analysis_result_id == analysis_result_id
+        ]
+
+    def require_inspection_photo_for_view(
+        self,
+        user: UserContext,
+        workspace_id: UUID,
+        inspection_photo_id: UUID,
+    ) -> InspectionPhotoResponse:
+        self.require_workspace_access(user, workspace_id)
+        self.require_data_use_agreement(workspace_id)
+        photo = self.inspection_photos.get(inspection_photo_id)
+        if photo is None or photo.workspace_id != workspace_id:
+            raise DomainError(
+                "photo_view_unavailable",
+                "The requested Inspection Photo is not available in this Workspace.",
+                404,
+            )
+        return photo
 
     def _active_membership_for_user(self, user_id: UUID) -> WorkspaceMembershipRecord | None:
         for membership in self.memberships:

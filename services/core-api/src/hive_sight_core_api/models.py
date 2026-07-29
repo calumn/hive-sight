@@ -21,6 +21,16 @@ class UploadStatus(StrEnum):
     accepted = "accepted"
 
 
+class AnnotationType(StrEnum):
+    complete_visible_bee = "complete_visible_bee"
+    partial_visible_bee = "partial_visible_bee"
+    likely_varroa_detection = "likely_varroa_detection"
+
+
+class CoordinateSpace(StrEnum):
+    normalized = "normalized"
+
+
 class HealthResponse(BaseModel):
     service: str
     status: str
@@ -150,6 +160,37 @@ class AnalysisResultResponse(BaseModel):
     completed_at: datetime
 
 
+class AnnotationCreate(BaseModel):
+    annotation_type: AnnotationType
+    x: float
+    y: float
+    width: float
+    height: float
+    coordinate_space: CoordinateSpace
+    source_image_width_px: int
+    source_image_height_px: int
+    confidence: float
+    source: str
+
+
+class AnnotationResponse(BaseModel):
+    annotation_id: UUID
+    workspace_id: UUID
+    inspection_photo_id: UUID
+    analysis_result_id: UUID
+    annotation_type: AnnotationType
+    x: float
+    y: float
+    width: float
+    height: float
+    coordinate_space: CoordinateSpace
+    source_image_width_px: int
+    source_image_height_px: int
+    confidence: float
+    source: str
+    created_at: datetime
+
+
 class AnalysisRunDetailResponse(BaseModel):
     analysis_run_id: UUID
     workspace_id: UUID
@@ -165,6 +206,26 @@ class AnalysisRunDetailResponse(BaseModel):
     model_version: str | None = None
     message: str
     analysis_result: AnalysisResultResponse | None = None
+
+
+class InspectionPhotoEvidenceResponse(BaseModel):
+    inspection_photo_id: UUID
+    filename: str
+    content_type: str
+    view_url: str
+    width: int
+    height: int
+
+
+class AnalysisEvidenceResponse(BaseModel):
+    analysis_run_id: UUID
+    analysis_result_id: UUID
+    inspection_photo: InspectionPhotoEvidenceResponse
+    analysis_result: AnalysisResultResponse
+    annotations: list[AnnotationResponse]
+    result_kind: str
+    model_version: str
+    caveat: str
 
 
 class ProcessAnalysisRunRequest(BaseModel):

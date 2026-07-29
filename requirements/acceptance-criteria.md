@@ -61,6 +61,16 @@ Acceptance criteria are provisional and will be refined as requirements are revi
 ## Web UI
 
 - A user can complete the first workflow in a browser: create apiary, create hive, create inspection, upload photos, view analysis results.
+- Browser acceptance tests can exercise implemented Web UI workflows through the same visible path a Beekeeper uses.
+- Browser acceptance tests verify that visual evidence views render the uploaded photo and annotation overlays well enough to detect broken or misaligned evidence rendering.
+
+## Test Evidence And Slice Verification
+
+- A developer can run one slice verification command from the command line before closing a slice.
+- The slice verification report records the service tests, API-level BDD scenarios, Web TypeScript checks, and browser acceptance tests that were executed.
+- The slice verification report records pass/fail status, commands run, concise summaries, and failure artifact locations where available.
+- The slice verification report does not claim formal code coverage percentages unless separate coverage tooling is added.
+- UI-level Gherkin should be introduced after the first Playwright browser harness stabilizes, within the next few slices.
 
 ## Ownership And Permissions
 

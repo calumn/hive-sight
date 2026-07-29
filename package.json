@@ -7,6 +7,8 @@
   "scripts": {
     "dev:web": "pnpm --filter @hive-sight/web dev",
     "build:web": "pnpm --filter @hive-sight/web build",
-    "check:web": "pnpm --filter @hive-sight/web check"
+    "check:web": "pnpm --filter @hive-sight/web check",
+    "test:acceptance:web": "pnpm --filter @hive-sight/web test:acceptance",
+    "verify:slice": "node scripts/verify-slice.mjs"
   }
 }

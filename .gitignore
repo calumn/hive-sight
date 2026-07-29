@@ -74,6 +74,7 @@ npm-debug.log*
 # Test reports
 # -------------------------
 test-results/
+playwright-report/
 reports/
 junit*.xml
 

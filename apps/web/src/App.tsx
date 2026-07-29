@@ -5,6 +5,7 @@ import {
   CloudUpload,
   FileImage,
   FlaskConical,
+  Image,
   LoaderCircle,
   Plus,
   RefreshCw,
@@ -16,11 +17,15 @@ import {
   createApiary,
   createHive,
   createInspection,
+  fetchAnalysisEvidence,
   fetchCoreHealth,
   fetchDevSession,
+  fetchInspectionPhotoObjectUrl,
   processAnalysisRun,
   uploadInspectionPhoto,
+  type AnalysisEvidence,
   type AnalysisRunDetail,
+  type Annotation,
   type Apiary,
   type ApiError,
   type DevSession,
@@ -51,6 +56,8 @@ export function App() {
   const [hive, setHive] = useState<Hive | null>(null);
   const [inspection, setInspection] = useState<Inspection | null>(null);
   const [analysisDetail, setAnalysisDetail] = useState<AnalysisRunDetail | null>(null);
+  const [analysisEvidence, setAnalysisEvidence] = useState<AnalysisEvidence | null>(null);
+  const [evidenceImageUrl, setEvidenceImageUrl] = useState<string | null>(null);
   const [apiaryName, setApiaryName] = useState("Home apiary");
   const [hiveName, setHiveName] = useState("Hive A");
   const [inspectionDate, setInspectionDate] = useState(new Date().toISOString().slice(0, 10));
@@ -61,6 +68,14 @@ export function App() {
       .then(([health, session]) => setLoadState({ kind: "ready", health, session }))
       .catch((error: Error) => setLoadState({ kind: "error", message: error.message }));
   }, []);
+
+  useEffect(() => {
+    return () => {
+      if (evidenceImageUrl) {
+        URL.revokeObjectURL(evidenceImageUrl);
+      }
+    };
+  }, [evidenceImageUrl]);
 
   const session = loadState.kind === "ready" ? loadState.session : null;
   const termsAccepted = session?.workspaceDataUseAgreementStatus === "accepted";
@@ -113,6 +128,7 @@ export function App() {
       setHive(null);
       setInspection(null);
       setAnalysisDetail(null);
+      clearEvidenceImage();
     });
   }
 
@@ -126,6 +142,7 @@ export function App() {
       setHive(created);
       setInspection(null);
       setAnalysisDetail(null);
+      clearEvidenceImage();
     });
   }
 
@@ -142,6 +159,7 @@ export function App() {
       });
       setInspection(created);
       setAnalysisDetail(null);
+      clearEvidenceImage();
     });
   }
 
@@ -159,6 +177,7 @@ export function App() {
       });
       await refreshSession();
       setAnalysisDetail(null);
+      clearEvidenceImage();
       setActionState({ kind: "accepted", intake });
     });
   }
@@ -175,7 +194,35 @@ export function App() {
         analysisRunId: acceptedIntake.analysisRun.analysisRunId
       });
       setAnalysisDetail(detail);
+      if (detail.status === "completed") {
+        const evidence = await fetchAnalysisEvidence({
+          devUserId,
+          workspaceId: session.workspaceId,
+          analysisRunId: acceptedIntake.analysisRun.analysisRunId
+        });
+        const nextImageUrl = await fetchInspectionPhotoObjectUrl({
+          devUserId,
+          viewUrl: evidence.inspectionPhoto.viewUrl
+        });
+        setAnalysisEvidence(evidence);
+        setEvidenceImageUrl((current) => {
+          if (current) {
+            URL.revokeObjectURL(current);
+          }
+          return nextImageUrl;
+        });
+      }
       setActionState({ kind: "accepted", intake: acceptedIntake });
+    });
+  }
+
+  function clearEvidenceImage() {
+    setAnalysisEvidence(null);
+    setEvidenceImageUrl((current) => {
+      if (current) {
+        URL.revokeObjectURL(current);
+      }
+      return null;
     });
   }
 
@@ -223,6 +270,7 @@ export function App() {
               type="button"
               onClick={onAcceptTerms}
               disabled={termsAccepted || actionState.kind === "working"}
+              data-testid="accept-terms-button"
             >
               {termsAccepted ? <Check size={18} /> : <ShieldCheck size={18} />}
               {termsAccepted ? "Terms accepted" : "Accept terms"}
@@ -235,13 +283,18 @@ export function App() {
                 <PanelHeading icon={<Plus size={20} />} title="Apiary" />
                 <label>
                   <span>Name</span>
-                  <input
-                    value={apiaryName}
-                    onChange={(event) => setApiaryName(event.target.value)}
-                    required
-                  />
+                <input
+                  value={apiaryName}
+                  onChange={(event) => setApiaryName(event.target.value)}
+                  required
+                  data-testid="apiary-name-input"
+                />
                 </label>
-                <button type="submit" disabled={actionState.kind === "working"}>
+                <button
+                  type="submit"
+                  disabled={actionState.kind === "working"}
+                  data-testid="create-apiary-button"
+                >
                   Create apiary
                 </button>
                 <RecordBadge value={apiary?.apiaryId} />
@@ -251,13 +304,18 @@ export function App() {
                 <PanelHeading icon={<Plus size={20} />} title="Hive" />
                 <label>
                   <span>Name</span>
-                  <input
-                    value={hiveName}
-                    onChange={(event) => setHiveName(event.target.value)}
-                    required
-                  />
+                <input
+                  value={hiveName}
+                  onChange={(event) => setHiveName(event.target.value)}
+                  required
+                  data-testid="hive-name-input"
+                />
                 </label>
-                <button type="submit" disabled={!canCreateHive || actionState.kind === "working"}>
+                <button
+                  type="submit"
+                  disabled={!canCreateHive || actionState.kind === "working"}
+                  data-testid="create-hive-button"
+                >
                   Create hive
                 </button>
                 <RecordBadge value={hive?.hiveId} />
@@ -269,14 +327,16 @@ export function App() {
                   <span>Date</span>
                   <input
                     type="date"
-                    value={inspectionDate}
-                    onChange={(event) => setInspectionDate(event.target.value)}
-                    required
-                  />
+                  value={inspectionDate}
+                  onChange={(event) => setInspectionDate(event.target.value)}
+                  required
+                  data-testid="inspection-date-input"
+                />
                 </label>
                 <button
                   type="submit"
                   disabled={!canCreateInspection || actionState.kind === "working"}
+                  data-testid="create-inspection-button"
                 >
                   Create inspection
                 </button>
@@ -293,12 +353,14 @@ export function App() {
                   type="file"
                   accept="image/jpeg,image/png,image/webp"
                   onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+                  data-testid="inspection-photo-input"
                 />
               </label>
               <button
                 className="primary-action"
                 type="submit"
                 disabled={!canUpload || actionState.kind === "working"}
+                data-testid="upload-photo-button"
               >
                 <CloudUpload size={18} />
                 Upload photo
@@ -311,6 +373,8 @@ export function App() {
                 analysisRunId={actionState.intake.analysisRun.analysisRunId}
                 queuedStatus={actionState.intake.analysisRun.status}
                 detail={analysisDetail}
+                evidence={analysisEvidence}
+                imageUrl={evidenceImageUrl}
                 onProcessAnalysis={onProcessAnalysis}
               />
             ) : null}
@@ -400,11 +464,15 @@ function AnalysisPanel({
   analysisRunId,
   queuedStatus,
   detail,
+  evidence,
+  imageUrl,
   onProcessAnalysis
 }: {
   analysisRunId: string;
   queuedStatus: string;
   detail: AnalysisRunDetail | null;
+  evidence: AnalysisEvidence | null;
+  imageUrl: string | null;
   onProcessAnalysis: () => void;
 }) {
   const status = detail?.status ?? queuedStatus;
@@ -421,6 +489,7 @@ function AnalysisPanel({
         type="button"
         onClick={onProcessAnalysis}
         disabled={status !== "queued"}
+        data-testid="process-analysis-button"
       >
         {status === "queued" ? <FlaskConical size={18} /> : <RefreshCw size={18} />}
         Process stub analysis
@@ -435,6 +504,10 @@ function AnalysisPanel({
         </div>
       ) : null}
 
+      {evidence && imageUrl ? (
+        <EvidencePanel evidence={evidence} imageUrl={imageUrl} />
+      ) : null}
+
       {detail?.failureMessage ? (
         <p className="analysis-caveat failed">{detail.failureMessage}</p>
       ) : (
@@ -444,6 +517,71 @@ function AnalysisPanel({
         </p>
       )}
     </section>
+  );
+}
+
+function EvidencePanel({ evidence, imageUrl }: { evidence: AnalysisEvidence; imageUrl: string }) {
+  const completeBeeCount = evidence.annotations.filter(
+    (annotation) => annotation.annotationType === "complete_visible_bee"
+  ).length;
+  const partialBeeCount = evidence.annotations.filter(
+    (annotation) => annotation.annotationType === "partial_visible_bee"
+  ).length;
+
+  return (
+    <section className="evidence-panel" aria-label="Annotation evidence" data-testid="evidence-panel">
+      <div className="evidence-heading">
+        <PanelHeading icon={<Image size={20} />} title="Evidence" />
+        <div className="evidence-legend" aria-label="Overlay legend">
+          <span className="legend-item complete">Complete visible bee</span>
+          <span className="legend-item partial">Partial visible bee</span>
+        </div>
+      </div>
+      <div
+        className="photo-evidence"
+        style={{ aspectRatio: `${evidence.inspectionPhoto.width} / ${evidence.inspectionPhoto.height}` }}
+        data-testid="photo-evidence"
+      >
+        <img src={imageUrl} alt={evidence.inspectionPhoto.filename} data-testid="evidence-image" />
+        {evidence.annotations.map((annotation) => (
+          <AnnotationBox key={annotation.annotationId} annotation={annotation} />
+        ))}
+      </div>
+      <p className="evidence-summary" data-testid="evidence-summary">
+        {completeBeeCount} complete visible bees and {partialBeeCount} partial visible bee are
+        shown from deterministic stub evidence.
+      </p>
+      <p className="analysis-caveat" data-testid="evidence-caveat">
+        {evidence.caveat}
+      </p>
+    </section>
+  );
+}
+
+function AnnotationBox({ annotation }: { annotation: Annotation }) {
+  const className =
+    annotation.annotationType === "complete_visible_bee"
+      ? "annotation-box complete"
+      : "annotation-box partial";
+  const label =
+    annotation.annotationType === "complete_visible_bee"
+      ? "Complete visible bee"
+      : "Partial visible bee";
+
+  return (
+    <span
+      className={className}
+      data-testid="annotation-box"
+      data-annotation-type={annotation.annotationType}
+      style={{
+        left: `${annotation.x * 100}%`,
+        top: `${annotation.y * 100}%`,
+        width: `${annotation.width * 100}%`,
+        height: `${annotation.height * 100}%`
+      }}
+      title={`${label}, confidence ${Math.round(annotation.confidence * 100)}%`}
+      aria-label={label}
+    />
   );
 }
 

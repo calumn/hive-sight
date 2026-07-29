@@ -27,3 +27,25 @@ pnpm dev:web
 ```
 
 The first implementation is deliberately a scaffold. It proves the service boundaries before adding persistence, authentication, queues, object-storage signing, and model inference.
+
+## Verification
+
+Run the current slice verification suite from the repo root:
+
+```sh
+pnpm verify:slice
+```
+
+This runs the Core API tests, Analysis Service tests, Web TypeScript check, and Web browser acceptance tests, then writes a summary report to `reports/slice-verification/latest.md`.
+
+Run only the Web browser acceptance test:
+
+```sh
+pnpm test:acceptance:web
+```
+
+Run the browser acceptance test visibly for local debugging:
+
+```sh
+pnpm --filter @hive-sight/web test:acceptance:headed
+```

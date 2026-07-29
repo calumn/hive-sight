@@ -245,8 +245,12 @@ Recommended early test layers:
 - `InspectionPhotoAccess` tests for authorization, data-use agreement, upload validation, object-key generation, and URL expiry rules.
 - `AnalysisJobRunner` tests using fixture images or fake image references and deterministic model-runtime adapters.
 - Web App tests around `CoreApiClient` and user-facing workflows once UI workflows become real.
+- Playwright browser acceptance tests for implemented Web UI vertical-slice workflows, starting with one reliable Chromium path before adding a browser matrix.
+- Slice verification report generation from a repo-level command so service tests, API-level BDD scenarios, Web TypeScript checks, and browser acceptance tests are visible in one human-readable artifact.
 
 Avoid tests that lock onto private helper functions or route-handler internals. If a test has to change when the implementation is reorganized but behaviour is unchanged, it is probably testing past the interface.
+
+Keep API-level Gherkin and UI-level browser acceptance distinct. API-level Gherkin remains the stable acceptance seam for Core API behaviour; UI-level Gherkin should be added after the initial Playwright harness stabilizes so browser workflows also have executable specification language.
 
 ## Next Implementation Recommendation
 
@@ -263,4 +267,3 @@ Before adding persistence, queueing, storage signing, or model stubs, create the
 - Web App: `src/coreApiClient.ts`
 
 Keep the interfaces small. Add adapters only when production and test versions both exist or are clearly imminent.
-

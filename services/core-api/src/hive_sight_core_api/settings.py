@@ -13,7 +13,10 @@ class Settings:
 
 def load_settings() -> Settings:
     return Settings(
-        allowed_origins=_csv_env("CORE_API_ALLOWED_ORIGINS", "http://localhost:5173"),
+        allowed_origins=_csv_env(
+            "CORE_API_ALLOWED_ORIGINS",
+            "http://localhost:5173,http://127.0.0.1:5173",
+        ),
         database_url=os.getenv(
             "CORE_API_DATABASE_URL",
             "postgresql://hive_sight:hive_sight@localhost:5432/hive_sight_core",

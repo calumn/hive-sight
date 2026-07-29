@@ -30,6 +30,6 @@ class AnalysisJobRunner:
             partial_visible_bee_count=model_analysis.partial_visible_bee_count,
             likely_varroa_detections=model_analysis.likely_varroa_detections,
             tagged_image_object_key=model_analysis.tagged_image_object_key,
+            annotations=model_analysis.annotations,
             completed_at=self.clock(),
         )
-
