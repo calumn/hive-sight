@@ -1,0 +1,37 @@
+import { expect, test } from "@playwright/test";
+
+test("Beekeeper records Hive Configuration before creating an Inspection", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByText("core-api online")).toBeVisible();
+
+  const acceptTerms = page.getByTestId("accept-terms-button");
+  if (await acceptTerms.isEnabled()) {
+    await acceptTerms.click();
+  }
+  await expect(acceptTerms).toContainText("Terms accepted");
+
+  const suffix = Date.now().toString();
+  await page.getByTestId("apiary-name-input").fill(`Slice 12 apiary ${suffix}`);
+  await page.getByTestId("create-apiary-button").click();
+
+  await expect(page.getByTestId("hive-configuration-frame-standard-select")).toBeVisible();
+  await page
+    .getByTestId("hive-configuration-frame-standard-select")
+    .selectOption("british_national_deep_brood");
+  await expect(page.getByTestId("hive-configuration-dimensions")).toContainText("432 mm");
+  await expect(page.getByTestId("hive-configuration-dimensions")).toContainText("216 mm");
+
+  await page.getByTestId("hive-name-input").fill(`Slice 12 hive ${suffix}`);
+  await page.getByTestId("create-hive-button").click();
+  await expect(page.getByTestId("hive-configuration-state")).toContainText(
+    "British National deep brood"
+  );
+
+  await expect(page.getByTestId("create-inspection-button")).toBeEnabled();
+  await page.getByTestId("inspection-date-input").fill("2026-07-30");
+  await page.getByTestId("inspection-intent-select").selectOption("training_data_collection");
+  await page.getByTestId("create-inspection-button").click();
+  await expect(page.getByTestId("inspection-intent-badge")).toContainText(
+    "Training data collection"
+  );
+});

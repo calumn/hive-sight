@@ -1,12 +1,12 @@
+import json
+import shutil
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 from hashlib import sha256
 from io import BytesIO
-import json
 from math import cos, radians, sin, sqrt
 from pathlib import Path
-import shutil
 from uuid import UUID, uuid4
 
 from hive_sight_core_api.models import (
@@ -19,14 +19,20 @@ from hive_sight_core_api.models import (
     AnnotationWorkflowType,
     ApiaryResponse,
     DatasetExclusionReason,
-    DatasetItemResponse,
     DatasetItemProvenanceResponse,
+    DatasetItemResponse,
     DatasetLabellingSessionResponse,
     DatasetLabellingSessionStatus,
     DatasetRole,
     DataUseAgreementStatus,
     DevSessionResponse,
+    FrameStandardResponse,
+    FrameStandardStatus,
     GeneratedDatasetExportFileEntry,
+    HiveConfigurationResponse,
+    HiveConfigurationSnapshotResponse,
+    HiveConfigurationStatus,
+    HiveConfigurationUpsertRequest,
     HiveResponse,
     ImageQualityStatus,
     InspectionIntent,
@@ -39,9 +45,9 @@ from hive_sight_core_api.models import (
     OrientedBeeEllipseUpdateRequest,
     PhysicalYoloObbExportResponse,
     PrelabelerRunResponse,
-    ReviewedEllipseSnapshot,
     ReviewDecisionResponse,
     ReviewDecisionValue,
+    ReviewedEllipseSnapshot,
     ReviewSubjectType,
     TrainingCropCreateRequest,
     TrainingCropDatasetItemCreateRequest,
@@ -68,6 +74,24 @@ except ImportError:  # pragma: no cover - dependency is declared for the Core AP
 
 DEFAULT_DEV_REVIEWER_USER_ID = UUID("00000000-0000-0000-0000-000000000101")
 DEFAULT_DEV_DATASET_CURATOR_USER_ID = UUID("00000000-0000-0000-0000-000000000101")
+
+
+FRAME_STANDARDS: tuple[FrameStandardResponse, ...] = (
+    FrameStandardResponse(frame_standard_id="british_national_shallow_super", display_name="British National shallow super", hive_type="british_national", frame_use="shallow_super", top_bar_length_mm=432, bottom_bar_length_mm=356, side_bar_height_mm=140, source_note="Project-maintained starter metadata for dev traceability; verify before production calibration.", status=FrameStandardStatus.known),
+    FrameStandardResponse(frame_standard_id="british_national_deep_brood", display_name="British National deep brood", hive_type="british_national", frame_use="deep_brood", top_bar_length_mm=432, bottom_bar_length_mm=356, side_bar_height_mm=216, source_note="Project-maintained starter metadata for dev traceability; verify before production calibration.", status=FrameStandardStatus.known),
+    FrameStandardResponse(frame_standard_id="british_national_extra_deep_14x12", display_name="British National extra deep 14x12", hive_type="british_national", frame_use="extra_deep_14x12", top_bar_length_mm=432, bottom_bar_length_mm=356, side_bar_height_mm=305, source_note="Project-maintained starter metadata for dev traceability; verify before production calibration.", status=FrameStandardStatus.known),
+    FrameStandardResponse(frame_standard_id="wbc_shallow_super", display_name="WBC shallow super", hive_type="wbc", frame_use="shallow_super", top_bar_length_mm=432, bottom_bar_length_mm=356, side_bar_height_mm=140, source_note="Project-maintained starter metadata for dev traceability; verify before production calibration.", status=FrameStandardStatus.known),
+    FrameStandardResponse(frame_standard_id="wbc_deep_brood", display_name="WBC deep brood", hive_type="wbc", frame_use="deep_brood", top_bar_length_mm=432, bottom_bar_length_mm=356, side_bar_height_mm=216, source_note="Project-maintained starter metadata for dev traceability; verify before production calibration.", status=FrameStandardStatus.known),
+    FrameStandardResponse(frame_standard_id="wbc_extra_deep_14x12", display_name="WBC extra deep 14x12", hive_type="wbc", frame_use="extra_deep_14x12", top_bar_length_mm=432, bottom_bar_length_mm=356, side_bar_height_mm=305, source_note="Project-maintained starter metadata for dev traceability; verify before production calibration.", status=FrameStandardStatus.known),
+    FrameStandardResponse(frame_standard_id="smith_shallow_super", display_name="Smith shallow super", hive_type="smith", frame_use="shallow_super", top_bar_length_mm=394, bottom_bar_length_mm=356, side_bar_height_mm=140, source_note="Project-maintained starter metadata for dev traceability; verify before production calibration.", status=FrameStandardStatus.known),
+    FrameStandardResponse(frame_standard_id="smith_deep_brood", display_name="Smith deep brood", hive_type="smith", frame_use="deep_brood", top_bar_length_mm=394, bottom_bar_length_mm=356, side_bar_height_mm=216, source_note="Project-maintained starter metadata for dev traceability; verify before production calibration.", status=FrameStandardStatus.known),
+    FrameStandardResponse(frame_standard_id="british_commercial_shallow_super", display_name="British Commercial shallow super", hive_type="british_commercial", frame_use="shallow_super", top_bar_length_mm=432, bottom_bar_length_mm=406, side_bar_height_mm=152, source_note="Project-maintained starter metadata for dev traceability; verify before production calibration.", status=FrameStandardStatus.known),
+    FrameStandardResponse(frame_standard_id="british_commercial_deep_brood", display_name="British Commercial deep brood", hive_type="british_commercial", frame_use="deep_brood", top_bar_length_mm=432, bottom_bar_length_mm=406, side_bar_height_mm=254, source_note="Project-maintained starter metadata for dev traceability; verify before production calibration.", status=FrameStandardStatus.known),
+    FrameStandardResponse(frame_standard_id="langstroth_shallow_super", display_name="Langstroth shallow super", hive_type="langstroth", frame_use="shallow_super", top_bar_length_mm=483, bottom_bar_length_mm=447, side_bar_height_mm=137, source_note="Project-maintained starter metadata for dev traceability; verify before production calibration.", status=FrameStandardStatus.known),
+    FrameStandardResponse(frame_standard_id="langstroth_deep_brood", display_name="Langstroth deep brood", hive_type="langstroth", frame_use="deep_brood", top_bar_length_mm=483, bottom_bar_length_mm=447, side_bar_height_mm=232, source_note="Project-maintained starter metadata for dev traceability; verify before production calibration.", status=FrameStandardStatus.known),
+    FrameStandardResponse(frame_standard_id="unknown", display_name="Unknown", hive_type="unknown", frame_use="unknown", source_note="Explicitly unknown equipment context; count and flag in later training reports.", status=FrameStandardStatus.unknown),
+    FrameStandardResponse(frame_standard_id="other", display_name="Other", hive_type="other", frame_use="other", source_note="Equipment context not in the starter catalogue; notes are required.", status=FrameStandardStatus.other),
+)
 
 
 @dataclass(frozen=True)
@@ -119,6 +143,7 @@ class InMemoryProductDataStore:
     memberships: list[WorkspaceMembershipRecord] = field(default_factory=list)
     apiaries: dict[UUID, ApiaryResponse] = field(default_factory=dict)
     hives: dict[UUID, HiveResponse] = field(default_factory=dict)
+    hive_configurations: dict[UUID, HiveConfigurationResponse] = field(default_factory=dict)
     inspections: dict[UUID, InspectionResponse] = field(default_factory=dict)
     inspection_photos: dict[UUID, InspectionPhotoResponse] = field(default_factory=dict)
     analysis_runs: dict[UUID, AnalysisRunResponse] = field(default_factory=dict)
@@ -203,6 +228,86 @@ class InMemoryProductDataStore:
         self.hives[hive.hive_id] = hive
         return hive
 
+    def list_frame_standards(self) -> list[FrameStandardResponse]:
+        return list(FRAME_STANDARDS)
+
+    def get_frame_standard(self, frame_standard_id: str) -> FrameStandardResponse | None:
+        for frame_standard in FRAME_STANDARDS:
+            if frame_standard.frame_standard_id == frame_standard_id:
+                return frame_standard
+        return None
+
+    def upsert_hive_configuration(
+        self,
+        user: UserContext,
+        hive_id: UUID,
+        request: HiveConfigurationUpsertRequest,
+    ) -> HiveConfigurationResponse:
+        hive = self.hives.get(hive_id)
+        if hive is None or hive.workspace_id != request.workspace_id:
+            raise DomainError(
+                "hive_not_found",
+                "The requested Hive was not found in this Workspace.",
+                404,
+            )
+        self.require_workspace_access(user, hive.workspace_id)
+        frame_standard = self.get_frame_standard(request.frame_standard_id)
+        if frame_standard is None:
+            raise DomainError(
+                "frame_standard_not_found",
+                "The requested Frame Standard is not in the HiveSight starter catalogue.",
+                422,
+            )
+        notes = _clean_optional_text(request.notes)
+        if frame_standard.status == FrameStandardStatus.other and notes is None:
+            raise DomainError(
+                "hive_configuration_notes_required",
+                "The 'other' Frame Standard requires Hive Configuration notes.",
+                422,
+            )
+        existing = self.hive_configurations.get(hive_id)
+        now = self.clock()
+        configuration = HiveConfigurationResponse(
+            hive_configuration_id=existing.hive_configuration_id if existing else self.id_factory(),
+            hive_id=hive_id,
+            workspace_id=hive.workspace_id,
+            hive_type=frame_standard.hive_type,
+            frame_use=frame_standard.frame_use,
+            frame_standard_id=frame_standard.frame_standard_id,
+            frame_standard=frame_standard,
+            notes=notes,
+            status=HiveConfigurationStatus.current,
+            effective_from=request.effective_from or now.date(),
+            configured_by_user_id=user.user_id,
+            configured_at=existing.configured_at if existing else now,
+            updated_at=now,
+        )
+        self.hive_configurations[hive_id] = configuration
+        return configuration
+
+    def get_hive_configuration(
+        self,
+        user: UserContext,
+        workspace_id: UUID,
+        hive_id: UUID,
+    ) -> HiveConfigurationResponse:
+        hive = self.hives.get(hive_id)
+        if hive is None or hive.workspace_id != workspace_id:
+            raise DomainError(
+                "hive_not_found",
+                "The requested Hive was not found in this Workspace.",
+                404,
+            )
+        self.require_workspace_access(user, workspace_id)
+        configuration = self.hive_configurations.get(hive_id)
+        if configuration is None:
+            raise DomainError(
+                "hive_configuration_required",
+                "Record Hive Configuration before using this Hive for Inspections.",
+                409,
+            )
+        return configuration
+
     def create_inspection(
         self,
         user: UserContext,
@@ -214,6 +319,12 @@ class InMemoryProductDataStore:
         if hive is None:
             raise DomainError("inspection_not_found", "The requested hive was not found.", 404)
         self.require_workspace_access(user, hive.workspace_id)
+        if hive.hive_id not in self.hive_configurations:
+            raise DomainError(
+                "hive_configuration_required",
+                "Record Hive Configuration before creating an Inspection for this Hive.",
+                409,
+            )
         inspection = InspectionResponse(
             inspection_id=self.id_factory(),
             hive_id=hive_id,
@@ -1226,7 +1337,7 @@ class InMemoryProductDataStore:
             reviewed_ellipse_snapshots=[],
             source_group_key=session.source_group_key,
             image_quality_status=session.image_quality_status,
-            provenance=DatasetItemProvenanceResponse(
+            provenance=self._dataset_item_provenance_for_photo(
                 workspace_id=workspace_id,
                 inspection_photo_id=session.inspection_photo_id,
             ),
@@ -1628,17 +1739,51 @@ class InMemoryProductDataStore:
         self,
         crop: TrainingCropResponse,
     ) -> DatasetItemProvenanceResponse:
-        photo = self.inspection_photos.get(crop.inspection_photo_id)
+        return self._dataset_item_provenance_for_photo(
+            workspace_id=crop.workspace_id,
+            inspection_photo_id=crop.inspection_photo_id,
+            training_crop_id=crop.training_crop_id,
+        )
+
+    def _dataset_item_provenance_for_photo(
+        self,
+        workspace_id: UUID,
+        inspection_photo_id: UUID,
+        training_crop_id: UUID | None = None,
+    ) -> DatasetItemProvenanceResponse:
+        photo = self.inspection_photos.get(inspection_photo_id)
         inspection = self.inspections.get(photo.inspection_id) if photo else None
         hive = self.hives.get(inspection.hive_id) if inspection else None
         apiary = self.apiaries.get(hive.apiary_id) if hive else None
         return DatasetItemProvenanceResponse(
-            workspace_id=crop.workspace_id,
+            workspace_id=workspace_id,
             apiary_id=apiary.apiary_id if apiary else None,
             hive_id=hive.hive_id if hive else None,
             inspection_id=inspection.inspection_id if inspection else None,
-            inspection_photo_id=crop.inspection_photo_id,
-            training_crop_id=crop.training_crop_id,
+            inspection_photo_id=inspection_photo_id,
+            training_crop_id=training_crop_id,
+            hive_configuration=self._hive_configuration_snapshot(hive.hive_id if hive else None),
+        )
+
+    def _hive_configuration_snapshot(
+        self,
+        hive_id: UUID | None,
+    ) -> HiveConfigurationSnapshotResponse | None:
+        if hive_id is None:
+            return None
+        configuration = self.hive_configurations.get(hive_id)
+        if configuration is None:
+            return None
+        frame_standard = configuration.frame_standard
+        return HiveConfigurationSnapshotResponse(
+            hive_configuration_id=configuration.hive_configuration_id,
+            hive_type=configuration.hive_type,
+            frame_use=configuration.frame_use,
+            frame_standard_id=configuration.frame_standard_id,
+            frame_standard_display_name=frame_standard.display_name,
+            top_bar_length_mm=frame_standard.top_bar_length_mm,
+            bottom_bar_length_mm=frame_standard.bottom_bar_length_mm,
+            side_bar_height_mm=frame_standard.side_bar_height_mm,
         )
 
     def _validate_dataset_item_exclusion(
@@ -1921,4 +2066,3 @@ def _dataset_yaml_text(class_map: dict[str, str]) -> str:
         f"{names}\n"
         "# HiveSight: YOLO OBB labels derived from canonical oriented bee ellipses.\n"
     )
-    TrainingCropDatasetItemCreateRequest,

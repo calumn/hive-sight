@@ -27,6 +27,37 @@ export type Hive = {
   name: string;
 };
 
+export type FrameStandardStatus = "known" | "unknown" | "other";
+
+export type FrameStandard = {
+  frameStandardId: string;
+  displayName: string;
+  hiveType: string;
+  frameUse: string;
+  topBarLengthMm: number | null;
+  bottomBarLengthMm: number | null;
+  sideBarHeightMm: number | null;
+  measurementUnit: string;
+  sourceNote: string;
+  status: FrameStandardStatus;
+};
+
+export type HiveConfiguration = {
+  hiveConfigurationId: string;
+  hiveId: string;
+  workspaceId: string;
+  hiveType: string;
+  frameUse: string;
+  frameStandardId: string;
+  frameStandard: FrameStandard;
+  notes: string | null;
+  status: "current";
+  effectiveFrom: string;
+  configuredByUserId: string;
+  configuredAt: string;
+  updatedAt: string;
+};
+
 export type InspectionIntent = "training_data_collection" | "varroa_assessment";
 
 export type Inspection = {
@@ -482,6 +513,45 @@ export async function createHive({
   });
   await ensureOk(response);
   return parseHive(await response.json());
+}
+
+export async function fetchFrameStandards({
+  devUserId
+}: {
+  devUserId: string;
+}): Promise<FrameStandard[]> {
+  const response = await fetch(`${coreApiUrl}/v1/frame-standards`, {
+    headers: devAuthHeaders(devUserId)
+  });
+  await ensureOk(response);
+  return requireArray(await response.json(), "Frame Standard list response").map(parseFrameStandard);
+}
+
+export async function upsertHiveConfiguration({
+  devUserId,
+  workspaceId,
+  hiveId,
+  frameStandardId,
+  notes
+}: {
+  devUserId: string;
+  workspaceId: string;
+  hiveId: string;
+  frameStandardId: string;
+  notes: string;
+}): Promise<HiveConfiguration> {
+  const trimmedNotes = notes.trim();
+  const response = await fetch(`${coreApiUrl}/v1/hives/${hiveId}/configuration`, {
+    method: "PUT",
+    headers: jsonHeaders(devUserId),
+    body: JSON.stringify({
+      workspace_id: workspaceId,
+      frame_standard_id: frameStandardId,
+      notes: trimmedNotes.length > 0 ? trimmedNotes : null
+    })
+  });
+  await ensureOk(response);
+  return parseHiveConfiguration(await response.json());
 }
 
 export async function createInspection({
@@ -1096,6 +1166,44 @@ function parseHive(value: unknown): Hive {
   };
 }
 
+function parseFrameStandard(value: unknown): FrameStandard {
+  const record = requireRecord(value, "Frame Standard response");
+  return {
+    frameStandardId: requireString(record.frame_standard_id, "frame_standard_id"),
+    displayName: requireString(record.display_name, "display_name"),
+    hiveType: requireString(record.hive_type, "hive_type"),
+    frameUse: requireString(record.frame_use, "frame_use"),
+    topBarLengthMm: optionalNumber(record.top_bar_length_mm, "top_bar_length_mm"),
+    bottomBarLengthMm: optionalNumber(record.bottom_bar_length_mm, "bottom_bar_length_mm"),
+    sideBarHeightMm: optionalNumber(record.side_bar_height_mm, "side_bar_height_mm"),
+    measurementUnit: requireString(record.measurement_unit, "measurement_unit"),
+    sourceNote: requireString(record.source_note, "source_note"),
+    status: requireFrameStandardStatus(record.status)
+  };
+}
+
+function parseHiveConfiguration(value: unknown): HiveConfiguration {
+  const record = requireRecord(value, "Hive Configuration response");
+  return {
+    hiveConfigurationId: requireString(
+      record.hive_configuration_id,
+      "hive_configuration_id"
+    ),
+    hiveId: requireString(record.hive_id, "hive_id"),
+    workspaceId: requireString(record.workspace_id, "workspace_id"),
+    hiveType: requireString(record.hive_type, "hive_type"),
+    frameUse: requireString(record.frame_use, "frame_use"),
+    frameStandardId: requireString(record.frame_standard_id, "frame_standard_id"),
+    frameStandard: parseFrameStandard(record.frame_standard),
+    notes: optionalString(record.notes, "notes"),
+    status: requireHiveConfigurationStatus(record.status),
+    effectiveFrom: requireString(record.effective_from, "effective_from"),
+    configuredByUserId: requireString(record.configured_by_user_id, "configured_by_user_id"),
+    configuredAt: requireString(record.configured_at, "configured_at"),
+    updatedAt: requireString(record.updated_at, "updated_at")
+  };
+}
+
 function parseInspection(value: unknown): Inspection {
   const record = requireRecord(value, "Inspection response");
   return {
@@ -1640,6 +1748,20 @@ function requireInspectionIntent(value: unknown): InspectionIntent {
     return value;
   }
   throw new Error("Core API response had an unexpected inspection intent");
+}
+
+function requireFrameStandardStatus(value: unknown): FrameStandardStatus {
+  if (value === "known" || value === "unknown" || value === "other") {
+    return value;
+  }
+  throw new Error("Core API response had an unexpected Frame Standard status");
+}
+
+function requireHiveConfigurationStatus(value: unknown): "current" {
+  if (value === "current") {
+    return value;
+  }
+  throw new Error("Core API response had an unexpected Hive Configuration status");
 }
 
 function requireAnalysisStatus(value: unknown): PhotoIntake["analysisRun"]["status"] {

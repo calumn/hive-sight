@@ -1,12 +1,13 @@
+import json
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from io import BytesIO
-import json
 from pathlib import Path
 from uuid import UUID
 
 import pytest
 from fastapi.testclient import TestClient
+from hive_configuration_test_support import configure_hive
 from PIL import Image
 from pytest_bdd import given, scenarios, then, when
 
@@ -219,6 +220,12 @@ def _upload_photo(slice_context: SliceContext) -> str:
         json={"apiary_id": apiary_id, "name": "Hive A"},
         headers=_headers(),
     ).json()["hive_id"]
+    configure_hive(
+        slice_context.client,
+        workspace_id=slice_context.workspace_id,
+        hive_id=hive_id,
+        headers=_headers(),
+    )
     inspection_id = slice_context.client.post(
         "/v1/inspections",
         json={

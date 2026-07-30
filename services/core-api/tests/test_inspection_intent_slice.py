@@ -2,6 +2,7 @@ from datetime import UTC, date, datetime
 from uuid import UUID
 
 from fastapi.testclient import TestClient
+from hive_configuration_test_support import configure_hive
 
 from hive_sight_core_api.dependencies import build_dev_state, get_dev_state
 from hive_sight_core_api.main import app
@@ -188,6 +189,7 @@ def _create_hive_context(
         json={"apiary_id": apiary_id, "name": "Hive A"},
         headers={"x-hivesight-dev-user-id": str(USER_ID)},
     ).json()["hive_id"]
+    configure_hive(client, workspace_id=workspace_id, hive_id=hive_id, user_id=USER_ID)
     return workspace_id, hive_id
 
 

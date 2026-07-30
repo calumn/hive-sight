@@ -33,7 +33,10 @@ from hive_sight_core_api.models import (
     DatasetLabellingSessionResponse,
     DevSessionResponse,
     ErrorResponse,
+    FrameStandardResponse,
     HealthResponse,
+    HiveConfigurationResponse,
+    HiveConfigurationUpsertRequest,
     HiveCreateRequest,
     HiveResponse,
     InspectionCreateRequest,
@@ -43,20 +46,20 @@ from hive_sight_core_api.models import (
     OrientedBeeEllipseCreateRequest,
     OrientedBeeEllipseResponse,
     OrientedBeeEllipseUpdateRequest,
+    PhotoIntakeResponse,
     PhysicalYoloObbExportRequest,
     PhysicalYoloObbExportResponse,
-    PhotoIntakeResponse,
     ProcessAnalysisRunRequest,
     ReviewDecisionCreateRequest,
     ReviewDecisionResponse,
     StartDatasetLabellingRequest,
-    TrainingCropDatasetItemCreateRequest,
-    UpdateDatasetLabellingSessionRequest,
     TrainingCropCreateRequest,
+    TrainingCropDatasetItemCreateRequest,
     TrainingCropEvidenceResponse,
     TrainingCropListResponse,
     TrainingCropResponse,
     TrainingCropUpdateRequest,
+    UpdateDatasetLabellingSessionRequest,
     UploadUrlResponse,
     WorkspaceDataUseAgreementAcceptanceRequest,
     WorkspaceDataUseAgreementAcceptanceResponse,
@@ -175,6 +178,38 @@ def create_hive(
     state: DevStateDep,
 ) -> HiveResponse:
     return state.store.create_hive(user=user, apiary_id=request.apiary_id, name=request.name)
+
+
+@app.get("/v1/frame-standards", response_model=list[FrameStandardResponse])
+def list_frame_standards(
+    user: AuthenticatedUserDep,
+    state: DevStateDep,
+) -> list[FrameStandardResponse]:
+    return state.store.list_frame_standards()
+
+
+@app.put("/v1/hives/{hive_id}/configuration", response_model=HiveConfigurationResponse)
+def upsert_hive_configuration(
+    hive_id: UUID,
+    request: HiveConfigurationUpsertRequest,
+    user: AuthenticatedUserDep,
+    state: DevStateDep,
+) -> HiveConfigurationResponse:
+    return state.store.upsert_hive_configuration(user=user, hive_id=hive_id, request=request)
+
+
+@app.get("/v1/hives/{hive_id}/configuration", response_model=HiveConfigurationResponse)
+def get_hive_configuration(
+    hive_id: UUID,
+    workspace_id: UUID,
+    user: AuthenticatedUserDep,
+    state: DevStateDep,
+) -> HiveConfigurationResponse:
+    return state.store.get_hive_configuration(
+        user=user,
+        workspace_id=workspace_id,
+        hive_id=hive_id,
+    )
 
 
 @app.post("/v1/inspections", response_model=InspectionResponse, status_code=201)

@@ -5,6 +5,7 @@ from uuid import UUID
 
 import pytest
 from fastapi.testclient import TestClient
+from hive_configuration_test_support import configure_hive
 from pytest_bdd import given, scenarios, then, when
 
 from hive_sight_core_api.dependencies import build_dev_state, get_dev_state
@@ -95,6 +96,12 @@ def curator_has_reviewed_bee_draft_annotations(slice_context: SliceContext) -> N
         json={"apiary_id": apiary_id, "name": "Hive A"},
         headers={"x-hivesight-dev-user-id": str(slice_context.current_user_id)},
     ).json()["hive_id"]
+    configure_hive(
+        slice_context.client,
+        workspace_id=slice_context.workspace_id,
+        hive_id=hive_id,
+        user_id=slice_context.current_user_id,
+    )
     inspection_id = slice_context.client.post(
         "/v1/inspections",
         json={

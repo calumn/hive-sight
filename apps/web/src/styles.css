@@ -198,6 +198,33 @@ h1 {
   margin: 0;
 }
 
+.compact-facts {
+  background: #f7f9f5;
+  border: 1px solid #dce2d7;
+  border-radius: 6px;
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 10px;
+}
+
+.compact-facts div {
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.compact-facts dt {
+  color: #626a5f;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.compact-facts dd {
+  font-family: "SFMono-Regular", Consolas, monospace;
+  margin: 0;
+}
+
 .primary-action {
   background: #31572c;
   border-color: #31572c;

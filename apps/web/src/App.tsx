@@ -37,6 +37,7 @@ import {
   fetchCoreHealth,
   fetchDatasetLabellingEvidence,
   fetchDevSession,
+  fetchFrameStandards,
   fetchInspectionPhotos,
   fetchInspectionPhotoObjectUrl,
   fetchTrainingCropEvidence,
@@ -45,6 +46,7 @@ import {
   startDatasetLabellingSession,
   updateTrainingCrop,
   updateTrainingCropEllipse,
+  upsertHiveConfiguration,
   updateDatasetLabellingSessionMetadata,
   uploadInspectionPhoto,
   type AnalysisEvidence,
@@ -56,6 +58,7 @@ import {
   type DevSession,
   type HealthResponse,
   type Hive,
+  type HiveConfiguration,
   type DatasetLabellingEvidence,
   type DatasetExclusionReason,
   type DatasetItem,
@@ -64,6 +67,7 @@ import {
   type Inspection,
   type InspectionIntent,
   type InspectionPhoto,
+  type FrameStandard,
   type OrientedBeeEllipse,
   type PhysicalYoloObbExport,
   type PhotoIntake,
@@ -101,6 +105,12 @@ export function App() {
   const [actionState, setActionState] = useState<ActionState>({ kind: "idle" });
   const [apiary, setApiary] = useState<Apiary | null>(null);
   const [hive, setHive] = useState<Hive | null>(null);
+  const [frameStandards, setFrameStandards] = useState<FrameStandard[]>([]);
+  const [selectedFrameStandardId, setSelectedFrameStandardId] = useState(
+    "british_national_deep_brood"
+  );
+  const [hiveConfigurationNotes, setHiveConfigurationNotes] = useState("");
+  const [hiveConfiguration, setHiveConfiguration] = useState<HiveConfiguration | null>(null);
   const [inspection, setInspection] = useState<Inspection | null>(null);
   const [inspectionPhotos, setInspectionPhotos] = useState<InspectionPhoto[]>([]);
   const [analysisDetail, setAnalysisDetail] = useState<AnalysisRunDetail | null>(null);
@@ -123,8 +133,14 @@ export function App() {
   const [file, setFile] = useState<File | null>(null);
 
   useEffect(() => {
-    Promise.all([fetchCoreHealth(), fetchDevSession(devUserId)])
-      .then(([health, session]) => setLoadState({ kind: "ready", health, session }))
+    Promise.all([fetchCoreHealth(), fetchDevSession(devUserId), fetchFrameStandards({ devUserId })])
+      .then(([health, session, standards]) => {
+        setFrameStandards(standards);
+        if (!standards.some((standard) => standard.frameStandardId === "british_national_deep_brood")) {
+          setSelectedFrameStandardId(standards[0]?.frameStandardId ?? "");
+        }
+        setLoadState({ kind: "ready", health, session });
+      })
       .catch((error: Error) => setLoadState({ kind: "error", message: error.message }));
   }, []);
 
@@ -141,8 +157,16 @@ export function App() {
 
   const session = loadState.kind === "ready" ? loadState.session : null;
   const termsAccepted = session?.workspaceDataUseAgreementStatus === "accepted";
-  const canCreateHive = Boolean(apiary);
-  const canCreateInspection = Boolean(hive);
+  const selectedFrameStandard = frameStandards.find(
+    (standard) => standard.frameStandardId === selectedFrameStandardId
+  );
+  const hiveConfigurationNotesRequired = selectedFrameStandard?.status === "other";
+  const canCreateHive = Boolean(
+    apiary &&
+      selectedFrameStandardId &&
+      (!hiveConfigurationNotesRequired || hiveConfigurationNotes.trim().length > 0)
+  );
+  const canCreateInspection = Boolean(hive && hiveConfiguration);
   const canUpload = Boolean(termsAccepted && inspection && file);
   const isTrainingDataCollection = inspection?.intent === "training_data_collection";
   const isVarroaAssessment = inspection?.intent === "varroa_assessment";
@@ -190,6 +214,7 @@ export function App() {
       });
       setApiary(created);
       setHive(null);
+      setHiveConfiguration(null);
       setInspection(null);
       setInspectionPhotos([]);
       setAnalysisDetail(null);
@@ -205,7 +230,15 @@ export function App() {
     }
     await runAction("Creating hive", async () => {
       const created = await createHive({ devUserId, apiaryId: apiary.apiaryId, name: hiveName });
+      const configuration = await upsertHiveConfiguration({
+        devUserId,
+        workspaceId: created.workspaceId,
+        hiveId: created.hiveId,
+        frameStandardId: selectedFrameStandardId,
+        notes: hiveConfigurationNotes
+      });
       setHive(created);
+      setHiveConfiguration(configuration);
       setInspection(null);
       setInspectionPhotos([]);
       setAnalysisDetail(null);
@@ -572,7 +605,7 @@ export function App() {
               </form>
 
               <form className="stacked-form" onSubmit={onCreateHive}>
-                <PanelHeading icon={<Plus size={20} />} title="Hive" />
+                <PanelHeading icon={<Plus size={20} />} title="Hive Configuration" />
                 <label>
                   <span>Name</span>
                 <input
@@ -582,6 +615,55 @@ export function App() {
                   data-testid="hive-name-input"
                 />
                 </label>
+                <label>
+                  <span>Frame Standard</span>
+                  <select
+                    value={selectedFrameStandardId}
+                    onChange={(event) => {
+                      setSelectedFrameStandardId(event.target.value);
+                      setHiveConfiguration(null);
+                      setHive(null);
+                      setInspection(null);
+                    }}
+                    required
+                    data-testid="hive-configuration-frame-standard-select"
+                  >
+                    {frameStandards.map((standard) => (
+                      <option key={standard.frameStandardId} value={standard.frameStandardId}>
+                        {standard.displayName}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {selectedFrameStandard ? (
+                  <dl
+                    className="compact-facts"
+                    data-testid="hive-configuration-dimensions"
+                  >
+                    <div>
+                      <dt>Top bar</dt>
+                      <dd>{formatFrameStandardDimension(selectedFrameStandard.topBarLengthMm)}</dd>
+                    </div>
+                    <div>
+                      <dt>Bottom bar</dt>
+                      <dd>{formatFrameStandardDimension(selectedFrameStandard.bottomBarLengthMm)}</dd>
+                    </div>
+                    <div>
+                      <dt>Side bar</dt>
+                      <dd>{formatFrameStandardDimension(selectedFrameStandard.sideBarHeightMm)}</dd>
+                    </div>
+                  </dl>
+                ) : null}
+                <label>
+                  <span>{hiveConfigurationNotesRequired ? "Notes required" : "Notes"}</span>
+                  <textarea
+                    value={hiveConfigurationNotes}
+                    onChange={(event) => setHiveConfigurationNotes(event.target.value)}
+                    required={hiveConfigurationNotesRequired}
+                    rows={3}
+                    data-testid="hive-configuration-notes-input"
+                  />
+                </label>
                 <button
                   type="submit"
                   disabled={!canCreateHive || actionState.kind === "working"}
@@ -590,6 +672,11 @@ export function App() {
                   Create hive
                 </button>
                 <RecordBadge value={hive?.hiveId} />
+                {hiveConfiguration ? (
+                  <p className="intent-badge" data-testid="hive-configuration-state">
+                    {hiveConfiguration.frameStandard.displayName}
+                  </p>
+                ) : null}
               </form>
 
               <form className="stacked-form" onSubmit={onCreateInspection}>
@@ -783,6 +870,10 @@ function InspectionPhotoListPanel({
 
 function formatInspectionIntent(intent: InspectionIntent) {
   return intent === "training_data_collection" ? "Training data collection" : "Varroa assessment";
+}
+
+function formatFrameStandardDimension(value: number | null): string {
+  return value === null ? "Unknown" : `${value} mm`;
 }
 
 function centerFixedCrop(sourceX: number, sourceY: number, sourceWidth: number, sourceHeight: number): CropDraft {

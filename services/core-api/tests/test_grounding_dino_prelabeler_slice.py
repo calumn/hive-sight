@@ -4,6 +4,7 @@ from uuid import UUID
 
 import pytest
 from fastapi.testclient import TestClient
+from hive_configuration_test_support import configure_hive
 
 from hive_sight_core_api.dataset_labelling_workflow import PrelabellingRequest
 from hive_sight_core_api.dependencies import (
@@ -306,6 +307,7 @@ def _upload_inspection_photo(client: TestClient) -> tuple[str, str]:
         json={"apiary_id": apiary_id, "name": "Hive A"},
         headers={"x-hivesight-dev-user-id": str(CURATOR_USER_ID)},
     ).json()["hive_id"]
+    configure_hive(client, workspace_id=workspace_id, hive_id=hive_id, user_id=CURATOR_USER_ID)
     inspection_id = client.post(
         "/v1/inspections",
         json={

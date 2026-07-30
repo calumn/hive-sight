@@ -5,6 +5,7 @@ from uuid import UUID
 
 import pytest
 from fastapi.testclient import TestClient
+from hive_configuration_test_support import configure_hive
 from pytest_bdd import given, scenarios, then, when
 
 from hive_sight_core_api.dependencies import build_dev_state, get_dev_state
@@ -73,6 +74,12 @@ def user_logged_in_with_terms(slice_context: SliceContext) -> None:
         json={"apiary_id": apiary_id, "name": "Hive A"},
         headers={"x-hivesight-dev-user-id": str(USER_ID)},
     ).json()["hive_id"]
+    configure_hive(
+        slice_context.client,
+        workspace_id=workspace_id,
+        hive_id=hive_id,
+        user_id=USER_ID,
+    )
     slice_context.workspace_id = workspace_id
     slice_context.hive_id = hive_id
 

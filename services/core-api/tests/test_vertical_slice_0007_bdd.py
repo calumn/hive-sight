@@ -5,6 +5,7 @@ from uuid import UUID
 
 import pytest
 from fastapi.testclient import TestClient
+from hive_configuration_test_support import configure_hive
 from pytest_bdd import given, scenarios, then, when
 
 from hive_sight_core_api.dataset_labelling_workflow import (
@@ -118,6 +119,12 @@ def beekeeper_has_uploaded_photo(slice_context: SliceContext) -> None:
         json={"apiary_id": apiary_id, "name": "Hive A"},
         headers={"x-hivesight-dev-user-id": str(CURATOR_USER_ID)},
     ).json()["hive_id"]
+    configure_hive(
+        slice_context.client,
+        workspace_id=slice_context.workspace_id,
+        hive_id=hive_id,
+        user_id=CURATOR_USER_ID,
+    )
     inspection_id = slice_context.client.post(
         "/v1/inspections",
         json={

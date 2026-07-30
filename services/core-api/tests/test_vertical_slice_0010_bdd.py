@@ -5,6 +5,7 @@ from uuid import UUID
 
 import pytest
 from fastapi.testclient import TestClient
+from hive_configuration_test_support import configure_hive
 from pytest_bdd import given, scenarios, then, when
 
 from hive_sight_core_api.dependencies import build_dev_state, get_dev_state
@@ -203,6 +204,12 @@ def _upload_photo(slice_context: SliceContext) -> str:
         json={"apiary_id": apiary_id, "name": "Hive A"},
         headers=_headers(),
     ).json()["hive_id"]
+    configure_hive(
+        slice_context.client,
+        workspace_id=slice_context.workspace_id,
+        hive_id=hive_id,
+        headers=_headers(),
+    )
     inspection_id = slice_context.client.post(
         "/v1/inspections",
         json={

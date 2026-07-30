@@ -1,11 +1,12 @@
+import json
 from datetime import UTC, date, datetime
 from hashlib import sha256
 from io import BytesIO
-import json
 from pathlib import Path
 from uuid import UUID
 
 from fastapi.testclient import TestClient
+from hive_configuration_test_support import configure_hive
 from PIL import Image
 
 from hive_sight_core_api.dependencies import build_dev_state, get_dev_state
@@ -111,8 +112,10 @@ def test_physical_yolo_obb_package_writes_crop_images_labels_and_manifest(
         assert manifest["exported_items"][0]["dataset_item_id"] == training_item["dataset_item_id"]
         assert manifest["exported_items"][0]["original_filename"] == "frame.png"
         assert manifest["exported_items"][0]["label_rows"] == [
-            "0 0.250000 0.281250 0.375000 0.281250 "
-            "0.375000 0.343750 0.250000 0.343750"
+            (
+                "0 0.250000 0.281250 0.375000 0.281250 "
+                "0.375000 0.343750 0.250000 0.343750"
+            )
         ]
         assert manifest["protected_benchmark_dataset_item_ids"] == [benchmark_item["dataset_item_id"]]
         assert [item["dataset_item_id"] for item in manifest["excluded_dataset_items"]] == [
@@ -236,6 +239,7 @@ def _upload_photo(client: TestClient, image_bytes: bytes | None = None) -> tuple
         json={"apiary_id": apiary_id, "name": "Hive A"},
         headers=_headers(),
     ).json()["hive_id"]
+    configure_hive(client, workspace_id=workspace_id, hive_id=hive_id, headers=_headers())
     inspection_id = client.post(
         "/v1/inspections",
         json={

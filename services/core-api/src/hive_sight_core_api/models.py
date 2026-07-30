@@ -109,6 +109,16 @@ class TrainingCropExclusionReason(StrEnum):
     other = "other"
 
 
+class FrameStandardStatus(StrEnum):
+    known = "known"
+    unknown = "unknown"
+    other = "other"
+
+
+class HiveConfigurationStatus(StrEnum):
+    current = "current"
+
+
 class HealthResponse(BaseModel):
     service: str
     status: str
@@ -194,6 +204,53 @@ class HiveResponse(BaseModel):
     apiary_id: UUID
     workspace_id: UUID
     name: str
+
+
+class FrameStandardResponse(BaseModel):
+    frame_standard_id: str
+    display_name: str
+    hive_type: str
+    frame_use: str
+    top_bar_length_mm: int | None = None
+    bottom_bar_length_mm: int | None = None
+    side_bar_height_mm: int | None = None
+    measurement_unit: str = "mm"
+    source_note: str
+    status: FrameStandardStatus
+
+
+class HiveConfigurationUpsertRequest(BaseModel):
+    workspace_id: UUID
+    frame_standard_id: str = Field(min_length=1)
+    notes: str | None = Field(default=None, max_length=500)
+    effective_from: date | None = None
+
+
+class HiveConfigurationResponse(BaseModel):
+    hive_configuration_id: UUID
+    hive_id: UUID
+    workspace_id: UUID
+    hive_type: str
+    frame_use: str
+    frame_standard_id: str
+    frame_standard: FrameStandardResponse
+    notes: str | None = None
+    status: HiveConfigurationStatus
+    effective_from: date
+    configured_by_user_id: UUID
+    configured_at: datetime
+    updated_at: datetime
+
+
+class HiveConfigurationSnapshotResponse(BaseModel):
+    hive_configuration_id: UUID
+    hive_type: str
+    frame_use: str
+    frame_standard_id: str
+    frame_standard_display_name: str
+    top_bar_length_mm: int | None = None
+    bottom_bar_length_mm: int | None = None
+    side_bar_height_mm: int | None = None
 
 
 class InspectionCreateRequest(BaseModel):
@@ -435,6 +492,7 @@ class DatasetItemProvenanceResponse(BaseModel):
     inspection_id: UUID | None = None
     inspection_photo_id: UUID
     training_crop_id: UUID | None = None
+    hive_configuration: HiveConfigurationSnapshotResponse | None = None
 
 
 class DatasetItemResponse(BaseModel):
