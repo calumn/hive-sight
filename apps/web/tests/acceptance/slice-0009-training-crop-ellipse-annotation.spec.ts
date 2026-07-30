@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 import { fileURLToPath } from "node:url";
 
 const fixtureImagePath = fileURLToPath(new URL("../fixtures/bee-frame-test.png", import.meta.url));
@@ -40,8 +40,49 @@ test("Dataset Curator creates a crop, adds an oriented bee ellipse, and complete
 
   await page.getByTestId("training-crop-surface").click({ position: { x: 180, y: 120 } });
   await expect(page.getByTestId("training-crop-ellipse")).toHaveCount(1);
+
+  const cropSurfaceBox = await page.getByTestId("training-crop-surface").boundingBox();
+  const controlsBox = await page.getByTestId("training-crop-review-controls").boundingBox();
+  const metricsBox = await page.getByTestId("training-crop-metrics").boundingBox();
+  expect(cropSurfaceBox).not.toBeNull();
+  expect(controlsBox).not.toBeNull();
+  expect(metricsBox).not.toBeNull();
+  expect(controlsBox!.x).toBeGreaterThan(cropSurfaceBox!.x + cropSurfaceBox!.width - 1);
+  expect(metricsBox!.y).toBeGreaterThan(
+    Math.max(cropSurfaceBox!.y + cropSurfaceBox!.height, controlsBox!.y + controlsBox!.height) - 1
+  );
+
+  const initialX = await readGeometryValue(page, "training-ellipse-center-x");
+  const initialY = await readGeometryValue(page, "training-ellipse-center-y");
+  const initialRadiusX = await readGeometryValue(page, "training-ellipse-radius-x");
+  const initialRadiusY = await readGeometryValue(page, "training-ellipse-radius-y");
+  const initialRotation = await readGeometryValue(page, "training-ellipse-rotation");
+
+  await page.getByTestId("nudge-training-ellipse-left-button").click();
+  await expectGeometryValue(page, "training-ellipse-center-x", initialX - 5);
+  await page.getByTestId("nudge-training-ellipse-right-button").click();
+  await expectGeometryValue(page, "training-ellipse-center-x", initialX);
+
+  await page.getByTestId("nudge-training-ellipse-up-button").click();
+  await expectGeometryValue(page, "training-ellipse-center-y", initialY - 5);
+  await page.getByTestId("nudge-training-ellipse-down-button").click();
+  await expectGeometryValue(page, "training-ellipse-center-y", initialY);
+
+  await page.getByTestId("shrink-training-ellipse-x-button").click();
+  await expectGeometryValue(page, "training-ellipse-radius-x", initialRadiusX - 5);
+  await page.getByTestId("grow-training-ellipse-x-button").click();
+  await expectGeometryValue(page, "training-ellipse-radius-x", initialRadiusX);
+
+  await page.getByTestId("shrink-training-ellipse-y-button").click();
+  await expectGeometryValue(page, "training-ellipse-radius-y", initialRadiusY - 5);
+  await page.getByTestId("grow-training-ellipse-y-button").click();
+  await expectGeometryValue(page, "training-ellipse-radius-y", initialRadiusY);
+
   await page.getByTestId("rotate-training-ellipse-button").click();
+  await expectGeometryValue(page, "training-ellipse-rotation", initialRotation + 5);
   await expect(page.getByTestId("training-crop-review-controls")).toContainText("5 degrees");
+  await page.getByTestId("rotate-training-ellipse-anticlockwise-button").click();
+  await expectGeometryValue(page, "training-ellipse-rotation", initialRotation);
 
   await expect(page.getByTestId("training-crop-visible-status-select")).toHaveValue(
     "has_visible_bees"
@@ -50,3 +91,18 @@ test("Dataset Curator creates a crop, adds an oriented bee ellipse, and complete
   await expect(page.getByTestId("training-crop-list-item")).toContainText("review_complete");
   await expect(page.getByTestId("training-crop-list-item")).toContainText("has_visible_bees");
 });
+
+async function readGeometryValue(page: Page, testId: string): Promise<number> {
+  const text = await page.getByTestId(testId).innerText();
+  const value = Number(text);
+  expect(Number.isFinite(value)).toBe(true);
+  return value;
+}
+
+async function expectGeometryValue(
+  page: Page,
+  testId: string,
+  expectedValue: number
+): Promise<void> {
+  await expect.poll(() => readGeometryValue(page, testId)).toBe(expectedValue);
+}

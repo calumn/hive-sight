@@ -698,6 +698,13 @@ label span {
   gap: 12px;
 }
 
+.crop-editing-tool {
+  align-items: start;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
+}
+
 .crop-surface {
   background: #151812;
   border: 1px solid #dce2d7;
@@ -742,12 +749,56 @@ label span {
     0 4px 14px rgba(0, 0, 0, 0.3);
 }
 
-.crop-review-panel {
-  grid-template-columns: minmax(0, 1fr) minmax(170px, 230px) repeat(4, minmax(120px, 1fr));
+.crop-ellipse-controls {
+  background: #f7f9f5;
+  border: 1px solid #dce2d7;
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  padding: 14px;
 }
 
-.crop-review-panel > div {
-  grid-column: 1 / -1;
+.crop-ellipse-controls p {
+  color: #515b4c;
+  line-height: 1.4;
+  margin-bottom: 0;
+}
+
+.geometry-values {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin: 0;
+}
+
+.geometry-values div {
+  background: #ffffff;
+  border: 1px solid #dce2d7;
+  border-radius: 6px;
+  display: grid;
+  gap: 2px;
+  min-height: 54px;
+  padding: 8px;
+}
+
+.geometry-values dt {
+  color: #64705e;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.geometry-values dd {
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 0.95rem;
+  font-weight: 800;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.control-cluster {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .review-panel > div,
@@ -817,7 +868,8 @@ label span {
   .crop-photo-controls,
   .crop-draft-controls,
   .crop-completion-controls,
-  .crop-review-panel {
+  .crop-editing-tool,
+  .control-cluster {
     grid-template-columns: 1fr;
   }
 

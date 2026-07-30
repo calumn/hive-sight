@@ -1,5 +1,9 @@
 import {
   Activity,
+  ArrowDown,
+  ArrowLeft,
+  ArrowRight,
+  ArrowUp,
   Check,
   CircleAlert,
   CloudUpload,
@@ -7,7 +11,9 @@ import {
   FlaskConical,
   Image,
   LoaderCircle,
+  Minus,
   Plus,
+  RotateCcw,
   RefreshCw,
   RotateCw,
   ShieldCheck,
@@ -835,6 +841,65 @@ function ellipseStyle(crop: TrainingCrop, ellipse: OrientedBeeEllipse) {
   };
 }
 
+type EllipseGeometry = {
+  centerX: number;
+  centerY: number;
+  radiusX: number;
+  radiusY: number;
+  rotationDegrees: number;
+};
+
+function nextEllipseGeometry(
+  ellipse: OrientedBeeEllipse,
+  values: Partial<EllipseGeometry>
+): EllipseGeometry {
+  return {
+    centerX: values.centerX ?? ellipse.centerX,
+    centerY: values.centerY ?? ellipse.centerY,
+    radiusX: values.radiusX ?? ellipse.radiusX,
+    radiusY: values.radiusY ?? ellipse.radiusY,
+    rotationDegrees: values.rotationDegrees ?? ellipse.rotationDegrees
+  };
+}
+
+function ellipseFitsInsideCrop(crop: TrainingCrop, ellipse: EllipseGeometry): boolean {
+  if (ellipse.radiusX < 5 || ellipse.radiusY < 5) {
+    return false;
+  }
+  const angle = (normalizeRotation(ellipse.rotationDegrees) * Math.PI) / 180;
+  const xExtent = Math.sqrt(
+    (ellipse.radiusX * Math.cos(angle)) ** 2 + (ellipse.radiusY * Math.sin(angle)) ** 2
+  );
+  const yExtent = Math.sqrt(
+    (ellipse.radiusX * Math.sin(angle)) ** 2 + (ellipse.radiusY * Math.cos(angle)) ** 2
+  );
+  return (
+    ellipse.centerX - xExtent >= crop.cropX &&
+    ellipse.centerY - yExtent >= crop.cropY &&
+    ellipse.centerX + xExtent <= crop.cropX + crop.cropWidth &&
+    ellipse.centerY + yExtent <= crop.cropY + crop.cropHeight
+  );
+}
+
+function canAdjustEllipse(
+  crop: TrainingCrop | null,
+  ellipse: OrientedBeeEllipse | null,
+  values: Partial<EllipseGeometry>
+): boolean {
+  if (!crop || !ellipse) {
+    return false;
+  }
+  return ellipseFitsInsideCrop(crop, nextEllipseGeometry(ellipse, values));
+}
+
+function normalizeRotation(rotationDegrees: number): number {
+  return ((rotationDegrees % 360) + 360) % 360;
+}
+
+function formatGeometryValue(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.max(minimum, Math.min(maximum, value));
 }
@@ -956,6 +1021,37 @@ function TrainingCropAnnotationPanel({
     evidence?.beeEllipses.find((ellipse) => ellipse.annotationId === selectedEllipseId) ?? null;
   const cropLocked =
     selectedCrop?.reviewStatus === "review_complete" || selectedCrop?.reviewStatus === "excluded";
+  const controlLocked = !selectedEllipse || cropLocked || Boolean(workingLabel);
+  const canNudgeLeft = canAdjustEllipse(selectedCrop, selectedEllipse, {
+    centerX: (selectedEllipse?.centerX ?? 0) - 5
+  });
+  const canNudgeRight = canAdjustEllipse(selectedCrop, selectedEllipse, {
+    centerX: (selectedEllipse?.centerX ?? 0) + 5
+  });
+  const canNudgeUp = canAdjustEllipse(selectedCrop, selectedEllipse, {
+    centerY: (selectedEllipse?.centerY ?? 0) - 5
+  });
+  const canNudgeDown = canAdjustEllipse(selectedCrop, selectedEllipse, {
+    centerY: (selectedEllipse?.centerY ?? 0) + 5
+  });
+  const canRotateClockwise = canAdjustEllipse(selectedCrop, selectedEllipse, {
+    rotationDegrees: (selectedEllipse?.rotationDegrees ?? 0) + 5
+  });
+  const canRotateAntiClockwise = canAdjustEllipse(selectedCrop, selectedEllipse, {
+    rotationDegrees: (selectedEllipse?.rotationDegrees ?? 0) - 5
+  });
+  const canShrinkRadiusX = canAdjustEllipse(selectedCrop, selectedEllipse, {
+    radiusX: (selectedEllipse?.radiusX ?? 0) - 5
+  });
+  const canGrowRadiusX = canAdjustEllipse(selectedCrop, selectedEllipse, {
+    radiusX: (selectedEllipse?.radiusX ?? 0) + 5
+  });
+  const canShrinkRadiusY = canAdjustEllipse(selectedCrop, selectedEllipse, {
+    radiusY: (selectedEllipse?.radiusY ?? 0) - 5
+  });
+  const canGrowRadiusY = canAdjustEllipse(selectedCrop, selectedEllipse, {
+    radiusY: (selectedEllipse?.radiusY ?? 0) + 5
+  });
 
   useEffect(() => {
     if (photos.length === 0) {
@@ -1304,113 +1400,260 @@ function TrainingCropAnnotationPanel({
 
           {selectedCrop && sourceImageUrl ? (
             <section className="crop-editor" aria-label="Selected Training Crop editor">
-              <div
-                className="crop-surface"
-                style={{ aspectRatio: `${selectedCrop.cropWidth} / ${selectedCrop.cropHeight}` }}
-                onClick={(event) => void onCropSurfaceClick(event)}
-                data-testid="training-crop-surface"
-              >
-                <img
-                  src={sourceImageUrl}
-                  alt="Selected Training Crop"
-                  style={cropImageStyle(selectedCrop)}
-                  draggable={false}
-                />
-                {evidence?.beeEllipses.map((ellipse) => (
-                  <button
-                    key={ellipse.annotationId}
-                    type="button"
-                    className={`bee-ellipse ${ellipse.annotationType === "partial_visible_bee" ? "partial" : "complete"} ${
-                      ellipse.annotationId === selectedEllipseId ? "selected" : ""
-                    }`}
-                    style={ellipseStyle(selectedCrop, ellipse)}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      setSelectedEllipseId(ellipse.annotationId);
-                    }}
-                    data-testid="training-crop-ellipse"
-                    aria-label={ellipse.annotationType}
+              <div className="crop-editing-tool" data-testid="training-crop-editing-tool">
+                <div
+                  className="crop-surface"
+                  style={{ aspectRatio: `${selectedCrop.cropWidth} / ${selectedCrop.cropHeight}` }}
+                  onClick={(event) => void onCropSurfaceClick(event)}
+                  data-testid="training-crop-surface"
+                >
+                  <img
+                    src={sourceImageUrl}
+                    alt="Selected Training Crop"
+                    style={cropImageStyle(selectedCrop)}
+                    draggable={false}
                   />
-                ))}
+                  {evidence?.beeEllipses.map((ellipse) => (
+                    <button
+                      key={ellipse.annotationId}
+                      type="button"
+                      className={`bee-ellipse ${
+                        ellipse.annotationType === "partial_visible_bee" ? "partial" : "complete"
+                      } ${ellipse.annotationId === selectedEllipseId ? "selected" : ""}`}
+                      style={ellipseStyle(selectedCrop, ellipse)}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setSelectedEllipseId(ellipse.annotationId);
+                      }}
+                      data-testid="training-crop-ellipse"
+                      aria-label={ellipse.annotationType}
+                    />
+                  ))}
+                </div>
+
+                <div
+                  className="crop-ellipse-controls"
+                  data-testid="training-crop-review-controls"
+                  aria-label="Selected ellipse controls"
+                >
+                  <div>
+                    <strong>Ellipse controls</strong>
+                    <p data-testid="selected-training-ellipse-label">
+                      {selectedEllipse
+                        ? `${selectedEllipse.annotationType} / ${formatGeometryValue(
+                            normalizeRotation(selectedEllipse.rotationDegrees)
+                          )} degrees`
+                        : "Click inside the crop to add a default bee ellipse."}
+                    </p>
+                  </div>
+                  <dl className="geometry-values" data-testid="training-ellipse-geometry-values">
+                    <div>
+                      <dt>X</dt>
+                      <dd data-testid="training-ellipse-center-x">
+                        {selectedEllipse ? formatGeometryValue(selectedEllipse.centerX) : "-"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Y</dt>
+                      <dd data-testid="training-ellipse-center-y">
+                        {selectedEllipse ? formatGeometryValue(selectedEllipse.centerY) : "-"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Rx</dt>
+                      <dd data-testid="training-ellipse-radius-x">
+                        {selectedEllipse ? formatGeometryValue(selectedEllipse.radiusX) : "-"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Ry</dt>
+                      <dd data-testid="training-ellipse-radius-y">
+                        {selectedEllipse ? formatGeometryValue(selectedEllipse.radiusY) : "-"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Rot</dt>
+                      <dd data-testid="training-ellipse-rotation">
+                        {selectedEllipse
+                          ? formatGeometryValue(normalizeRotation(selectedEllipse.rotationDegrees))
+                          : "-"}
+                      </dd>
+                    </div>
+                  </dl>
+                  <label>
+                    <span>Bee type</span>
+                    <select
+                      value={selectedEllipse?.annotationType ?? "complete_visible_bee"}
+                      onChange={(event) =>
+                        selectedEllipse &&
+                        void updateSelectedEllipse({
+                          annotationType: event.target.value as BeeAnnotationType
+                        })
+                      }
+                      disabled={controlLocked}
+                      data-testid="training-ellipse-type-select"
+                    >
+                      <option value="complete_visible_bee">Complete visible bee</option>
+                      <option value="partial_visible_bee">Partial visible bee</option>
+                    </select>
+                  </label>
+                  <div className="control-cluster" aria-label="Move selected ellipse">
+                    <button
+                      type="button"
+                      disabled={controlLocked || !canNudgeUp}
+                      onClick={() =>
+                        selectedEllipse &&
+                        void updateSelectedEllipse({ centerY: selectedEllipse.centerY - 5 })
+                      }
+                      data-testid="nudge-training-ellipse-up-button"
+                      title="Nudge up"
+                    >
+                      <ArrowUp size={18} />
+                      Up
+                    </button>
+                    <button
+                      type="button"
+                      disabled={controlLocked || !canNudgeLeft}
+                      onClick={() =>
+                        selectedEllipse &&
+                        void updateSelectedEllipse({ centerX: selectedEllipse.centerX - 5 })
+                      }
+                      data-testid="nudge-training-ellipse-left-button"
+                      title="Nudge left"
+                    >
+                      <ArrowLeft size={18} />
+                      Left
+                    </button>
+                    <button
+                      type="button"
+                      disabled={controlLocked || !canNudgeRight}
+                      onClick={() =>
+                        selectedEllipse &&
+                        void updateSelectedEllipse({ centerX: selectedEllipse.centerX + 5 })
+                      }
+                      data-testid="nudge-training-ellipse-right-button"
+                      title="Nudge right"
+                    >
+                      <ArrowRight size={18} />
+                      Right
+                    </button>
+                    <button
+                      type="button"
+                      disabled={controlLocked || !canNudgeDown}
+                      onClick={() =>
+                        selectedEllipse &&
+                        void updateSelectedEllipse({ centerY: selectedEllipse.centerY + 5 })
+                      }
+                      data-testid="nudge-training-ellipse-down-button"
+                      title="Nudge down"
+                    >
+                      <ArrowDown size={18} />
+                      Down
+                    </button>
+                  </div>
+                  <div className="control-cluster" aria-label="Rotate selected ellipse">
+                    <button
+                      type="button"
+                      disabled={controlLocked || !canRotateAntiClockwise}
+                      onClick={() =>
+                        selectedEllipse &&
+                        void updateSelectedEllipse({
+                          rotationDegrees: selectedEllipse.rotationDegrees - 5
+                        })
+                      }
+                      data-testid="rotate-training-ellipse-anticlockwise-button"
+                      title="Rotate anti-clockwise"
+                    >
+                      <RotateCcw size={18} />
+                      Rotate -
+                    </button>
+                    <button
+                      type="button"
+                      disabled={controlLocked || !canRotateClockwise}
+                      onClick={() =>
+                        selectedEllipse &&
+                        void updateSelectedEllipse({
+                          rotationDegrees: selectedEllipse.rotationDegrees + 5
+                        })
+                      }
+                      data-testid="rotate-training-ellipse-button"
+                      title="Rotate clockwise"
+                    >
+                      <RotateCw size={18} />
+                      Rotate +
+                    </button>
+                  </div>
+                  <div className="control-cluster" aria-label="Resize selected ellipse">
+                    <button
+                      type="button"
+                      disabled={controlLocked || !canShrinkRadiusX}
+                      onClick={() =>
+                        selectedEllipse &&
+                        void updateSelectedEllipse({ radiusX: selectedEllipse.radiusX - 5 })
+                      }
+                      data-testid="shrink-training-ellipse-x-button"
+                      title="Reduce horizontal radius"
+                    >
+                      <Minus size={18} />
+                      Rx
+                    </button>
+                    <button
+                      type="button"
+                      disabled={controlLocked || !canGrowRadiusX}
+                      onClick={() =>
+                        selectedEllipse &&
+                        void updateSelectedEllipse({ radiusX: selectedEllipse.radiusX + 5 })
+                      }
+                      data-testid="grow-training-ellipse-x-button"
+                      title="Increase horizontal radius"
+                    >
+                      <Plus size={18} />
+                      Rx
+                    </button>
+                    <button
+                      type="button"
+                      disabled={controlLocked || !canShrinkRadiusY}
+                      onClick={() =>
+                        selectedEllipse &&
+                        void updateSelectedEllipse({ radiusY: selectedEllipse.radiusY - 5 })
+                      }
+                      data-testid="shrink-training-ellipse-y-button"
+                      title="Reduce vertical radius"
+                    >
+                      <Minus size={18} />
+                      Ry
+                    </button>
+                    <button
+                      type="button"
+                      disabled={controlLocked || !canGrowRadiusY}
+                      onClick={() =>
+                        selectedEllipse &&
+                        void updateSelectedEllipse({ radiusY: selectedEllipse.radiusY + 5 })
+                      }
+                      data-testid="grow-training-ellipse-y-button"
+                      title="Increase vertical radius"
+                    >
+                      <Plus size={18} />
+                      Ry
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={controlLocked}
+                    onClick={() => void deleteSelectedEllipse()}
+                    data-testid="delete-training-ellipse-button"
+                  >
+                    <Trash2 size={18} />
+                    Delete ellipse
+                  </button>
+                </div>
               </div>
 
-              <div className="result-grid crop-metrics">
+              <div className="result-grid crop-metrics" data-testid="training-crop-metrics">
                 <Metric label="Review" value={selectedCrop.reviewStatus} />
                 <Metric label="Visible bees" value={selectedCrop.visibleBeeStatus} />
                 <Metric label="Ellipses" value={evidence?.beeEllipses.length ?? 0} />
                 <Metric label="Coordinates" value="source px" />
-              </div>
-
-              <div className="review-panel crop-review-panel" data-testid="training-crop-review-controls">
-                <div>
-                  <strong>Ellipse controls</strong>
-                  <p>
-                    {selectedEllipse
-                      ? `${selectedEllipse.annotationType} / ${Math.round(selectedEllipse.rotationDegrees)} degrees`
-                      : "Click inside the crop to add a default bee ellipse."}
-                  </p>
-                </div>
-                <label>
-                  <span>Bee type</span>
-                  <select
-                    value={selectedEllipse?.annotationType ?? "complete_visible_bee"}
-                    onChange={(event) =>
-                      selectedEllipse &&
-                      void updateSelectedEllipse({ annotationType: event.target.value as BeeAnnotationType })
-                    }
-                    disabled={!selectedEllipse || cropLocked}
-                    data-testid="training-ellipse-type-select"
-                  >
-                    <option value="complete_visible_bee">Complete visible bee</option>
-                    <option value="partial_visible_bee">Partial visible bee</option>
-                  </select>
-                </label>
-                <button
-                  type="button"
-                  disabled={!selectedEllipse || cropLocked}
-                  onClick={() =>
-                    selectedEllipse && void updateSelectedEllipse({ rotationDegrees: selectedEllipse.rotationDegrees + 5 })
-                  }
-                  data-testid="rotate-training-ellipse-button"
-                >
-                  <RotateCw size={18} />
-                  Rotate
-                </button>
-                <button
-                  type="button"
-                  disabled={!selectedEllipse || cropLocked}
-                  onClick={() => void deleteSelectedEllipse()}
-                  data-testid="delete-training-ellipse-button"
-                >
-                  <Trash2 size={18} />
-                  Delete
-                </button>
-                <button
-                  type="button"
-                  disabled={!selectedEllipse || cropLocked}
-                  onClick={() =>
-                    selectedEllipse &&
-                    void updateSelectedEllipse({
-                      centerX: selectedEllipse.centerX + 5
-                    })
-                  }
-                  data-testid="nudge-training-ellipse-right-button"
-                >
-                  Nudge right
-                </button>
-                <button
-                  type="button"
-                  disabled={!selectedEllipse || cropLocked}
-                  onClick={() =>
-                    selectedEllipse &&
-                    void updateSelectedEllipse({
-                      radiusX: selectedEllipse.radiusX + 5
-                    })
-                  }
-                  data-testid="widen-training-ellipse-button"
-                >
-                  Widen
-                </button>
               </div>
 
               <div className="metadata-panel crop-completion-controls">
