@@ -248,6 +248,17 @@ label span {
   color: #23572d;
 }
 
+.intent-badge {
+  background: #eef3f8;
+  border: 1px solid #cad9e3;
+  border-radius: 6px;
+  color: #244962;
+  font-size: 0.84rem;
+  font-weight: 800;
+  margin-bottom: 0;
+  padding: 9px;
+}
+
 .upload-panel {
   grid-template-columns: minmax(0, 1fr) minmax(160px, 220px);
 }
@@ -306,6 +317,45 @@ label span {
 .outcome.accepted {
   background: #eaf7ec;
   color: #24592d;
+}
+
+.photo-list-panel {
+  background: #ffffff;
+  border: 1px solid #dce2d7;
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+}
+
+.photo-list {
+  display: grid;
+  gap: 10px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.photo-list li {
+  align-items: center;
+  background: #f7f9f5;
+  border: 1px solid #dce2d7;
+  border-radius: 8px;
+  display: flex;
+  gap: 10px;
+  min-height: 58px;
+  padding: 10px;
+}
+
+.photo-list strong {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.photo-list p {
+  color: #566052;
+  font-size: 0.84rem;
+  margin-bottom: 0;
 }
 
 .analysis-panel {

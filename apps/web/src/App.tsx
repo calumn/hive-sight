@@ -23,6 +23,7 @@ import {
   fetchCoreHealth,
   fetchDatasetLabellingEvidence,
   fetchDevSession,
+  fetchInspectionPhotos,
   fetchInspectionPhotoObjectUrl,
   processAnalysisRun,
   startDatasetLabellingSession,
@@ -41,6 +42,8 @@ import {
   type DatasetRole,
   type ImageQualityStatus,
   type Inspection,
+  type InspectionIntent,
+  type InspectionPhoto,
   type PhotoIntake,
   type ReviewDecisionValue
 } from "./coreApiClient";
@@ -65,6 +68,7 @@ export function App() {
   const [apiary, setApiary] = useState<Apiary | null>(null);
   const [hive, setHive] = useState<Hive | null>(null);
   const [inspection, setInspection] = useState<Inspection | null>(null);
+  const [inspectionPhotos, setInspectionPhotos] = useState<InspectionPhoto[]>([]);
   const [analysisDetail, setAnalysisDetail] = useState<AnalysisRunDetail | null>(null);
   const [analysisEvidence, setAnalysisEvidence] = useState<AnalysisEvidence | null>(null);
   const [evidenceImageUrl, setEvidenceImageUrl] = useState<string | null>(null);
@@ -80,6 +84,8 @@ export function App() {
   const [apiaryName, setApiaryName] = useState("Home apiary");
   const [hiveName, setHiveName] = useState("Hive A");
   const [inspectionDate, setInspectionDate] = useState(new Date().toISOString().slice(0, 10));
+  const [inspectionIntent, setInspectionIntent] =
+    useState<InspectionIntent>("varroa_assessment");
   const [file, setFile] = useState<File | null>(null);
 
   useEffect(() => {
@@ -104,6 +110,8 @@ export function App() {
   const canCreateHive = Boolean(apiary);
   const canCreateInspection = Boolean(hive);
   const canUpload = Boolean(termsAccepted && inspection && file);
+  const isTrainingDataCollection = inspection?.intent === "training_data_collection";
+  const isVarroaAssessment = inspection?.intent === "varroa_assessment";
   const selectedFileLabel = useMemo(() => {
     if (!file) {
       return "No photo selected";
@@ -149,6 +157,7 @@ export function App() {
       setApiary(created);
       setHive(null);
       setInspection(null);
+      setInspectionPhotos([]);
       setAnalysisDetail(null);
       clearEvidenceImage();
       clearLabellingImage();
@@ -164,6 +173,7 @@ export function App() {
       const created = await createHive({ devUserId, apiaryId: apiary.apiaryId, name: hiveName });
       setHive(created);
       setInspection(null);
+      setInspectionPhotos([]);
       setAnalysisDetail(null);
       clearEvidenceImage();
       clearLabellingImage();
@@ -179,9 +189,11 @@ export function App() {
       const created = await createInspection({
         devUserId,
         hiveId: hive.hiveId,
-        inspectionDate
+        inspectionDate,
+        intent: inspectionIntent
       });
       setInspection(created);
+      setInspectionPhotos([]);
       setAnalysisDetail(null);
       clearEvidenceImage();
       clearLabellingImage();
@@ -201,11 +213,25 @@ export function App() {
         file
       });
       await refreshSession();
+      await refreshInspectionPhotos();
       setAnalysisDetail(null);
       clearEvidenceImage();
       clearLabellingImage();
       setActionState({ kind: "accepted", intake });
     });
+  }
+
+  async function refreshInspectionPhotos() {
+    if (!session || !inspection) {
+      return;
+    }
+    const listing = await fetchInspectionPhotos({
+      devUserId,
+      workspaceId: session.workspaceId,
+      inspectionId: inspection.inspectionId
+    });
+    setInspection(listing.inspection);
+    setInspectionPhotos(listing.photos);
   }
 
   async function onProcessAnalysis() {
@@ -544,6 +570,19 @@ export function App() {
                   data-testid="inspection-date-input"
                 />
                 </label>
+                <label>
+                  <span>Intent</span>
+                  <select
+                    value={inspectionIntent}
+                    onChange={(event) =>
+                      setInspectionIntent(event.target.value as InspectionIntent)
+                    }
+                    data-testid="inspection-intent-select"
+                  >
+                    <option value="varroa_assessment">Varroa assessment</option>
+                    <option value="training_data_collection">Training data collection</option>
+                  </select>
+                </label>
                 <button
                   type="submit"
                   disabled={!canCreateInspection || actionState.kind === "working"}
@@ -552,6 +591,11 @@ export function App() {
                   Create inspection
                 </button>
                 <RecordBadge value={inspection?.inspectionId} />
+                {inspection ? (
+                  <p className="intent-badge" data-testid="inspection-intent-badge">
+                    {formatInspectionIntent(inspection.intent)}
+                  </p>
+                ) : null}
               </form>
             </div>
 
@@ -578,21 +622,27 @@ export function App() {
               </button>
             </form>
 
+            {inspection ? (
+              <InspectionPhotoListPanel photos={inspectionPhotos} intent={inspection.intent} />
+            ) : null}
+
             <Outcome state={actionState} analysisDetail={analysisDetail} />
             {actionState.kind === "accepted" ? (
               <>
-                <AnalysisPanel
-                  analysisRunId={actionState.intake.analysisRun.analysisRunId}
-                  queuedStatus={actionState.intake.analysisRun.status}
-                  detail={analysisDetail}
-                  evidence={analysisEvidence}
-                  imageUrl={evidenceImageUrl}
-                  reviewerCapability={loadState.session.reviewerCapability}
-                  reviewState={reviewState}
-                  onProcessAnalysis={onProcessAnalysis}
-                  onSubmitReviewDecision={onSubmitReviewDecision}
-                />
-                {loadState.session.datasetCuratorCapability ? (
+                {isVarroaAssessment ? (
+                  <AnalysisPanel
+                    analysisRunId={actionState.intake.analysisRun.analysisRunId}
+                    queuedStatus={actionState.intake.analysisRun.status}
+                    detail={analysisDetail}
+                    evidence={analysisEvidence}
+                    imageUrl={evidenceImageUrl}
+                    reviewerCapability={loadState.session.reviewerCapability}
+                    reviewState={reviewState}
+                    onProcessAnalysis={onProcessAnalysis}
+                    onSubmitReviewDecision={onSubmitReviewDecision}
+                  />
+                ) : null}
+                {isTrainingDataCollection && loadState.session.datasetCuratorCapability ? (
                   <DatasetLabellingPanel
                     evidence={labellingEvidence}
                     imageUrl={labellingImageUrl}
@@ -642,6 +692,49 @@ function RecordBadge({ value }: { value: string | undefined }) {
   return (
     <p className={value ? "record-badge ready" : "record-badge"}>{value ? value : "Pending"}</p>
   );
+}
+
+function InspectionPhotoListPanel({
+  photos,
+  intent
+}: {
+  photos: InspectionPhoto[];
+  intent: InspectionIntent;
+}) {
+  return (
+    <section
+      className="photo-list-panel"
+      aria-label="Inspection photos"
+      data-testid="inspection-photo-list"
+    >
+      <div className="analysis-header">
+        <PanelHeading icon={<Image size={20} />} title="Inspection photos" />
+        <span className="analysis-status status-queued">{formatInspectionIntent(intent)}</span>
+      </div>
+      {photos.length === 0 ? (
+        <p className="analysis-caveat">No photos uploaded for this Inspection yet.</p>
+      ) : (
+        <ul className="photo-list">
+          {photos.map((photo) => (
+            <li key={photo.inspectionPhotoId} data-testid="inspection-photo-list-item">
+              <FileImage size={18} />
+              <div>
+                <strong>{photo.filename}</strong>
+                <p>
+                  {photo.uploadStatus} / {Math.round(photo.sizeBytes / 1024)} KB /{" "}
+                  {new Date(photo.uploadedAt).toLocaleString()}
+                </p>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function formatInspectionIntent(intent: InspectionIntent) {
+  return intent === "training_data_collection" ? "Training data collection" : "Varroa assessment";
 }
 
 function Outcome({

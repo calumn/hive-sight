@@ -120,7 +120,11 @@ def beekeeper_has_uploaded_photo(slice_context: SliceContext) -> None:
     ).json()["hive_id"]
     inspection_id = slice_context.client.post(
         "/v1/inspections",
-        json={"hive_id": hive_id, "inspection_date": str(date(2026, 7, 29))},
+        json={
+            "hive_id": hive_id,
+            "inspection_date": str(date(2026, 7, 29)),
+            "intent": "training_data_collection",
+        },
         headers={"x-hivesight-dev-user-id": str(CURATOR_USER_ID)},
     ).json()["inspection_id"]
     intake = slice_context.client.post(

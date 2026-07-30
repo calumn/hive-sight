@@ -21,6 +21,11 @@ class UploadStatus(StrEnum):
     accepted = "accepted"
 
 
+class InspectionIntent(StrEnum):
+    training_data_collection = "training_data_collection"
+    varroa_assessment = "varroa_assessment"
+
+
 class AnnotationType(StrEnum):
     complete_visible_bee = "complete_visible_bee"
     partial_visible_bee = "partial_visible_bee"
@@ -172,6 +177,7 @@ class HiveResponse(BaseModel):
 class InspectionCreateRequest(BaseModel):
     hive_id: UUID
     inspection_date: date
+    intent: InspectionIntent
 
 
 class InspectionResponse(BaseModel):
@@ -179,6 +185,12 @@ class InspectionResponse(BaseModel):
     hive_id: UUID
     workspace_id: UUID
     inspection_date: date
+    intent: InspectionIntent
+
+
+class InspectionIntentUpdateRequest(BaseModel):
+    workspace_id: UUID
+    intent: InspectionIntent
 
 
 class InspectionPhotoResponse(BaseModel):
@@ -192,6 +204,11 @@ class InspectionPhotoResponse(BaseModel):
     upload_status: UploadStatus
     uploaded_by_user_id: UUID
     uploaded_at: datetime
+
+
+class InspectionPhotoListResponse(BaseModel):
+    inspection: InspectionResponse
+    photos: list[InspectionPhotoResponse]
 
 
 class PhotoIntakeResponse(BaseModel):

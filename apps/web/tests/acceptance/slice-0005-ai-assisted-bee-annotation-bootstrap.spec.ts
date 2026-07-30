@@ -23,12 +23,13 @@ test("Dataset Curator reviews AI-assisted bee draft annotations", async ({ page 
   await expect(page.getByTestId("create-inspection-button")).toBeEnabled();
 
   await page.getByTestId("inspection-date-input").fill("2026-07-29");
+  await page.getByTestId("inspection-intent-select").selectOption("training_data_collection");
   await page.getByTestId("create-inspection-button").click();
 
   await page.getByTestId("inspection-photo-input").setInputFiles(fixtureImagePath);
   await expect(page.getByText("bee-frame-test.png")).toBeVisible();
   await page.getByTestId("upload-photo-button").click();
-  await expect(page.getByText("Analysis queued")).toBeVisible();
+  await expect(page.getByTestId("inspection-photo-list")).toContainText("bee-frame-test.png");
 
   const labellingPanel = page.getByTestId("dataset-labelling-panel");
   await expect(labellingPanel).toBeVisible();

@@ -25,11 +25,12 @@ test("Dataset Curator assigns reviewed bee evidence to a protected benchmark ite
   await expect(page.getByTestId("create-inspection-button")).toBeEnabled();
 
   await page.getByTestId("inspection-date-input").fill("2026-07-29");
+  await page.getByTestId("inspection-intent-select").selectOption("training_data_collection");
   await page.getByTestId("create-inspection-button").click();
 
   await page.getByTestId("inspection-photo-input").setInputFiles(fixtureImagePath);
   await page.getByTestId("upload-photo-button").click();
-  await expect(page.getByText("Analysis queued")).toBeVisible();
+  await expect(page.getByTestId("inspection-photo-list")).toContainText("bee-frame-test.png");
 
   await page.getByTestId("start-dataset-labelling-button").click();
   await expect(page.getByTestId("dataset-evidence-panel")).toBeVisible();

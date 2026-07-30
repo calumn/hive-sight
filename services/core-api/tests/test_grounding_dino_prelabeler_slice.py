@@ -308,7 +308,11 @@ def _upload_inspection_photo(client: TestClient) -> tuple[str, str]:
     ).json()["hive_id"]
     inspection_id = client.post(
         "/v1/inspections",
-        json={"hive_id": hive_id, "inspection_date": str(date(2026, 7, 29))},
+        json={
+            "hive_id": hive_id,
+            "inspection_date": str(date(2026, 7, 29)),
+            "intent": "training_data_collection",
+        },
         headers={"x-hivesight-dev-user-id": str(CURATOR_USER_ID)},
     ).json()["inspection_id"]
     intake_response = client.post(

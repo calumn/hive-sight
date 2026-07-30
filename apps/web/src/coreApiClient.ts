@@ -27,26 +27,36 @@ export type Hive = {
   name: string;
 };
 
+export type InspectionIntent = "training_data_collection" | "varroa_assessment";
+
 export type Inspection = {
   inspectionId: string;
   hiveId: string;
   workspaceId: string;
   inspectionDate: string;
+  intent: InspectionIntent;
+};
+
+export type InspectionPhoto = {
+  inspectionPhotoId: string;
+  inspectionId: string;
+  workspaceId: string;
+  originalObjectKey: string;
+  filename: string;
+  contentType: string;
+  sizeBytes: number;
+  uploadStatus: "accepted";
+  uploadedByUserId: string;
+  uploadedAt: string;
+};
+
+export type InspectionPhotoList = {
+  inspection: Inspection;
+  photos: InspectionPhoto[];
 };
 
 export type PhotoIntake = {
-  inspectionPhoto: {
-    inspectionPhotoId: string;
-    inspectionId: string;
-    workspaceId: string;
-    originalObjectKey: string;
-    filename: string;
-    contentType: string;
-    sizeBytes: number;
-    uploadStatus: "accepted";
-    uploadedByUserId: string;
-    uploadedAt: string;
-  };
+  inspectionPhoto: InspectionPhoto;
   analysisRun: {
     analysisRunId: string;
     inspectionPhotoId: string;
@@ -299,19 +309,38 @@ export async function createHive({
 export async function createInspection({
   devUserId,
   hiveId,
-  inspectionDate
+  inspectionDate,
+  intent
 }: {
   devUserId: string;
   hiveId: string;
   inspectionDate: string;
+  intent: InspectionIntent;
 }): Promise<Inspection> {
   const response = await fetch(`${coreApiUrl}/v1/inspections`, {
     method: "POST",
     headers: jsonHeaders(devUserId),
-    body: JSON.stringify({ hive_id: hiveId, inspection_date: inspectionDate })
+    body: JSON.stringify({ hive_id: hiveId, inspection_date: inspectionDate, intent })
   });
   await ensureOk(response);
   return parseInspection(await response.json());
+}
+
+export async function fetchInspectionPhotos({
+  devUserId,
+  workspaceId,
+  inspectionId
+}: {
+  devUserId: string;
+  workspaceId: string;
+  inspectionId: string;
+}): Promise<InspectionPhotoList> {
+  const params = new URLSearchParams({ workspace_id: workspaceId });
+  const response = await fetch(`${coreApiUrl}/v1/inspections/${inspectionId}/photos?${params}`, {
+    headers: devAuthHeaders(devUserId)
+  });
+  await ensureOk(response);
+  return parseInspectionPhotoList(await response.json());
 }
 
 export async function uploadInspectionPhoto({
@@ -616,27 +645,16 @@ function parseInspection(value: unknown): Inspection {
     inspectionId: requireString(record.inspection_id, "inspection_id"),
     hiveId: requireString(record.hive_id, "hive_id"),
     workspaceId: requireString(record.workspace_id, "workspace_id"),
-    inspectionDate: requireString(record.inspection_date, "inspection_date")
+    inspectionDate: requireString(record.inspection_date, "inspection_date"),
+    intent: requireInspectionIntent(record.intent)
   };
 }
 
 function parsePhotoIntake(value: unknown): PhotoIntake {
   const record = requireRecord(value, "Photo intake response");
-  const photo = requireRecord(record.inspection_photo, "Inspection photo response");
   const analysisRun = requireRecord(record.analysis_run, "Analysis run response");
   return {
-    inspectionPhoto: {
-      inspectionPhotoId: requireString(photo.inspection_photo_id, "inspection_photo_id"),
-      inspectionId: requireString(photo.inspection_id, "inspection_id"),
-      workspaceId: requireString(photo.workspace_id, "workspace_id"),
-      originalObjectKey: requireString(photo.original_object_key, "original_object_key"),
-      filename: requireString(photo.filename, "filename"),
-      contentType: requireString(photo.content_type, "content_type"),
-      sizeBytes: requireNumber(photo.size_bytes, "size_bytes"),
-      uploadStatus: requireUploadStatus(photo.upload_status),
-      uploadedByUserId: requireString(photo.uploaded_by_user_id, "uploaded_by_user_id"),
-      uploadedAt: requireString(photo.uploaded_at, "uploaded_at")
-    },
+    inspectionPhoto: parseInspectionPhoto(record.inspection_photo),
     analysisRun: {
       analysisRunId: requireString(analysisRun.analysis_run_id, "analysis_run_id"),
       inspectionPhotoId: requireString(analysisRun.inspection_photo_id, "inspection_photo_id"),
@@ -644,6 +662,30 @@ function parsePhotoIntake(value: unknown): PhotoIntake {
       queuedAt: requireString(analysisRun.queued_at, "queued_at"),
       message: requireString(analysisRun.message, "message")
     }
+  };
+}
+
+function parseInspectionPhotoList(value: unknown): InspectionPhotoList {
+  const record = requireRecord(value, "Inspection photo list response");
+  return {
+    inspection: parseInspection(record.inspection),
+    photos: requireArray(record.photos, "photos").map(parseInspectionPhoto)
+  };
+}
+
+function parseInspectionPhoto(value: unknown): InspectionPhoto {
+  const photo = requireRecord(value, "Inspection photo response");
+  return {
+    inspectionPhotoId: requireString(photo.inspection_photo_id, "inspection_photo_id"),
+    inspectionId: requireString(photo.inspection_id, "inspection_id"),
+    workspaceId: requireString(photo.workspace_id, "workspace_id"),
+    originalObjectKey: requireString(photo.original_object_key, "original_object_key"),
+    filename: requireString(photo.filename, "filename"),
+    contentType: requireString(photo.content_type, "content_type"),
+    sizeBytes: requireNumber(photo.size_bytes, "size_bytes"),
+    uploadStatus: requireUploadStatus(photo.upload_status),
+    uploadedByUserId: requireString(photo.uploaded_by_user_id, "uploaded_by_user_id"),
+    uploadedAt: requireString(photo.uploaded_at, "uploaded_at")
   };
 }
 
@@ -907,6 +949,13 @@ function requireUploadStatus(value: unknown): "accepted" {
     return value;
   }
   throw new Error("Core API response had an unexpected upload status");
+}
+
+function requireInspectionIntent(value: unknown): InspectionIntent {
+  if (value === "training_data_collection" || value === "varroa_assessment") {
+    return value;
+  }
+  throw new Error("Core API response had an unexpected inspection intent");
 }
 
 function requireAnalysisStatus(value: unknown): PhotoIntake["analysisRun"]["status"] {

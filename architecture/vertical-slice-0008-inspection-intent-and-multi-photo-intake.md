@@ -30,16 +30,32 @@ A Beekeeper can create an Inspection with either training data collection intent
 
 - Creating an Inspection requires one valid intent.
 - An Inspection cannot be created with mixed intents.
+- The UI makes the intent choice explicit at Inspection creation time, with `varroa_assessment` selected by default.
+- Inspection intent can be changed only while the Inspection has no photos.
 - An Inspection can contain multiple photos.
+- Multi-photo support may be repeated single-photo upload to the same Inspection; batch upload is deferred.
 - Each uploaded photo remains independently addressable and reviewable.
+- The first UI projection is a simple photo list/grid; frame and side grouping are deferred.
 - The UI makes the selected intent visible after creation.
 - Dataset labelling affordances are available only for training-data collection inspections.
+- Training-data collection photos appear as dataset labelling candidates without a separate "send to labelling" step.
 - Varroa assessment affordances are available only for Varroa assessment inspections.
+- Unknown Inspection intent values are rejected by the API.
+- Workspace Data Use Agreement acceptance is required for uploads under both intents.
+- The photo list shows basic uploaded-photo evidence only: filename, upload status, size, and upload time.
+
+## Locked Decisions
+
+- Training-data inspections retain Hive, Apiary, Workspace, and source traceability.
+- No persistence migration is needed in this slice because the current dev state is in-memory.
+- Permanent Bee Annotation Repository storage is deferred. Slice 0008 must not decide durable model-training storage mechanics beyond keeping source Inspection Photo provenance intact.
 
 ## Out Of Scope
 
 - Full frame inventory management.
 - Enforcing a maximum of 22 photos.
+- Batch photo upload.
+- Permanent Bee Annotation Repository storage.
 - Oriented ellipse annotation UI.
 - Model training.
 - Varroa analysis quality changes.

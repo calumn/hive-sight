@@ -519,7 +519,11 @@ def _create_queued_analysis_run(client: TestClient) -> tuple[str, str]:
     ).json()["hive_id"]
     inspection_id = client.post(
         "/v1/inspections",
-        json={"hive_id": hive_id, "inspection_date": str(date(2026, 7, 29))},
+        json={
+            "hive_id": hive_id,
+            "inspection_date": str(date(2026, 7, 29)),
+            "intent": "varroa_assessment",
+        },
         headers={"x-hivesight-dev-user-id": str(USER_ID)},
     ).json()["inspection_id"]
     intake = client.post(

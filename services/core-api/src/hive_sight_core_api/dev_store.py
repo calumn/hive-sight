@@ -21,6 +21,8 @@ from hive_sight_core_api.models import (
     DevSessionResponse,
     HiveResponse,
     ImageQualityStatus,
+    InspectionIntent,
+    InspectionPhotoListResponse,
     InspectionPhotoResponse,
     InspectionResponse,
     PrelabelerRunResponse,
@@ -171,6 +173,7 @@ class InMemoryProductDataStore:
         user: UserContext,
         hive_id: UUID,
         inspection_date: date,
+        intent: InspectionIntent,
     ) -> InspectionResponse:
         hive = self.hives.get(hive_id)
         if hive is None:
@@ -181,9 +184,29 @@ class InMemoryProductDataStore:
             hive_id=hive_id,
             workspace_id=hive.workspace_id,
             inspection_date=inspection_date,
+            intent=intent,
         )
         self.inspections[inspection.inspection_id] = inspection
         return inspection
+
+    def update_inspection_intent(
+        self,
+        user: UserContext,
+        workspace_id: UUID,
+        inspection_id: UUID,
+        intent: InspectionIntent,
+    ) -> InspectionResponse:
+        self.require_workspace_access(user, workspace_id)
+        inspection = self.require_inspection(workspace_id, inspection_id)
+        if any(photo.inspection_id == inspection_id for photo in self.inspection_photos.values()):
+            raise DomainError(
+                "inspection_intent_locked",
+                "Inspection intent cannot be changed after photos have been uploaded.",
+                409,
+            )
+        updated = inspection.model_copy(update={"intent": intent})
+        self.inspections[updated.inspection_id] = updated
+        return updated
 
     def require_workspace_access(self, user: UserContext, workspace_id: UUID) -> None:
         if workspace_id not in self.workspaces:
@@ -250,6 +273,23 @@ class InMemoryProductDataStore:
         )
         self.inspection_photos[inspection_photo_id] = photo
         return photo
+
+    def list_inspection_photos(
+        self,
+        user: UserContext,
+        workspace_id: UUID,
+        inspection_id: UUID,
+    ) -> InspectionPhotoListResponse:
+        self.require_workspace_access(user, workspace_id)
+        self.require_data_use_agreement(workspace_id)
+        inspection = self.require_inspection(workspace_id, inspection_id)
+        photos = [
+            photo
+            for photo in self.inspection_photos.values()
+            if photo.workspace_id == workspace_id and photo.inspection_id == inspection_id
+        ]
+        photos.sort(key=lambda photo: photo.uploaded_at)
+        return InspectionPhotoListResponse(inspection=inspection, photos=photos)
 
     def record_analysis_run(self, analysis_run: AnalysisRunResponse) -> AnalysisRunResponse:
         self.analysis_runs[analysis_run.analysis_run_id] = analysis_run
@@ -518,6 +558,13 @@ class InMemoryProductDataStore:
                 "inspection_photo_not_found",
                 "The requested Inspection Photo was not found in this Workspace.",
                 404,
+            )
+        inspection = self.require_inspection(workspace_id, photo.inspection_id)
+        if inspection.intent != InspectionIntent.training_data_collection:
+            raise DomainError(
+                "inspection_intent_not_for_dataset_labelling",
+                "Dataset labelling is available only for training data collection Inspections.",
+                409,
             )
         return photo
 

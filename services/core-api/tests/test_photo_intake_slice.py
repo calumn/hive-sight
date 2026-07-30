@@ -47,7 +47,11 @@ def test_photo_intake_accepts_image_for_authorized_workspace_with_terms() -> Non
         ).json()["hive_id"]
         inspection_id = client.post(
             "/v1/inspections",
-            json={"hive_id": hive_id, "inspection_date": str(date(2026, 7, 29))},
+            json={
+                "hive_id": hive_id,
+                "inspection_date": str(date(2026, 7, 29)),
+                "intent": "varroa_assessment",
+            },
             headers={"x-hivesight-dev-user-id": str(USER_ID)},
         ).json()["inspection_id"]
 
@@ -122,7 +126,11 @@ def test_photo_intake_rejects_workspace_without_data_use_agreement() -> None:
         ).json()["hive_id"]
         inspection_id = client.post(
             "/v1/inspections",
-            json={"hive_id": hive_id, "inspection_date": str(date(2026, 7, 29))},
+            json={
+                "hive_id": hive_id,
+                "inspection_date": str(date(2026, 7, 29)),
+                "intent": "varroa_assessment",
+            },
             headers={"x-hivesight-dev-user-id": str(USER_ID)},
         ).json()["inspection_id"]
 
@@ -204,7 +212,11 @@ def test_photo_intake_rejects_unsupported_content_type_and_large_file() -> None:
         ).json()["hive_id"]
         inspection_id = client.post(
             "/v1/inspections",
-            json={"hive_id": hive_id, "inspection_date": str(date(2026, 7, 29))},
+            json={
+                "hive_id": hive_id,
+                "inspection_date": str(date(2026, 7, 29)),
+                "intent": "varroa_assessment",
+            },
             headers={"x-hivesight-dev-user-id": str(USER_ID)},
         ).json()["inspection_id"]
 
