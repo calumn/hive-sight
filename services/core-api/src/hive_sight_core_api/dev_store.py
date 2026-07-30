@@ -1,7 +1,12 @@
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
+from hashlib import sha256
+from io import BytesIO
+import json
 from math import cos, radians, sin, sqrt
+from pathlib import Path
+import shutil
 from uuid import UUID, uuid4
 
 from hive_sight_core_api.models import (
@@ -21,6 +26,7 @@ from hive_sight_core_api.models import (
     DatasetRole,
     DataUseAgreementStatus,
     DevSessionResponse,
+    GeneratedDatasetExportFileEntry,
     HiveResponse,
     ImageQualityStatus,
     InspectionIntent,
@@ -31,6 +37,7 @@ from hive_sight_core_api.models import (
     OrientedBeeEllipseCreateRequest,
     OrientedBeeEllipseResponse,
     OrientedBeeEllipseUpdateRequest,
+    PhysicalYoloObbExportResponse,
     PrelabelerRunResponse,
     ReviewedEllipseSnapshot,
     ReviewDecisionResponse,
@@ -52,6 +59,12 @@ from hive_sight_core_api.models import (
     YoloObbImageEntry,
     YoloObbLabelEntry,
 )
+
+try:
+    from PIL import Image, UnidentifiedImageError
+except ImportError:  # pragma: no cover - dependency is declared for the Core API package.
+    Image = None
+    UnidentifiedImageError = Exception
 
 DEFAULT_DEV_REVIEWER_USER_ID = UUID("00000000-0000-0000-0000-000000000101")
 DEFAULT_DEV_DATASET_CURATOR_USER_ID = UUID("00000000-0000-0000-0000-000000000101")
@@ -1420,6 +1433,197 @@ class InMemoryProductDataStore:
             ),
         )
 
+    def create_physical_yolo_obb_export_package(
+        self,
+        user: UserContext,
+        workspace_id: UUID,
+        image_loader: Callable[[str], bytes | None],
+        export_root: Path,
+    ) -> PhysicalYoloObbExportResponse:
+        yolo_export = self.create_yolo_obb_export(user=user, workspace_id=workspace_id)
+        if not yolo_export.image_entries:
+            raise DomainError(
+                "no_dataset_items_for_physical_export",
+                "Create at least one training or validation Dataset Item before exporting a package.",
+                409,
+            )
+
+        export_dir = export_root / f"dataset-export-{yolo_export.export_id}"
+        if export_dir.exists():
+            raise DomainError(
+                "dataset_export_package_exists",
+                "A physical dataset export package already exists for this export id.",
+                409,
+            )
+
+        generated_files: list[GeneratedDatasetExportFileEntry] = []
+        try:
+            (export_dir / "images" / "train").mkdir(parents=True, exist_ok=False)
+            (export_dir / "images" / "val").mkdir(parents=True, exist_ok=False)
+            (export_dir / "labels" / "train").mkdir(parents=True, exist_ok=False)
+            (export_dir / "labels" / "val").mkdir(parents=True, exist_ok=False)
+
+            label_entries_by_item: dict[UUID, list[YoloObbLabelEntry]] = {}
+            for label_entry in yolo_export.label_entries:
+                label_entries_by_item.setdefault(label_entry.dataset_item_id, []).append(label_entry)
+
+            exported_items: list[dict[str, object]] = []
+            for index, image_entry in enumerate(yolo_export.image_entries, start=1):
+                dataset_item = self.dataset_items[image_entry.dataset_item_id]
+                labels = label_entries_by_item.get(dataset_item.dataset_item_id, [])
+                if not labels:
+                    raise DomainError(
+                        "dataset_item_has_no_reviewed_ellipses",
+                        "Physical export requires every included Dataset Item to have reviewed bee ellipses.",
+                        409,
+                    )
+                photo = self.inspection_photos.get(dataset_item.inspection_photo_id)
+                if photo is None:
+                    raise DomainError(
+                        "inspection_photo_not_found",
+                        "The source Inspection Photo for a Dataset Item was not found.",
+                        404,
+                    )
+                image_bytes = image_loader(photo.original_object_key)
+                if image_bytes is None:
+                    raise DomainError(
+                        "source_image_missing",
+                        "The source Inspection Photo bytes are missing from local object storage.",
+                        409,
+                    )
+
+                split_dir = _physical_split_dir(dataset_item.dataset_role)
+                filename_stem = f"bee-crop-{index:06d}-{dataset_item.dataset_item_id.hex[:8]}"
+                image_relative_path = f"images/{split_dir}/{filename_stem}.png"
+                label_relative_path = f"labels/{split_dir}/{filename_stem}.txt"
+                crop_png = _render_training_crop_png(
+                    image_bytes=image_bytes,
+                    dataset_item=dataset_item,
+                )
+                label_text = "\n".join(label.label for label in labels) + "\n"
+
+                image_path = export_dir / image_relative_path
+                label_path = export_dir / label_relative_path
+                image_path.write_bytes(crop_png)
+                label_path.write_text(label_text, encoding="utf-8")
+
+                image_file = _generated_file_entry(
+                    export_dir=export_dir,
+                    relative_path=image_relative_path,
+                    file_kind="image",
+                    split=split_dir,
+                    dataset_item=dataset_item,
+                    filename_stem=filename_stem,
+                )
+                label_file = _generated_file_entry(
+                    export_dir=export_dir,
+                    relative_path=label_relative_path,
+                    file_kind="label",
+                    split=split_dir,
+                    dataset_item=dataset_item,
+                    filename_stem=filename_stem,
+                )
+                generated_files.extend([image_file, label_file])
+                exported_items.append(
+                    {
+                        "dataset_item_id": str(dataset_item.dataset_item_id),
+                        "training_crop_id": str(dataset_item.training_crop_id),
+                        "inspection_photo_id": str(dataset_item.inspection_photo_id),
+                        "original_filename": photo.filename,
+                        "dataset_role": dataset_item.dataset_role,
+                        "export_filename_stem": filename_stem,
+                        "image_file": image_file.model_dump(mode="json"),
+                        "label_file": label_file.model_dump(mode="json"),
+                        "label_rows": [label.label for label in labels],
+                        "provenance": (
+                            dataset_item.provenance.model_dump(mode="json")
+                            if dataset_item.provenance
+                            else None
+                        ),
+                    }
+                )
+
+            dataset_yaml_path = export_dir / "dataset.yaml"
+            dataset_yaml_path.write_text(_dataset_yaml_text(yolo_export.class_map), encoding="utf-8")
+            dataset_yaml_file = _generated_file_entry(
+                export_dir=export_dir,
+                relative_path="dataset.yaml",
+                file_kind="dataset_yaml",
+                split="metadata",
+                dataset_item=None,
+                filename_stem=None,
+            )
+            generated_files.append(dataset_yaml_file)
+
+            manifest = {
+                "export_id": str(yolo_export.export_id),
+                "workspace_id": str(workspace_id),
+                "export_format": "yolo_obb",
+                "label_convention": yolo_export.label_convention,
+                "coordinate_basis": yolo_export.coordinate_basis,
+                "created_by_user_id": str(user.user_id),
+                "created_at": yolo_export.created_at.isoformat(),
+                "class_map": yolo_export.class_map,
+                "training_item_count": yolo_export.training_item_count,
+                "validation_item_count": yolo_export.validation_item_count,
+                "benchmark_item_count": yolo_export.benchmark_item_count,
+                "excluded_item_count": len(yolo_export.excluded_dataset_items),
+                "included_dataset_item_ids": [
+                    str(dataset_item_id) for dataset_item_id in yolo_export.included_dataset_item_ids
+                ],
+                "protected_benchmark_dataset_item_ids": [
+                    str(dataset_item_id)
+                    for dataset_item_id in yolo_export.protected_benchmark_dataset_item_ids
+                ],
+                "excluded_dataset_items": [
+                    item.model_dump(mode="json") for item in yolo_export.excluded_dataset_items
+                ],
+                "exported_items": exported_items,
+                "generated_files": [
+                    file.model_dump(mode="json") for file in generated_files
+                ],
+                "caveat": yolo_export.caveat,
+            }
+            manifest_path = export_dir / "manifest.json"
+            manifest_path.write_text(
+                json.dumps(manifest, indent=2, sort_keys=True),
+                encoding="utf-8",
+            )
+            generated_files.append(
+                _generated_file_entry(
+                    export_dir=export_dir,
+                    relative_path="manifest.json",
+                    file_kind="manifest",
+                    split="metadata",
+                    dataset_item=None,
+                    filename_stem=None,
+                )
+            )
+        except Exception:
+            if export_dir.exists():
+                shutil.rmtree(export_dir, ignore_errors=True)
+            raise
+
+        return PhysicalYoloObbExportResponse(
+            export_id=yolo_export.export_id,
+            workspace_id=workspace_id,
+            export_format="yolo_obb",
+            package_path=str(export_dir),
+            manifest_path=str(export_dir / "manifest.json"),
+            dataset_yaml_path=str(export_dir / "dataset.yaml"),
+            created_by_user_id=user.user_id,
+            created_at=yolo_export.created_at,
+            class_map=yolo_export.class_map,
+            training_item_count=yolo_export.training_item_count,
+            validation_item_count=yolo_export.validation_item_count,
+            benchmark_item_count=yolo_export.benchmark_item_count,
+            excluded_item_count=len(yolo_export.excluded_dataset_items),
+            protected_benchmark_dataset_item_ids=yolo_export.protected_benchmark_dataset_item_ids,
+            excluded_dataset_items=yolo_export.excluded_dataset_items,
+            generated_files=generated_files,
+            caveat=yolo_export.caveat,
+        )
+
     def _dataset_item_provenance_for_training_crop(
         self,
         crop: TrainingCropResponse,
@@ -1535,6 +1739,7 @@ class DevState:
     object_storage: InMemoryObjectStorage
     event_recorder: InMemoryEventRecorder
     upload_policy: UploadPolicy
+    dataset_export_root: Path = Path("var/exports/datasets")
 
 
 class DomainError(Exception):
@@ -1614,4 +1819,106 @@ def _ellipse_to_crop_normalized_obb_points(
             ]
         )
     return points
+
+
+def _physical_split_dir(dataset_role: DatasetRole) -> str:
+    if dataset_role == DatasetRole.training:
+        return "train"
+    if dataset_role == DatasetRole.validation:
+        return "val"
+    raise DomainError(
+        "dataset_role_not_exportable",
+        "Physical YOLO OBB packages export training and validation Dataset Items only.",
+        409,
+    )
+
+
+def _render_training_crop_png(
+    image_bytes: bytes,
+    dataset_item: DatasetItemResponse,
+) -> bytes:
+    if Image is None:
+        raise DomainError(
+            "image_export_dependency_missing",
+            "Pillow is required to create physical dataset export packages.",
+            500,
+        )
+    if (
+        dataset_item.crop_x is None
+        or dataset_item.crop_y is None
+        or dataset_item.crop_width is None
+        or dataset_item.crop_height is None
+    ):
+        raise DomainError(
+            "dataset_item_missing_crop_geometry",
+            "Physical export requires crop-sourced Dataset Items.",
+            409,
+        )
+    try:
+        source_image = Image.open(BytesIO(image_bytes)).convert("RGB")
+    except (UnidentifiedImageError, OSError) as exc:
+        raise DomainError(
+            "source_image_unreadable",
+            "The source Inspection Photo could not be read for physical export.",
+            409,
+        ) from exc
+
+    crop_box = (
+        dataset_item.crop_x,
+        dataset_item.crop_y,
+        dataset_item.crop_x + dataset_item.crop_width,
+        dataset_item.crop_y + dataset_item.crop_height,
+    )
+    if (
+        crop_box[0] < 0
+        or crop_box[1] < 0
+        or crop_box[2] > source_image.width
+        or crop_box[3] > source_image.height
+    ):
+        raise DomainError(
+            "training_crop_outside_source_image",
+            "The Training Crop cannot be rendered from the available source image dimensions.",
+            409,
+        )
+    crop = source_image.crop(crop_box)
+    output = BytesIO()
+    crop.save(output, format="PNG")
+    return output.getvalue()
+
+
+def _generated_file_entry(
+    export_dir: Path,
+    relative_path: str,
+    file_kind: str,
+    split: str,
+    dataset_item: DatasetItemResponse | None,
+    filename_stem: str | None,
+) -> GeneratedDatasetExportFileEntry:
+    file_path = export_dir / relative_path
+    file_bytes = file_path.read_bytes()
+    return GeneratedDatasetExportFileEntry(
+        relative_path=relative_path,
+        file_kind=file_kind,
+        split=split,
+        dataset_item_id=dataset_item.dataset_item_id if dataset_item else None,
+        training_crop_id=dataset_item.training_crop_id if dataset_item else None,
+        inspection_photo_id=dataset_item.inspection_photo_id if dataset_item else None,
+        export_filename_stem=filename_stem,
+        size_bytes=len(file_bytes),
+        sha256=sha256(file_bytes).hexdigest(),
+    )
+
+
+def _dataset_yaml_text(class_map: dict[str, str]) -> str:
+    names = "\n".join(
+        f"  {class_id}: {class_name}" for class_id, class_name in sorted(class_map.items())
+    )
+    return (
+        "path: .\n"
+        "train: images/train\n"
+        "val: images/val\n"
+        "names:\n"
+        f"{names}\n"
+        "# HiveSight: YOLO OBB labels derived from canonical oriented bee ellipses.\n"
+    )
     TrainingCropDatasetItemCreateRequest,

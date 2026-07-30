@@ -5,6 +5,7 @@ description = "Product-facing Core API for HiveSight."
 requires-python = ">=3.12"
 dependencies = [
   "fastapi>=0.115,<1.0",
+  "pillow>=10.0,<12.0",
   "uvicorn[standard]>=0.32,<1.0"
 ]
 
@@ -16,7 +17,6 @@ dev = [
   "ruff>=0.8,<1.0"
 ]
 grounding-dino = [
-  "pillow>=10.0,<12.0",
   "torch>=2.3,<3.0",
   "torchvision>=0.18,<1.0",
   "transformers>=4.50,<6.0"

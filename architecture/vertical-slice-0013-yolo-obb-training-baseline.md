@@ -1,8 +1,10 @@
-# Vertical Slice 0011: YOLO OBB Training Baseline
+# Vertical Slice 0013: YOLO OBB Training Baseline
 
 ## Purpose
 
 Create the first repeatable HiveSight Bee Detector training baseline using reviewed crop-level oriented bee ellipses exported to YOLO OBB labels.
+
+This slice should follow physical dataset packaging and hive/frame metadata work so the first training run has a real local dataset package and enough source context to interpret early model behaviour.
 
 ## Source Inputs
 
@@ -10,6 +12,8 @@ Create the first repeatable HiveSight Bee Detector training baseline using revie
 - `requirements/model-requirements.md`
 - `architecture/adr/0002-oriented-ellipse-canonical-bee-annotations.md`
 - `architecture/domain-model.md`
+- `architecture/vertical-slice-0011-physical-dataset-export-package.md`
+- `architecture/vertical-slice-0012-hive-configuration-and-frame-standard-metadata.md`
 
 ## User Outcome
 
@@ -17,8 +21,7 @@ A Dataset Curator or model reviewer can export reviewed bee evidence into a YOLO
 
 ## Thin Slice
 
-- Export reviewed oriented bee ellipses into YOLO OBB format.
-- Package training and validation Dataset Items into a repeatable local training folder.
+- Use a physical YOLO OBB dataset export package as training input.
 - Run a first YOLO OBB nano or small training job when enough local reviewed data exists.
 - Record Training Run metadata.
 - Record Model Candidate metadata.
@@ -27,8 +30,8 @@ A Dataset Curator or model reviewer can export reviewed bee evidence into a YOLO
 ## Acceptance Criteria
 
 - Exported labels are derived from reviewed oriented bee ellipses.
-- The export records which Dataset Version or Dataset Items were used.
-- Benchmark Dataset Items are excluded from training export.
+- The training run records which physical export package was used.
+- Benchmark Dataset Items are excluded from training input.
 - A Training Run records model family, training settings, source data, start/end time, status, and outcome.
 - A Model Candidate is created separately from any approved user-facing Model Version.
 - The baseline report does not claim production suitability.
@@ -43,7 +46,7 @@ A Dataset Curator or model reviewer can export reviewed bee evidence into a YOLO
 
 ## Test Notes
 
-- Add tests for ellipse-to-OBB conversion.
-- Add tests proving benchmark items are excluded from training export.
+- Add tests proving the training adapter consumes the physical export package shape.
+- Add tests proving benchmark items are excluded from training input.
 - Add tests for Training Run and Model Candidate records.
 - Add a verification report section for model export/training artifacts.

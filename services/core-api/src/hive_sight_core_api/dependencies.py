@@ -1,6 +1,7 @@
 from collections.abc import Callable
 from datetime import UTC, datetime
 from functools import lru_cache
+from pathlib import Path
 from typing import Annotated
 from uuid import UUID
 
@@ -32,6 +33,8 @@ from hive_sight_core_api.grounding_dino_prelabeler import (
 from hive_sight_core_api.inspection_photo_access import InspectionPhotoAccess
 from hive_sight_core_api.settings import Settings, load_settings
 
+DEFAULT_DATASET_EXPORT_ROOT = Path(__file__).resolve().parents[4] / "var" / "exports" / "datasets"
+
 
 @lru_cache
 def get_settings() -> Settings:
@@ -47,6 +50,7 @@ def build_dev_state(
     id_values: list[UUID] | None = None,
     clock: Callable[[], datetime] = lambda: datetime.now(UTC),
     max_upload_size_bytes: int = 15 * 1024 * 1024,
+    dataset_export_root: Path = DEFAULT_DATASET_EXPORT_ROOT,
 ) -> DevState:
     id_factory = deterministic_id_factory(id_values) if id_values is not None else None
     store = InMemoryProductDataStore(
@@ -58,6 +62,7 @@ def build_dev_state(
         object_storage=InMemoryObjectStorage(),
         event_recorder=InMemoryEventRecorder(),
         upload_policy=UploadPolicy(max_size_bytes=max_upload_size_bytes),
+        dataset_export_root=dataset_export_root,
     )
 
 

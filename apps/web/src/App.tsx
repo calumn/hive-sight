@@ -29,6 +29,7 @@ import {
   createInspection,
   createDatasetItem,
   createTrainingCropDatasetItem,
+  createPhysicalYoloObbExport,
   createYoloObbExport,
   createReviewDecision,
   deleteTrainingCropEllipse,
@@ -64,6 +65,7 @@ import {
   type InspectionIntent,
   type InspectionPhoto,
   type OrientedBeeEllipse,
+  type PhysicalYoloObbExport,
   type PhotoIntake,
   type ReviewDecisionValue,
   type TrainingCrop,
@@ -1025,6 +1027,8 @@ function TrainingCropAnnotationPanel({
     useState<DatasetExclusionReason>("unsuitable_crop");
   const [trainingCropDatasetItem, setTrainingCropDatasetItem] = useState<DatasetItem | null>(null);
   const [yoloObbExport, setYoloObbExport] = useState<YoloObbExport | null>(null);
+  const [physicalYoloObbExport, setPhysicalYoloObbExport] =
+    useState<PhysicalYoloObbExport | null>(null);
   const [workingLabel, setWorkingLabel] = useState<string | null>(null);
 
   const selectedPhoto = photos.find((photo) => photo.inspectionPhotoId === selectedPhotoId) ?? null;
@@ -1318,6 +1322,13 @@ function TrainingCropAnnotationPanel({
     await runCropAction("Creating YOLO OBB export", async () => {
       const manifest = await createYoloObbExport({ devUserId, workspaceId });
       setYoloObbExport(manifest);
+    });
+  }
+
+  async function createPhysicalExportPackage() {
+    await runCropAction("Creating physical export package", async () => {
+      const physicalExport = await createPhysicalYoloObbExport({ devUserId, workspaceId });
+      setPhysicalYoloObbExport(physicalExport);
     });
   }
 
@@ -1824,6 +1835,15 @@ function TrainingCropAnnotationPanel({
                   <FileImage size={18} />
                   Export manifest
                 </button>
+                <button
+                  type="button"
+                  disabled={Boolean(workingLabel)}
+                  onClick={() => void createPhysicalExportPackage()}
+                  data-testid="create-physical-yolo-obb-export-button"
+                >
+                  <CloudUpload size={18} />
+                  Export package
+                </button>
                 <div className="review-state" data-testid="training-crop-dataset-item-state">
                   {trainingCropDatasetItem
                     ? `Dataset item: ${trainingCropDatasetItem.datasetRole} / ${trainingCropDatasetItem.reviewedEllipseSnapshots.length} ellipse snapshots`
@@ -1840,6 +1860,23 @@ function TrainingCropAnnotationPanel({
                     <span>Excluded {yoloObbExport.excludedDatasetItems.length}</span>
                     <span>Labels {yoloObbExport.labelEntries.length}</span>
                     <code>class x1 y1 x2 y2 x3 y3 x4 y4</code>
+                  </div>
+                ) : null}
+                {physicalYoloObbExport ? (
+                  <div
+                    className="export-summary package-summary"
+                    data-testid="physical-yolo-obb-export-summary"
+                  >
+                    <strong>{physicalYoloObbExport.exportFormat} package</strong>
+                    <span>Training {physicalYoloObbExport.trainingItemCount}</span>
+                    <span>Validation {physicalYoloObbExport.validationItemCount}</span>
+                    <span>Benchmark protected {physicalYoloObbExport.benchmarkItemCount}</span>
+                    <span>Excluded {physicalYoloObbExport.excludedItemCount}</span>
+                    <span>Files {physicalYoloObbExport.generatedFiles.length}</span>
+                    <code>{physicalYoloObbExport.packagePath}</code>
+                    <code>{physicalYoloObbExport.manifestPath}</code>
+                    <code>{physicalYoloObbExport.datasetYamlPath}</code>
+                    <p>{physicalYoloObbExport.caveat}</p>
                   </div>
                 ) : null}
               </div>

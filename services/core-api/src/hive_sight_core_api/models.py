@@ -469,6 +469,10 @@ class YoloObbExportRequest(BaseModel):
     workspace_id: UUID
 
 
+class PhysicalYoloObbExportRequest(BaseModel):
+    workspace_id: UUID
+
+
 class YoloObbLabelEntry(BaseModel):
     dataset_item_id: UUID
     training_crop_id: UUID
@@ -515,6 +519,38 @@ class YoloObbExportResponse(BaseModel):
     benchmark_item_count: int
     image_entries: list[YoloObbImageEntry]
     label_entries: list[YoloObbLabelEntry]
+    caveat: str
+
+
+class GeneratedDatasetExportFileEntry(BaseModel):
+    relative_path: str
+    file_kind: str
+    split: str
+    dataset_item_id: UUID | None = None
+    training_crop_id: UUID | None = None
+    inspection_photo_id: UUID | None = None
+    export_filename_stem: str | None = None
+    size_bytes: int
+    sha256: str
+
+
+class PhysicalYoloObbExportResponse(BaseModel):
+    export_id: UUID
+    workspace_id: UUID
+    export_format: str
+    package_path: str
+    manifest_path: str
+    dataset_yaml_path: str
+    created_by_user_id: UUID
+    created_at: datetime
+    class_map: dict[str, str]
+    training_item_count: int
+    validation_item_count: int
+    benchmark_item_count: int
+    excluded_item_count: int
+    protected_benchmark_dataset_item_ids: list[UUID]
+    excluded_dataset_items: list[YoloObbExcludedItem]
+    generated_files: list[GeneratedDatasetExportFileEntry]
     caveat: str
 
 

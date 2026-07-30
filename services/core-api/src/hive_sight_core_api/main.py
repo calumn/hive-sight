@@ -43,6 +43,8 @@ from hive_sight_core_api.models import (
     OrientedBeeEllipseCreateRequest,
     OrientedBeeEllipseResponse,
     OrientedBeeEllipseUpdateRequest,
+    PhysicalYoloObbExportRequest,
+    PhysicalYoloObbExportResponse,
     PhotoIntakeResponse,
     ProcessAnalysisRunRequest,
     ReviewDecisionCreateRequest,
@@ -434,6 +436,24 @@ def create_yolo_obb_export(
     state: DevStateDep,
 ) -> YoloObbExportResponse:
     return state.store.create_yolo_obb_export(user=user, workspace_id=request.workspace_id)
+
+
+@app.post(
+    "/v1/dataset-exports/yolo-obb/package",
+    response_model=PhysicalYoloObbExportResponse,
+    status_code=201,
+)
+def create_physical_yolo_obb_export_package(
+    request: PhysicalYoloObbExportRequest,
+    user: AuthenticatedUserDep,
+    state: DevStateDep,
+) -> PhysicalYoloObbExportResponse:
+    return state.store.create_physical_yolo_obb_export_package(
+        user=user,
+        workspace_id=request.workspace_id,
+        image_loader=state.object_storage.get_object,
+        export_root=state.dataset_export_root,
+    )
 
 
 @app.get(

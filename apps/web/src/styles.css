@@ -667,6 +667,14 @@ label span {
 
 .export-summary code {
   font-family: "SFMono-Regular", Consolas, monospace;
+  overflow-wrap: anywhere;
+}
+
+.package-summary p {
+  color: #515b4c;
+  flex-basis: 100%;
+  line-height: 1.4;
+  margin-bottom: 0;
 }
 
 .crop-draft-controls {

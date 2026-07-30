@@ -359,6 +359,38 @@ export type YoloObbExport = {
   caveat: string;
 };
 
+export type GeneratedDatasetExportFile = {
+  relativePath: string;
+  fileKind: "manifest" | "dataset_yaml" | "image" | "label";
+  split: "train" | "val" | "metadata";
+  datasetItemId: string | null;
+  trainingCropId: string | null;
+  inspectionPhotoId: string | null;
+  exportFilenameStem: string | null;
+  sizeBytes: number;
+  sha256: string;
+};
+
+export type PhysicalYoloObbExport = {
+  exportId: string;
+  workspaceId: string;
+  exportFormat: "yolo_obb";
+  packagePath: string;
+  manifestPath: string;
+  datasetYamlPath: string;
+  createdByUserId: string;
+  createdAt: string;
+  classMap: Record<string, string>;
+  trainingItemCount: number;
+  validationItemCount: number;
+  benchmarkItemCount: number;
+  excludedItemCount: number;
+  protectedBenchmarkDatasetItemIds: string[];
+  excludedDatasetItems: YoloObbExcludedItem[];
+  generatedFiles: GeneratedDatasetExportFile[];
+  caveat: string;
+};
+
 export type AnalysisRunDetail = {
   analysisRunId: string;
   workspaceId: string;
@@ -749,6 +781,22 @@ export async function createYoloObbExport({
   });
   await ensureOk(response);
   return parseYoloObbExport(await response.json());
+}
+
+export async function createPhysicalYoloObbExport({
+  devUserId,
+  workspaceId
+}: {
+  devUserId: string;
+  workspaceId: string;
+}): Promise<PhysicalYoloObbExport> {
+  const response = await fetch(`${coreApiUrl}/v1/dataset-exports/yolo-obb/package`, {
+    method: "POST",
+    headers: jsonHeaders(devUserId),
+    body: JSON.stringify({ workspace_id: workspaceId })
+  });
+  await ensureOk(response);
+  return parsePhysicalYoloObbExport(await response.json());
 }
 
 export async function createTrainingCrop({
@@ -1341,6 +1389,52 @@ function parseYoloObbExport(value: unknown): YoloObbExport {
   };
 }
 
+function parsePhysicalYoloObbExport(value: unknown): PhysicalYoloObbExport {
+  const record = requireRecord(value, "Physical YOLO OBB export response");
+  return {
+    exportId: requireString(record.export_id, "export_id"),
+    workspaceId: requireString(record.workspace_id, "workspace_id"),
+    exportFormat: requireYoloObbExportFormat(record.export_format),
+    packagePath: requireString(record.package_path, "package_path"),
+    manifestPath: requireString(record.manifest_path, "manifest_path"),
+    datasetYamlPath: requireString(record.dataset_yaml_path, "dataset_yaml_path"),
+    createdByUserId: requireString(record.created_by_user_id, "created_by_user_id"),
+    createdAt: requireString(record.created_at, "created_at"),
+    classMap: parseStringMap(record.class_map, "class_map"),
+    trainingItemCount: requireNumber(record.training_item_count, "training_item_count"),
+    validationItemCount: requireNumber(record.validation_item_count, "validation_item_count"),
+    benchmarkItemCount: requireNumber(record.benchmark_item_count, "benchmark_item_count"),
+    excludedItemCount: requireNumber(record.excluded_item_count, "excluded_item_count"),
+    protectedBenchmarkDatasetItemIds: requireArray(
+      record.protected_benchmark_dataset_item_ids,
+      "protected_benchmark_dataset_item_ids"
+    ).map((id) => requireString(id, "protected_benchmark_dataset_item_ids[]")),
+    excludedDatasetItems: requireArray(
+      record.excluded_dataset_items,
+      "excluded_dataset_items"
+    ).map(parseYoloObbExcludedItem),
+    generatedFiles: requireArray(record.generated_files, "generated_files").map(
+      parseGeneratedDatasetExportFile
+    ),
+    caveat: requireString(record.caveat, "caveat")
+  };
+}
+
+function parseGeneratedDatasetExportFile(value: unknown): GeneratedDatasetExportFile {
+  const record = requireRecord(value, "Generated dataset export file response");
+  return {
+    relativePath: requireString(record.relative_path, "relative_path"),
+    fileKind: requireGeneratedDatasetExportFileKind(record.file_kind),
+    split: requireGeneratedDatasetExportSplit(record.split),
+    datasetItemId: optionalString(record.dataset_item_id, "dataset_item_id"),
+    trainingCropId: optionalString(record.training_crop_id, "training_crop_id"),
+    inspectionPhotoId: optionalString(record.inspection_photo_id, "inspection_photo_id"),
+    exportFilenameStem: optionalString(record.export_filename_stem, "export_filename_stem"),
+    sizeBytes: requireNumber(record.size_bytes, "size_bytes"),
+    sha256: requireString(record.sha256, "sha256")
+  };
+}
+
 function parseYoloObbLabelEntry(value: unknown): YoloObbLabelEntry {
   const record = requireRecord(value, "YOLO OBB label entry response");
   return {
@@ -1646,6 +1740,22 @@ function requireYoloObbExportFormat(value: unknown): "yolo_obb" {
     return value;
   }
   throw new Error("Core API response had an unexpected export format");
+}
+
+function requireGeneratedDatasetExportFileKind(
+  value: unknown
+): "manifest" | "dataset_yaml" | "image" | "label" {
+  if (value === "manifest" || value === "dataset_yaml" || value === "image" || value === "label") {
+    return value;
+  }
+  throw new Error("Core API response had an unexpected generated file kind");
+}
+
+function requireGeneratedDatasetExportSplit(value: unknown): "train" | "val" | "metadata" {
+  if (value === "train" || value === "val" || value === "metadata") {
+    return value;
+  }
+  throw new Error("Core API response had an unexpected generated file split");
 }
 
 function requireDatasetExclusionReason(value: unknown): DatasetExclusionReason {
