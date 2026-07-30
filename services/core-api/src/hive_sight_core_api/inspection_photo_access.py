@@ -9,7 +9,7 @@ from hive_sight_core_api.dev_store import (
     UploadPolicy,
     UserContext,
 )
-from hive_sight_core_api.models import AnalysisRunRequest, PhotoIntakeResponse, UploadUrlResponse
+from hive_sight_core_api.models import AnalysisRunRequest, PhotoIntakeResponse
 
 
 @dataclass(frozen=True)
@@ -20,18 +20,6 @@ class InspectionPhotoAccess:
     object_storage: InMemoryObjectStorage | None = None
     analysis_workflow: AnalysisRequestWorkflow | None = None
     upload_policy: UploadPolicy = field(default_factory=UploadPolicy)
-    upload_url_expires_in_seconds: int = 900
-
-    def create_upload_access(self, inspection_photo_id: UUID) -> UploadUrlResponse:
-        object_key = f"inspection-photos/{inspection_photo_id}/original.jpg"
-
-        return UploadUrlResponse(
-            inspection_photo_id=inspection_photo_id,
-            upload_url=f"{self.object_storage_endpoint}/{self.object_storage_bucket}/{object_key}",
-            object_key=object_key,
-            expires_in_seconds=self.upload_url_expires_in_seconds,
-        )
-
     def accept_photo_for_analysis(
         self,
         user: UserContext,

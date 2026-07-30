@@ -42,6 +42,10 @@ create_upload_access(workspace_id, inspection_photo_id, filename, content_type, 
 create_view_access(workspace_id, inspection_photo_id, rendition)
 ```
 
+Current implementation note:
+
+Slice 0001 uses the Core API proxied upload path rather than a signed upload-url endpoint. Do not expose a public upload-url route until `create_upload_access(...)` enforces Workspace authorization, Workspace Data Use Agreement status, upload size, content type, object-key scope, expiry, and auditable issued-access metadata behind this module interface.
+
 Behaviour hidden behind the interface:
 
 - Workspace authorization checks

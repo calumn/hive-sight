@@ -60,7 +60,6 @@ from hive_sight_core_api.models import (
     TrainingCropResponse,
     TrainingCropUpdateRequest,
     UpdateDatasetLabellingSessionRequest,
-    UploadUrlResponse,
     WorkspaceDataUseAgreementAcceptanceRequest,
     WorkspaceDataUseAgreementAcceptanceResponse,
     YoloObbExportRequest,
@@ -253,14 +252,6 @@ def list_inspection_photos(
         workspace_id=workspace_id,
         inspection_id=inspection_id,
     )
-
-
-@app.get("/v1/inspection-photos/{inspection_photo_id}/upload-url", response_model=UploadUrlResponse)
-def create_upload_url(
-    inspection_photo_id: UUID,
-    photo_access: InspectionPhotoAccessDep,
-) -> UploadUrlResponse:
-    return photo_access.create_upload_access(inspection_photo_id)
 
 
 @app.post("/v1/inspection-photos/intake", response_model=PhotoIntakeResponse, status_code=202)

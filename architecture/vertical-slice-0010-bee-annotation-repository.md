@@ -1,5 +1,11 @@
 # Vertical Slice 0010: Bee Annotation Repository
 
+## Status
+
+Superseded by `architecture/vertical-slice-0010-bee-annotation-repository-and-dataset-export.md`.
+
+This earlier draft intentionally kept YOLO OBB export out of scope. The implemented Slice 0010 combined Bee Annotation Repository assignment with logical YOLO OBB dataset export, and later slices depend on that broader scope. Keep this file only as a historical draft; do not use it for implementation planning.
+
 ## Purpose
 
 Turn reviewed Training Crops and oriented bee ellipses into traceable Bee Annotation Repository evidence that can be assigned to dataset roles.

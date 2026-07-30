@@ -99,3 +99,77 @@ Human judgment still required:
 - Decide what public datasets are usable.
 - Define first benchmark size and review process.
 - Choose the first model or service for prototyping.
+
+### 2026-07-30 Architecture And Vertical Slice Delivery Baseline
+
+Human-confirmed decisions:
+
+- Use thin, demonstrable vertical slices rather than a large upfront platform build.
+- Keep Core API, Web UI, and Analysis Service as separate service boundaries.
+- Use API-level BDD scenarios for acceptance behaviour first.
+- Add browser acceptance tests once the local web harness was available.
+- Treat AI-assisted annotation as human-verified evidence, not automatic ground truth.
+- Start bee annotation with rotated ellipses because bee pose matters for training.
+- Use YOLO OBB as the first trainable model direction, while keeping model adapters swappable.
+- Separate inspection intent between training-data collection and Varroa assessment.
+- Require Hive Configuration from Slice 12 onward because frame standards can affect later statistics and bias analysis.
+
+AI contribution:
+
+- Proposed slice boundaries, test seams, and acceptance criteria from evolving product discussions.
+- Converted repeated human decisions into architecture notes, BDD scenarios, API tests, and browser acceptance tests.
+- Identified where model lifecycle concepts needed dedicated requirements before deeper model work.
+- Helped keep domain language stable across requirements, architecture, Python contracts, TypeScript client types, and UI copy.
+
+Human judgment still required:
+
+- Choose real persistence, queue, object-storage, auth, and deployment technologies.
+- Decide when the Analysis Service must be wired into the Core API flow rather than remaining a tested but orphaned service.
+- Decide whether UI-level Gherkin is still a required delivery standard or should be explicitly dropped.
+- Verify starter Hive Configuration frame dimensions before using them for production claims or calibration.
+
+### 2026-07-30 External Review Remediation Pause
+
+Human-confirmed decisions:
+
+- Pause new functional slices until the external review findings have been triaged and actioned.
+- Treat the unauthenticated unused upload-url endpoint as a real risk despite being unwired.
+- Resolve duplicate slice documentation before building more slices on top of it.
+- Resume this AI-SDLC observations log because it is part of the project's stated learning goal.
+
+AI contribution:
+
+- Verified the external findings against the current repository state.
+- Removed the dead upload-url route and its misleading test rather than preserving an unsafe future trap.
+- Marked the earlier, narrower Slice 0010 document as superseded by the implemented Slice 0010 export specification.
+- Added this observation entry to restore the feedback loop between delivery, review, and learning artifacts.
+
+Human judgment still required:
+
+- Decide how far to go before the next functional slice: immediate small fixes only, or a deeper architecture-debt slice.
+- Decide whether to extract authorization, validation, and geometry logic out of `dev_store.py` before adding persistence.
+- Decide whether to keep Analysis Service separate and wire it, or fold the current stub behaviour back into Core API until model work is real.
+
+### 2026-07-30 Skills Remediation And Parking Lot
+
+Human-confirmed decisions:
+
+- Implement the skills remediation rather than leaving it as a review document.
+- Keep generic `sdlc-*` skills reusable by moving HiveSight-specific defaults into a project-specific skill.
+- Create an explicit parking-lot artifact for important deferred work.
+- Review relevant parked items when planning new slices or remediation tranches.
+- Defer security, API contract governance, and release readiness skills until their trigger conditions arrive.
+
+AI contribution:
+
+- Created `hivesight-project-delivery-context`, `sdlc-governance-traceability-audit`, `sdlc-architecture-persistence-design`, and `sdlc-skills-library-review`.
+- Removed stale project-specific and borrowed-template guidance from generic skills.
+- Embedded concise closeout and parking-lot checks into high-use SDLC skills.
+- Added `architecture/parking-lot.md` with initial deferred items and revisit triggers.
+- Validated the skills library and updated `architecture/skills-remediation-2026-07-30.md` with completion evidence.
+
+Human judgment still required:
+
+- Revisit UI-level Gherkin before the next major UI workflow.
+- Create security, API contract governance, and release readiness skills when the parked triggers occur.
+- Use the traceability-audit skill before restarting functional slice delivery.
