@@ -15,6 +15,8 @@ The current scaffold is deliberately thin:
 
 This is acceptable as a starting skeleton. It should not become the long-term structure. The next step is to move behaviour out of route handlers and into modules with explicit interfaces.
 
+Slice 0013 accepted Postgres for durable product and model-governance metadata and kept the Analysis Service as a separate async boundary. See `architecture/adr/0003-postgres-for-durable-product-and-model-governance-metadata.md`, `architecture/adr/0004-keep-analysis-service-separate-and-integrate-through-async-workflow.md`, and `architecture/postgres-persistence-design.md`.
+
 ## Design Vocabulary
 
 Use these terms consistently in codebase design discussions:

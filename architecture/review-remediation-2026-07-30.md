@@ -35,7 +35,7 @@ Review Remediation 0001 moved Hive Configuration/Inspection gating, Training Cro
 
 ### R-002: Decide Analysis Service Integration Direction
 
-Status: open
+Status: actioned as architecture decision by Slice 0013
 
 Problem:
 
@@ -43,14 +43,11 @@ The Analysis Service is tested but not called by the Core API. Core API still ru
 
 Recommended next action:
 
-Choose one of two paths before real model work deepens:
-
-- Wire Core API to Analysis Service through an owned request/result contract.
-- Or fold the stub behaviour back into Core API until the model runtime warrants a separate service.
+ADR 0004 accepts keeping the Analysis Service separate and integrating it through an async workflow shape. The first implementation should use an in-memory queue adapter and owned request/result contracts before choosing durable queue technology.
 
 ### R-003: Resolve UI-Level Gherkin Commitment
 
-Status: open
+Status: actioned as delivery-standard decision by Slice 0013
 
 Problem:
 
@@ -58,11 +55,11 @@ Several slice documents state that UI-level Gherkin should be introduced soon, b
 
 Recommended next action:
 
-Either create a UI BDD harness slice or explicitly revise the delivery standard to keep UI acceptance in Playwright while API acceptance remains Gherkin.
+Keep API-level acceptance in Gherkin/pytest-bdd. Keep UI acceptance in Playwright specs plus generated verification reports for now. UI-level Gherkin remains parked as a future option in `PARK-0001`.
 
 ### R-004: Revisit Load-Bearing Architecture Decisions
 
-Status: open
+Status: partially actioned by Slice 0013
 
 Problem:
 
@@ -70,11 +67,11 @@ Several architecture questions remain open after twelve slices: auth provider, q
 
 Recommended next action:
 
-Run a dedicated architecture decision pass before persistence, queue integration, or production auth work starts.
+ADR 0003 accepts Postgres for durable product and model-governance metadata. Slice 0014 is the next persistence implementation slice. Object storage provider, durable queue technology, production auth provider, deployment platform, Analysis Store ownership, and production storage lifecycle remain parked with explicit triggers.
 
 ### R-005: Correct Varroa Traceability Claims
 
-Status: open
+Status: actioned as traceability correction by Slice 0013
 
 Problem:
 
@@ -82,7 +79,7 @@ Varroa detection is still the product goal, but delivered slices have intentiona
 
 Recommended next action:
 
-Review `architecture/domain-model.md`, `requirements/model-requirements.md`, and related traceability sections before starting Varroa-specific slices.
+Requirements and domain docs now distinguish the Varroa product/model goal from implemented bee-annotation and bee-detector training foundations. Varroa-specific functional/model slices should still be planned deliberately before implementation resumes in that area.
 
 ## Verification
 
@@ -92,6 +89,14 @@ Initial remediation verification:
 - Ruff: passed
 
 Review Remediation 0001 verification:
+
+- Core API tests: `83 passed, 1 xfailed`
+- Analysis Service tests: `2 passed`
+- Web TypeScript check: passed
+- Playwright browser acceptance tests: `10 passed`
+- `pnpm verify:slice`: passed
+
+Slice 0013 verification:
 
 - Core API tests: `83 passed, 1 xfailed`
 - Analysis Service tests: `2 passed`

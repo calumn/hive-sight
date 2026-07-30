@@ -105,7 +105,7 @@ Operations and release readiness.
 
 ## PARK-0005: Varroa Traceability Correction
 
-Status: parked
+Status: closed
 Date parked: 2026-07-30
 Source: HiveSight review
 Area: requirements and domain model
@@ -116,11 +116,11 @@ Varroa detection remains the product goal, but delivered slices have intentional
 
 Why parked:
 
-The current pause is focused on skills remediation and dev-store architecture remediation.
+Slice 0013 corrected the traceability status: Varroa detection remains the product/model goal, but implemented slices currently cover bee annotation, dataset foundations, and bee-detector training preparation rather than real Varroa detection.
 
 Revisit trigger:
 
-Before starting Varroa-specific functional slices or updating model requirements for Varroa detection.
+Closed by Slice 0013. Future Varroa-specific functional slices should still be planned from current requirements and model requirements before implementation.
 
 Suggested owner or area:
 
@@ -143,7 +143,7 @@ The review recommendations architecture decision pass must run first, and Slice 
 
 Revisit trigger:
 
-At Slice 0013 closeout for a `go`, `reshape`, `defer`, or `close` decision, and again after Slice 0014 Postgres-backed Bee Annotation Repository persistence is complete.
+Slice 0013 closeout decision: `go after Slice 0014`. Revisit after Slice 0014 Postgres-backed Bee Annotation Repository persistence is complete.
 
 Suggested owner or area:
 
@@ -166,7 +166,7 @@ This is useful and likely important for acceptance testing, but it should not be
 
 Revisit trigger:
 
-During Slice 0013 closeout, before starting Slice 0014. The team must decide whether the dev persona switcher becomes its own slice before persistence, immediately after persistence, or before the next role-specific UI acceptance flow.
+Slice 0013 closeout decision: keep this after Slice 0014 unless role-specific UI acceptance becomes the immediate next workflow. Revisit before the next role-specific UI acceptance flow.
 
 Suggested owner or area:
 

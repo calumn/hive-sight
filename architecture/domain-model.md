@@ -25,6 +25,8 @@ In scope:
 - explicit privacy/deletion gap capture
 - model version, dataset version, benchmark, and review concepts needed for model governance
 
+Implementation traceability note: some domain concepts are future-state concepts. As of Slice 0013, the implemented path is bee annotation, dataset foundations, Hive Configuration metadata, and preparation for a Bee Detector baseline. Real Varroa detection, Varroa Annotation review, Visible Varroa Rate calculation, Training Runs, Model Candidates, Model Versions, and Benchmark Evaluations are modelled concepts, not completed runtime behaviour.
+
 Out of scope:
 
 - multi-user collaboration

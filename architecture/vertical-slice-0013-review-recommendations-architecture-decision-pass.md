@@ -1,5 +1,7 @@
 # Vertical Slice 0013: Review Recommendations Architecture Decision Pass
 
+Status: implemented.
+
 ## Purpose
 
 Close the external review loop before returning to product/model feature slices.
@@ -123,7 +125,7 @@ Expected output:
 
 Locked decision:
 
-R-002 is partially actioned by ADR 0004. Analysis Service stays separate and will integrate through an async workflow shape. The next implementation should start with an in-memory queue adapter and owned contracts before choosing durable queue technology. Implementation ordering is decided at Slice 0013 closeout.
+R-002 is actioned as an architecture decision by ADR 0004. Analysis Service stays separate and will integrate through an async workflow shape. The next implementation should start with an in-memory queue adapter and owned contracts before choosing durable queue technology.
 
 ### R-003: Resolve UI-Level Gherkin Commitment
 
@@ -227,12 +229,12 @@ R-005 is actioned if Slice 0013 corrects traceability wording so docs distinguis
 | Item | Decision | Status After Slice 0013 | Follow-On |
 | --- | --- | --- | --- |
 | R-001 Domain logic in `dev_store.py` | Review Remediation 0001 handled the highest-risk rule clusters; remaining export/auth/persistence debt does not block Slice 0014. | Partially actioned | Revisit export/package extraction after Slice 0014 and before/during Slice 0015 if needed. |
-| R-002 Analysis Service integration | Keep Analysis Service separate; integrate via async workflow shape with in-memory queue adapter first. | Partially actioned by ADR 0004 | Later Analysis Service integration slice; API contract governance trigger applies. |
+| R-002 Analysis Service integration | Keep Analysis Service separate; integrate via async workflow shape with in-memory queue adapter first. | Actioned as architecture decision by ADR 0004 | Later Analysis Service integration slice; API contract governance trigger applies. |
 | R-003 UI-level Gherkin | UI acceptance remains Playwright specs plus generated verification reports for now. | Actioned as decision; future capability parked | `PARK-0001` remains parked with sharper trigger. |
 | R-004 Load-bearing architecture decisions | Choose Postgres now; defer auth provider, object storage provider, durable queue, deployment, and Analysis Store ownership. | Partially actioned by ADR 0003 and architecture snapshots | Slice 0014 Postgres persistence; parked triggers for the rest. |
-| R-005 Varroa traceability | Correct wording that implies Varroa detection is implemented; keep Varroa as future product/model goal. | Actioned if docs corrected | Close or supersede `PARK-0005`. |
-| Dev Persona Switcher | Persist dev persona seed records in Slice 0014; UI switcher remains separate dev-only slice. | Parked with ordering decision required at closeout | `PARK-0007`; likely before next role-specific UI acceptance flow. |
-| Slice 0015 YOLO OBB Training Baseline | Keep as likely `go`, but only after Slice 0014 persistence. | Parked pending Slice 0013 closeout and Slice 0014 | `PARK-0006`; update Slice 0015 prerequisites. |
+| R-005 Varroa traceability | Correct wording that implies Varroa detection is implemented; keep Varroa as future product/model goal. | Actioned | `PARK-0005` closed. |
+| Dev Persona Switcher | Persist dev persona seed records in Slice 0014; UI switcher remains separate dev-only slice. | Parked | `PARK-0007`; revisit before the next role-specific UI acceptance flow. |
+| Slice 0015 YOLO OBB Training Baseline | Go after Slice 0014 Postgres persistence. | Parked pending Slice 0014 | `PARK-0006`. |
 
 ## Required Slice 0013 Artifacts
 
@@ -345,26 +347,33 @@ Slice 0014 deliberately excludes:
 
 ## Acceptance Criteria
 
-- [ ] R-001 has an updated status and residual-debt decision.
-- [ ] R-002 has an explicit Analysis Service direction, either as an ADR or a documented deferred decision with trigger.
-- [ ] R-003 has an explicit UI acceptance-testing standard decision and `PARK-0001` is updated or closed.
-- [ ] R-004 has a triaged decision matrix for persistence, object storage, queue, auth, Analysis Store, deployment, and upload/storage lifecycle.
-- [ ] R-005 has a completed Varroa traceability audit and any misleading wording is corrected or parked.
-- [ ] Dev persona switcher ordering is decided before Slice 0014 starts.
-- [ ] All new deferred work is captured in `architecture/parking-lot.md` with revisit triggers.
-- [ ] Any material architecture choices are recorded in ADRs or existing architecture docs.
-- [ ] `architecture/review-remediation-2026-07-30.md` reflects the outcome of this pass.
-- [ ] `requirements/ai-sdlc-observations.md` records the review closeout outcome.
-- [ ] The final output names the next recommended build slice.
-- [ ] Slice 0014 is defined or updated as Postgres-backed Bee Annotation Repository persistence.
-- [ ] Slice 0015 clearly depends on Slice 0014 and remains parked until Slice 0013 closeout.
+- [x] R-001 has an updated status and residual-debt decision.
+- [x] R-002 has an explicit Analysis Service direction, either as an ADR or a documented deferred decision with trigger.
+- [x] R-003 has an explicit UI acceptance-testing standard decision and `PARK-0001` is updated or closed.
+- [x] R-004 has a triaged decision matrix for persistence, object storage, queue, auth, Analysis Store, deployment, and upload/storage lifecycle.
+- [x] R-005 has a completed Varroa traceability audit and any misleading wording is corrected or parked.
+- [x] Dev persona switcher ordering is decided before Slice 0014 starts.
+- [x] All new deferred work is captured in `architecture/parking-lot.md` with revisit triggers.
+- [x] Any material architecture choices are recorded in ADRs or existing architecture docs.
+- [x] `architecture/review-remediation-2026-07-30.md` reflects the outcome of this pass.
+- [x] `requirements/ai-sdlc-observations.md` records the review closeout outcome.
+- [x] The final output names the next recommended build slice.
+- [x] Slice 0014 is defined or updated as Postgres-backed Bee Annotation Repository persistence.
+- [x] Slice 0015 clearly depends on Slice 0014 and remains parked until Slice 0013 closeout.
 
 ## Open Questions
 
 - Resolved: Slice 0015 YOLO OBB Training Baseline depends on Slice 0014 Postgres persistence.
-- Resolved: Analysis Service remains separate and needs ADR 0004.
+- Resolved: Analysis Service remains separate and is recorded in ADR 0004.
 - Resolved: UI acceptance remains Playwright specs plus generated verification reports for now.
 - Resolved: Postgres persistence is the most urgent load-bearing architecture decision.
 - Resolved: dev persona seed records belong in Slice 0014, but the dev persona switcher UI is a separate parked slice.
 - Resolved: Varroa traceability correction is handled inside Slice 0013.
-- Remaining for Slice 0013 closeout: confirm whether Slice 0015 is `go`, `reshape`, `defer`, or `close` after Slice 0014.
+- Resolved: Slice 0015 is `go after Slice 0014`.
+
+## Closeout Decisions
+
+- Next recommended build slice: Vertical Slice 0014, Postgres-Backed Bee Annotation Repository Persistence.
+- Slice 0015 YOLO OBB Training Baseline remains parked and should proceed after Slice 0014 unless Slice 0014 uncovers a stronger blocker.
+- Dev Persona Switcher remains parked until after Slice 0014, unless the next role-specific UI acceptance flow makes it urgent sooner.
+- UI-level Gherkin remains parked as a future option; UI acceptance continues through Playwright specs plus generated verification reports.

@@ -17,6 +17,8 @@ The logical model pipeline has two stages:
 
 The implementation may use one model or multiple models. The requirements should preserve the logical separation between bee detection and Varroa detection so each can be measured, improved, and governed independently.
 
+Implementation traceability note: as of Slice 0013, HiveSight has implemented bee annotation and dataset foundations for a future Bee Detector baseline. The Varroa detection requirements remain product/model requirements, not implemented runtime capability.
+
 ## Model Objectives
 
 ### MR-001 Bee Detection

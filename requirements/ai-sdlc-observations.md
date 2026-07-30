@@ -195,3 +195,32 @@ Human judgment still required:
 - Decide the real persistence technology and migration path.
 - Decide when Workspace authorization and Data Use Agreement checks should move from dev-store helpers into explicit policy services.
 - Extract YOLO OBB export/package construction out of `dev_store.py` before export persistence or long-running package generation becomes load-bearing.
+
+### 2026-07-30 Slice 0013 Review Recommendations Architecture Decision Pass
+
+Human-confirmed decisions:
+
+- Keep the Analysis Service separate and integrate it later through an async workflow shape.
+- Use Postgres for durable Core API product and model-governance metadata.
+- Keep image bytes, dataset package files, and future model artifacts outside Postgres.
+- Move API-level BDD and browser acceptance to the Postgres-backed path once Slice 0014 lands, while preserving in-memory adapters for fast workflow tests.
+- Keep UI acceptance in Playwright specs plus generated verification reports for now; UI-level Gherkin is parked.
+- Treat Varroa detection as the product/model goal, but do not imply it is implemented while current slices prove bee annotation and Bee Detector foundations.
+- Make Slice 0014 Postgres-backed Bee Annotation Repository persistence the next build slice.
+- Make Slice 0015 YOLO OBB Training Baseline `go after Slice 0014`.
+
+AI contribution:
+
+- Created ADR 0003 for Postgres metadata persistence.
+- Created ADR 0004 for the Analysis Service async integration direction.
+- Added current and proposed system architecture snapshots with diagrams and known gaps.
+- Added the Postgres persistence design for the narrow Slice 0014 schema.
+- Updated parking-lot and remediation docs so review recommendations are no longer only in chat history.
+- Added traceability notes where Varroa requirements could otherwise be mistaken for implemented capability.
+
+Human judgment still required:
+
+- Implement Slice 0014 and verify the first durable persistence path.
+- Choose durable queue, production auth, object-storage provider, deployment platform, and Analysis Store ownership when their parked triggers arrive.
+- Revisit the dev persona switcher before the next role-specific UI acceptance flow.
+- Revisit Varroa-specific slices only after the bee-detector and dataset foundations are sufficiently real.

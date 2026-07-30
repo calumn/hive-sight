@@ -2,6 +2,8 @@
 
 Acceptance criteria are provisional and will be refined as requirements are reviewed.
 
+Implementation traceability note: the Varroa Detection and Infection-Rate Estimate criteria describe the product target. As of Slice 0013, implemented slices have proven bee annotation, dataset foundations, and bee-detector training preparation only; real Varroa detection and Varroa-rate calculation remain future functional/model work.
+
 ## Apiary and Hive Management
 
 - A registered User receives a default Workspace and owner Workspace Membership during onboarding.

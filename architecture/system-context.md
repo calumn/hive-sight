@@ -2,6 +2,8 @@
 
 This document shows the first HiveSight system boundary. It is intentionally higher level than a deployment diagram: it names the actors, applications, services, stores, and trust boundaries needed to support the V1 architecture.
 
+For implementation-state detail, see `architecture/current-system-architecture.md`. For the next-tranche target shape after the Slice 0013 architecture decision pass, see `architecture/proposed-system-architecture.md`.
+
 ## Context
 
 HiveSight is a Varroa-focused inspection support system for hobbyist and small-scale beekeepers. Version one is web-first, but the backend must be suitable for future Android and Apple applications.
