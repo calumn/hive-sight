@@ -30,6 +30,14 @@ _Avoid_: Site, yard, location unless specifically referring to geography.
 An individual managed colony record within an apiary.
 _Avoid_: Colony when referring to the system record rather than the biological colony.
 
+**Hive Configuration**:
+The beekeeper-recorded equipment context for a Hive, such as hive type, box use, and expected frame standard.
+_Avoid_: Hive Type when the point includes more than the named hive family.
+
+**Frame Standard**:
+The expected physical frame dimensions for a Hive Configuration and frame use, such as brood, super, or extra deep.
+_Avoid_: Frame Label when referring to physical equipment dimensions rather than grouping photos.
+
 **Inspection**:
 A dated review of one hive, containing photos and analysis evidence.
 _Avoid_: Inspection event, visit, session.

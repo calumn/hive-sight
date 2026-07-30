@@ -34,6 +34,7 @@ class AnnotationType(StrEnum):
 
 class CoordinateSpace(StrEnum):
     normalized = "normalized"
+    source_image_pixels = "source_image_pixels"
 
 
 class ReviewDecisionValue(StrEnum):
@@ -84,6 +85,27 @@ class DatasetExclusionReason(StrEnum):
     privacy_concern = "privacy_concern"
     unsuitable_crop = "unsuitable_crop"
     insufficient_review_confidence = "insufficient_review_confidence"
+    other = "other"
+
+
+class TrainingCropReviewStatus(StrEnum):
+    review_pending = "review_pending"
+    review_complete = "review_complete"
+    excluded = "excluded"
+
+
+class VisibleBeeStatus(StrEnum):
+    unassessed = "unassessed"
+    has_visible_bees = "has_visible_bees"
+    no_visible_bees = "no_visible_bees"
+
+
+class TrainingCropExclusionReason(StrEnum):
+    poor_image_quality = "poor_image_quality"
+    no_visible_bees = "no_visible_bees"
+    ambiguous_subject = "ambiguous_subject"
+    unsuitable_crop = "unsuitable_crop"
+    duplicate_or_near_duplicate = "duplicate_or_near_duplicate"
     other = "other"
 
 
@@ -396,6 +418,105 @@ class DatasetItemResponse(BaseModel):
     assignment_note: str | None = None
     exclusion_reason: DatasetExclusionReason | None = None
     benchmark_protected: bool
+
+
+class TrainingCropCreateRequest(BaseModel):
+    workspace_id: UUID
+    inspection_photo_id: UUID
+    crop_x: int = Field(ge=0)
+    crop_y: int = Field(ge=0)
+    crop_width: int = Field(gt=0)
+    crop_height: int = Field(gt=0)
+    source_image_width_px: int = Field(gt=0)
+    source_image_height_px: int = Field(gt=0)
+    notes: str | None = Field(default=None, max_length=500)
+
+
+class TrainingCropUpdateRequest(BaseModel):
+    workspace_id: UUID
+    crop_x: int | None = Field(default=None, ge=0)
+    crop_y: int | None = Field(default=None, ge=0)
+    crop_width: int | None = Field(default=None, gt=0)
+    crop_height: int | None = Field(default=None, gt=0)
+    visible_bee_status: VisibleBeeStatus | None = None
+    review_status: TrainingCropReviewStatus | None = None
+    exclusion_reason: TrainingCropExclusionReason | None = None
+    notes: str | None = Field(default=None, max_length=500)
+
+
+class TrainingCropResponse(BaseModel):
+    training_crop_id: UUID
+    workspace_id: UUID
+    inspection_photo_id: UUID
+    crop_x: int
+    crop_y: int
+    crop_width: int
+    crop_height: int
+    coordinate_space: CoordinateSpace
+    source_image_width_px: int
+    source_image_height_px: int
+    crop_image_width_px: int
+    crop_image_height_px: int
+    curriculum_stage: str
+    review_status: TrainingCropReviewStatus
+    visible_bee_status: VisibleBeeStatus
+    exclusion_reason: TrainingCropExclusionReason | None = None
+    notes: str | None = None
+    created_by_user_id: UUID
+    created_at: datetime
+    updated_at: datetime
+
+
+class TrainingCropListResponse(BaseModel):
+    inspection_photo: InspectionPhotoResponse
+    training_crops: list[TrainingCropResponse]
+
+
+class OrientedBeeEllipseCreateRequest(BaseModel):
+    workspace_id: UUID
+    annotation_type: AnnotationType
+    center_x: float = Field(ge=0)
+    center_y: float = Field(ge=0)
+    radius_x: float = Field(gt=0)
+    radius_y: float = Field(gt=0)
+    rotation_degrees: float = 0
+
+
+class OrientedBeeEllipseUpdateRequest(BaseModel):
+    workspace_id: UUID
+    annotation_type: AnnotationType | None = None
+    center_x: float | None = Field(default=None, ge=0)
+    center_y: float | None = Field(default=None, ge=0)
+    radius_x: float | None = Field(default=None, gt=0)
+    radius_y: float | None = Field(default=None, gt=0)
+    rotation_degrees: float | None = None
+
+
+class OrientedBeeEllipseResponse(BaseModel):
+    annotation_id: UUID
+    workspace_id: UUID
+    inspection_photo_id: UUID
+    training_crop_id: UUID
+    annotation_type: AnnotationType
+    center_x: float
+    center_y: float
+    radius_x: float
+    radius_y: float
+    rotation_degrees: float
+    coordinate_space: CoordinateSpace
+    source_image_width_px: int
+    source_image_height_px: int
+    source: str
+    created_by_user_id: UUID
+    created_at: datetime
+    updated_at: datetime
+
+
+class TrainingCropEvidenceResponse(BaseModel):
+    inspection_photo: InspectionPhotoEvidenceResponse
+    training_crop: TrainingCropResponse
+    bee_ellipses: list[OrientedBeeEllipseResponse]
+    caveat: str
 
 
 class ProcessAnalysisRunRequest(BaseModel):

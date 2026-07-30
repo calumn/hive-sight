@@ -82,6 +82,8 @@ export type AnalysisResult = {
 
 export type AnnotationType = "complete_visible_bee" | "partial_visible_bee" | "likely_varroa_detection";
 
+export type BeeAnnotationType = "complete_visible_bee" | "partial_visible_bee";
+
 export type ReviewDecisionValue = "approved" | "rejected" | "uncertain" | "excluded";
 
 export type ImageQualityStatus = "unassessed" | "usable" | "poor_quality" | "exclude";
@@ -95,6 +97,18 @@ export type DatasetExclusionReason =
   | "privacy_concern"
   | "unsuitable_crop"
   | "insufficient_review_confidence"
+  | "other";
+
+export type VisibleBeeStatus = "unassessed" | "has_visible_bees" | "no_visible_bees";
+
+export type TrainingCropReviewStatus = "review_pending" | "review_complete" | "excluded";
+
+export type TrainingCropExclusionReason =
+  | "poor_image_quality"
+  | "no_visible_bees"
+  | "ambiguous_subject"
+  | "unsuitable_crop"
+  | "duplicate_or_near_duplicate"
   | "other";
 
 export type DatasetLabellingSessionStatus =
@@ -210,6 +224,61 @@ export type DatasetLabellingEvidence = {
   reviewedAnnotations: Annotation[];
   latestReviewDecisions: ReviewDecision[];
   datasetItem: DatasetItem | null;
+  caveat: string;
+};
+
+export type TrainingCrop = {
+  trainingCropId: string;
+  workspaceId: string;
+  inspectionPhotoId: string;
+  cropX: number;
+  cropY: number;
+  cropWidth: number;
+  cropHeight: number;
+  coordinateSpace: "source_image_pixels";
+  sourceImageWidthPx: number;
+  sourceImageHeightPx: number;
+  cropImageWidthPx: number;
+  cropImageHeightPx: number;
+  curriculumStage: string;
+  reviewStatus: TrainingCropReviewStatus;
+  visibleBeeStatus: VisibleBeeStatus;
+  exclusionReason: TrainingCropExclusionReason | null;
+  notes: string | null;
+  createdByUserId: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type TrainingCropList = {
+  inspectionPhoto: InspectionPhoto;
+  trainingCrops: TrainingCrop[];
+};
+
+export type OrientedBeeEllipse = {
+  annotationId: string;
+  workspaceId: string;
+  inspectionPhotoId: string;
+  trainingCropId: string;
+  annotationType: BeeAnnotationType;
+  centerX: number;
+  centerY: number;
+  radiusX: number;
+  radiusY: number;
+  rotationDegrees: number;
+  coordinateSpace: "source_image_pixels";
+  sourceImageWidthPx: number;
+  sourceImageHeightPx: number;
+  source: string;
+  createdByUserId: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type TrainingCropEvidence = {
+  inspectionPhoto: InspectionPhotoEvidence;
+  trainingCrop: TrainingCrop;
+  beeEllipses: OrientedBeeEllipse[];
   caveat: string;
 };
 
@@ -559,6 +628,223 @@ export async function createDatasetItem({
   return parseDatasetItem(await response.json());
 }
 
+export async function createTrainingCrop({
+  devUserId,
+  workspaceId,
+  inspectionPhotoId,
+  cropX,
+  cropY,
+  cropWidth,
+  cropHeight,
+  sourceImageWidthPx,
+  sourceImageHeightPx,
+  notes
+}: {
+  devUserId: string;
+  workspaceId: string;
+  inspectionPhotoId: string;
+  cropX: number;
+  cropY: number;
+  cropWidth: number;
+  cropHeight: number;
+  sourceImageWidthPx: number;
+  sourceImageHeightPx: number;
+  notes: string;
+}): Promise<TrainingCrop> {
+  const trimmedNotes = notes.trim();
+  const response = await fetch(`${coreApiUrl}/v1/training-crops`, {
+    method: "POST",
+    headers: jsonHeaders(devUserId),
+    body: JSON.stringify({
+      workspace_id: workspaceId,
+      inspection_photo_id: inspectionPhotoId,
+      crop_x: cropX,
+      crop_y: cropY,
+      crop_width: cropWidth,
+      crop_height: cropHeight,
+      source_image_width_px: sourceImageWidthPx,
+      source_image_height_px: sourceImageHeightPx,
+      notes: trimmedNotes.length > 0 ? trimmedNotes : null
+    })
+  });
+  await ensureOk(response);
+  return parseTrainingCrop(await response.json());
+}
+
+export async function fetchTrainingCropsForPhoto({
+  devUserId,
+  workspaceId,
+  inspectionPhotoId
+}: {
+  devUserId: string;
+  workspaceId: string;
+  inspectionPhotoId: string;
+}): Promise<TrainingCropList> {
+  const params = new URLSearchParams({ workspace_id: workspaceId });
+  const response = await fetch(
+    `${coreApiUrl}/v1/inspection-photos/${inspectionPhotoId}/training-crops?${params}`,
+    { headers: devAuthHeaders(devUserId) }
+  );
+  await ensureOk(response);
+  return parseTrainingCropList(await response.json());
+}
+
+export async function updateTrainingCrop({
+  devUserId,
+  workspaceId,
+  trainingCropId,
+  cropX,
+  cropY,
+  cropWidth,
+  cropHeight,
+  visibleBeeStatus,
+  reviewStatus,
+  exclusionReason,
+  notes
+}: {
+  devUserId: string;
+  workspaceId: string;
+  trainingCropId: string;
+  cropX?: number;
+  cropY?: number;
+  cropWidth?: number;
+  cropHeight?: number;
+  visibleBeeStatus?: VisibleBeeStatus;
+  reviewStatus?: TrainingCropReviewStatus;
+  exclusionReason?: TrainingCropExclusionReason | null;
+  notes?: string;
+}): Promise<TrainingCrop> {
+  const body: Record<string, unknown> = { workspace_id: workspaceId };
+  if (cropX !== undefined) body.crop_x = cropX;
+  if (cropY !== undefined) body.crop_y = cropY;
+  if (cropWidth !== undefined) body.crop_width = cropWidth;
+  if (cropHeight !== undefined) body.crop_height = cropHeight;
+  if (visibleBeeStatus !== undefined) body.visible_bee_status = visibleBeeStatus;
+  if (reviewStatus !== undefined) body.review_status = reviewStatus;
+  if (exclusionReason !== undefined) body.exclusion_reason = exclusionReason;
+  if (notes !== undefined) body.notes = notes.trim().length > 0 ? notes.trim() : null;
+
+  const response = await fetch(`${coreApiUrl}/v1/training-crops/${trainingCropId}`, {
+    method: "PATCH",
+    headers: jsonHeaders(devUserId),
+    body: JSON.stringify(body)
+  });
+  await ensureOk(response);
+  return parseTrainingCrop(await response.json());
+}
+
+export async function fetchTrainingCropEvidence({
+  devUserId,
+  workspaceId,
+  trainingCropId
+}: {
+  devUserId: string;
+  workspaceId: string;
+  trainingCropId: string;
+}): Promise<TrainingCropEvidence> {
+  const params = new URLSearchParams({ workspace_id: workspaceId });
+  const response = await fetch(`${coreApiUrl}/v1/training-crops/${trainingCropId}/evidence?${params}`, {
+    headers: devAuthHeaders(devUserId)
+  });
+  await ensureOk(response);
+  return parseTrainingCropEvidence(await response.json());
+}
+
+export async function createTrainingCropEllipse({
+  devUserId,
+  workspaceId,
+  trainingCropId,
+  annotationType,
+  centerX,
+  centerY,
+  radiusX,
+  radiusY,
+  rotationDegrees
+}: {
+  devUserId: string;
+  workspaceId: string;
+  trainingCropId: string;
+  annotationType: BeeAnnotationType;
+  centerX: number;
+  centerY: number;
+  radiusX: number;
+  radiusY: number;
+  rotationDegrees: number;
+}): Promise<OrientedBeeEllipse> {
+  const response = await fetch(`${coreApiUrl}/v1/training-crops/${trainingCropId}/bee-ellipses`, {
+    method: "POST",
+    headers: jsonHeaders(devUserId),
+    body: JSON.stringify({
+      workspace_id: workspaceId,
+      annotation_type: annotationType,
+      center_x: centerX,
+      center_y: centerY,
+      radius_x: radiusX,
+      radius_y: radiusY,
+      rotation_degrees: rotationDegrees
+    })
+  });
+  await ensureOk(response);
+  return parseOrientedBeeEllipse(await response.json());
+}
+
+export async function updateTrainingCropEllipse({
+  devUserId,
+  workspaceId,
+  annotationId,
+  annotationType,
+  centerX,
+  centerY,
+  radiusX,
+  radiusY,
+  rotationDegrees
+}: {
+  devUserId: string;
+  workspaceId: string;
+  annotationId: string;
+  annotationType?: BeeAnnotationType;
+  centerX?: number;
+  centerY?: number;
+  radiusX?: number;
+  radiusY?: number;
+  rotationDegrees?: number;
+}): Promise<OrientedBeeEllipse> {
+  const body: Record<string, unknown> = { workspace_id: workspaceId };
+  if (annotationType !== undefined) body.annotation_type = annotationType;
+  if (centerX !== undefined) body.center_x = centerX;
+  if (centerY !== undefined) body.center_y = centerY;
+  if (radiusX !== undefined) body.radius_x = radiusX;
+  if (radiusY !== undefined) body.radius_y = radiusY;
+  if (rotationDegrees !== undefined) body.rotation_degrees = rotationDegrees;
+  const response = await fetch(`${coreApiUrl}/v1/training-crop-bee-ellipses/${annotationId}`, {
+    method: "PATCH",
+    headers: jsonHeaders(devUserId),
+    body: JSON.stringify(body)
+  });
+  await ensureOk(response);
+  return parseOrientedBeeEllipse(await response.json());
+}
+
+export async function deleteTrainingCropEllipse({
+  devUserId,
+  workspaceId,
+  annotationId
+}: {
+  devUserId: string;
+  workspaceId: string;
+  annotationId: string;
+}): Promise<void> {
+  const params = new URLSearchParams({ workspace_id: workspaceId });
+  const response = await fetch(
+    `${coreApiUrl}/v1/training-crop-bee-ellipses/${annotationId}?${params}`,
+    {
+      method: "DELETE",
+      headers: devAuthHeaders(devUserId)
+    }
+  );
+  await ensureOk(response);
+}
+
 function devAuthHeaders(devUserId: string): HeadersInit {
   return { "x-hivesight-dev-user-id": devUserId };
 }
@@ -768,6 +1054,76 @@ function parseDatasetLabellingEvidence(value: unknown): DatasetLabellingEvidence
     ).map(parseReviewDecision),
     datasetItem: record.dataset_item === null ? null : parseDatasetItem(record.dataset_item),
     caveat: requireString(record.caveat, "caveat")
+  };
+}
+
+function parseTrainingCropList(value: unknown): TrainingCropList {
+  const record = requireRecord(value, "Training Crop list response");
+  return {
+    inspectionPhoto: parseInspectionPhoto(record.inspection_photo),
+    trainingCrops: requireArray(record.training_crops, "training_crops").map(parseTrainingCrop)
+  };
+}
+
+function parseTrainingCropEvidence(value: unknown): TrainingCropEvidence {
+  const record = requireRecord(value, "Training Crop evidence response");
+  return {
+    inspectionPhoto: parseInspectionPhotoEvidence(record.inspection_photo),
+    trainingCrop: parseTrainingCrop(record.training_crop),
+    beeEllipses: requireArray(record.bee_ellipses, "bee_ellipses").map(parseOrientedBeeEllipse),
+    caveat: requireString(record.caveat, "caveat")
+  };
+}
+
+function parseTrainingCrop(value: unknown): TrainingCrop {
+  const record = requireRecord(value, "Training Crop response");
+  return {
+    trainingCropId: requireString(record.training_crop_id, "training_crop_id"),
+    workspaceId: requireString(record.workspace_id, "workspace_id"),
+    inspectionPhotoId: requireString(record.inspection_photo_id, "inspection_photo_id"),
+    cropX: requireNumber(record.crop_x, "crop_x"),
+    cropY: requireNumber(record.crop_y, "crop_y"),
+    cropWidth: requireNumber(record.crop_width, "crop_width"),
+    cropHeight: requireNumber(record.crop_height, "crop_height"),
+    coordinateSpace: requireSourceImagePixelCoordinateSpace(record.coordinate_space),
+    sourceImageWidthPx: requireNumber(record.source_image_width_px, "source_image_width_px"),
+    sourceImageHeightPx: requireNumber(record.source_image_height_px, "source_image_height_px"),
+    cropImageWidthPx: requireNumber(record.crop_image_width_px, "crop_image_width_px"),
+    cropImageHeightPx: requireNumber(record.crop_image_height_px, "crop_image_height_px"),
+    curriculumStage: requireString(record.curriculum_stage, "curriculum_stage"),
+    reviewStatus: requireTrainingCropReviewStatus(record.review_status),
+    visibleBeeStatus: requireVisibleBeeStatus(record.visible_bee_status),
+    exclusionReason:
+      record.exclusion_reason === null
+        ? null
+        : requireTrainingCropExclusionReason(record.exclusion_reason),
+    notes: optionalString(record.notes, "notes"),
+    createdByUserId: requireString(record.created_by_user_id, "created_by_user_id"),
+    createdAt: requireString(record.created_at, "created_at"),
+    updatedAt: requireString(record.updated_at, "updated_at")
+  };
+}
+
+function parseOrientedBeeEllipse(value: unknown): OrientedBeeEllipse {
+  const record = requireRecord(value, "Oriented bee ellipse response");
+  return {
+    annotationId: requireString(record.annotation_id, "annotation_id"),
+    workspaceId: requireString(record.workspace_id, "workspace_id"),
+    inspectionPhotoId: requireString(record.inspection_photo_id, "inspection_photo_id"),
+    trainingCropId: requireString(record.training_crop_id, "training_crop_id"),
+    annotationType: requireBeeAnnotationType(record.annotation_type),
+    centerX: requireNumber(record.center_x, "center_x"),
+    centerY: requireNumber(record.center_y, "center_y"),
+    radiusX: requireNumber(record.radius_x, "radius_x"),
+    radiusY: requireNumber(record.radius_y, "radius_y"),
+    rotationDegrees: requireNumber(record.rotation_degrees, "rotation_degrees"),
+    coordinateSpace: requireSourceImagePixelCoordinateSpace(record.coordinate_space),
+    sourceImageWidthPx: requireNumber(record.source_image_width_px, "source_image_width_px"),
+    sourceImageHeightPx: requireNumber(record.source_image_height_px, "source_image_height_px"),
+    source: requireString(record.source, "source"),
+    createdByUserId: requireString(record.created_by_user_id, "created_by_user_id"),
+    createdAt: requireString(record.created_at, "created_at"),
+    updatedAt: requireString(record.updated_at, "updated_at")
   };
 }
 
@@ -983,11 +1339,25 @@ function requireAnnotationType(value: unknown): AnnotationType {
   throw new Error("Core API response had an unexpected annotation type");
 }
 
+function requireBeeAnnotationType(value: unknown): BeeAnnotationType {
+  if (value === "complete_visible_bee" || value === "partial_visible_bee") {
+    return value;
+  }
+  throw new Error("Core API response had an unexpected bee annotation type");
+}
+
 function requireCoordinateSpace(value: unknown): "normalized" {
   if (value === "normalized") {
     return value;
   }
   throw new Error("Core API response had an unexpected coordinate space");
+}
+
+function requireSourceImagePixelCoordinateSpace(value: unknown): "source_image_pixels" {
+  if (value === "source_image_pixels") {
+    return value;
+  }
+  throw new Error("Core API response had an unexpected source pixel coordinate space");
 }
 
 function requireAnnotationWorkflowType(value: unknown): "analysis_result" | "dataset_labelling" {
@@ -1041,6 +1411,34 @@ function requireDatasetExclusionReason(value: unknown): DatasetExclusionReason {
     return value;
   }
   throw new Error("Core API response had an unexpected dataset exclusion reason");
+}
+
+function requireVisibleBeeStatus(value: unknown): VisibleBeeStatus {
+  if (value === "unassessed" || value === "has_visible_bees" || value === "no_visible_bees") {
+    return value;
+  }
+  throw new Error("Core API response had an unexpected visible bee status");
+}
+
+function requireTrainingCropReviewStatus(value: unknown): TrainingCropReviewStatus {
+  if (value === "review_pending" || value === "review_complete" || value === "excluded") {
+    return value;
+  }
+  throw new Error("Core API response had an unexpected Training Crop review status");
+}
+
+function requireTrainingCropExclusionReason(value: unknown): TrainingCropExclusionReason {
+  if (
+    value === "poor_image_quality" ||
+    value === "no_visible_bees" ||
+    value === "ambiguous_subject" ||
+    value === "unsuitable_crop" ||
+    value === "duplicate_or_near_duplicate" ||
+    value === "other"
+  ) {
+    return value;
+  }
+  throw new Error("Core API response had an unexpected Training Crop exclusion reason");
 }
 
 function requirePrelabelerRunStatus(value: unknown): "succeeded" | "failed" {

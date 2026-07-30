@@ -9,24 +9,33 @@ import {
   LoaderCircle,
   Plus,
   RefreshCw,
-  ShieldCheck
+  RotateCw,
+  ShieldCheck,
+  Trash2
 } from "lucide-react";
-import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
+import { type FormEvent, type MouseEvent, type ReactNode, useEffect, useMemo, useState } from "react";
 import {
   acceptWorkspaceDataUseAgreement,
+  createTrainingCrop,
+  createTrainingCropEllipse,
   createApiary,
   createHive,
   createInspection,
   createDatasetItem,
   createReviewDecision,
+  deleteTrainingCropEllipse,
   fetchAnalysisEvidence,
   fetchCoreHealth,
   fetchDatasetLabellingEvidence,
   fetchDevSession,
   fetchInspectionPhotos,
   fetchInspectionPhotoObjectUrl,
+  fetchTrainingCropEvidence,
+  fetchTrainingCropsForPhoto,
   processAnalysisRun,
   startDatasetLabellingSession,
+  updateTrainingCrop,
+  updateTrainingCropEllipse,
   updateDatasetLabellingSessionMetadata,
   uploadInspectionPhoto,
   type AnalysisEvidence,
@@ -34,6 +43,7 @@ import {
   type Annotation,
   type Apiary,
   type ApiError,
+  type BeeAnnotationType,
   type DevSession,
   type HealthResponse,
   type Hive,
@@ -44,8 +54,13 @@ import {
   type Inspection,
   type InspectionIntent,
   type InspectionPhoto,
+  type OrientedBeeEllipse,
   type PhotoIntake,
-  type ReviewDecisionValue
+  type ReviewDecisionValue,
+  type TrainingCrop,
+  type TrainingCropEvidence,
+  type TrainingCropExclusionReason,
+  type VisibleBeeStatus
 } from "./coreApiClient";
 
 const devUserId = "00000000-0000-0000-0000-000000000101";
@@ -61,6 +76,13 @@ type ActionState =
   | { kind: "working"; label: string }
   | { kind: "blocked"; code: string; message: string }
   | { kind: "accepted"; intake: PhotoIntake };
+
+type CropDraft = {
+  cropX: number;
+  cropY: number;
+  cropWidth: number;
+  cropHeight: number;
+};
 
 export function App() {
   const [loadState, setLoadState] = useState<LoadState>({ kind: "loading" });
@@ -643,15 +665,29 @@ export function App() {
                   />
                 ) : null}
                 {isTrainingDataCollection && loadState.session.datasetCuratorCapability ? (
-                  <DatasetLabellingPanel
-                    evidence={labellingEvidence}
-                    imageUrl={labellingImageUrl}
-                    labellingState={labellingState}
-                    onStartDatasetLabelling={onStartDatasetLabelling}
-                    onUpdateMetadata={onUpdateDatasetLabellingMetadata}
-                    onSubmitReviewDecision={onSubmitDatasetLabellingReview}
-                    onAssignDatasetRole={onAssignDatasetRole}
-                  />
+                  <>
+                    <TrainingCropAnnotationPanel
+                      devUserId={devUserId}
+                      workspaceId={loadState.session.workspaceId}
+                      photos={inspectionPhotos}
+                      onError={(error) =>
+                        setActionState({
+                          kind: "blocked",
+                          code: error.code,
+                          message: error.message
+                        })
+                      }
+                    />
+                    <DatasetLabellingPanel
+                      evidence={labellingEvidence}
+                      imageUrl={labellingImageUrl}
+                      labellingState={labellingState}
+                      onStartDatasetLabelling={onStartDatasetLabelling}
+                      onUpdateMetadata={onUpdateDatasetLabellingMetadata}
+                      onSubmitReviewDecision={onSubmitDatasetLabellingReview}
+                      onAssignDatasetRole={onAssignDatasetRole}
+                    />
+                  </>
                 ) : null}
               </>
             ) : null}
@@ -737,6 +773,113 @@ function formatInspectionIntent(intent: InspectionIntent) {
   return intent === "training_data_collection" ? "Training data collection" : "Varroa assessment";
 }
 
+function centerFixedCrop(sourceX: number, sourceY: number, sourceWidth: number, sourceHeight: number): CropDraft {
+  const cropWidth = Math.min(640, sourceWidth);
+  const cropHeight = Math.min(640, sourceHeight);
+  return {
+    cropX: Math.round(clamp(sourceX - cropWidth / 2, 0, sourceWidth - cropWidth)),
+    cropY: Math.round(clamp(sourceY - cropHeight / 2, 0, sourceHeight - cropHeight)),
+    cropWidth,
+    cropHeight
+  };
+}
+
+function clampDraft(
+  draft: CropDraft,
+  sourceImageSize: { width: number; height: number } | null
+): CropDraft {
+  if (!sourceImageSize) {
+    return draft;
+  }
+  const cropWidth = Math.round(clamp(draft.cropWidth, 1, sourceImageSize.width));
+  const cropHeight = Math.round(clamp(draft.cropHeight, 1, sourceImageSize.height));
+  return {
+    cropX: Math.round(clamp(draft.cropX, 0, sourceImageSize.width - cropWidth)),
+    cropY: Math.round(clamp(draft.cropY, 0, sourceImageSize.height - cropHeight)),
+    cropWidth,
+    cropHeight
+  };
+}
+
+function cropOverlayStyle(
+  crop: CropDraft | TrainingCrop,
+  sourceImageSize: { width: number; height: number } | null
+) {
+  if (!sourceImageSize) {
+    return undefined;
+  }
+  return {
+    left: `${(crop.cropX / sourceImageSize.width) * 100}%`,
+    top: `${(crop.cropY / sourceImageSize.height) * 100}%`,
+    width: `${(crop.cropWidth / sourceImageSize.width) * 100}%`,
+    height: `${(crop.cropHeight / sourceImageSize.height) * 100}%`
+  };
+}
+
+function cropImageStyle(crop: TrainingCrop) {
+  return {
+    left: `${(-crop.cropX / crop.cropWidth) * 100}%`,
+    top: `${(-crop.cropY / crop.cropHeight) * 100}%`,
+    width: `${(crop.sourceImageWidthPx / crop.cropWidth) * 100}%`,
+    height: `${(crop.sourceImageHeightPx / crop.cropHeight) * 100}%`
+  };
+}
+
+function ellipseStyle(crop: TrainingCrop, ellipse: OrientedBeeEllipse) {
+  return {
+    left: `${((ellipse.centerX - crop.cropX - ellipse.radiusX) / crop.cropWidth) * 100}%`,
+    top: `${((ellipse.centerY - crop.cropY - ellipse.radiusY) / crop.cropHeight) * 100}%`,
+    width: `${((ellipse.radiusX * 2) / crop.cropWidth) * 100}%`,
+    height: `${((ellipse.radiusY * 2) / crop.cropHeight) * 100}%`,
+    transform: `rotate(${ellipse.rotationDegrees}deg)`
+  };
+}
+
+function clamp(value: number, minimum: number, maximum: number): number {
+  return Math.max(minimum, Math.min(maximum, value));
+}
+
+function CropOverlay({
+  crop,
+  sourceImageSize
+}: {
+  crop: CropDraft;
+  sourceImageSize: { width: number; height: number } | null;
+}) {
+  return (
+    <span
+      className="crop-overlay draft"
+      style={cropOverlayStyle(crop, sourceImageSize)}
+      data-testid="training-draft-crop-overlay"
+    />
+  );
+}
+
+function NumberField({
+  label,
+  value,
+  onChange,
+  testId
+}: {
+  label: string;
+  value: number;
+  onChange: (value: number) => void;
+  testId: string;
+}) {
+  return (
+    <label>
+      <span>{label}</span>
+      <input
+        type="number"
+        value={value}
+        min={0}
+        onChange={(event) => onChange(Number(event.target.value))}
+        data-testid={testId}
+      />
+    </label>
+  );
+}
+
 function Outcome({
   state,
   analysisDetail
@@ -778,6 +921,562 @@ function Outcome({
   }
 
   return null;
+}
+
+function TrainingCropAnnotationPanel({
+  devUserId,
+  workspaceId,
+  photos,
+  onError
+}: {
+  devUserId: string;
+  workspaceId: string;
+  photos: InspectionPhoto[];
+  onError: (error: ApiError) => void;
+}) {
+  const [selectedPhotoId, setSelectedPhotoId] = useState<string>("");
+  const [sourceImageUrl, setSourceImageUrl] = useState<string | null>(null);
+  const [sourceImageSize, setSourceImageSize] = useState<{ width: number; height: number } | null>(
+    null
+  );
+  const [draftCrop, setDraftCrop] = useState<CropDraft | null>(null);
+  const [crops, setCrops] = useState<TrainingCrop[]>([]);
+  const [selectedCropId, setSelectedCropId] = useState<string | null>(null);
+  const [evidence, setEvidence] = useState<TrainingCropEvidence | null>(null);
+  const [selectedEllipseId, setSelectedEllipseId] = useState<string | null>(null);
+  const [cropNotes, setCropNotes] = useState("Reviewed for bee annotation training evidence.");
+  const [visibleBeeStatus, setVisibleBeeStatus] = useState<VisibleBeeStatus>("has_visible_bees");
+  const [exclusionReason, setExclusionReason] =
+    useState<TrainingCropExclusionReason>("unsuitable_crop");
+  const [workingLabel, setWorkingLabel] = useState<string | null>(null);
+
+  const selectedPhoto = photos.find((photo) => photo.inspectionPhotoId === selectedPhotoId) ?? null;
+  const selectedCrop = evidence?.trainingCrop ?? crops.find((crop) => crop.trainingCropId === selectedCropId) ?? null;
+  const selectedEllipse =
+    evidence?.beeEllipses.find((ellipse) => ellipse.annotationId === selectedEllipseId) ?? null;
+  const cropLocked =
+    selectedCrop?.reviewStatus === "review_complete" || selectedCrop?.reviewStatus === "excluded";
+
+  useEffect(() => {
+    if (photos.length === 0) {
+      setSelectedPhotoId("");
+      return;
+    }
+    setSelectedPhotoId((current) =>
+      photos.some((photo) => photo.inspectionPhotoId === current)
+        ? current
+        : photos[0].inspectionPhotoId
+    );
+  }, [photos]);
+
+  useEffect(() => {
+    if (!selectedPhoto) {
+      setSourceImageUrl((current) => {
+        if (current) URL.revokeObjectURL(current);
+        return null;
+      });
+      setSourceImageSize(null);
+      setDraftCrop(null);
+      setCrops([]);
+      setEvidence(null);
+      setSelectedCropId(null);
+      return;
+    }
+
+    let cancelled = false;
+    fetchInspectionPhotoObjectUrl({
+      devUserId,
+      viewUrl: `/v1/inspection-photos/${selectedPhoto.inspectionPhotoId}/content?workspace_id=${workspaceId}`
+    })
+      .then((nextImageUrl) => {
+        if (cancelled) {
+          URL.revokeObjectURL(nextImageUrl);
+          return;
+        }
+        setSourceImageUrl((current) => {
+          if (current) URL.revokeObjectURL(current);
+          return nextImageUrl;
+        });
+        setSourceImageSize(null);
+        setDraftCrop(null);
+        setSelectedEllipseId(null);
+        void refreshCropsForPhoto(selectedPhoto.inspectionPhotoId);
+      })
+      .catch((error) => onError(toApiError(error)));
+
+    return () => {
+      cancelled = true;
+    };
+  }, [devUserId, onError, selectedPhoto, workspaceId]);
+
+  useEffect(() => {
+    if (!selectedCropId) {
+      setEvidence(null);
+      return;
+    }
+    void refreshEvidence(selectedCropId);
+  }, [selectedCropId]);
+
+  async function runCropAction(label: string, action: () => Promise<void>) {
+    setWorkingLabel(label);
+    try {
+      await action();
+    } catch (error) {
+      onError(toApiError(error));
+    } finally {
+      setWorkingLabel(null);
+    }
+  }
+
+  async function refreshCropsForPhoto(inspectionPhotoId: string) {
+    const listing = await fetchTrainingCropsForPhoto({
+      devUserId,
+      workspaceId,
+      inspectionPhotoId
+    });
+    setCrops(listing.trainingCrops);
+    setSelectedCropId((current) =>
+      current && listing.trainingCrops.some((crop) => crop.trainingCropId === current)
+        ? current
+        : (listing.trainingCrops.at(-1)?.trainingCropId ?? null)
+    );
+  }
+
+  async function refreshEvidence(trainingCropId: string) {
+    const nextEvidence = await fetchTrainingCropEvidence({
+      devUserId,
+      workspaceId,
+      trainingCropId
+    });
+    setEvidence(nextEvidence);
+    setVisibleBeeStatus(nextEvidence.trainingCrop.visibleBeeStatus);
+    setCropNotes(nextEvidence.trainingCrop.notes ?? "");
+    setSelectedEllipseId((current) =>
+      current && nextEvidence.beeEllipses.some((ellipse) => ellipse.annotationId === current)
+        ? current
+        : (nextEvidence.beeEllipses.at(-1)?.annotationId ?? null)
+    );
+  }
+
+  function onSourceImageClick(event: MouseEvent<HTMLDivElement>) {
+    if (!sourceImageSize) {
+      return;
+    }
+    const rect = event.currentTarget.getBoundingClientRect();
+    const sourceX = ((event.clientX - rect.left) / rect.width) * sourceImageSize.width;
+    const sourceY = ((event.clientY - rect.top) / rect.height) * sourceImageSize.height;
+    setDraftCrop(centerFixedCrop(sourceX, sourceY, sourceImageSize.width, sourceImageSize.height));
+  }
+
+  async function onSaveDraftCrop() {
+    if (!selectedPhoto || !sourceImageSize || !draftCrop) {
+      return;
+    }
+    await runCropAction("Saving Training Crop", async () => {
+      const crop = await createTrainingCrop({
+        devUserId,
+        workspaceId,
+        inspectionPhotoId: selectedPhoto.inspectionPhotoId,
+        cropX: draftCrop.cropX,
+        cropY: draftCrop.cropY,
+        cropWidth: draftCrop.cropWidth,
+        cropHeight: draftCrop.cropHeight,
+        sourceImageWidthPx: sourceImageSize.width,
+        sourceImageHeightPx: sourceImageSize.height,
+        notes: cropNotes
+      });
+      setDraftCrop(null);
+      await refreshCropsForPhoto(selectedPhoto.inspectionPhotoId);
+      setSelectedCropId(crop.trainingCropId);
+    });
+  }
+
+  async function onCropSurfaceClick(event: MouseEvent<HTMLDivElement>) {
+    if (!selectedCrop || cropLocked || selectedCrop.visibleBeeStatus === "no_visible_bees") {
+      return;
+    }
+    const rect = event.currentTarget.getBoundingClientRect();
+    const centerX = selectedCrop.cropX + ((event.clientX - rect.left) / rect.width) * selectedCrop.cropWidth;
+    const centerY =
+      selectedCrop.cropY + ((event.clientY - rect.top) / rect.height) * selectedCrop.cropHeight;
+    await runCropAction("Adding bee ellipse", async () => {
+      const ellipse = await createTrainingCropEllipse({
+        devUserId,
+        workspaceId,
+        trainingCropId: selectedCrop.trainingCropId,
+        annotationType: "complete_visible_bee",
+        centerX: clamp(centerX, selectedCrop.cropX + 40, selectedCrop.cropX + selectedCrop.cropWidth - 40),
+        centerY: clamp(centerY, selectedCrop.cropY + 20, selectedCrop.cropY + selectedCrop.cropHeight - 20),
+        radiusX: 40,
+        radiusY: 20,
+        rotationDegrees: 0
+      });
+      setSelectedEllipseId(ellipse.annotationId);
+      await refreshEvidence(selectedCrop.trainingCropId);
+    });
+  }
+
+  async function updateSelectedEllipse(values: Partial<OrientedBeeEllipse>) {
+    if (!selectedCrop || !selectedEllipse || cropLocked) {
+      return;
+    }
+    await runCropAction("Updating bee ellipse", async () => {
+      await updateTrainingCropEllipse({
+        devUserId,
+        workspaceId,
+        annotationId: selectedEllipse.annotationId,
+        annotationType: values.annotationType,
+        centerX: values.centerX,
+        centerY: values.centerY,
+        radiusX: values.radiusX,
+        radiusY: values.radiusY,
+        rotationDegrees: values.rotationDegrees
+      });
+      await refreshEvidence(selectedCrop.trainingCropId);
+    });
+  }
+
+  async function deleteSelectedEllipse() {
+    if (!selectedCrop || !selectedEllipse || cropLocked) {
+      return;
+    }
+    await runCropAction("Deleting bee ellipse", async () => {
+      await deleteTrainingCropEllipse({
+        devUserId,
+        workspaceId,
+        annotationId: selectedEllipse.annotationId
+      });
+      setSelectedEllipseId(null);
+      await refreshEvidence(selectedCrop.trainingCropId);
+    });
+  }
+
+  async function completeCrop(reviewVisibleBeeStatus: VisibleBeeStatus) {
+    if (!selectedCrop) {
+      return;
+    }
+    await runCropAction("Completing Training Crop", async () => {
+      await updateTrainingCrop({
+        devUserId,
+        workspaceId,
+        trainingCropId: selectedCrop.trainingCropId,
+        visibleBeeStatus: reviewVisibleBeeStatus,
+        reviewStatus: "review_complete",
+        notes: cropNotes
+      });
+      await refreshEvidence(selectedCrop.trainingCropId);
+      if (selectedPhoto) await refreshCropsForPhoto(selectedPhoto.inspectionPhotoId);
+    });
+  }
+
+  async function excludeCrop() {
+    if (!selectedCrop) {
+      return;
+    }
+    await runCropAction("Excluding Training Crop", async () => {
+      await updateTrainingCrop({
+        devUserId,
+        workspaceId,
+        trainingCropId: selectedCrop.trainingCropId,
+        reviewStatus: "excluded",
+        exclusionReason,
+        notes: cropNotes
+      });
+      await refreshEvidence(selectedCrop.trainingCropId);
+      if (selectedPhoto) await refreshCropsForPhoto(selectedPhoto.inspectionPhotoId);
+    });
+  }
+
+  return (
+    <section
+      className="analysis-panel training-crop-panel"
+      aria-label="Training Crop annotation"
+      data-testid="training-crop-panel"
+    >
+      <div className="analysis-header">
+        <PanelHeading icon={<Image size={20} />} title="Training crops" />
+        <span className="analysis-status status-queued">{crops.length} crops</span>
+      </div>
+
+      {photos.length === 0 ? (
+        <p className="analysis-caveat">Upload a training data photo before creating crops.</p>
+      ) : (
+        <>
+          <div className="metadata-panel crop-photo-controls">
+            <label>
+              <span>Source photo</span>
+              <select
+                value={selectedPhotoId}
+                onChange={(event) => setSelectedPhotoId(event.target.value)}
+                data-testid="training-crop-photo-select"
+              >
+                {photos.map((photo) => (
+                  <option key={photo.inspectionPhotoId} value={photo.inspectionPhotoId}>
+                    {photo.filename}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <span>Notes</span>
+              <input
+                value={cropNotes}
+                maxLength={500}
+                onChange={(event) => setCropNotes(event.target.value)}
+                data-testid="training-crop-notes-input"
+              />
+            </label>
+            <button type="button" onClick={() => selectedPhoto && void refreshCropsForPhoto(selectedPhoto.inspectionPhotoId)}>
+              <RefreshCw size={18} />
+              Refresh
+            </button>
+          </div>
+
+          {sourceImageUrl ? (
+            <div
+              className="source-photo-preview"
+              onClick={onSourceImageClick}
+              data-testid="training-source-photo-preview"
+            >
+              <img
+                src={sourceImageUrl}
+                alt={selectedPhoto?.filename ?? "Training source"}
+                onLoad={(event) =>
+                  setSourceImageSize({
+                    width: event.currentTarget.naturalWidth,
+                    height: event.currentTarget.naturalHeight
+                  })
+                }
+                data-testid="training-source-image"
+              />
+              {draftCrop ? <CropOverlay crop={draftCrop} sourceImageSize={sourceImageSize} /> : null}
+              {crops.map((crop) => (
+                <button
+                  key={crop.trainingCropId}
+                  type="button"
+                  className={`crop-overlay saved ${crop.trainingCropId === selectedCropId ? "selected" : ""}`}
+                  style={cropOverlayStyle(crop, sourceImageSize)}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setSelectedCropId(crop.trainingCropId);
+                  }}
+                  data-testid="saved-training-crop-overlay"
+                  aria-label={`Training Crop ${crop.reviewStatus}`}
+                />
+              ))}
+            </div>
+          ) : null}
+
+          {draftCrop ? (
+            <div className="metadata-panel crop-draft-controls" data-testid="training-crop-draft-controls">
+              <NumberField label="X" value={draftCrop.cropX} onChange={(cropX) => setDraftCrop(clampDraft({ ...draftCrop, cropX }, sourceImageSize))} testId="training-crop-x-input" />
+              <NumberField label="Y" value={draftCrop.cropY} onChange={(cropY) => setDraftCrop(clampDraft({ ...draftCrop, cropY }, sourceImageSize))} testId="training-crop-y-input" />
+              <NumberField label="Width" value={draftCrop.cropWidth} onChange={(cropWidth) => setDraftCrop(clampDraft({ ...draftCrop, cropWidth }, sourceImageSize))} testId="training-crop-width-input" />
+              <NumberField label="Height" value={draftCrop.cropHeight} onChange={(cropHeight) => setDraftCrop(clampDraft({ ...draftCrop, cropHeight }, sourceImageSize))} testId="training-crop-height-input" />
+              <button
+                type="button"
+                onClick={() => void onSaveDraftCrop()}
+                disabled={Boolean(workingLabel)}
+                data-testid="save-training-crop-button"
+              >
+                <Check size={18} />
+                Save crop
+              </button>
+            </div>
+          ) : null}
+
+          {crops.length > 0 ? (
+            <ul className="crop-list" data-testid="training-crop-list">
+              {crops.map((crop, index) => (
+                <li key={crop.trainingCropId}>
+                  <button
+                    type="button"
+                    className={crop.trainingCropId === selectedCropId ? "selected-row" : ""}
+                    onClick={() => setSelectedCropId(crop.trainingCropId)}
+                    data-testid="training-crop-list-item"
+                  >
+                    Crop {index + 1} / {crop.reviewStatus} / {crop.visibleBeeStatus}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+
+          {selectedCrop && sourceImageUrl ? (
+            <section className="crop-editor" aria-label="Selected Training Crop editor">
+              <div
+                className="crop-surface"
+                style={{ aspectRatio: `${selectedCrop.cropWidth} / ${selectedCrop.cropHeight}` }}
+                onClick={(event) => void onCropSurfaceClick(event)}
+                data-testid="training-crop-surface"
+              >
+                <img
+                  src={sourceImageUrl}
+                  alt="Selected Training Crop"
+                  style={cropImageStyle(selectedCrop)}
+                  draggable={false}
+                />
+                {evidence?.beeEllipses.map((ellipse) => (
+                  <button
+                    key={ellipse.annotationId}
+                    type="button"
+                    className={`bee-ellipse ${ellipse.annotationType === "partial_visible_bee" ? "partial" : "complete"} ${
+                      ellipse.annotationId === selectedEllipseId ? "selected" : ""
+                    }`}
+                    style={ellipseStyle(selectedCrop, ellipse)}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setSelectedEllipseId(ellipse.annotationId);
+                    }}
+                    data-testid="training-crop-ellipse"
+                    aria-label={ellipse.annotationType}
+                  />
+                ))}
+              </div>
+
+              <div className="result-grid crop-metrics">
+                <Metric label="Review" value={selectedCrop.reviewStatus} />
+                <Metric label="Visible bees" value={selectedCrop.visibleBeeStatus} />
+                <Metric label="Ellipses" value={evidence?.beeEllipses.length ?? 0} />
+                <Metric label="Coordinates" value="source px" />
+              </div>
+
+              <div className="review-panel crop-review-panel" data-testid="training-crop-review-controls">
+                <div>
+                  <strong>Ellipse controls</strong>
+                  <p>
+                    {selectedEllipse
+                      ? `${selectedEllipse.annotationType} / ${Math.round(selectedEllipse.rotationDegrees)} degrees`
+                      : "Click inside the crop to add a default bee ellipse."}
+                  </p>
+                </div>
+                <label>
+                  <span>Bee type</span>
+                  <select
+                    value={selectedEllipse?.annotationType ?? "complete_visible_bee"}
+                    onChange={(event) =>
+                      selectedEllipse &&
+                      void updateSelectedEllipse({ annotationType: event.target.value as BeeAnnotationType })
+                    }
+                    disabled={!selectedEllipse || cropLocked}
+                    data-testid="training-ellipse-type-select"
+                  >
+                    <option value="complete_visible_bee">Complete visible bee</option>
+                    <option value="partial_visible_bee">Partial visible bee</option>
+                  </select>
+                </label>
+                <button
+                  type="button"
+                  disabled={!selectedEllipse || cropLocked}
+                  onClick={() =>
+                    selectedEllipse && void updateSelectedEllipse({ rotationDegrees: selectedEllipse.rotationDegrees + 5 })
+                  }
+                  data-testid="rotate-training-ellipse-button"
+                >
+                  <RotateCw size={18} />
+                  Rotate
+                </button>
+                <button
+                  type="button"
+                  disabled={!selectedEllipse || cropLocked}
+                  onClick={() => void deleteSelectedEllipse()}
+                  data-testid="delete-training-ellipse-button"
+                >
+                  <Trash2 size={18} />
+                  Delete
+                </button>
+                <button
+                  type="button"
+                  disabled={!selectedEllipse || cropLocked}
+                  onClick={() =>
+                    selectedEllipse &&
+                    void updateSelectedEllipse({
+                      centerX: selectedEllipse.centerX + 5
+                    })
+                  }
+                  data-testid="nudge-training-ellipse-right-button"
+                >
+                  Nudge right
+                </button>
+                <button
+                  type="button"
+                  disabled={!selectedEllipse || cropLocked}
+                  onClick={() =>
+                    selectedEllipse &&
+                    void updateSelectedEllipse({
+                      radiusX: selectedEllipse.radiusX + 5
+                    })
+                  }
+                  data-testid="widen-training-ellipse-button"
+                >
+                  Widen
+                </button>
+              </div>
+
+              <div className="metadata-panel crop-completion-controls">
+                <label>
+                  <span>Visible bee status</span>
+                  <select
+                    value={visibleBeeStatus}
+                    onChange={(event) => setVisibleBeeStatus(event.target.value as VisibleBeeStatus)}
+                    disabled={cropLocked}
+                    data-testid="training-crop-visible-status-select"
+                  >
+                    <option value="has_visible_bees">Has visible bees</option>
+                    <option value="no_visible_bees">No visible bees</option>
+                    <option value="unassessed">Unassessed</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Exclusion reason</span>
+                  <select
+                    value={exclusionReason}
+                    onChange={(event) =>
+                      setExclusionReason(event.target.value as TrainingCropExclusionReason)
+                    }
+                    disabled={cropLocked}
+                    data-testid="training-crop-exclusion-reason-select"
+                  >
+                    <option value="poor_image_quality">Poor image quality</option>
+                    <option value="no_visible_bees">No visible bees</option>
+                    <option value="ambiguous_subject">Ambiguous subject</option>
+                    <option value="unsuitable_crop">Unsuitable crop</option>
+                    <option value="duplicate_or_near_duplicate">Duplicate or near duplicate</option>
+                    <option value="other">Other</option>
+                  </select>
+                </label>
+                <button
+                  type="button"
+                  disabled={cropLocked || Boolean(workingLabel)}
+                  onClick={() => void completeCrop(visibleBeeStatus)}
+                  data-testid="complete-training-crop-button"
+                >
+                  <Check size={18} />
+                  Complete crop
+                </button>
+                <button
+                  type="button"
+                  disabled={cropLocked || Boolean(workingLabel)}
+                  onClick={() => void excludeCrop()}
+                  data-testid="exclude-training-crop-button"
+                >
+                  <CircleAlert size={18} />
+                  Exclude
+                </button>
+              </div>
+            </section>
+          ) : null}
+
+          {workingLabel ? (
+            <div className="outcome working" role="status">
+              <LoaderCircle className="spin" size={20} />
+              <span>{workingLabel}</span>
+            </div>
+          ) : null}
+        </>
+      )}
+    </section>
+  );
 }
 
 function AnalysisPanel({

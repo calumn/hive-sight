@@ -227,7 +227,73 @@ Essential fields:
 Relationships:
 
 - belongs to one apiary
+- may have one current hive configuration
 - has many inspections
+
+### Hive Configuration
+
+The equipment context for a Hive that may help interpret inspection photos and model performance.
+
+Essential fields:
+
+- id
+- hive id
+- hive type
+- box/use
+- optional frame standard id
+- status
+- effective from
+- created at
+
+Initial hive types may include:
+
+- `british_national`
+- `wbc`
+- `smith`
+- `british_commercial`
+- `langstroth`
+- `other`
+- `unknown`
+
+Initial box/use values may include:
+
+- `brood`
+- `super`
+- `extra_deep`
+- `other`
+- `unknown`
+
+Relationships:
+
+- belongs to one hive
+- may reference one frame standard
+
+Rules:
+
+- Hive Configuration is model context and provenance, not a requirement for Slice 9 annotation.
+- A Hive may start with `unknown` equipment context and be refined later.
+- Training data should preserve whatever Hive Configuration was known when the source photo was captured or reviewed.
+
+### Frame Standard
+
+A reusable description of expected physical frame dimensions.
+
+Essential fields:
+
+- id
+- display name
+- hive type
+- frame use
+- top bar length
+- bottom bar length
+- side bar height
+- measurement unit
+- source or notes
+
+Rules:
+
+- Frame Standard describes expected equipment dimensions; it does not prove the photo has been calibrated to physical scale.
+- Frame Standard may later support model bias analysis, crop calibration, quality checks, and frame-region guidance.
 
 ### Inspection
 

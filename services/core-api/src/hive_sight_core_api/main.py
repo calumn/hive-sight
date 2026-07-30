@@ -40,12 +40,20 @@ from hive_sight_core_api.models import (
     InspectionIntentUpdateRequest,
     InspectionPhotoListResponse,
     InspectionResponse,
+    OrientedBeeEllipseCreateRequest,
+    OrientedBeeEllipseResponse,
+    OrientedBeeEllipseUpdateRequest,
     PhotoIntakeResponse,
     ProcessAnalysisRunRequest,
     ReviewDecisionCreateRequest,
     ReviewDecisionResponse,
     StartDatasetLabellingRequest,
     UpdateDatasetLabellingSessionRequest,
+    TrainingCropCreateRequest,
+    TrainingCropEvidenceResponse,
+    TrainingCropListResponse,
+    TrainingCropResponse,
+    TrainingCropUpdateRequest,
     UploadUrlResponse,
     WorkspaceDataUseAgreementAcceptanceRequest,
     WorkspaceDataUseAgreementAcceptanceResponse,
@@ -352,6 +360,113 @@ def start_dataset_labelling(
         workspace_id=request.workspace_id,
         inspection_photo_id=request.inspection_photo_id,
     )
+
+
+@app.post("/v1/training-crops", response_model=TrainingCropResponse, status_code=201)
+def create_training_crop(
+    request: TrainingCropCreateRequest,
+    user: AuthenticatedUserDep,
+    state: DevStateDep,
+) -> TrainingCropResponse:
+    return state.store.create_training_crop(user=user, request=request)
+
+
+@app.get(
+    "/v1/inspection-photos/{inspection_photo_id}/training-crops",
+    response_model=TrainingCropListResponse,
+)
+def list_training_crops_for_photo(
+    inspection_photo_id: UUID,
+    workspace_id: UUID,
+    user: AuthenticatedUserDep,
+    state: DevStateDep,
+) -> TrainingCropListResponse:
+    return state.store.list_training_crops_for_photo(
+        user=user,
+        workspace_id=workspace_id,
+        inspection_photo_id=inspection_photo_id,
+    )
+
+
+@app.patch("/v1/training-crops/{training_crop_id}", response_model=TrainingCropResponse)
+def update_training_crop(
+    training_crop_id: UUID,
+    request: TrainingCropUpdateRequest,
+    user: AuthenticatedUserDep,
+    state: DevStateDep,
+) -> TrainingCropResponse:
+    return state.store.update_training_crop(
+        user=user,
+        training_crop_id=training_crop_id,
+        request=request,
+    )
+
+
+@app.get(
+    "/v1/training-crops/{training_crop_id}/evidence",
+    response_model=TrainingCropEvidenceResponse,
+)
+def get_training_crop_evidence(
+    training_crop_id: UUID,
+    workspace_id: UUID,
+    user: AuthenticatedUserDep,
+    state: DevStateDep,
+) -> TrainingCropEvidenceResponse:
+    return state.store.get_training_crop_evidence(
+        user=user,
+        workspace_id=workspace_id,
+        training_crop_id=training_crop_id,
+    )
+
+
+@app.post(
+    "/v1/training-crops/{training_crop_id}/bee-ellipses",
+    response_model=OrientedBeeEllipseResponse,
+    status_code=201,
+)
+def create_training_crop_ellipse(
+    training_crop_id: UUID,
+    request: OrientedBeeEllipseCreateRequest,
+    user: AuthenticatedUserDep,
+    state: DevStateDep,
+) -> OrientedBeeEllipseResponse:
+    return state.store.create_training_crop_ellipse(
+        user=user,
+        training_crop_id=training_crop_id,
+        request=request,
+    )
+
+
+@app.patch(
+    "/v1/training-crop-bee-ellipses/{annotation_id}",
+    response_model=OrientedBeeEllipseResponse,
+)
+def update_training_crop_ellipse(
+    annotation_id: UUID,
+    request: OrientedBeeEllipseUpdateRequest,
+    user: AuthenticatedUserDep,
+    state: DevStateDep,
+) -> OrientedBeeEllipseResponse:
+    return state.store.update_training_crop_ellipse(
+        user=user,
+        annotation_id=annotation_id,
+        request=request,
+    )
+
+
+@app.delete("/v1/training-crop-bee-ellipses/{annotation_id}", status_code=204)
+def delete_training_crop_ellipse(
+    annotation_id: UUID,
+    workspace_id: UUID,
+    user: AuthenticatedUserDep,
+    state: DevStateDep,
+) -> Response:
+    state.store.delete_training_crop_ellipse(
+        user=user,
+        workspace_id=workspace_id,
+        annotation_id=annotation_id,
+    )
+    return Response(status_code=204)
 
 
 @app.patch(
