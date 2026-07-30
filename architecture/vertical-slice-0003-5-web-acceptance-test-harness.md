@@ -8,7 +8,7 @@ This is a testing-enablement slice rather than a new product feature. It closes 
 
 This slice also introduces a lightweight slice verification report: one developer command runs the current test set and writes a coherent human-readable report showing what was run, what passed or failed, and where browser failure artifacts can be found. The report describes executed checks; it does not claim formal code coverage percentages.
 
-Slice 3.5 starts with plain Playwright tests so the team can first stabilize the browser harness itself. UI-level Gherkin remains required within the next few slices; it is deliberately deferred from this slice so step-definition plumbing does not obscure the first browser automation milestone.
+Slice 3.5 started with plain Playwright tests so the team could first stabilize the browser harness itself. Later Slice 0013 planning parked UI-level Gherkin as a future option rather than a near-term requirement; until deliberately reselected, UI acceptance coverage uses Playwright specs plus generated slice verification reports.
 
 ## Source Inputs
 
@@ -129,7 +129,7 @@ Candidate command shape:
 - Cross-browser matrix testing beyond one reliable local browser.
 - Mobile-device farm testing. A single responsive viewport check is enough for this slice.
 - Error-path browser tests such as missing terms, invalid file type, cross-Workspace evidence access, or failed analysis.
-- UI-level Gherkin step definitions. Gherkin is deferred, not abandoned, and must be introduced within the next few slices.
+- UI-level Gherkin step definitions. Later Slice 0013 planning parked this as a future option rather than a near-term requirement.
 - CI pipeline integration if local execution is not yet stable; CI can be a follow-on step.
 - Formal code coverage thresholds or coverage percentage claims.
 - A historical report dashboard, trend analysis, flaky-test tracking, or quality gate service.
@@ -161,13 +161,13 @@ Candidate command shape:
 - [ ] The report does not claim formal code coverage percentages unless separate coverage tooling is added later.
 - [ ] The existing Core API tests, Analysis Service tests, and Web TypeScript check still pass.
 - [ ] The documented workaround is explicit: Codex may author and maintain the tests, but if the in-app browser remains blocked from localhost, local browser acceptance execution is performed by the developer or future CI.
-- [ ] The document states that UI-level Gherkin must be introduced within the next few slices.
+- [ ] The document states that UI-level Gherkin is parked as a future option after Slice 0013 planning.
 
 ## Decisions From Slice Review
 
 - One command starts both the Core API and Web UI.
 - The first acceptance test uses a small committed fixture image.
-- Slice 3.5 starts with plain Playwright tests. UI-level Gherkin must be brought in within the next few slices.
+- Slice 3.5 starts with plain Playwright tests. Later Slice 0013 planning parked UI-level Gherkin as a future option; it must be deliberately reselected before implementation.
 - A dev/test-only reset seam may be added if needed for stable isolation.
 - Overlay alignment checks are practical geometry assertions, not pixel-perfect screenshot baselines.
 - The browser target is Chromium only.

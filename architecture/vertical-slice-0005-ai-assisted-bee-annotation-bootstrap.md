@@ -174,7 +174,7 @@ Minimum API shapes:
 - Treating Reviewed Annotations as training-ready ground truth.
 - Production auth provider integration, invitation flow, internal capability management UI, or full admin console.
 - Durable database persistence if the in-memory/dev store remains sufficient for the slice.
-- UI-level Gherkin. It remains required within the next few slices, but this slice may continue using plain Playwright for browser acceptance if that keeps the product behaviour thin.
+- UI-level Gherkin. Later Slice 0013 planning parked this as a future option; this slice continues to rely on plain Playwright for browser acceptance.
 
 ## Acceptance Criteria
 

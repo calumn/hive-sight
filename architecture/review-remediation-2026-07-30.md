@@ -23,7 +23,7 @@ The review found that the delivered code and domain vocabulary are strong for th
 
 ### R-001: Extract Domain Logic Out Of `dev_store.py`
 
-Status: open
+Status: partially actioned by Review Remediation 0001
 
 Problem:
 
@@ -31,7 +31,7 @@ Problem:
 
 Recommended next action:
 
-Defined as `architecture/review-remediation-0001-extract-domain-rules-out-of-dev-store.md`.
+Review Remediation 0001 moved Hive Configuration/Inspection gating, Training Crop rules, and Training Crop Dataset Item assignment into explicit workflows. Residual debt remains for export/package construction, production authorization policy, and the eventual real persistence adapter.
 
 ### R-002: Decide Analysis Service Integration Direction
 
@@ -90,3 +90,11 @@ Initial remediation verification:
 
 - Core API tests: `76 passed, 1 xfailed`
 - Ruff: passed
+
+Review Remediation 0001 verification:
+
+- Core API tests: `83 passed, 1 xfailed`
+- Analysis Service tests: `2 passed`
+- Web TypeScript check: passed
+- Playwright browser acceptance tests: `10 passed`
+- `pnpm verify:slice`: passed

@@ -15,10 +15,14 @@ from hive_sight_core_api.dependencies import (
     get_analysis_request_workflow,
     get_dataset_labelling_workflow,
     get_dataset_role_assignment_workflow,
+    get_hive_configuration_workflow,
     get_inspection_photo_access,
     get_settings,
+    get_training_crop_dataset_item_workflow,
+    get_training_crop_workflow,
 )
 from hive_sight_core_api.dev_store import DomainError, UserContext
+from hive_sight_core_api.hive_configuration_workflow import HiveConfigurationWorkflow
 from hive_sight_core_api.inspection_photo_access import InspectionPhotoAccess
 from hive_sight_core_api.models import (
     AnalysisEvidenceResponse,
@@ -65,6 +69,10 @@ from hive_sight_core_api.models import (
     YoloObbExportRequest,
     YoloObbExportResponse,
 )
+from hive_sight_core_api.training_crop_dataset_item_workflow import (
+    TrainingCropDatasetItemWorkflow,
+)
+from hive_sight_core_api.training_crop_workflow import TrainingCropWorkflow
 
 settings = get_settings()
 
@@ -99,6 +107,18 @@ DatasetLabellingWorkflowDep = Annotated[
 DatasetRoleAssignmentWorkflowDep = Annotated[
     DatasetRoleAssignmentWorkflow,
     Depends(get_dataset_role_assignment_workflow),
+]
+HiveConfigurationWorkflowDep = Annotated[
+    HiveConfigurationWorkflow,
+    Depends(get_hive_configuration_workflow),
+]
+TrainingCropWorkflowDep = Annotated[
+    TrainingCropWorkflow,
+    Depends(get_training_crop_workflow),
+]
+TrainingCropDatasetItemWorkflowDep = Annotated[
+    TrainingCropDatasetItemWorkflow,
+    Depends(get_training_crop_dataset_item_workflow),
 ]
 DevUserIdHeader = Annotated[str | None, Header(alias="x-hivesight-dev-user-id")]
 
@@ -182,9 +202,10 @@ def create_hive(
 @app.get("/v1/frame-standards", response_model=list[FrameStandardResponse])
 def list_frame_standards(
     user: AuthenticatedUserDep,
-    state: DevStateDep,
+    workflow: HiveConfigurationWorkflowDep,
 ) -> list[FrameStandardResponse]:
-    return state.store.list_frame_standards()
+    _ = user
+    return workflow.list_frame_standards()
 
 
 @app.put("/v1/hives/{hive_id}/configuration", response_model=HiveConfigurationResponse)
@@ -192,9 +213,9 @@ def upsert_hive_configuration(
     hive_id: UUID,
     request: HiveConfigurationUpsertRequest,
     user: AuthenticatedUserDep,
-    state: DevStateDep,
+    workflow: HiveConfigurationWorkflowDep,
 ) -> HiveConfigurationResponse:
-    return state.store.upsert_hive_configuration(user=user, hive_id=hive_id, request=request)
+    return workflow.upsert_hive_configuration(user=user, hive_id=hive_id, request=request)
 
 
 @app.get("/v1/hives/{hive_id}/configuration", response_model=HiveConfigurationResponse)
@@ -202,9 +223,9 @@ def get_hive_configuration(
     hive_id: UUID,
     workspace_id: UUID,
     user: AuthenticatedUserDep,
-    state: DevStateDep,
+    workflow: HiveConfigurationWorkflowDep,
 ) -> HiveConfigurationResponse:
-    return state.store.get_hive_configuration(
+    return workflow.get_hive_configuration(
         user=user,
         workspace_id=workspace_id,
         hive_id=hive_id,
@@ -215,9 +236,9 @@ def get_hive_configuration(
 def create_inspection(
     request: InspectionCreateRequest,
     user: AuthenticatedUserDep,
-    state: DevStateDep,
+    workflow: HiveConfigurationWorkflowDep,
 ) -> InspectionResponse:
-    return state.store.create_inspection(
+    return workflow.create_inspection(
         user=user,
         hive_id=request.hive_id,
         inspection_date=request.inspection_date,
@@ -230,9 +251,9 @@ def update_inspection_intent(
     inspection_id: UUID,
     request: InspectionIntentUpdateRequest,
     user: AuthenticatedUserDep,
-    state: DevStateDep,
+    workflow: HiveConfigurationWorkflowDep,
 ) -> InspectionResponse:
-    return state.store.update_inspection_intent(
+    return workflow.update_inspection_intent(
         user=user,
         workspace_id=request.workspace_id,
         inspection_id=inspection_id,
@@ -397,9 +418,9 @@ def start_dataset_labelling(
 def create_training_crop(
     request: TrainingCropCreateRequest,
     user: AuthenticatedUserDep,
-    state: DevStateDep,
+    workflow: TrainingCropWorkflowDep,
 ) -> TrainingCropResponse:
-    return state.store.create_training_crop(user=user, request=request)
+    return workflow.create_training_crop(user=user, request=request)
 
 
 @app.get(
@@ -410,9 +431,9 @@ def list_training_crops_for_photo(
     inspection_photo_id: UUID,
     workspace_id: UUID,
     user: AuthenticatedUserDep,
-    state: DevStateDep,
+    workflow: TrainingCropWorkflowDep,
 ) -> TrainingCropListResponse:
-    return state.store.list_training_crops_for_photo(
+    return workflow.list_training_crops_for_photo(
         user=user,
         workspace_id=workspace_id,
         inspection_photo_id=inspection_photo_id,
@@ -424,9 +445,9 @@ def update_training_crop(
     training_crop_id: UUID,
     request: TrainingCropUpdateRequest,
     user: AuthenticatedUserDep,
-    state: DevStateDep,
+    workflow: TrainingCropWorkflowDep,
 ) -> TrainingCropResponse:
-    return state.store.update_training_crop(
+    return workflow.update_training_crop(
         user=user,
         training_crop_id=training_crop_id,
         request=request,
@@ -442,9 +463,9 @@ def create_training_crop_dataset_item(
     training_crop_id: UUID,
     request: TrainingCropDatasetItemCreateRequest,
     user: AuthenticatedUserDep,
-    state: DevStateDep,
+    workflow: TrainingCropDatasetItemWorkflowDep,
 ) -> DatasetItemResponse:
-    return state.store.create_dataset_item_from_training_crop(
+    return workflow.create_dataset_item_from_training_crop(
         user=user,
         training_crop_id=training_crop_id,
         request=request,
@@ -490,9 +511,9 @@ def get_training_crop_evidence(
     training_crop_id: UUID,
     workspace_id: UUID,
     user: AuthenticatedUserDep,
-    state: DevStateDep,
+    workflow: TrainingCropWorkflowDep,
 ) -> TrainingCropEvidenceResponse:
-    return state.store.get_training_crop_evidence(
+    return workflow.get_training_crop_evidence(
         user=user,
         workspace_id=workspace_id,
         training_crop_id=training_crop_id,
@@ -508,9 +529,9 @@ def create_training_crop_ellipse(
     training_crop_id: UUID,
     request: OrientedBeeEllipseCreateRequest,
     user: AuthenticatedUserDep,
-    state: DevStateDep,
+    workflow: TrainingCropWorkflowDep,
 ) -> OrientedBeeEllipseResponse:
-    return state.store.create_training_crop_ellipse(
+    return workflow.create_training_crop_ellipse(
         user=user,
         training_crop_id=training_crop_id,
         request=request,
@@ -525,9 +546,9 @@ def update_training_crop_ellipse(
     annotation_id: UUID,
     request: OrientedBeeEllipseUpdateRequest,
     user: AuthenticatedUserDep,
-    state: DevStateDep,
+    workflow: TrainingCropWorkflowDep,
 ) -> OrientedBeeEllipseResponse:
-    return state.store.update_training_crop_ellipse(
+    return workflow.update_training_crop_ellipse(
         user=user,
         annotation_id=annotation_id,
         request=request,
@@ -539,9 +560,9 @@ def delete_training_crop_ellipse(
     annotation_id: UUID,
     workspace_id: UUID,
     user: AuthenticatedUserDep,
-    state: DevStateDep,
+    workflow: TrainingCropWorkflowDep,
 ) -> Response:
-    state.store.delete_training_crop_ellipse(
+    workflow.delete_training_crop_ellipse(
         user=user,
         workspace_id=workspace_id,
         annotation_id=annotation_id,

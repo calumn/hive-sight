@@ -70,7 +70,7 @@ Acceptance criteria are provisional and will be refined as requirements are revi
 - The slice verification report records the service tests, API-level BDD scenarios, Web TypeScript checks, and browser acceptance tests that were executed.
 - The slice verification report records pass/fail status, commands run, concise summaries, and failure artifact locations where available.
 - The slice verification report does not claim formal code coverage percentages unless separate coverage tooling is added.
-- UI-level Gherkin should be introduced after the first Playwright browser harness stabilizes, within the next few slices.
+- UI-level Gherkin is parked as a future option. Until deliberately reselected, browser acceptance coverage uses Playwright specs plus generated slice verification reports.
 
 ## Ownership And Permissions
 

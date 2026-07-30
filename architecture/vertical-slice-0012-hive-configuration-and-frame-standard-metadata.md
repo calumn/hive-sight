@@ -16,7 +16,7 @@ This slice gives HiveSight the first explicit source-context signal for model bi
 - `architecture/vertical-slice-0009-training-crop-ellipse-annotation.md`
 - `architecture/vertical-slice-0010-bee-annotation-repository-and-dataset-export.md`
 - `architecture/vertical-slice-0011-physical-dataset-export-package.md`
-- `architecture/vertical-slice-0013-yolo-obb-training-baseline.md`
+- `architecture/vertical-slice-0015-yolo-obb-training-baseline.md`
 
 ## User Path
 
@@ -127,7 +127,7 @@ The catalogue source note should explicitly say the initial dimensions are proje
 - Dataset Item provenance snapshots current Hive Configuration at Dataset Item creation time.
 - Physical dataset export manifests include Hive Configuration metadata from Dataset Item provenance snapshots.
 - Physical export API responses remain summary-only; detailed Hive Configuration metadata lives in the Dataset Item provenance and `manifest.json`.
-- Training Run and Model Candidate behaviour remains out of scope until Slice 13.
+- Training Run and Model Candidate behaviour remains out of scope until the parked YOLO OBB Training Baseline slice is promoted.
 
 ## Layers Touched
 

@@ -173,3 +173,25 @@ Human judgment still required:
 - Revisit UI-level Gherkin before the next major UI workflow.
 - Create security, API contract governance, and release readiness skills when the parked triggers occur.
 - Use the traceability-audit skill before restarting functional slice delivery.
+
+### 2026-07-30 Review Remediation 0001 Implementation
+
+Human-confirmed decisions:
+
+- Resume implementation after the skills remediation and parking-lot pattern were in place.
+- Treat Review Remediation 0001 as a behaviour-preserving refactor, not a functional product slice.
+- Keep real persistence out of scope while making future persistence easier.
+
+AI contribution:
+
+- Added direct workflow tests for Hive Configuration/Inspection gating, Training Crop rules, and Training Crop Dataset Item assignment.
+- Added `HiveConfigurationWorkflow`, `TrainingCropWorkflow`, and `TrainingCropDatasetItemWorkflow`.
+- Rewired Core API routes to call injected workflows for the moved rule clusters.
+- Added persistence-shaped methods to `InMemoryProductDataStore` while preserving public API behaviour.
+- Verified the remediation with `pnpm verify:slice`.
+
+Human judgment still required:
+
+- Decide the real persistence technology and migration path.
+- Decide when Workspace authorization and Data Use Agreement checks should move from dev-store helpers into explicit policy services.
+- Extract YOLO OBB export/package construction out of `dev_store.py` before export persistence or long-running package generation becomes load-bearing.

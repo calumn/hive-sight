@@ -97,7 +97,7 @@ The UI shows package path, manifest path, dataset YAML path, counts, and caveat.
 - `manifest.json` includes generated label file references and the exact YOLO OBB label rows.
 - Slice 11 records SHA-256 hashes and byte sizes for generated crop images, label files, `manifest.json`, and `dataset.yaml`.
 - `pnpm verify:slice` must prove the physical export artifacts exist and contain the expected content.
-- Planned order remains Slice 11 physical export package, Slice 12 hive configuration/frame standard metadata, then Slice 13 YOLO OBB training baseline.
+- Planned order changed after external review remediation: Slice 13 is the review recommendations architecture decision pass, and the YOLO OBB training baseline is parked as Slice 15 pending that decision pass.
 
 ## Layers Touched
 

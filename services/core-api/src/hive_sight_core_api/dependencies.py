@@ -30,8 +30,13 @@ from hive_sight_core_api.grounding_dino_prelabeler import (
     GroundingDinoBeePrelabeler,
     TransformersGroundingDinoRunner,
 )
+from hive_sight_core_api.hive_configuration_workflow import HiveConfigurationWorkflow
 from hive_sight_core_api.inspection_photo_access import InspectionPhotoAccess
 from hive_sight_core_api.settings import Settings, load_settings
+from hive_sight_core_api.training_crop_dataset_item_workflow import (
+    TrainingCropDatasetItemWorkflow,
+)
+from hive_sight_core_api.training_crop_workflow import TrainingCropWorkflow
 
 DEFAULT_DATASET_EXPORT_ROOT = Path(__file__).resolve().parents[4] / "var" / "exports" / "datasets"
 
@@ -121,6 +126,20 @@ def get_dataset_role_assignment_workflow(
     state: DevStateDep,
 ) -> DatasetRoleAssignmentWorkflow:
     return DatasetRoleAssignmentWorkflow(store=state.store)
+
+
+def get_hive_configuration_workflow(state: DevStateDep) -> HiveConfigurationWorkflow:
+    return HiveConfigurationWorkflow(store=state.store)
+
+
+def get_training_crop_workflow(state: DevStateDep) -> TrainingCropWorkflow:
+    return TrainingCropWorkflow(store=state.store)
+
+
+def get_training_crop_dataset_item_workflow(
+    state: DevStateDep,
+) -> TrainingCropDatasetItemWorkflow:
+    return TrainingCropDatasetItemWorkflow(store=state.store)
 
 
 def get_inspection_photo_access(state: DevStateDep) -> InspectionPhotoAccess:

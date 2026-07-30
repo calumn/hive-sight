@@ -132,7 +132,7 @@ Minimum API shapes:
 - Production admin identity, production auth provider integration, invitations, multi-user Workspace roles, or a full admin console.
 - Durable database persistence if the in-memory/dev store remains sufficient for the slice.
 - CI integration beyond the existing local slice verification command.
-- UI-level Gherkin. It remains required within the next few slices, but this slice may continue using plain Playwright for browser acceptance if that keeps the product behaviour thin.
+- UI-level Gherkin. Later Slice 0013 planning parked this as a future option; this slice continues to rely on plain Playwright for browser acceptance.
 
 ## Acceptance Criteria
 

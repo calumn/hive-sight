@@ -232,19 +232,19 @@ Those names should belong to workflow/application services.
 
 ## Acceptance Criteria
 
-- [ ] `dev_store.py` no longer owns Training Crop validation rules directly.
-- [ ] `dev_store.py` no longer owns Dataset Item assignment validation rules directly.
-- [ ] `dev_store.py` no longer owns Hive Configuration validation rules directly.
-- [ ] Inspection creation gating is enforced by an application workflow rather than a store method.
-- [ ] New workflow/application service tests cover the moved rules directly.
-- [ ] Existing Core API tests continue to pass without weakening assertions.
-- [ ] Existing API-level BDD scenarios continue to pass.
-- [ ] Existing Playwright browser acceptance tests continue to pass.
-- [ ] Public request/response contracts do not change.
-- [ ] Stable `DomainError` codes and messages remain unchanged unless explicitly documented.
-- [ ] `architecture/review-remediation-2026-07-30.md` marks R-001 as actioned or partially actioned with residual debt.
-- [ ] `requirements/ai-sdlc-observations.md` records the remediation outcome after implementation.
-- [ ] `pnpm verify:slice` passes.
+- [x] `dev_store.py` no longer owns Training Crop validation rules directly.
+- [x] `dev_store.py` no longer owns Dataset Item assignment validation rules directly for Training Crop assignment.
+- [x] `dev_store.py` no longer owns Hive Configuration validation rules directly.
+- [x] Inspection creation gating is enforced by an application workflow rather than a store method.
+- [x] New workflow/application service tests cover the moved rules directly.
+- [x] Existing Core API tests continue to pass without weakening assertions.
+- [x] Existing API-level BDD scenarios continue to pass.
+- [x] Existing Playwright browser acceptance tests continue to pass.
+- [x] Public request/response contracts do not change.
+- [x] Stable `DomainError` codes and messages remain unchanged.
+- [x] `architecture/review-remediation-2026-07-30.md` marks R-001 as partially actioned with residual debt.
+- [x] `requirements/ai-sdlc-observations.md` records the remediation outcome after implementation.
+- [x] `pnpm verify:slice` passes.
 
 ## Out Of Scope
 
@@ -287,6 +287,37 @@ Those names should belong to workflow/application services.
 
 ## Open Questions
 
-- Should physical YOLO OBB export be extracted in this remediation, or left for a follow-up once Dataset Item assignment is moved?
-- Should capability checks remain on `InMemoryProductDataStore` temporarily, or become an explicit `AuthorizationPolicy` service now?
-- Should repository protocols live in one `repositories.py` module initially, or be split by domain area immediately?
+- Resolved: physical YOLO OBB export stays in `dev_store.py` for this remediation and remains residual debt.
+- Resolved: capability checks remain on `InMemoryProductDataStore` temporarily; extracting authorization policy is deferred until auth becomes real.
+- Resolved: no formal `repositories.py` was added yet. The remediation introduced persistence-shaped store methods first because there is still only one concrete adapter.
+
+## Implementation Outcome
+
+Implemented on 2026-07-30.
+
+New application workflow seams:
+
+- `HiveConfigurationWorkflow`
+  - owns Frame Standard selection rules, `other` notes validation, Hive Configuration upsert, Hive Configuration lookup, Inspection creation gating, and Inspection intent locking.
+- `TrainingCropWorkflow`
+  - owns Training Crop bounds validation, editable-state locking, zero-bee review rules, oriented bee ellipse validation, ellipse lifecycle, and Training Crop evidence projection.
+- `TrainingCropDatasetItemWorkflow`
+  - owns Training Crop to Dataset Item assignment rules, exclusion validation, reviewed ellipse snapshot creation, and Training Crop provenance snapshot assembly.
+
+Store changes:
+
+- Added persistence-shaped methods such as `get_hive`, `get_current_hive_configuration`, `save_hive_configuration`, `save_inspection`, `inspection_has_photos`, `get_inspection_photo`, `list_training_crops_for_photo_id`, `save_training_crop`, `save_training_crop_ellipse`, `get_training_crop_ellipse`, `delete_training_crop_ellipse_record`, and `save_dataset_item`.
+- Kept legacy store use-case method names as compatibility wrappers where helpful, but FastAPI routes now call injected workflows for the moved rule clusters.
+
+Verification:
+
+- Focused workflow and related API tests: 20 passed.
+- Core API tests: 83 passed, 1 xfailed.
+- Ruff: passed.
+- `pnpm verify:slice`: passed, including Core API tests, Analysis Service tests, Web TypeScript check, and 10 Playwright browser acceptance tests.
+
+Residual debt:
+
+- Older Dataset Labelling Session to Dataset Item assignment still uses `DatasetRoleAssignmentWorkflow` plus store persistence methods.
+- YOLO OBB export and physical package construction remain in `dev_store.py`.
+- Workspace authorization, Data Use Agreement, and dataset-curator capability checks remain on the in-memory store until production auth/persistence decisions justify an explicit policy/repository split.

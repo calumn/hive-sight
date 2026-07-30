@@ -29,6 +29,16 @@ Avoid using `component` or `boundary` when the more precise term is `module`, `i
 
 ## Core API Modules
 
+### Current Application Workflow Seams
+
+Review Remediation 0001 moved several recent domain-rule clusters out of the in-memory dev store and into explicit Core API workflows:
+
+- `HiveConfigurationWorkflow`: Frame Standard selection, Hive Configuration validation, Inspection creation gating, and Inspection intent locking.
+- `TrainingCropWorkflow`: Training Crop bounds, crop review state, crop locking, oriented bee ellipse validation, and Training Crop evidence projection.
+- `TrainingCropDatasetItemWorkflow`: Training Crop Dataset Item assignment, exclusion rules, reviewed ellipse snapshots, and Training Crop provenance snapshot assembly.
+
+`InMemoryProductDataStore` remains the concrete dev repository, but the moved workflows should stay the public application seams for route handlers and direct workflow tests. Do not put these rules back into store adapters when real persistence is introduced.
+
 ### Inspection Photo Access
 
 Candidate module:

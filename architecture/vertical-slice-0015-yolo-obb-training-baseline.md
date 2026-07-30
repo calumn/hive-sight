@@ -1,4 +1,14 @@
-# Vertical Slice 0013: YOLO OBB Training Baseline
+# Vertical Slice 0015: YOLO OBB Training Baseline
+
+Status: parked pending Vertical Slice 0013 closeout and Vertical Slice 0014 completion.
+
+This slice was originally drafted as Slice 0013. It has been renumbered and parked because the Review Recommendations Architecture Decision Pass must run first.
+
+Locked dependency:
+
+- Vertical Slice 0014 must introduce Postgres-backed Bee Annotation Repository metadata persistence before this training baseline is implemented.
+
+Slice 0013 closeout should still make an explicit `go`, `reshape`, `defer`, or `close` decision for this slice. The expected outcome from grilling is `go after Slice 0014`, unless the Slice 0013 architecture artifacts uncover a stronger blocker.
 
 ## Purpose
 
@@ -14,6 +24,8 @@ This slice should follow physical dataset packaging and hive/frame metadata work
 - `architecture/domain-model.md`
 - `architecture/vertical-slice-0011-physical-dataset-export-package.md`
 - `architecture/vertical-slice-0012-hive-configuration-and-frame-standard-metadata.md`
+- `architecture/vertical-slice-0013-review-recommendations-architecture-decision-pass.md`
+- `architecture/vertical-slice-0014-postgres-backed-bee-annotation-repository-persistence.md`
 
 ## User Outcome
 
@@ -23,8 +35,8 @@ A Dataset Curator or model reviewer can export reviewed bee evidence into a YOLO
 
 - Use a physical YOLO OBB dataset export package as training input.
 - Run a first YOLO OBB nano or small training job when enough local reviewed data exists.
-- Record Training Run metadata.
-- Record Model Candidate metadata.
+- Record Training Run metadata durably.
+- Record Model Candidate metadata durably.
 - Produce a baseline report that states data volume, model family, training settings, and basic validation metrics.
 
 ## Acceptance Criteria
@@ -43,6 +55,8 @@ A Dataset Curator or model reviewer can export reviewed bee evidence into a YOLO
 - Protected benchmark evaluation for release.
 - Cloud training infrastructure.
 - Production model serving.
+- Core API to Analysis Service integration.
+- Production auth, object storage, queue, or deployment decisions.
 
 ## Test Notes
 

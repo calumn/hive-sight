@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 from hashlib import sha256
 from io import BytesIO
-from math import cos, radians, sin, sqrt
+from math import cos, radians, sin
 from pathlib import Path
 from uuid import UUID, uuid4
 
@@ -31,12 +31,10 @@ from hive_sight_core_api.models import (
     GeneratedDatasetExportFileEntry,
     HiveConfigurationResponse,
     HiveConfigurationSnapshotResponse,
-    HiveConfigurationStatus,
     HiveConfigurationUpsertRequest,
     HiveResponse,
     ImageQualityStatus,
     InspectionIntent,
-    InspectionPhotoEvidenceResponse,
     InspectionPhotoListResponse,
     InspectionPhotoResponse,
     InspectionResponse,
@@ -52,13 +50,10 @@ from hive_sight_core_api.models import (
     TrainingCropCreateRequest,
     TrainingCropDatasetItemCreateRequest,
     TrainingCropEvidenceResponse,
-    TrainingCropExclusionReason,
     TrainingCropListResponse,
     TrainingCropResponse,
-    TrainingCropReviewStatus,
     TrainingCropUpdateRequest,
     UploadStatus,
-    VisibleBeeStatus,
     WorkspaceDataUseAgreementAcceptanceResponse,
     YoloObbExcludedItem,
     YoloObbExportResponse,
@@ -228,6 +223,9 @@ class InMemoryProductDataStore:
         self.hives[hive.hive_id] = hive
         return hive
 
+    def get_hive(self, hive_id: UUID) -> HiveResponse | None:
+        return self.hives.get(hive_id)
+
     def list_frame_standards(self) -> list[FrameStandardResponse]:
         return list(FRAME_STANDARDS)
 
@@ -237,53 +235,32 @@ class InMemoryProductDataStore:
                 return frame_standard
         return None
 
+    def get_current_hive_configuration(
+        self,
+        hive_id: UUID,
+    ) -> HiveConfigurationResponse | None:
+        return self.hive_configurations.get(hive_id)
+
+    def save_hive_configuration(
+        self,
+        configuration: HiveConfigurationResponse,
+    ) -> HiveConfigurationResponse:
+        self.hive_configurations[configuration.hive_id] = configuration
+        return configuration
+
     def upsert_hive_configuration(
         self,
         user: UserContext,
         hive_id: UUID,
         request: HiveConfigurationUpsertRequest,
     ) -> HiveConfigurationResponse:
-        hive = self.hives.get(hive_id)
-        if hive is None or hive.workspace_id != request.workspace_id:
-            raise DomainError(
-                "hive_not_found",
-                "The requested Hive was not found in this Workspace.",
-                404,
-            )
-        self.require_workspace_access(user, hive.workspace_id)
-        frame_standard = self.get_frame_standard(request.frame_standard_id)
-        if frame_standard is None:
-            raise DomainError(
-                "frame_standard_not_found",
-                "The requested Frame Standard is not in the HiveSight starter catalogue.",
-                422,
-            )
-        notes = _clean_optional_text(request.notes)
-        if frame_standard.status == FrameStandardStatus.other and notes is None:
-            raise DomainError(
-                "hive_configuration_notes_required",
-                "The 'other' Frame Standard requires Hive Configuration notes.",
-                422,
-            )
-        existing = self.hive_configurations.get(hive_id)
-        now = self.clock()
-        configuration = HiveConfigurationResponse(
-            hive_configuration_id=existing.hive_configuration_id if existing else self.id_factory(),
+        from hive_sight_core_api.hive_configuration_workflow import HiveConfigurationWorkflow
+
+        return HiveConfigurationWorkflow(store=self).upsert_hive_configuration(
+            user=user,
             hive_id=hive_id,
-            workspace_id=hive.workspace_id,
-            hive_type=frame_standard.hive_type,
-            frame_use=frame_standard.frame_use,
-            frame_standard_id=frame_standard.frame_standard_id,
-            frame_standard=frame_standard,
-            notes=notes,
-            status=HiveConfigurationStatus.current,
-            effective_from=request.effective_from or now.date(),
-            configured_by_user_id=user.user_id,
-            configured_at=existing.configured_at if existing else now,
-            updated_at=now,
+            request=request,
         )
-        self.hive_configurations[hive_id] = configuration
-        return configuration
 
     def get_hive_configuration(
         self,
@@ -291,22 +268,13 @@ class InMemoryProductDataStore:
         workspace_id: UUID,
         hive_id: UUID,
     ) -> HiveConfigurationResponse:
-        hive = self.hives.get(hive_id)
-        if hive is None or hive.workspace_id != workspace_id:
-            raise DomainError(
-                "hive_not_found",
-                "The requested Hive was not found in this Workspace.",
-                404,
-            )
-        self.require_workspace_access(user, workspace_id)
-        configuration = self.hive_configurations.get(hive_id)
-        if configuration is None:
-            raise DomainError(
-                "hive_configuration_required",
-                "Record Hive Configuration before using this Hive for Inspections.",
-                409,
-            )
-        return configuration
+        from hive_sight_core_api.hive_configuration_workflow import HiveConfigurationWorkflow
+
+        return HiveConfigurationWorkflow(store=self).get_hive_configuration(
+            user=user,
+            workspace_id=workspace_id,
+            hive_id=hive_id,
+        )
 
     def create_inspection(
         self,
@@ -315,25 +283,14 @@ class InMemoryProductDataStore:
         inspection_date: date,
         intent: InspectionIntent,
     ) -> InspectionResponse:
-        hive = self.hives.get(hive_id)
-        if hive is None:
-            raise DomainError("inspection_not_found", "The requested hive was not found.", 404)
-        self.require_workspace_access(user, hive.workspace_id)
-        if hive.hive_id not in self.hive_configurations:
-            raise DomainError(
-                "hive_configuration_required",
-                "Record Hive Configuration before creating an Inspection for this Hive.",
-                409,
-            )
-        inspection = InspectionResponse(
-            inspection_id=self.id_factory(),
+        from hive_sight_core_api.hive_configuration_workflow import HiveConfigurationWorkflow
+
+        return HiveConfigurationWorkflow(store=self).create_inspection(
+            user=user,
             hive_id=hive_id,
-            workspace_id=hive.workspace_id,
             inspection_date=inspection_date,
             intent=intent,
         )
-        self.inspections[inspection.inspection_id] = inspection
-        return inspection
 
     def update_inspection_intent(
         self,
@@ -342,17 +299,21 @@ class InMemoryProductDataStore:
         inspection_id: UUID,
         intent: InspectionIntent,
     ) -> InspectionResponse:
-        self.require_workspace_access(user, workspace_id)
-        inspection = self.require_inspection(workspace_id, inspection_id)
-        if any(photo.inspection_id == inspection_id for photo in self.inspection_photos.values()):
-            raise DomainError(
-                "inspection_intent_locked",
-                "Inspection intent cannot be changed after photos have been uploaded.",
-                409,
-            )
-        updated = inspection.model_copy(update={"intent": intent})
-        self.inspections[updated.inspection_id] = updated
-        return updated
+        from hive_sight_core_api.hive_configuration_workflow import HiveConfigurationWorkflow
+
+        return HiveConfigurationWorkflow(store=self).update_inspection_intent(
+            user=user,
+            workspace_id=workspace_id,
+            inspection_id=inspection_id,
+            intent=intent,
+        )
+
+    def save_inspection(self, inspection: InspectionResponse) -> InspectionResponse:
+        self.inspections[inspection.inspection_id] = inspection
+        return inspection
+
+    def inspection_has_photos(self, inspection_id: UUID) -> bool:
+        return any(photo.inspection_id == inspection_id for photo in self.inspection_photos.values())
 
     def require_workspace_access(self, user: UserContext, workspace_id: UUID) -> None:
         if workspace_id not in self.workspaces:
@@ -419,6 +380,12 @@ class InMemoryProductDataStore:
         )
         self.inspection_photos[inspection_photo_id] = photo
         return photo
+
+    def get_inspection_photo(
+        self,
+        inspection_photo_id: UUID,
+    ) -> InspectionPhotoResponse | None:
+        return self.inspection_photos.get(inspection_photo_id)
 
     def list_inspection_photos(
         self,
@@ -744,44 +711,9 @@ class InMemoryProductDataStore:
         user: UserContext,
         request: TrainingCropCreateRequest,
     ) -> TrainingCropResponse:
-        self.require_inspection_photo_for_training_crop(
-            user=user,
-            workspace_id=request.workspace_id,
-            inspection_photo_id=request.inspection_photo_id,
-        )
-        self._validate_crop_bounds(
-            crop_x=request.crop_x,
-            crop_y=request.crop_y,
-            crop_width=request.crop_width,
-            crop_height=request.crop_height,
-            source_image_width_px=request.source_image_width_px,
-            source_image_height_px=request.source_image_height_px,
-        )
-        created_at = self.clock()
-        crop = TrainingCropResponse(
-            training_crop_id=self.id_factory(),
-            workspace_id=request.workspace_id,
-            inspection_photo_id=request.inspection_photo_id,
-            crop_x=request.crop_x,
-            crop_y=request.crop_y,
-            crop_width=request.crop_width,
-            crop_height=request.crop_height,
-            coordinate_space="source_image_pixels",
-            source_image_width_px=request.source_image_width_px,
-            source_image_height_px=request.source_image_height_px,
-            crop_image_width_px=request.crop_width,
-            crop_image_height_px=request.crop_height,
-            curriculum_stage="small_crop",
-            review_status=TrainingCropReviewStatus.review_pending,
-            visible_bee_status=VisibleBeeStatus.unassessed,
-            exclusion_reason=None,
-            notes=_clean_optional_text(request.notes),
-            created_by_user_id=user.user_id,
-            created_at=created_at,
-            updated_at=created_at,
-        )
-        self.training_crops[crop.training_crop_id] = crop
-        return crop
+        from hive_sight_core_api.training_crop_workflow import TrainingCropWorkflow
+
+        return TrainingCropWorkflow(store=self).create_training_crop(user=user, request=request)
 
     def list_training_crops_for_photo(
         self,
@@ -789,18 +721,30 @@ class InMemoryProductDataStore:
         workspace_id: UUID,
         inspection_photo_id: UUID,
     ) -> TrainingCropListResponse:
-        photo = self.require_inspection_photo_for_training_crop(
+        from hive_sight_core_api.training_crop_workflow import TrainingCropWorkflow
+
+        return TrainingCropWorkflow(store=self).list_training_crops_for_photo(
             user=user,
             workspace_id=workspace_id,
             inspection_photo_id=inspection_photo_id,
         )
+        
+    def list_training_crops_for_photo_id(
+        self,
+        workspace_id: UUID,
+        inspection_photo_id: UUID,
+    ) -> list[TrainingCropResponse]:
         crops = [
             crop
             for crop in self.training_crops.values()
             if crop.workspace_id == workspace_id and crop.inspection_photo_id == inspection_photo_id
         ]
         crops.sort(key=lambda crop: crop.created_at)
-        return TrainingCropListResponse(inspection_photo=photo, training_crops=crops)
+        return crops
+
+    def save_training_crop(self, crop: TrainingCropResponse) -> TrainingCropResponse:
+        self.training_crops[crop.training_crop_id] = crop
+        return crop
 
     def update_training_crop(
         self,
@@ -808,75 +752,13 @@ class InMemoryProductDataStore:
         training_crop_id: UUID,
         request: TrainingCropUpdateRequest,
     ) -> TrainingCropResponse:
-        crop = self.require_training_crop(
+        from hive_sight_core_api.training_crop_workflow import TrainingCropWorkflow
+
+        return TrainingCropWorkflow(store=self).update_training_crop(
             user=user,
-            workspace_id=request.workspace_id,
             training_crop_id=training_crop_id,
+            request=request,
         )
-        self._require_crop_editable(crop)
-        existing_ellipses = self.get_ellipses_for_training_crop(training_crop_id)
-        bounds_updates = {
-            key: value
-            for key, value in {
-                "crop_x": request.crop_x,
-                "crop_y": request.crop_y,
-                "crop_width": request.crop_width,
-                "crop_height": request.crop_height,
-            }.items()
-            if value is not None
-        }
-        if bounds_updates and existing_ellipses:
-            raise DomainError(
-                "crop_bounds_locked",
-                "Training Crop bounds cannot be changed after bee ellipses exist.",
-                409,
-            )
-
-        next_values = {
-            "crop_x": crop.crop_x,
-            "crop_y": crop.crop_y,
-            "crop_width": crop.crop_width,
-            "crop_height": crop.crop_height,
-            "visible_bee_status": crop.visible_bee_status,
-            "review_status": crop.review_status,
-            "exclusion_reason": crop.exclusion_reason,
-            "notes": crop.notes,
-        }
-        next_values.update(bounds_updates)
-        if request.visible_bee_status is not None:
-            next_values["visible_bee_status"] = request.visible_bee_status
-        if request.review_status is not None:
-            next_values["review_status"] = request.review_status
-        if request.exclusion_reason is not None:
-            next_values["exclusion_reason"] = request.exclusion_reason
-        if request.notes is not None:
-            next_values["notes"] = _clean_optional_text(request.notes)
-
-        self._validate_crop_bounds(
-            crop_x=next_values["crop_x"],
-            crop_y=next_values["crop_y"],
-            crop_width=next_values["crop_width"],
-            crop_height=next_values["crop_height"],
-            source_image_width_px=crop.source_image_width_px,
-            source_image_height_px=crop.source_image_height_px,
-        )
-        self._validate_crop_review_state(
-            visible_bee_status=next_values["visible_bee_status"],
-            review_status=next_values["review_status"],
-            exclusion_reason=next_values["exclusion_reason"],
-            ellipse_count=len(existing_ellipses),
-        )
-
-        updated = crop.model_copy(
-            update={
-                **next_values,
-                "crop_image_width_px": next_values["crop_width"],
-                "crop_image_height_px": next_values["crop_height"],
-                "updated_at": self.clock(),
-            }
-        )
-        self.training_crops[updated.training_crop_id] = updated
-        return updated
 
     def create_training_crop_ellipse(
         self,
@@ -884,58 +766,26 @@ class InMemoryProductDataStore:
         training_crop_id: UUID,
         request: OrientedBeeEllipseCreateRequest,
     ) -> OrientedBeeEllipseResponse:
-        crop = self.require_training_crop(
+        from hive_sight_core_api.training_crop_workflow import TrainingCropWorkflow
+
+        return TrainingCropWorkflow(store=self).create_training_crop_ellipse(
             user=user,
-            workspace_id=request.workspace_id,
             training_crop_id=training_crop_id,
+            request=request,
         )
-        self._require_crop_editable(crop)
-        if crop.visible_bee_status == VisibleBeeStatus.no_visible_bees:
-            raise DomainError(
-                "no_visible_bees_conflicts_with_ellipses",
-                "A no-visible-bees Training Crop cannot retain bee ellipses.",
-                409,
-            )
-        self._validate_bee_annotation_type(request.annotation_type)
-        rotation = _normalize_rotation(request.rotation_degrees)
-        self._validate_ellipse_inside_crop(
-            crop=crop,
-            center_x=request.center_x,
-            center_y=request.center_y,
-            radius_x=request.radius_x,
-            radius_y=request.radius_y,
-            rotation_degrees=rotation,
-        )
-        created_at = self.clock()
-        ellipse = OrientedBeeEllipseResponse(
-            annotation_id=self.id_factory(),
-            workspace_id=request.workspace_id,
-            inspection_photo_id=crop.inspection_photo_id,
-            training_crop_id=training_crop_id,
-            annotation_type=request.annotation_type,
-            center_x=request.center_x,
-            center_y=request.center_y,
-            radius_x=request.radius_x,
-            radius_y=request.radius_y,
-            rotation_degrees=rotation,
-            coordinate_space="source_image_pixels",
-            source_image_width_px=crop.source_image_width_px,
-            source_image_height_px=crop.source_image_height_px,
-            source="human_from_scratch",
-            created_by_user_id=user.user_id,
-            created_at=created_at,
-            updated_at=created_at,
-        )
+
+    def save_training_crop_ellipse(
+        self,
+        ellipse: OrientedBeeEllipseResponse,
+    ) -> OrientedBeeEllipseResponse:
         self.training_crop_ellipses[ellipse.annotation_id] = ellipse
-        if crop.visible_bee_status == VisibleBeeStatus.unassessed:
-            updated_crop = crop.model_copy(
-                update={
-                    "visible_bee_status": VisibleBeeStatus.has_visible_bees,
-                    "updated_at": created_at,
-                }
-            )
-            self.training_crops[updated_crop.training_crop_id] = updated_crop
         return ellipse
+
+    def get_training_crop_ellipse(
+        self,
+        annotation_id: UUID,
+    ) -> OrientedBeeEllipseResponse | None:
+        return self.training_crop_ellipses.get(annotation_id)
 
     def update_training_crop_ellipse(
         self,
@@ -943,37 +793,13 @@ class InMemoryProductDataStore:
         annotation_id: UUID,
         request: OrientedBeeEllipseUpdateRequest,
     ) -> OrientedBeeEllipseResponse:
-        ellipse = self.training_crop_ellipses.get(annotation_id)
-        if ellipse is None or ellipse.workspace_id != request.workspace_id:
-            raise DomainError(
-                "ellipse_not_found",
-                "The requested oriented bee ellipse was not found in this Workspace.",
-                404,
-            )
-        crop = self.require_training_crop(
+        from hive_sight_core_api.training_crop_workflow import TrainingCropWorkflow
+
+        return TrainingCropWorkflow(store=self).update_training_crop_ellipse(
             user=user,
-            workspace_id=request.workspace_id,
-            training_crop_id=ellipse.training_crop_id,
+            annotation_id=annotation_id,
+            request=request,
         )
-        self._require_crop_editable(crop)
-        annotation_type = request.annotation_type or ellipse.annotation_type
-        self._validate_bee_annotation_type(annotation_type)
-        next_values = {
-            "annotation_type": annotation_type,
-            "center_x": ellipse.center_x if request.center_x is None else request.center_x,
-            "center_y": ellipse.center_y if request.center_y is None else request.center_y,
-            "radius_x": ellipse.radius_x if request.radius_x is None else request.radius_x,
-            "radius_y": ellipse.radius_y if request.radius_y is None else request.radius_y,
-            "rotation_degrees": (
-                ellipse.rotation_degrees
-                if request.rotation_degrees is None
-                else _normalize_rotation(request.rotation_degrees)
-            ),
-        }
-        self._validate_ellipse_inside_crop(crop=crop, **next_values)
-        updated = ellipse.model_copy(update={**next_values, "updated_at": self.clock()})
-        self.training_crop_ellipses[updated.annotation_id] = updated
-        return updated
 
     def delete_training_crop_ellipse(
         self,
@@ -981,19 +807,15 @@ class InMemoryProductDataStore:
         workspace_id: UUID,
         annotation_id: UUID,
     ) -> None:
-        ellipse = self.training_crop_ellipses.get(annotation_id)
-        if ellipse is None or ellipse.workspace_id != workspace_id:
-            raise DomainError(
-                "ellipse_not_found",
-                "The requested oriented bee ellipse was not found in this Workspace.",
-                404,
-            )
-        crop = self.require_training_crop(
+        from hive_sight_core_api.training_crop_workflow import TrainingCropWorkflow
+
+        TrainingCropWorkflow(store=self).delete_training_crop_ellipse(
             user=user,
             workspace_id=workspace_id,
-            training_crop_id=ellipse.training_crop_id,
+            annotation_id=annotation_id,
         )
-        self._require_crop_editable(crop)
+
+    def delete_training_crop_ellipse_record(self, annotation_id: UUID) -> None:
         del self.training_crop_ellipses[annotation_id]
 
     def get_training_crop_evidence(
@@ -1002,34 +824,12 @@ class InMemoryProductDataStore:
         workspace_id: UUID,
         training_crop_id: UUID,
     ) -> TrainingCropEvidenceResponse:
-        crop = self.require_training_crop(
+        from hive_sight_core_api.training_crop_workflow import TrainingCropWorkflow
+
+        return TrainingCropWorkflow(store=self).get_training_crop_evidence(
             user=user,
             workspace_id=workspace_id,
             training_crop_id=training_crop_id,
-        )
-        photo = self.require_inspection_photo_for_training_crop(
-            user=user,
-            workspace_id=workspace_id,
-            inspection_photo_id=crop.inspection_photo_id,
-        )
-        return TrainingCropEvidenceResponse(
-            inspection_photo=InspectionPhotoEvidenceResponse(
-                inspection_photo_id=photo.inspection_photo_id,
-                filename=photo.filename,
-                content_type=photo.content_type,
-                view_url=(
-                    f"/v1/inspection-photos/{photo.inspection_photo_id}/content"
-                    f"?workspace_id={workspace_id}"
-                ),
-                width=crop.source_image_width_px,
-                height=crop.source_image_height_px,
-            ),
-            training_crop=crop,
-            bee_ellipses=self.get_ellipses_for_training_crop(training_crop_id),
-            caveat=(
-                "Training Crop annotations are human-created review evidence. "
-                "Dataset use is assigned later through Bee Annotation Repository workflows."
-            ),
         )
 
     def require_training_crop(
@@ -1061,116 +861,6 @@ class InMemoryProductDataStore:
         ]
         ellipses.sort(key=lambda ellipse: ellipse.created_at)
         return ellipses
-
-    def _validate_crop_bounds(
-        self,
-        crop_x: int,
-        crop_y: int,
-        crop_width: int,
-        crop_height: int,
-        source_image_width_px: int,
-        source_image_height_px: int,
-    ) -> None:
-        if (
-            crop_x < 0
-            or crop_y < 0
-            or crop_width <= 0
-            or crop_height <= 0
-            or crop_x + crop_width > source_image_width_px
-            or crop_y + crop_height > source_image_height_px
-        ):
-            raise DomainError(
-                "invalid_crop_bounds",
-                "Training Crop bounds must fit inside the source Inspection Photo.",
-                422,
-            )
-
-    def _validate_crop_review_state(
-        self,
-        visible_bee_status: VisibleBeeStatus,
-        review_status: TrainingCropReviewStatus,
-        exclusion_reason: TrainingCropExclusionReason | None,
-        ellipse_count: int,
-    ) -> None:
-        if visible_bee_status == VisibleBeeStatus.no_visible_bees and ellipse_count > 0:
-            raise DomainError(
-                "no_visible_bees_conflicts_with_ellipses",
-                "A no-visible-bees Training Crop cannot retain bee ellipses.",
-                409,
-            )
-        if (
-            review_status == TrainingCropReviewStatus.review_complete
-            and visible_bee_status == VisibleBeeStatus.has_visible_bees
-            and ellipse_count == 0
-        ):
-            raise DomainError(
-                "visible_bees_require_ellipse",
-                "A reviewed Training Crop with visible bees requires at least one bee ellipse.",
-                409,
-            )
-        if (
-            review_status == TrainingCropReviewStatus.review_complete
-            and visible_bee_status == VisibleBeeStatus.unassessed
-        ):
-            raise DomainError(
-                "visible_bee_status_required",
-                "A reviewed Training Crop requires an assessed visible bee status.",
-                409,
-            )
-        if review_status == TrainingCropReviewStatus.excluded and exclusion_reason is None:
-            raise DomainError(
-                "exclusion_reason_required",
-                "An excluded Training Crop requires an exclusion reason.",
-                409,
-            )
-
-    def _validate_bee_annotation_type(self, annotation_type: AnnotationType) -> None:
-        if annotation_type not in {
-            AnnotationType.complete_visible_bee,
-            AnnotationType.partial_visible_bee,
-        }:
-            raise DomainError(
-                "unsupported_training_crop_annotation_type",
-                "Training Crop annotation supports complete and partial visible bees only.",
-                422,
-            )
-
-    def _validate_ellipse_inside_crop(
-        self,
-        crop: TrainingCropResponse,
-        center_x: float,
-        center_y: float,
-        radius_x: float,
-        radius_y: float,
-        rotation_degrees: float,
-        annotation_type: AnnotationType | None = None,
-    ) -> None:
-        _ = annotation_type
-        angle = radians(rotation_degrees)
-        x_extent = sqrt((radius_x * cos(angle)) ** 2 + (radius_y * sin(angle)) ** 2)
-        y_extent = sqrt((radius_x * sin(angle)) ** 2 + (radius_y * cos(angle)) ** 2)
-        if (
-            center_x - x_extent < crop.crop_x
-            or center_y - y_extent < crop.crop_y
-            or center_x + x_extent > crop.crop_x + crop.crop_width
-            or center_y + y_extent > crop.crop_y + crop.crop_height
-        ):
-            raise DomainError(
-                "ellipse_outside_crop_bounds",
-                "Oriented bee ellipses must stay inside the Training Crop bounds.",
-                422,
-            )
-
-    def _require_crop_editable(self, crop: TrainingCropResponse) -> None:
-        if crop.review_status in {
-            TrainingCropReviewStatus.review_complete,
-            TrainingCropReviewStatus.excluded,
-        }:
-            raise DomainError(
-                "training_crop_locked",
-                "Completed or excluded Training Crops are locked in this slice.",
-                409,
-            )
 
     def existing_labelling_session_for_photo(
         self,
@@ -1356,80 +1046,17 @@ class InMemoryProductDataStore:
         training_crop_id: UUID,
         request: TrainingCropDatasetItemCreateRequest,
     ) -> DatasetItemResponse:
-        crop = self.require_training_crop(
-            user=user,
-            workspace_id=request.workspace_id,
-            training_crop_id=training_crop_id,
+        from hive_sight_core_api.training_crop_dataset_item_workflow import (
+            TrainingCropDatasetItemWorkflow,
         )
-        cleaned_note = _clean_optional_text(request.assignment_note)
-        self._validate_dataset_item_exclusion(
-            dataset_role=request.dataset_role,
-            assignment_note=cleaned_note,
-            exclusion_reason=request.exclusion_reason,
-        )
-        self._validate_training_crop_dataset_item_state(
-            crop=crop,
-            dataset_role=request.dataset_role,
-        )
-        existing = self.get_dataset_item_for_training_crop(training_crop_id)
-        if existing is not None:
-            raise DomainError(
-                "dataset_item_already_assigned",
-                "This Training Crop has already been assigned to a Dataset Item.",
-                409,
-            )
 
-        ellipses = self.get_ellipses_for_training_crop(training_crop_id)
-        ellipse_snapshots = [
-            ReviewedEllipseSnapshot(
-                annotation_id=ellipse.annotation_id,
-                annotation_type=ellipse.annotation_type,
-                center_x=ellipse.center_x,
-                center_y=ellipse.center_y,
-                radius_x=ellipse.radius_x,
-                radius_y=ellipse.radius_y,
-                rotation_degrees=ellipse.rotation_degrees,
-                coordinate_space=ellipse.coordinate_space,
-                source_image_width_px=ellipse.source_image_width_px,
-                source_image_height_px=ellipse.source_image_height_px,
-                source=ellipse.source,
-                created_by_user_id=ellipse.created_by_user_id,
-                created_at=ellipse.created_at,
-                updated_at=ellipse.updated_at,
-            )
-            for ellipse in ellipses
-        ]
-        provenance = self._dataset_item_provenance_for_training_crop(crop)
-        dataset_item = DatasetItemResponse(
-            dataset_item_id=self.id_factory(),
-            workspace_id=request.workspace_id,
-            inspection_photo_id=crop.inspection_photo_id,
-            labelling_session_id=None,
+        return TrainingCropDatasetItemWorkflow(store=self).create_dataset_item_from_training_crop(
+            user=user,
             training_crop_id=training_crop_id,
-            source_evidence_type="training_crop",
-            dataset_role=request.dataset_role,
-            reviewed_annotation_ids=[ellipse.annotation_id for ellipse in ellipses],
-            reviewed_ellipse_snapshots=ellipse_snapshots,
-            crop_x=crop.crop_x,
-            crop_y=crop.crop_y,
-            crop_width=crop.crop_width,
-            crop_height=crop.crop_height,
-            crop_image_width_px=crop.crop_image_width_px,
-            crop_image_height_px=crop.crop_image_height_px,
-            curriculum_stage=crop.curriculum_stage,
-            source_group_key=None,
-            image_quality_status=(
-                ImageQualityStatus.exclude
-                if request.dataset_role == DatasetRole.excluded
-                else ImageQualityStatus.usable
-            ),
-            provenance=provenance,
-            assigned_by_user_id=user.user_id,
-            assigned_at=self.clock(),
-            assignment_note=cleaned_note,
-            exclusion_reason=request.exclusion_reason,
-            benchmark_protected=request.dataset_role == DatasetRole.benchmark,
+            request=request,
         )
+
+    def save_dataset_item(self, dataset_item: DatasetItemResponse) -> DatasetItemResponse:
         self.dataset_items[dataset_item.dataset_item_id] = dataset_item
         return dataset_item
 
@@ -1785,66 +1412,6 @@ class InMemoryProductDataStore:
             bottom_bar_length_mm=frame_standard.bottom_bar_length_mm,
             side_bar_height_mm=frame_standard.side_bar_height_mm,
         )
-
-    def _validate_dataset_item_exclusion(
-        self,
-        dataset_role: DatasetRole,
-        assignment_note: str | None,
-        exclusion_reason: DatasetExclusionReason | None,
-    ) -> None:
-        if dataset_role == DatasetRole.excluded and exclusion_reason is None:
-            raise DomainError(
-                "exclusion_reason_required",
-                "Excluded Dataset Items require an exclusion reason.",
-                422,
-            )
-        if dataset_role != DatasetRole.excluded and exclusion_reason is not None:
-            raise DomainError(
-                "exclusion_reason_not_allowed",
-                "Only excluded Dataset Items may carry an exclusion reason.",
-                422,
-            )
-        if exclusion_reason == DatasetExclusionReason.other and assignment_note is None:
-            raise DomainError(
-                "assignment_note_required",
-                "The 'other' exclusion reason requires an assignment note.",
-                422,
-            )
-
-    def _validate_training_crop_dataset_item_state(
-        self,
-        crop: TrainingCropResponse,
-        dataset_role: DatasetRole,
-    ) -> None:
-        if crop.review_status == TrainingCropReviewStatus.review_pending:
-            raise DomainError(
-                "training_crop_review_required",
-                "Assign a Dataset Role only after Training Crop review is complete or excluded.",
-                409,
-            )
-        if crop.review_status == TrainingCropReviewStatus.excluded:
-            if dataset_role != DatasetRole.excluded:
-                raise DomainError(
-                    "training_crop_excluded_requires_excluded_role",
-                    "Excluded Training Crops can only create excluded Dataset Items.",
-                    409,
-                )
-            return
-        if crop.visible_bee_status == VisibleBeeStatus.no_visible_bees:
-            if dataset_role != DatasetRole.excluded:
-                raise DomainError(
-                    "no_visible_bees_requires_excluded_role",
-                    "No-visible-bees Training Crops can only create excluded Dataset Items in this slice.",
-                    409,
-                )
-            return
-        ellipses = self.get_ellipses_for_training_crop(crop.training_crop_id)
-        if crop.visible_bee_status != VisibleBeeStatus.has_visible_bees or not ellipses:
-            raise DomainError(
-                "reviewed_visible_bees_required",
-                "Dataset Items for bee detector training require reviewed visible bee ellipses.",
-                409,
-            )
 
     def require_inspection_photo_for_view(
         self,
