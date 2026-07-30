@@ -629,6 +629,46 @@ label span {
   grid-template-columns: minmax(180px, 260px) minmax(0, 1fr) minmax(140px, 190px);
 }
 
+.crop-dataset-controls {
+  grid-template-columns: minmax(0, 1fr) minmax(160px, 220px) minmax(220px, 1fr) repeat(2, minmax(140px, 170px));
+}
+
+.crop-dataset-controls > div:first-child,
+.crop-dataset-controls .review-state,
+.crop-dataset-controls .export-summary {
+  grid-column: 1 / -1;
+}
+
+.crop-dataset-controls p {
+  color: #515b4c;
+  line-height: 1.4;
+  margin-bottom: 0;
+}
+
+.export-summary {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #dce2d7;
+  border-radius: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding: 10px;
+}
+
+.export-summary span,
+.export-summary code {
+  background: #f7f9f5;
+  border: 1px solid #dce2d7;
+  border-radius: 6px;
+  font-weight: 800;
+  padding: 6px 8px;
+}
+
+.export-summary code {
+  font-family: "SFMono-Regular", Consolas, monospace;
+}
+
 .crop-draft-controls {
   grid-template-columns: repeat(4, minmax(110px, 1fr)) minmax(140px, 180px);
 }
@@ -868,6 +908,7 @@ label span {
   .crop-photo-controls,
   .crop-draft-controls,
   .crop-completion-controls,
+  .crop-dataset-controls,
   .crop-editing-tool,
   .control-cluster {
     grid-template-columns: 1fr;

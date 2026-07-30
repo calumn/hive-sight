@@ -28,6 +28,8 @@ import {
   createHive,
   createInspection,
   createDatasetItem,
+  createTrainingCropDatasetItem,
+  createYoloObbExport,
   createReviewDecision,
   deleteTrainingCropEllipse,
   fetchAnalysisEvidence,
@@ -55,6 +57,7 @@ import {
   type Hive,
   type DatasetLabellingEvidence,
   type DatasetExclusionReason,
+  type DatasetItem,
   type DatasetRole,
   type ImageQualityStatus,
   type Inspection,
@@ -66,7 +69,8 @@ import {
   type TrainingCrop,
   type TrainingCropEvidence,
   type TrainingCropExclusionReason,
-  type VisibleBeeStatus
+  type VisibleBeeStatus,
+  type YoloObbExport
 } from "./coreApiClient";
 
 const devUserId = "00000000-0000-0000-0000-000000000101";
@@ -1013,6 +1017,14 @@ function TrainingCropAnnotationPanel({
   const [visibleBeeStatus, setVisibleBeeStatus] = useState<VisibleBeeStatus>("has_visible_bees");
   const [exclusionReason, setExclusionReason] =
     useState<TrainingCropExclusionReason>("unsuitable_crop");
+  const [datasetRole, setDatasetRole] = useState<DatasetRole>("training");
+  const [datasetAssignmentNote, setDatasetAssignmentNote] = useState(
+    "Assigned from completed Training Crop review."
+  );
+  const [datasetExclusionReason, setDatasetExclusionReason] =
+    useState<DatasetExclusionReason>("unsuitable_crop");
+  const [trainingCropDatasetItem, setTrainingCropDatasetItem] = useState<DatasetItem | null>(null);
+  const [yoloObbExport, setYoloObbExport] = useState<YoloObbExport | null>(null);
   const [workingLabel, setWorkingLabel] = useState<string | null>(null);
 
   const selectedPhoto = photos.find((photo) => photo.inspectionPhotoId === selectedPhotoId) ?? null;
@@ -1108,8 +1120,10 @@ function TrainingCropAnnotationPanel({
   useEffect(() => {
     if (!selectedCropId) {
       setEvidence(null);
+      setTrainingCropDatasetItem(null);
       return;
     }
+    setTrainingCropDatasetItem(null);
     void refreshEvidence(selectedCropId);
   }, [selectedCropId]);
 
@@ -1280,6 +1294,30 @@ function TrainingCropAnnotationPanel({
       });
       await refreshEvidence(selectedCrop.trainingCropId);
       if (selectedPhoto) await refreshCropsForPhoto(selectedPhoto.inspectionPhotoId);
+    });
+  }
+
+  async function assignSelectedCropToDataset() {
+    if (!selectedCrop) {
+      return;
+    }
+    await runCropAction("Assigning Dataset Item", async () => {
+      const datasetItem = await createTrainingCropDatasetItem({
+        devUserId,
+        workspaceId,
+        trainingCropId: selectedCrop.trainingCropId,
+        datasetRole,
+        assignmentNote: datasetAssignmentNote,
+        exclusionReason: datasetRole === "excluded" ? datasetExclusionReason : null
+      });
+      setTrainingCropDatasetItem(datasetItem);
+    });
+  }
+
+  async function createExportManifest() {
+    await runCropAction("Creating YOLO OBB export", async () => {
+      const manifest = await createYoloObbExport({ devUserId, workspaceId });
+      setYoloObbExport(manifest);
     });
   }
 
@@ -1706,6 +1744,104 @@ function TrainingCropAnnotationPanel({
                   <CircleAlert size={18} />
                   Exclude
                 </button>
+              </div>
+
+              <div className="metadata-panel crop-dataset-controls">
+                <div>
+                  <strong>Bee Annotation Repository</strong>
+                  <p>
+                    Assign this completed Training Crop into the workspace dataset, then create a
+                    YOLO OBB manifest from eligible items.
+                  </p>
+                </div>
+                <label>
+                  <span>Dataset role</span>
+                  <select
+                    value={datasetRole}
+                    onChange={(event) => setDatasetRole(event.target.value as DatasetRole)}
+                    disabled={Boolean(trainingCropDatasetItem) || Boolean(workingLabel)}
+                    data-testid="training-crop-dataset-role-select"
+                  >
+                    <option value="training">Training</option>
+                    <option value="validation">Validation</option>
+                    <option value="benchmark">Benchmark</option>
+                    <option value="excluded">Excluded</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Assignment note</span>
+                  <input
+                    value={datasetAssignmentNote}
+                    maxLength={500}
+                    onChange={(event) => setDatasetAssignmentNote(event.target.value)}
+                    disabled={Boolean(trainingCropDatasetItem) || Boolean(workingLabel)}
+                    data-testid="training-crop-dataset-assignment-note-input"
+                  />
+                </label>
+                {datasetRole === "excluded" ? (
+                  <label>
+                    <span>Dataset exclusion reason</span>
+                    <select
+                      value={datasetExclusionReason}
+                      onChange={(event) =>
+                        setDatasetExclusionReason(event.target.value as DatasetExclusionReason)
+                      }
+                      disabled={Boolean(trainingCropDatasetItem) || Boolean(workingLabel)}
+                      data-testid="training-crop-dataset-exclusion-reason-select"
+                    >
+                      <option value="poor_image_quality">Poor image quality</option>
+                      <option value="ambiguous_subject">Ambiguous subject</option>
+                      <option value="duplicate_or_near_duplicate">Duplicate or near duplicate</option>
+                      <option value="privacy_concern">Privacy concern</option>
+                      <option value="unsuitable_crop">Unsuitable crop</option>
+                      <option value="insufficient_review_confidence">
+                        Insufficient review confidence
+                      </option>
+                      <option value="other">Other</option>
+                    </select>
+                  </label>
+                ) : null}
+                <button
+                  type="button"
+                  disabled={
+                    !selectedCrop ||
+                    Boolean(trainingCropDatasetItem) ||
+                    Boolean(workingLabel) ||
+                    selectedCrop.reviewStatus === "review_pending"
+                  }
+                  onClick={() => void assignSelectedCropToDataset()}
+                  data-testid="assign-training-crop-dataset-role-button"
+                >
+                  <ShieldCheck size={18} />
+                  Assign item
+                </button>
+                <button
+                  type="button"
+                  disabled={Boolean(workingLabel)}
+                  onClick={() => void createExportManifest()}
+                  data-testid="create-yolo-obb-export-button"
+                >
+                  <FileImage size={18} />
+                  Export manifest
+                </button>
+                <div className="review-state" data-testid="training-crop-dataset-item-state">
+                  {trainingCropDatasetItem
+                    ? `Dataset item: ${trainingCropDatasetItem.datasetRole} / ${trainingCropDatasetItem.reviewedEllipseSnapshots.length} ellipse snapshots`
+                    : selectedCrop.reviewStatus === "review_pending"
+                      ? "Complete or exclude the Training Crop before assigning a Dataset Item."
+                      : "Ready for Dataset Item assignment."}
+                </div>
+                {yoloObbExport ? (
+                  <div className="export-summary" data-testid="yolo-obb-export-summary">
+                    <strong>{yoloObbExport.exportFormat} manifest</strong>
+                    <span>Training {yoloObbExport.trainingItemCount}</span>
+                    <span>Validation {yoloObbExport.validationItemCount}</span>
+                    <span>Benchmark protected {yoloObbExport.benchmarkItemCount}</span>
+                    <span>Excluded {yoloObbExport.excludedDatasetItems.length}</span>
+                    <span>Labels {yoloObbExport.labelEntries.length}</span>
+                    <code>class x1 y1 x2 y2 x3 y3 x4 y4</code>
+                  </div>
+                ) : null}
               </div>
             </section>
           ) : null}

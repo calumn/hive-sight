@@ -15,6 +15,7 @@ from hive_sight_core_api.models import (
     ApiaryResponse,
     DatasetExclusionReason,
     DatasetItemResponse,
+    DatasetItemProvenanceResponse,
     DatasetLabellingSessionResponse,
     DatasetLabellingSessionStatus,
     DatasetRole,
@@ -31,10 +32,12 @@ from hive_sight_core_api.models import (
     OrientedBeeEllipseResponse,
     OrientedBeeEllipseUpdateRequest,
     PrelabelerRunResponse,
+    ReviewedEllipseSnapshot,
     ReviewDecisionResponse,
     ReviewDecisionValue,
     ReviewSubjectType,
     TrainingCropCreateRequest,
+    TrainingCropDatasetItemCreateRequest,
     TrainingCropEvidenceResponse,
     TrainingCropExclusionReason,
     TrainingCropListResponse,
@@ -44,6 +47,10 @@ from hive_sight_core_api.models import (
     UploadStatus,
     VisibleBeeStatus,
     WorkspaceDataUseAgreementAcceptanceResponse,
+    YoloObbExcludedItem,
+    YoloObbExportResponse,
+    YoloObbImageEntry,
+    YoloObbLabelEntry,
 )
 
 DEFAULT_DEV_REVIEWER_USER_ID = UUID("00000000-0000-0000-0000-000000000101")
@@ -1199,10 +1206,17 @@ class InMemoryProductDataStore:
             workspace_id=workspace_id,
             inspection_photo_id=session.inspection_photo_id,
             labelling_session_id=labelling_session_id,
+            training_crop_id=None,
+            source_evidence_type="dataset_labelling_session",
             dataset_role=dataset_role,
             reviewed_annotation_ids=reviewed_annotation_ids,
+            reviewed_ellipse_snapshots=[],
             source_group_key=session.source_group_key,
             image_quality_status=session.image_quality_status,
+            provenance=DatasetItemProvenanceResponse(
+                workspace_id=workspace_id,
+                inspection_photo_id=session.inspection_photo_id,
+            ),
             assigned_by_user_id=user.user_id,
             assigned_at=self.clock(),
             assignment_note=assignment_note,
@@ -1211,6 +1225,277 @@ class InMemoryProductDataStore:
         )
         self.dataset_items[dataset_item.dataset_item_id] = dataset_item
         return dataset_item
+
+    def create_dataset_item_from_training_crop(
+        self,
+        user: UserContext,
+        training_crop_id: UUID,
+        request: TrainingCropDatasetItemCreateRequest,
+    ) -> DatasetItemResponse:
+        crop = self.require_training_crop(
+            user=user,
+            workspace_id=request.workspace_id,
+            training_crop_id=training_crop_id,
+        )
+        cleaned_note = _clean_optional_text(request.assignment_note)
+        self._validate_dataset_item_exclusion(
+            dataset_role=request.dataset_role,
+            assignment_note=cleaned_note,
+            exclusion_reason=request.exclusion_reason,
+        )
+        self._validate_training_crop_dataset_item_state(
+            crop=crop,
+            dataset_role=request.dataset_role,
+        )
+        existing = self.get_dataset_item_for_training_crop(training_crop_id)
+        if existing is not None:
+            raise DomainError(
+                "dataset_item_already_assigned",
+                "This Training Crop has already been assigned to a Dataset Item.",
+                409,
+            )
+
+        ellipses = self.get_ellipses_for_training_crop(training_crop_id)
+        ellipse_snapshots = [
+            ReviewedEllipseSnapshot(
+                annotation_id=ellipse.annotation_id,
+                annotation_type=ellipse.annotation_type,
+                center_x=ellipse.center_x,
+                center_y=ellipse.center_y,
+                radius_x=ellipse.radius_x,
+                radius_y=ellipse.radius_y,
+                rotation_degrees=ellipse.rotation_degrees,
+                coordinate_space=ellipse.coordinate_space,
+                source_image_width_px=ellipse.source_image_width_px,
+                source_image_height_px=ellipse.source_image_height_px,
+                source=ellipse.source,
+                created_by_user_id=ellipse.created_by_user_id,
+                created_at=ellipse.created_at,
+                updated_at=ellipse.updated_at,
+            )
+            for ellipse in ellipses
+        ]
+        provenance = self._dataset_item_provenance_for_training_crop(crop)
+        dataset_item = DatasetItemResponse(
+            dataset_item_id=self.id_factory(),
+            workspace_id=request.workspace_id,
+            inspection_photo_id=crop.inspection_photo_id,
+            labelling_session_id=None,
+            training_crop_id=training_crop_id,
+            source_evidence_type="training_crop",
+            dataset_role=request.dataset_role,
+            reviewed_annotation_ids=[ellipse.annotation_id for ellipse in ellipses],
+            reviewed_ellipse_snapshots=ellipse_snapshots,
+            crop_x=crop.crop_x,
+            crop_y=crop.crop_y,
+            crop_width=crop.crop_width,
+            crop_height=crop.crop_height,
+            crop_image_width_px=crop.crop_image_width_px,
+            crop_image_height_px=crop.crop_image_height_px,
+            curriculum_stage=crop.curriculum_stage,
+            source_group_key=None,
+            image_quality_status=(
+                ImageQualityStatus.exclude
+                if request.dataset_role == DatasetRole.excluded
+                else ImageQualityStatus.usable
+            ),
+            provenance=provenance,
+            assigned_by_user_id=user.user_id,
+            assigned_at=self.clock(),
+            assignment_note=cleaned_note,
+            exclusion_reason=request.exclusion_reason,
+            benchmark_protected=request.dataset_role == DatasetRole.benchmark,
+        )
+        self.dataset_items[dataset_item.dataset_item_id] = dataset_item
+        return dataset_item
+
+    def get_dataset_item_for_training_crop(
+        self,
+        training_crop_id: UUID,
+    ) -> DatasetItemResponse | None:
+        for dataset_item in self.dataset_items.values():
+            if dataset_item.training_crop_id == training_crop_id:
+                return dataset_item
+        return None
+
+    def create_yolo_obb_export(
+        self,
+        user: UserContext,
+        workspace_id: UUID,
+    ) -> YoloObbExportResponse:
+        self.require_workspace_access(user, workspace_id)
+        self.require_data_use_agreement(workspace_id)
+        self.require_dataset_curator_capability(user)
+
+        included_ids: list[UUID] = []
+        protected_benchmark_ids: list[UUID] = []
+        excluded_items: list[YoloObbExcludedItem] = []
+        image_entries: list[YoloObbImageEntry] = []
+        label_entries: list[YoloObbLabelEntry] = []
+        training_item_count = 0
+        validation_item_count = 0
+        benchmark_item_count = 0
+
+        for dataset_item in self.dataset_items.values():
+            if dataset_item.workspace_id != workspace_id:
+                continue
+            if dataset_item.dataset_role == DatasetRole.benchmark:
+                benchmark_item_count += 1
+                protected_benchmark_ids.append(dataset_item.dataset_item_id)
+                continue
+            if dataset_item.dataset_role == DatasetRole.excluded:
+                excluded_items.append(
+                    YoloObbExcludedItem(
+                        dataset_item_id=dataset_item.dataset_item_id,
+                        training_crop_id=dataset_item.training_crop_id,
+                        dataset_role=dataset_item.dataset_role,
+                        reason=dataset_item.exclusion_reason or "excluded",
+                    )
+                )
+                continue
+            if dataset_item.training_crop_id is None:
+                excluded_items.append(
+                    YoloObbExcludedItem(
+                        dataset_item_id=dataset_item.dataset_item_id,
+                        training_crop_id=None,
+                        dataset_role=dataset_item.dataset_role,
+                        reason="unsupported_source_evidence_type",
+                    )
+                )
+                continue
+            if dataset_item.dataset_role == DatasetRole.training:
+                training_item_count += 1
+            elif dataset_item.dataset_role == DatasetRole.validation:
+                validation_item_count += 1
+
+            included_ids.append(dataset_item.dataset_item_id)
+            image_entries.append(
+                YoloObbImageEntry(
+                    dataset_item_id=dataset_item.dataset_item_id,
+                    training_crop_id=dataset_item.training_crop_id,
+                    inspection_photo_id=dataset_item.inspection_photo_id,
+                    split=dataset_item.dataset_role,
+                    crop_x=dataset_item.crop_x or 0,
+                    crop_y=dataset_item.crop_y or 0,
+                    crop_width=dataset_item.crop_width or 0,
+                    crop_height=dataset_item.crop_height or 0,
+                )
+            )
+            for ellipse in dataset_item.reviewed_ellipse_snapshots:
+                class_id = _yolo_class_id(ellipse.annotation_type)
+                points = _ellipse_to_crop_normalized_obb_points(dataset_item, ellipse)
+                label_entries.append(
+                    YoloObbLabelEntry(
+                        dataset_item_id=dataset_item.dataset_item_id,
+                        training_crop_id=dataset_item.training_crop_id,
+                        annotation_id=ellipse.annotation_id,
+                        split=dataset_item.dataset_role,
+                        class_id=class_id,
+                        class_name=ellipse.annotation_type,
+                        label=" ".join([str(class_id), *[f"{point:.6f}" for point in points]]),
+                        points=points,
+                    )
+                )
+
+        return YoloObbExportResponse(
+            export_id=self.id_factory(),
+            workspace_id=workspace_id,
+            export_format="yolo_obb",
+            label_convention="class x1 y1 x2 y2 x3 y3 x4 y4",
+            coordinate_basis="crop-relative normalized corner points",
+            created_by_user_id=user.user_id,
+            created_at=self.clock(),
+            class_map={"0": "complete_visible_bee", "1": "partial_visible_bee"},
+            included_dataset_item_ids=included_ids,
+            excluded_dataset_items=excluded_items,
+            protected_benchmark_dataset_item_ids=protected_benchmark_ids,
+            training_item_count=training_item_count,
+            validation_item_count=validation_item_count,
+            benchmark_item_count=benchmark_item_count,
+            image_entries=image_entries,
+            label_entries=label_entries,
+            caveat=(
+                "YOLO OBB export rows are derived model-training projections. "
+                "Reviewed oriented bee ellipses remain the canonical annotation evidence."
+            ),
+        )
+
+    def _dataset_item_provenance_for_training_crop(
+        self,
+        crop: TrainingCropResponse,
+    ) -> DatasetItemProvenanceResponse:
+        photo = self.inspection_photos.get(crop.inspection_photo_id)
+        inspection = self.inspections.get(photo.inspection_id) if photo else None
+        hive = self.hives.get(inspection.hive_id) if inspection else None
+        apiary = self.apiaries.get(hive.apiary_id) if hive else None
+        return DatasetItemProvenanceResponse(
+            workspace_id=crop.workspace_id,
+            apiary_id=apiary.apiary_id if apiary else None,
+            hive_id=hive.hive_id if hive else None,
+            inspection_id=inspection.inspection_id if inspection else None,
+            inspection_photo_id=crop.inspection_photo_id,
+            training_crop_id=crop.training_crop_id,
+        )
+
+    def _validate_dataset_item_exclusion(
+        self,
+        dataset_role: DatasetRole,
+        assignment_note: str | None,
+        exclusion_reason: DatasetExclusionReason | None,
+    ) -> None:
+        if dataset_role == DatasetRole.excluded and exclusion_reason is None:
+            raise DomainError(
+                "exclusion_reason_required",
+                "Excluded Dataset Items require an exclusion reason.",
+                422,
+            )
+        if dataset_role != DatasetRole.excluded and exclusion_reason is not None:
+            raise DomainError(
+                "exclusion_reason_not_allowed",
+                "Only excluded Dataset Items may carry an exclusion reason.",
+                422,
+            )
+        if exclusion_reason == DatasetExclusionReason.other and assignment_note is None:
+            raise DomainError(
+                "assignment_note_required",
+                "The 'other' exclusion reason requires an assignment note.",
+                422,
+            )
+
+    def _validate_training_crop_dataset_item_state(
+        self,
+        crop: TrainingCropResponse,
+        dataset_role: DatasetRole,
+    ) -> None:
+        if crop.review_status == TrainingCropReviewStatus.review_pending:
+            raise DomainError(
+                "training_crop_review_required",
+                "Assign a Dataset Role only after Training Crop review is complete or excluded.",
+                409,
+            )
+        if crop.review_status == TrainingCropReviewStatus.excluded:
+            if dataset_role != DatasetRole.excluded:
+                raise DomainError(
+                    "training_crop_excluded_requires_excluded_role",
+                    "Excluded Training Crops can only create excluded Dataset Items.",
+                    409,
+                )
+            return
+        if crop.visible_bee_status == VisibleBeeStatus.no_visible_bees:
+            if dataset_role != DatasetRole.excluded:
+                raise DomainError(
+                    "no_visible_bees_requires_excluded_role",
+                    "No-visible-bees Training Crops can only create excluded Dataset Items in this slice.",
+                    409,
+                )
+            return
+        ellipses = self.get_ellipses_for_training_crop(crop.training_crop_id)
+        if crop.visible_bee_status != VisibleBeeStatus.has_visible_bees or not ellipses:
+            raise DomainError(
+                "reviewed_visible_bees_required",
+                "Dataset Items for bee detector training require reviewed visible bee ellipses.",
+                409,
+            )
 
     def require_inspection_photo_for_view(
         self,
@@ -1280,3 +1565,53 @@ def _clean_optional_text(value: str | None) -> str | None:
         return None
     cleaned = value.strip()
     return cleaned or None
+
+
+def _yolo_class_id(annotation_type: AnnotationType) -> int:
+    if annotation_type == AnnotationType.complete_visible_bee:
+        return 0
+    if annotation_type == AnnotationType.partial_visible_bee:
+        return 1
+    raise DomainError(
+        "unsupported_yolo_obb_annotation_type",
+        "YOLO OBB bee export supports complete and partial visible bee annotations only.",
+        422,
+    )
+
+
+def _ellipse_to_crop_normalized_obb_points(
+    dataset_item: DatasetItemResponse,
+    ellipse: ReviewedEllipseSnapshot,
+) -> list[float]:
+    if (
+        dataset_item.crop_x is None
+        or dataset_item.crop_y is None
+        or dataset_item.crop_width is None
+        or dataset_item.crop_height is None
+    ):
+        raise DomainError(
+            "dataset_item_missing_crop_geometry",
+            "YOLO OBB export requires crop-sourced Dataset Items.",
+            409,
+        )
+    crop_center_x = ellipse.center_x - dataset_item.crop_x
+    crop_center_y = ellipse.center_y - dataset_item.crop_y
+    angle = radians(ellipse.rotation_degrees)
+    corners = [
+        (-ellipse.radius_x, -ellipse.radius_y),
+        (ellipse.radius_x, -ellipse.radius_y),
+        (ellipse.radius_x, ellipse.radius_y),
+        (-ellipse.radius_x, ellipse.radius_y),
+    ]
+    points: list[float] = []
+    for dx, dy in corners:
+        rotated_x = crop_center_x + (dx * cos(angle)) - (dy * sin(angle))
+        rotated_y = crop_center_y + (dx * sin(angle)) + (dy * cos(angle))
+        points.extend(
+            [
+                rotated_x / dataset_item.crop_width,
+                rotated_y / dataset_item.crop_height,
+            ]
+        )
+    return points
+    TrainingCropDatasetItemCreateRequest,

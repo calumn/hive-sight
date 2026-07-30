@@ -164,11 +164,22 @@ export type DatasetItem = {
   datasetItemId: string;
   workspaceId: string;
   inspectionPhotoId: string;
-  labellingSessionId: string;
+  labellingSessionId: string | null;
+  trainingCropId: string | null;
+  sourceEvidenceType: "dataset_labelling_session" | "training_crop";
   datasetRole: DatasetRole;
   reviewedAnnotationIds: string[];
+  reviewedEllipseSnapshots: ReviewedEllipseSnapshot[];
+  cropX: number | null;
+  cropY: number | null;
+  cropWidth: number | null;
+  cropHeight: number | null;
+  cropImageWidthPx: number | null;
+  cropImageHeightPx: number | null;
+  curriculumStage: string | null;
   sourceGroupKey: string | null;
   imageQualityStatus: ImageQualityStatus;
+  permissionStatus: string;
   assignedByUserId: string;
   assignedAt: string;
   assignmentNote: string | null;
@@ -275,10 +286,76 @@ export type OrientedBeeEllipse = {
   updatedAt: string;
 };
 
+export type ReviewedEllipseSnapshot = {
+  annotationId: string;
+  annotationType: BeeAnnotationType;
+  centerX: number;
+  centerY: number;
+  radiusX: number;
+  radiusY: number;
+  rotationDegrees: number;
+  coordinateSpace: "source_image_pixels";
+  sourceImageWidthPx: number;
+  sourceImageHeightPx: number;
+  source: string;
+  createdByUserId: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type TrainingCropEvidence = {
   inspectionPhoto: InspectionPhotoEvidence;
   trainingCrop: TrainingCrop;
   beeEllipses: OrientedBeeEllipse[];
+  caveat: string;
+};
+
+export type YoloObbLabelEntry = {
+  datasetItemId: string;
+  trainingCropId: string;
+  annotationId: string;
+  split: DatasetRole;
+  classId: number;
+  className: BeeAnnotationType;
+  label: string;
+  points: number[];
+};
+
+export type YoloObbImageEntry = {
+  datasetItemId: string;
+  trainingCropId: string;
+  inspectionPhotoId: string;
+  split: DatasetRole;
+  cropX: number;
+  cropY: number;
+  cropWidth: number;
+  cropHeight: number;
+};
+
+export type YoloObbExcludedItem = {
+  datasetItemId: string;
+  trainingCropId: string | null;
+  datasetRole: DatasetRole;
+  reason: string;
+};
+
+export type YoloObbExport = {
+  exportId: string;
+  workspaceId: string;
+  exportFormat: "yolo_obb";
+  labelConvention: string;
+  coordinateBasis: string;
+  createdByUserId: string;
+  createdAt: string;
+  classMap: Record<string, string>;
+  includedDatasetItemIds: string[];
+  excludedDatasetItems: YoloObbExcludedItem[];
+  protectedBenchmarkDatasetItemIds: string[];
+  trainingItemCount: number;
+  validationItemCount: number;
+  benchmarkItemCount: number;
+  imageEntries: YoloObbImageEntry[];
+  labelEntries: YoloObbLabelEntry[];
   caveat: string;
 };
 
@@ -626,6 +703,52 @@ export async function createDatasetItem({
   });
   await ensureOk(response);
   return parseDatasetItem(await response.json());
+}
+
+export async function createTrainingCropDatasetItem({
+  devUserId,
+  workspaceId,
+  trainingCropId,
+  datasetRole,
+  assignmentNote,
+  exclusionReason
+}: {
+  devUserId: string;
+  workspaceId: string;
+  trainingCropId: string;
+  datasetRole: DatasetRole;
+  assignmentNote: string;
+  exclusionReason: DatasetExclusionReason | null;
+}): Promise<DatasetItem> {
+  const trimmedNote = assignmentNote.trim();
+  const response = await fetch(`${coreApiUrl}/v1/training-crops/${trainingCropId}/dataset-item`, {
+    method: "POST",
+    headers: jsonHeaders(devUserId),
+    body: JSON.stringify({
+      workspace_id: workspaceId,
+      dataset_role: datasetRole,
+      assignment_note: trimmedNote.length > 0 ? trimmedNote : null,
+      exclusion_reason: exclusionReason
+    })
+  });
+  await ensureOk(response);
+  return parseDatasetItem(await response.json());
+}
+
+export async function createYoloObbExport({
+  devUserId,
+  workspaceId
+}: {
+  devUserId: string;
+  workspaceId: string;
+}): Promise<YoloObbExport> {
+  const response = await fetch(`${coreApiUrl}/v1/dataset-exports/yolo-obb`, {
+    method: "POST",
+    headers: jsonHeaders(devUserId),
+    body: JSON.stringify({ workspace_id: workspaceId })
+  });
+  await ensureOk(response);
+  return parseYoloObbExport(await response.json());
 }
 
 export async function createTrainingCrop({
@@ -1127,20 +1250,54 @@ function parseOrientedBeeEllipse(value: unknown): OrientedBeeEllipse {
   };
 }
 
+function parseReviewedEllipseSnapshot(value: unknown): ReviewedEllipseSnapshot {
+  const record = requireRecord(value, "Reviewed ellipse snapshot response");
+  return {
+    annotationId: requireString(record.annotation_id, "annotation_id"),
+    annotationType: requireBeeAnnotationType(record.annotation_type),
+    centerX: requireNumber(record.center_x, "center_x"),
+    centerY: requireNumber(record.center_y, "center_y"),
+    radiusX: requireNumber(record.radius_x, "radius_x"),
+    radiusY: requireNumber(record.radius_y, "radius_y"),
+    rotationDegrees: requireNumber(record.rotation_degrees, "rotation_degrees"),
+    coordinateSpace: requireSourceImagePixelCoordinateSpace(record.coordinate_space),
+    sourceImageWidthPx: requireNumber(record.source_image_width_px, "source_image_width_px"),
+    sourceImageHeightPx: requireNumber(record.source_image_height_px, "source_image_height_px"),
+    source: requireString(record.source, "source"),
+    createdByUserId: requireString(record.created_by_user_id, "created_by_user_id"),
+    createdAt: requireString(record.created_at, "created_at"),
+    updatedAt: requireString(record.updated_at, "updated_at")
+  };
+}
+
 function parseDatasetItem(value: unknown): DatasetItem {
   const record = requireRecord(value, "Dataset item response");
   return {
     datasetItemId: requireString(record.dataset_item_id, "dataset_item_id"),
     workspaceId: requireString(record.workspace_id, "workspace_id"),
     inspectionPhotoId: requireString(record.inspection_photo_id, "inspection_photo_id"),
-    labellingSessionId: requireString(record.labelling_session_id, "labelling_session_id"),
+    labellingSessionId: optionalString(record.labelling_session_id, "labelling_session_id"),
+    trainingCropId: optionalString(record.training_crop_id, "training_crop_id"),
+    sourceEvidenceType: requireDatasetItemSourceEvidenceType(record.source_evidence_type),
     datasetRole: requireDatasetRole(record.dataset_role),
     reviewedAnnotationIds: requireArray(
       record.reviewed_annotation_ids,
       "reviewed_annotation_ids"
     ).map((annotationId) => requireString(annotationId, "reviewed_annotation_ids[]")),
+    reviewedEllipseSnapshots: requireArray(
+      record.reviewed_ellipse_snapshots,
+      "reviewed_ellipse_snapshots"
+    ).map(parseReviewedEllipseSnapshot),
+    cropX: optionalNumber(record.crop_x, "crop_x"),
+    cropY: optionalNumber(record.crop_y, "crop_y"),
+    cropWidth: optionalNumber(record.crop_width, "crop_width"),
+    cropHeight: optionalNumber(record.crop_height, "crop_height"),
+    cropImageWidthPx: optionalNumber(record.crop_image_width_px, "crop_image_width_px"),
+    cropImageHeightPx: optionalNumber(record.crop_image_height_px, "crop_image_height_px"),
+    curriculumStage: optionalString(record.curriculum_stage, "curriculum_stage"),
     sourceGroupKey: optionalString(record.source_group_key, "source_group_key"),
     imageQualityStatus: requireImageQualityStatus(record.image_quality_status),
+    permissionStatus: requireString(record.permission_status, "permission_status"),
     assignedByUserId: requireString(record.assigned_by_user_id, "assigned_by_user_id"),
     assignedAt: requireString(record.assigned_at, "assigned_at"),
     assignmentNote: optionalString(record.assignment_note, "assignment_note"),
@@ -1149,6 +1306,76 @@ function parseDatasetItem(value: unknown): DatasetItem {
         ? null
         : requireDatasetExclusionReason(record.exclusion_reason),
     benchmarkProtected: requireBoolean(record.benchmark_protected, "benchmark_protected")
+  };
+}
+
+function parseYoloObbExport(value: unknown): YoloObbExport {
+  const record = requireRecord(value, "YOLO OBB export response");
+  return {
+    exportId: requireString(record.export_id, "export_id"),
+    workspaceId: requireString(record.workspace_id, "workspace_id"),
+    exportFormat: requireYoloObbExportFormat(record.export_format),
+    labelConvention: requireString(record.label_convention, "label_convention"),
+    coordinateBasis: requireString(record.coordinate_basis, "coordinate_basis"),
+    createdByUserId: requireString(record.created_by_user_id, "created_by_user_id"),
+    createdAt: requireString(record.created_at, "created_at"),
+    classMap: parseStringMap(record.class_map, "class_map"),
+    includedDatasetItemIds: requireArray(
+      record.included_dataset_item_ids,
+      "included_dataset_item_ids"
+    ).map((id) => requireString(id, "included_dataset_item_ids[]")),
+    excludedDatasetItems: requireArray(
+      record.excluded_dataset_items,
+      "excluded_dataset_items"
+    ).map(parseYoloObbExcludedItem),
+    protectedBenchmarkDatasetItemIds: requireArray(
+      record.protected_benchmark_dataset_item_ids,
+      "protected_benchmark_dataset_item_ids"
+    ).map((id) => requireString(id, "protected_benchmark_dataset_item_ids[]")),
+    trainingItemCount: requireNumber(record.training_item_count, "training_item_count"),
+    validationItemCount: requireNumber(record.validation_item_count, "validation_item_count"),
+    benchmarkItemCount: requireNumber(record.benchmark_item_count, "benchmark_item_count"),
+    imageEntries: requireArray(record.image_entries, "image_entries").map(parseYoloObbImageEntry),
+    labelEntries: requireArray(record.label_entries, "label_entries").map(parseYoloObbLabelEntry),
+    caveat: requireString(record.caveat, "caveat")
+  };
+}
+
+function parseYoloObbLabelEntry(value: unknown): YoloObbLabelEntry {
+  const record = requireRecord(value, "YOLO OBB label entry response");
+  return {
+    datasetItemId: requireString(record.dataset_item_id, "dataset_item_id"),
+    trainingCropId: requireString(record.training_crop_id, "training_crop_id"),
+    annotationId: requireString(record.annotation_id, "annotation_id"),
+    split: requireDatasetRole(record.split),
+    classId: requireNumber(record.class_id, "class_id"),
+    className: requireBeeAnnotationType(record.class_name),
+    label: requireString(record.label, "label"),
+    points: requireArray(record.points, "points").map((point) => requireNumber(point, "points[]"))
+  };
+}
+
+function parseYoloObbImageEntry(value: unknown): YoloObbImageEntry {
+  const record = requireRecord(value, "YOLO OBB image entry response");
+  return {
+    datasetItemId: requireString(record.dataset_item_id, "dataset_item_id"),
+    trainingCropId: requireString(record.training_crop_id, "training_crop_id"),
+    inspectionPhotoId: requireString(record.inspection_photo_id, "inspection_photo_id"),
+    split: requireDatasetRole(record.split),
+    cropX: requireNumber(record.crop_x, "crop_x"),
+    cropY: requireNumber(record.crop_y, "crop_y"),
+    cropWidth: requireNumber(record.crop_width, "crop_width"),
+    cropHeight: requireNumber(record.crop_height, "crop_height")
+  };
+}
+
+function parseYoloObbExcludedItem(value: unknown): YoloObbExcludedItem {
+  const record = requireRecord(value, "YOLO OBB excluded item response");
+  return {
+    datasetItemId: requireString(record.dataset_item_id, "dataset_item_id"),
+    trainingCropId: optionalString(record.training_crop_id, "training_crop_id"),
+    datasetRole: requireDatasetRole(record.dataset_role),
+    reason: requireString(record.reason, "reason")
   };
 }
 
@@ -1256,6 +1483,13 @@ function requireArray(value: unknown, field: string): unknown[] {
     throw new Error(`Core API response field ${field} was not an array`);
   }
   return value;
+}
+
+function parseStringMap(value: unknown, field: string): Record<string, string> {
+  const record = requireRecord(value, field);
+  return Object.fromEntries(
+    Object.entries(record).map(([key, mapValue]) => [key, requireString(mapValue, `${field}.${key}`)])
+  );
 }
 
 function requireString(value: unknown, field: string): string {
@@ -1396,6 +1630,22 @@ function requireDatasetRole(value: unknown): DatasetRole {
     return value;
   }
   throw new Error("Core API response had an unexpected dataset role");
+}
+
+function requireDatasetItemSourceEvidenceType(
+  value: unknown
+): "dataset_labelling_session" | "training_crop" {
+  if (value === "dataset_labelling_session" || value === "training_crop") {
+    return value;
+  }
+  throw new Error("Core API response had an unexpected Dataset Item source evidence type");
+}
+
+function requireYoloObbExportFormat(value: unknown): "yolo_obb" {
+  if (value === "yolo_obb") {
+    return value;
+  }
+  throw new Error("Core API response had an unexpected export format");
 }
 
 function requireDatasetExclusionReason(value: unknown): DatasetExclusionReason {

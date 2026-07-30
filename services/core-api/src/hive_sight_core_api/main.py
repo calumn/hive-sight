@@ -48,6 +48,7 @@ from hive_sight_core_api.models import (
     ReviewDecisionCreateRequest,
     ReviewDecisionResponse,
     StartDatasetLabellingRequest,
+    TrainingCropDatasetItemCreateRequest,
     UpdateDatasetLabellingSessionRequest,
     TrainingCropCreateRequest,
     TrainingCropEvidenceResponse,
@@ -57,6 +58,8 @@ from hive_sight_core_api.models import (
     UploadUrlResponse,
     WorkspaceDataUseAgreementAcceptanceRequest,
     WorkspaceDataUseAgreementAcceptanceResponse,
+    YoloObbExportRequest,
+    YoloObbExportResponse,
 )
 
 settings = get_settings()
@@ -400,6 +403,37 @@ def update_training_crop(
         training_crop_id=training_crop_id,
         request=request,
     )
+
+
+@app.post(
+    "/v1/training-crops/{training_crop_id}/dataset-item",
+    response_model=DatasetItemResponse,
+    status_code=201,
+)
+def create_training_crop_dataset_item(
+    training_crop_id: UUID,
+    request: TrainingCropDatasetItemCreateRequest,
+    user: AuthenticatedUserDep,
+    state: DevStateDep,
+) -> DatasetItemResponse:
+    return state.store.create_dataset_item_from_training_crop(
+        user=user,
+        training_crop_id=training_crop_id,
+        request=request,
+    )
+
+
+@app.post(
+    "/v1/dataset-exports/yolo-obb",
+    response_model=YoloObbExportResponse,
+    status_code=201,
+)
+def create_yolo_obb_export(
+    request: YoloObbExportRequest,
+    user: AuthenticatedUserDep,
+    state: DevStateDep,
+) -> YoloObbExportResponse:
+    return state.store.create_yolo_obb_export(user=user, workspace_id=request.workspace_id)
 
 
 @app.get(

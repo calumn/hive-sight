@@ -404,20 +404,118 @@ class DatasetItemCreateRequest(BaseModel):
     exclusion_reason: DatasetExclusionReason | None = None
 
 
+class TrainingCropDatasetItemCreateRequest(BaseModel):
+    workspace_id: UUID
+    dataset_role: DatasetRole
+    assignment_note: str | None = Field(default=None, max_length=500)
+    exclusion_reason: DatasetExclusionReason | None = None
+
+
+class ReviewedEllipseSnapshot(BaseModel):
+    annotation_id: UUID
+    annotation_type: AnnotationType
+    center_x: float
+    center_y: float
+    radius_x: float
+    radius_y: float
+    rotation_degrees: float
+    coordinate_space: CoordinateSpace
+    source_image_width_px: int
+    source_image_height_px: int
+    source: str
+    created_by_user_id: UUID
+    created_at: datetime
+    updated_at: datetime
+
+
+class DatasetItemProvenanceResponse(BaseModel):
+    workspace_id: UUID
+    apiary_id: UUID | None = None
+    hive_id: UUID | None = None
+    inspection_id: UUID | None = None
+    inspection_photo_id: UUID
+    training_crop_id: UUID | None = None
+
+
 class DatasetItemResponse(BaseModel):
     dataset_item_id: UUID
     workspace_id: UUID
     inspection_photo_id: UUID
-    labelling_session_id: UUID
+    labelling_session_id: UUID | None = None
+    training_crop_id: UUID | None = None
+    source_evidence_type: str
     dataset_role: DatasetRole
     reviewed_annotation_ids: list[UUID]
+    reviewed_ellipse_snapshots: list[ReviewedEllipseSnapshot] = Field(default_factory=list)
+    crop_x: int | None = None
+    crop_y: int | None = None
+    crop_width: int | None = None
+    crop_height: int | None = None
+    crop_image_width_px: int | None = None
+    crop_image_height_px: int | None = None
+    curriculum_stage: str | None = None
     source_group_key: str | None = None
     image_quality_status: ImageQualityStatus
+    provenance: DatasetItemProvenanceResponse | None = None
+    permission_status: str = "workspace_data_use_agreement_accepted"
     assigned_by_user_id: UUID
     assigned_at: datetime
     assignment_note: str | None = None
     exclusion_reason: DatasetExclusionReason | None = None
     benchmark_protected: bool
+
+
+class YoloObbExportRequest(BaseModel):
+    workspace_id: UUID
+
+
+class YoloObbLabelEntry(BaseModel):
+    dataset_item_id: UUID
+    training_crop_id: UUID
+    annotation_id: UUID
+    split: DatasetRole
+    class_id: int
+    class_name: AnnotationType
+    label: str
+    points: list[float]
+
+
+class YoloObbImageEntry(BaseModel):
+    dataset_item_id: UUID
+    training_crop_id: UUID
+    inspection_photo_id: UUID
+    split: DatasetRole
+    crop_x: int
+    crop_y: int
+    crop_width: int
+    crop_height: int
+
+
+class YoloObbExcludedItem(BaseModel):
+    dataset_item_id: UUID
+    training_crop_id: UUID | None = None
+    dataset_role: DatasetRole
+    reason: str
+
+
+class YoloObbExportResponse(BaseModel):
+    export_id: UUID
+    workspace_id: UUID
+    export_format: str
+    label_convention: str
+    coordinate_basis: str
+    created_by_user_id: UUID
+    created_at: datetime
+    class_map: dict[str, str]
+    included_dataset_item_ids: list[UUID]
+    excluded_dataset_items: list[YoloObbExcludedItem]
+    protected_benchmark_dataset_item_ids: list[UUID]
+    training_item_count: int
+    validation_item_count: int
+    benchmark_item_count: int
+    image_entries: list[YoloObbImageEntry]
+    label_entries: list[YoloObbLabelEntry]
+    caveat: str
 
 
 class TrainingCropCreateRequest(BaseModel):
