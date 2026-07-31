@@ -20,7 +20,15 @@ import {
   ShieldCheck,
   Trash2
 } from "lucide-react";
-import { type FormEvent, type MouseEvent, type ReactNode, useEffect, useMemo, useState } from "react";
+import {
+  type FormEvent,
+  type MouseEvent,
+  type ReactNode,
+  useEffect,
+  useMemo,
+  useRef,
+  useState
+} from "react";
 import {
   acceptWorkspaceDataUseAgreement,
   createTrainingCrop,
@@ -36,10 +44,13 @@ import {
   createReviewDecision,
   deleteTrainingCropEllipse,
   fetchAnalysisEvidence,
+  fetchApiaries,
   fetchCoreHealth,
   fetchDatasetLabellingEvidence,
   fetchDevSession,
   fetchFrameStandards,
+  fetchHiveConfiguration,
+  fetchHives,
   fetchInspectionPhotos,
   fetchInspectionPhotoObjectUrl,
   fetchModelTrainingReadiness,
@@ -110,7 +121,9 @@ type CropDraft = {
 export function App() {
   const [loadState, setLoadState] = useState<LoadState>({ kind: "loading" });
   const [actionState, setActionState] = useState<ActionState>({ kind: "idle" });
+  const [apiaries, setApiaries] = useState<Apiary[]>([]);
   const [apiary, setApiary] = useState<Apiary | null>(null);
+  const [hives, setHives] = useState<Hive[]>([]);
   const [hive, setHive] = useState<Hive | null>(null);
   const [frameStandards, setFrameStandards] = useState<FrameStandard[]>([]);
   const [selectedFrameStandardId, setSelectedFrameStandardId] = useState(
@@ -136,16 +149,17 @@ export function App() {
   const [hiveName, setHiveName] = useState("Hive A");
   const [inspectionDate, setInspectionDate] = useState(new Date().toISOString().slice(0, 10));
   const [inspectionIntent, setInspectionIntent] =
-    useState<InspectionIntent>("varroa_assessment");
+    useState<InspectionIntent>("training_data_collection");
   const [file, setFile] = useState<File | null>(null);
 
   useEffect(() => {
     Promise.all([fetchCoreHealth(), fetchDevSession(devUserId), fetchFrameStandards({ devUserId })])
-      .then(([health, session, standards]) => {
+      .then(async ([health, session, standards]) => {
         setFrameStandards(standards);
         if (!standards.some((standard) => standard.frameStandardId === "british_national_deep_brood")) {
           setSelectedFrameStandardId(standards[0]?.frameStandardId ?? "");
         }
+        await refreshWorkspaceContext(session.workspaceId);
         setLoadState({ kind: "ready", health, session });
       })
       .catch((error: Error) => setLoadState({ kind: "error", message: error.message }));
@@ -192,6 +206,101 @@ export function App() {
     return nextSession;
   }
 
+  async function refreshWorkspaceContext(
+    workspaceId: string,
+    preferredApiaryId?: string,
+    preferredHiveId?: string
+  ) {
+    const listing = await fetchApiaries({ devUserId, workspaceId });
+    setApiaries(listing.apiaries);
+    const nextApiary =
+      listing.apiaries.find((candidate) => candidate.apiaryId === preferredApiaryId) ??
+      listing.apiaries[0] ??
+      null;
+    setApiary(nextApiary);
+    if (!nextApiary) {
+      setHives([]);
+      setHive(null);
+      setHiveConfiguration(null);
+      clearInspectionWorkflow();
+      return;
+    }
+    await refreshHivesForApiary(workspaceId, nextApiary, preferredHiveId);
+  }
+
+  async function refreshHivesForApiary(
+    workspaceId: string,
+    selectedApiary: Apiary,
+    preferredHiveId?: string
+  ) {
+    const listing = await fetchHives({
+      devUserId,
+      workspaceId,
+      apiaryId: selectedApiary.apiaryId
+    });
+    setHives(listing.hives);
+    const nextHive =
+      listing.hives.find((candidate) => candidate.hiveId === preferredHiveId) ??
+      listing.hives[0] ??
+      null;
+    setHive(nextHive);
+    clearInspectionWorkflow();
+    if (!nextHive) {
+      setHiveConfiguration(null);
+      return;
+    }
+    await loadHiveConfigurationForSelection(workspaceId, nextHive);
+  }
+
+  async function loadHiveConfigurationForSelection(workspaceId: string, selectedHive: Hive) {
+    try {
+      const configuration = await fetchHiveConfiguration({
+        devUserId,
+        workspaceId,
+        hiveId: selectedHive.hiveId
+      });
+      setHiveConfiguration(configuration);
+      setSelectedFrameStandardId(configuration.frameStandardId);
+      setHiveConfigurationNotes(configuration.notes ?? "");
+    } catch (error) {
+      const apiError = toApiError(error);
+      if (apiError.code === "hive_configuration_required") {
+        setHiveConfiguration(null);
+        return;
+      }
+      throw error;
+    }
+  }
+
+  async function onSelectApiary(apiaryId: string) {
+    if (!session) {
+      return;
+    }
+    const selectedApiary = apiaries.find((candidate) => candidate.apiaryId === apiaryId);
+    if (!selectedApiary) {
+      return;
+    }
+    await runAction("Selecting apiary", async () => {
+      setApiary(selectedApiary);
+      await refreshHivesForApiary(session.workspaceId, selectedApiary);
+    });
+  }
+
+  async function onSelectHive(hiveId: string) {
+    if (!session) {
+      return;
+    }
+    const selectedHive = hives.find((candidate) => candidate.hiveId === hiveId);
+    if (!selectedHive) {
+      return;
+    }
+    await runAction("Selecting hive", async () => {
+      setHive(selectedHive);
+      clearInspectionWorkflow();
+      await loadHiveConfigurationForSelection(session.workspaceId, selectedHive);
+    });
+  }
+
   async function onAcceptTerms() {
     if (!session) {
       return;
@@ -219,14 +328,7 @@ export function App() {
         workspaceId: session.workspaceId,
         name: apiaryName
       });
-      setApiary(created);
-      setHive(null);
-      setHiveConfiguration(null);
-      setInspection(null);
-      setInspectionPhotos([]);
-      setAnalysisDetail(null);
-      clearEvidenceImage();
-      clearLabellingImage();
+      await refreshWorkspaceContext(session.workspaceId, created.apiaryId);
     });
   }
 
@@ -246,11 +348,7 @@ export function App() {
       });
       setHive(created);
       setHiveConfiguration(configuration);
-      setInspection(null);
-      setInspectionPhotos([]);
-      setAnalysisDetail(null);
-      clearEvidenceImage();
-      clearLabellingImage();
+      await refreshHivesForApiary(created.workspaceId, apiary, created.hiveId);
     });
   }
 
@@ -537,6 +635,17 @@ export function App() {
     });
   }
 
+  function clearInspectionWorkflow() {
+    setInspection(null);
+    setInspectionPhotos([]);
+    setAnalysisDetail(null);
+    setFile(null);
+    setReviewState(null);
+    setLabellingState(null);
+    clearEvidenceImage();
+    clearLabellingImage();
+  }
+
   async function runAction(label: string, action: () => Promise<void>) {
     setActionState({ kind: "working", label });
     try {
@@ -592,8 +701,29 @@ export function App() {
             <div className="form-grid">
               <form className="stacked-form" onSubmit={onCreateApiary}>
                 <PanelHeading icon={<Plus size={20} />} title="Apiary" />
+                {apiaries.length > 0 ? (
+                  <label>
+                    <span>Selected Apiary</span>
+                    <select
+                      value={apiary?.apiaryId ?? ""}
+                      onChange={(event) => void onSelectApiary(event.target.value)}
+                      disabled={actionState.kind === "working"}
+                      data-testid="apiary-select"
+                    >
+                      {apiaries.map((candidate) => (
+                        <option key={candidate.apiaryId} value={candidate.apiaryId}>
+                          {candidate.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : (
+                  <p className="setup-copy" data-testid="apiary-empty-state">
+                    Add an Apiary to start organising Hives in this Workspace.
+                  </p>
+                )}
                 <label>
-                  <span>Name</span>
+                  <span>{apiaries.length > 0 ? "New Apiary name" : "Name"}</span>
                 <input
                   value={apiaryName}
                   onChange={(event) => setApiaryName(event.target.value)}
@@ -606,15 +736,40 @@ export function App() {
                   disabled={actionState.kind === "working"}
                   data-testid="create-apiary-button"
                 >
-                  Create apiary
+                  {apiaries.length > 0 ? "Add apiary" : "Create apiary"}
                 </button>
                 <RecordBadge value={apiary?.apiaryId} />
               </form>
 
               <form className="stacked-form" onSubmit={onCreateHive}>
                 <PanelHeading icon={<Plus size={20} />} title="Hive Configuration" />
+                {!apiary ? (
+                  <p className="setup-copy" data-testid="hive-empty-state">
+                    Select or add an Apiary before adding a Hive.
+                  </p>
+                ) : hives.length > 0 ? (
+                  <label>
+                    <span>Selected Hive</span>
+                    <select
+                      value={hive?.hiveId ?? ""}
+                      onChange={(event) => void onSelectHive(event.target.value)}
+                      disabled={actionState.kind === "working"}
+                      data-testid="hive-select"
+                    >
+                      {hives.map((candidate) => (
+                        <option key={candidate.hiveId} value={candidate.hiveId}>
+                          {candidate.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : (
+                  <p className="setup-copy" data-testid="hive-empty-state">
+                    Add a Hive and its frame context before creating Inspections.
+                  </p>
+                )}
                 <label>
-                  <span>Name</span>
+                  <span>{hives.length > 0 ? "New Hive name" : "Name"}</span>
                 <input
                   value={hiveName}
                   onChange={(event) => setHiveName(event.target.value)}
@@ -626,12 +781,7 @@ export function App() {
                   <span>Frame Standard</span>
                   <select
                     value={selectedFrameStandardId}
-                    onChange={(event) => {
-                      setSelectedFrameStandardId(event.target.value);
-                      setHiveConfiguration(null);
-                      setHive(null);
-                      setInspection(null);
-                    }}
+                    onChange={(event) => setSelectedFrameStandardId(event.target.value)}
                     required
                     data-testid="hive-configuration-frame-standard-select"
                   >
@@ -676,12 +826,16 @@ export function App() {
                   disabled={!canCreateHive || actionState.kind === "working"}
                   data-testid="create-hive-button"
                 >
-                  Create hive
+                  {hives.length > 0 ? "Add hive" : "Create hive"}
                 </button>
                 <RecordBadge value={hive?.hiveId} />
                 {hiveConfiguration ? (
                   <p className="intent-badge" data-testid="hive-configuration-state">
                     {hiveConfiguration.frameStandard.displayName}
+                  </p>
+                ) : hive ? (
+                  <p className="setup-copy" data-testid="hive-configuration-state">
+                    Hive Configuration is needed before this Hive can be used for Inspections.
                   </p>
                 ) : null}
               </form>
@@ -771,29 +925,18 @@ export function App() {
                   />
                 ) : null}
                 {isTrainingDataCollection && loadState.session.datasetCuratorCapability ? (
-                  <>
-                    <TrainingCropAnnotationPanel
-                      devUserId={devUserId}
-                      workspaceId={loadState.session.workspaceId}
-                      photos={inspectionPhotos}
-                      onError={(error) =>
-                        setActionState({
-                          kind: "blocked",
-                          code: error.code,
-                          message: error.message
-                        })
-                      }
-                    />
-                    <DatasetLabellingPanel
-                      evidence={labellingEvidence}
-                      imageUrl={labellingImageUrl}
-                      labellingState={labellingState}
-                      onStartDatasetLabelling={onStartDatasetLabelling}
-                      onUpdateMetadata={onUpdateDatasetLabellingMetadata}
-                      onSubmitReviewDecision={onSubmitDatasetLabellingReview}
-                      onAssignDatasetRole={onAssignDatasetRole}
-                    />
-                  </>
+                  <TrainingCropAnnotationPanel
+                    devUserId={devUserId}
+                    workspaceId={loadState.session.workspaceId}
+                    photos={inspectionPhotos}
+                    onError={(error) =>
+                      setActionState({
+                        kind: "blocked",
+                        code: error.code,
+                        message: error.message
+                      })
+                    }
+                  />
                 ) : null}
               </>
             ) : null}
@@ -1107,6 +1250,7 @@ function TrainingCropAnnotationPanel({
   photos: InspectionPhoto[];
   onError: (error: ApiError) => void;
 }) {
+  const cropViewportRef = useRef<HTMLDivElement | null>(null);
   const [selectedPhotoId, setSelectedPhotoId] = useState<string>("");
   const [sourceImageUrl, setSourceImageUrl] = useState<string | null>(null);
   const [sourceImageSize, setSourceImageSize] = useState<{ width: number; height: number } | null>(
@@ -1138,6 +1282,7 @@ function TrainingCropAnnotationPanel({
   const [trainingRun, setTrainingRun] = useState<TrainingRun | null>(null);
   const [acknowledgeModelWarnings, setAcknowledgeModelWarnings] = useState(false);
   const [workingLabel, setWorkingLabel] = useState<string | null>(null);
+  const [cropZoom, setCropZoom] = useState(1);
 
   const selectedPhoto = photos.find((photo) => photo.inspectionPhotoId === selectedPhotoId) ?? null;
   const selectedCrop = evidence?.trainingCrop ?? crops.find((crop) => crop.trainingCropId === selectedCropId) ?? null;
@@ -1236,6 +1381,7 @@ function TrainingCropAnnotationPanel({
       return;
     }
     setTrainingCropDatasetItem(null);
+    setCropZoom(1);
     void refreshEvidence(selectedCropId);
   }, [selectedCropId]);
 
@@ -1336,6 +1482,14 @@ function TrainingCropAnnotationPanel({
       setSelectedEllipseId(ellipse.annotationId);
       await refreshEvidence(selectedCrop.trainingCropId);
     });
+  }
+
+  function updateCropZoom(nextZoom: number) {
+    setCropZoom(clamp(Math.round(nextZoom * 4) / 4, 1, 4));
+  }
+
+  function panCropViewport(deltaX: number, deltaY: number) {
+    cropViewportRef.current?.scrollBy({ left: deltaX, top: deltaY, behavior: "smooth" });
   }
 
   async function updateSelectedEllipse(values: Partial<OrientedBeeEllipse>) {
@@ -1593,34 +1747,125 @@ function TrainingCropAnnotationPanel({
           {selectedCrop && sourceImageUrl ? (
             <section className="crop-editor" aria-label="Selected Training Crop editor">
               <div className="crop-editing-tool" data-testid="training-crop-editing-tool">
-                <div
-                  className="crop-surface"
-                  style={{ aspectRatio: `${selectedCrop.cropWidth} / ${selectedCrop.cropHeight}` }}
-                  onClick={(event) => void onCropSurfaceClick(event)}
-                  data-testid="training-crop-surface"
-                >
-                  <img
-                    src={sourceImageUrl}
-                    alt="Selected Training Crop"
-                    style={cropImageStyle(selectedCrop)}
-                    draggable={false}
-                  />
-                  {evidence?.beeEllipses.map((ellipse) => (
+                <div className="crop-workspace">
+                  <div className="crop-viewport-toolbar" aria-label="Crop viewport controls">
                     <button
-                      key={ellipse.annotationId}
                       type="button"
-                      className={`bee-ellipse ${
-                        ellipse.annotationType === "partial_visible_bee" ? "partial" : "complete"
-                      } ${ellipse.annotationId === selectedEllipseId ? "selected" : ""}`}
-                      style={ellipseStyle(selectedCrop, ellipse)}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        setSelectedEllipseId(ellipse.annotationId);
+                      onClick={() => updateCropZoom(cropZoom - 0.25)}
+                      disabled={cropZoom <= 1}
+                      data-testid="crop-zoom-out-button"
+                      title="Zoom out"
+                    >
+                      <Minus size={18} />
+                      Zoom
+                    </button>
+                    <label className="range-control">
+                      <span>Zoom {Math.round(cropZoom * 100)}%</span>
+                      <input
+                        type="range"
+                        min={1}
+                        max={4}
+                        step={0.25}
+                        value={cropZoom}
+                        onChange={(event) => updateCropZoom(Number(event.target.value))}
+                        data-testid="crop-zoom-slider"
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => updateCropZoom(cropZoom + 0.25)}
+                      disabled={cropZoom >= 4}
+                      data-testid="crop-zoom-in-button"
+                      title="Zoom in"
+                    >
+                      <Plus size={18} />
+                      Zoom
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        updateCropZoom(1);
+                        cropViewportRef.current?.scrollTo({ left: 0, top: 0, behavior: "smooth" });
                       }}
-                      data-testid="training-crop-ellipse"
-                      aria-label={ellipse.annotationType}
-                    />
-                  ))}
+                      data-testid="crop-zoom-reset-button"
+                      title="Reset crop view"
+                    >
+                      <RefreshCw size={18} />
+                      Reset
+                    </button>
+                  </div>
+                  <div className="crop-pan-controls" aria-label="Pan crop viewport">
+                    <button
+                      type="button"
+                      onClick={() => panCropViewport(0, -120)}
+                      data-testid="crop-pan-up-button"
+                      title="Pan up"
+                    >
+                      <ArrowUp size={18} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => panCropViewport(-120, 0)}
+                      data-testid="crop-pan-left-button"
+                      title="Pan left"
+                    >
+                      <ArrowLeft size={18} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => panCropViewport(120, 0)}
+                      data-testid="crop-pan-right-button"
+                      title="Pan right"
+                    >
+                      <ArrowRight size={18} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => panCropViewport(0, 120)}
+                      data-testid="crop-pan-down-button"
+                      title="Pan down"
+                    >
+                      <ArrowDown size={18} />
+                    </button>
+                  </div>
+                  <div
+                    className="crop-surface-viewport"
+                    ref={cropViewportRef}
+                    data-testid="training-crop-surface-viewport"
+                  >
+                    <div
+                      className="crop-surface"
+                      style={{
+                        aspectRatio: `${selectedCrop.cropWidth} / ${selectedCrop.cropHeight}`,
+                        width: `${cropZoom * 100}%`
+                      }}
+                      onClick={(event) => void onCropSurfaceClick(event)}
+                      data-testid="training-crop-surface"
+                    >
+                      <img
+                        src={sourceImageUrl}
+                        alt="Selected Training Crop"
+                        style={cropImageStyle(selectedCrop)}
+                        draggable={false}
+                      />
+                      {evidence?.beeEllipses.map((ellipse) => (
+                        <button
+                          key={ellipse.annotationId}
+                          type="button"
+                          className={`bee-ellipse ${
+                            ellipse.annotationType === "partial_visible_bee" ? "partial" : "complete"
+                          } ${ellipse.annotationId === selectedEllipseId ? "selected" : ""}`}
+                          style={ellipseStyle(selectedCrop, ellipse)}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setSelectedEllipseId(ellipse.annotationId);
+                          }}
+                          data-testid="training-crop-ellipse"
+                          aria-label={ellipse.annotationType}
+                        />
+                      ))}
+                    </div>
+                  </div>
                 </div>
 
                 <div

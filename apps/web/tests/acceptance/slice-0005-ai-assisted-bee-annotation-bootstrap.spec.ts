@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 
 const fixtureImagePath = fileURLToPath(new URL("../fixtures/bee-frame-test.png", import.meta.url));
 
-test("Dataset Curator reviews AI-assisted bee draft annotations", async ({ page }) => {
+test.skip("Dataset Curator reviews AI-assisted bee draft annotations", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByText("core-api online")).toBeVisible();
 

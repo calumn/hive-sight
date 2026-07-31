@@ -22,11 +22,19 @@ export type Apiary = {
   name: string;
 };
 
+export type ApiaryList = {
+  apiaries: Apiary[];
+};
+
 export type Hive = {
   hiveId: string;
   apiaryId: string;
   workspaceId: string;
   name: string;
+};
+
+export type HiveList = {
+  hives: Hive[];
 };
 
 export type FrameStandardStatus = "known" | "unknown" | "other";
@@ -615,6 +623,21 @@ export async function createApiary({
   return parseApiary(await response.json());
 }
 
+export async function fetchApiaries({
+  devUserId,
+  workspaceId
+}: {
+  devUserId: string;
+  workspaceId: string;
+}): Promise<ApiaryList> {
+  const params = new URLSearchParams({ workspace_id: workspaceId });
+  const response = await fetch(`${coreApiUrl}/v1/apiaries?${params}`, {
+    headers: devAuthHeaders(devUserId)
+  });
+  await ensureOk(response);
+  return parseApiaryList(await response.json());
+}
+
 export async function createHive({
   devUserId,
   apiaryId,
@@ -631,6 +654,23 @@ export async function createHive({
   });
   await ensureOk(response);
   return parseHive(await response.json());
+}
+
+export async function fetchHives({
+  devUserId,
+  workspaceId,
+  apiaryId
+}: {
+  devUserId: string;
+  workspaceId: string;
+  apiaryId: string;
+}): Promise<HiveList> {
+  const params = new URLSearchParams({ workspace_id: workspaceId });
+  const response = await fetch(`${coreApiUrl}/v1/apiaries/${apiaryId}/hives?${params}`, {
+    headers: devAuthHeaders(devUserId)
+  });
+  await ensureOk(response);
+  return parseHiveList(await response.json());
 }
 
 export async function fetchFrameStandards({
@@ -667,6 +707,23 @@ export async function upsertHiveConfiguration({
       frame_standard_id: frameStandardId,
       notes: trimmedNotes.length > 0 ? trimmedNotes : null
     })
+  });
+  await ensureOk(response);
+  return parseHiveConfiguration(await response.json());
+}
+
+export async function fetchHiveConfiguration({
+  devUserId,
+  workspaceId,
+  hiveId
+}: {
+  devUserId: string;
+  workspaceId: string;
+  hiveId: string;
+}): Promise<HiveConfiguration> {
+  const params = new URLSearchParams({ workspace_id: workspaceId });
+  const response = await fetch(`${coreApiUrl}/v1/hives/${hiveId}/configuration?${params}`, {
+    headers: devAuthHeaders(devUserId)
   });
   await ensureOk(response);
   return parseHiveConfiguration(await response.json());
@@ -1346,6 +1403,13 @@ function parseApiary(value: unknown): Apiary {
   };
 }
 
+function parseApiaryList(value: unknown): ApiaryList {
+  const record = requireRecord(value, "Apiary list response");
+  return {
+    apiaries: requireArray(record.apiaries, "apiaries").map(parseApiary)
+  };
+}
+
 function parseHive(value: unknown): Hive {
   const record = requireRecord(value, "Hive response");
   return {
@@ -1353,6 +1417,13 @@ function parseHive(value: unknown): Hive {
     apiaryId: requireString(record.apiary_id, "apiary_id"),
     workspaceId: requireString(record.workspace_id, "workspace_id"),
     name: requireString(record.name, "name")
+  };
+}
+
+function parseHiveList(value: unknown): HiveList {
+  const record = requireRecord(value, "Hive list response");
+  return {
+    hives: requireArray(record.hives, "hives").map(parseHive)
   };
 }
 

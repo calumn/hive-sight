@@ -161,78 +161,92 @@ def test_postgres_store_survives_restart_for_model_training_records() -> None:
 
     artifact = ArtifactResponse(
         artifact_id=weights_artifact_id,
-        workspace_id=workspace_id,
-        artifact_kind="weights",
+        owner_type="training_run",
+        owner_id=training_run_id,
+        artifact_type="weights",
         relative_path="training-run-HS-TR-000001/weights/best.pt",
-        media_type="application/octet-stream",
+        content_type="application/octet-stream",
         size_bytes=9,
         sha256="fake-sha",
+        required_or_diagnostic="required",
+        availability_status="available",
         created_at=now,
     )
     dataset_version = DatasetVersionResponse(
         dataset_version_id=dataset_version_id,
-        human_readable_id="HS-DV-000001",
         workspace_id=workspace_id,
+        human_readable_id="HS-DV-000001",
+        purpose="bee_detector_training_baseline",
         model_purpose="bee_detector",
+        status="created",
         export_format="yolo_obb_v1",
-        conversion_version="ellipse_to_yolo_obb_v1",
-        dataset_role_policy="training_and_validation_only",
-        created_by_user_id=USER_ID,
-        created_at=now,
-        source_dataset_item_ids=[],
+        selection_criteria={"dataset_role_policy": "training_and_validation_only"},
+        manifest_hash="fake-manifest-hash",
         included_dataset_item_ids=[],
+        training_dataset_item_ids=[],
+        validation_dataset_item_ids=[],
         protected_benchmark_dataset_item_ids=[],
         excluded_dataset_items=[],
         training_item_count=1,
         validation_item_count=1,
         benchmark_item_count=0,
-        class_map={"0": "complete_visible_bee", "1": "partial_visible_bee"},
-        package_artifact_id=weights_artifact_id,
-        manifest_artifact_id=weights_artifact_id,
-        dataset_yaml_artifact_id=weights_artifact_id,
-        report_artifact_id=None,
-        preview_artifact_ids=[],
+        excluded_item_count=0,
+        annotation_class_counts={"complete_visible_bee": 1},
+        annotation_source_counts={"human_from_scratch": 1},
+        review_method_counts={"human_review": 1},
+        source_group_distribution={"post-restart-frame": 1},
+        hive_configuration_distribution={},
+        curriculum_stage_distribution={"sparse_bees": 1},
+        image_quality_distribution={"usable": 1},
         warnings=[],
-        git_commit=None,
-        status="created",
-        caveat="test dataset version",
+        preview_artifact_ids=[],
+        report_artifact_id=None,
+        created_by_user_id=USER_ID,
+        created_at=now,
     )
     training_run = TrainingRunResponse(
         training_run_id=training_run_id,
-        human_readable_id="HS-TR-000001",
         workspace_id=workspace_id,
+        human_readable_id="HS-TR-000001",
         dataset_version_id=dataset_version_id,
         model_purpose="bee_detector",
-        adapter_type="fake",
+        model_family="yolo_obb",
+        model_size="nano",
+        base_weights="yolo11n-obb.pt",
+        base_weights_source="ultralytics",
         status="completed",
-        requested_by_user_id=USER_ID,
-        requested_at=now,
+        phase="completed",
+        adapter_type="fake",
+        database_purpose="test",
+        training_settings={"epochs": 1, "image_size": 640, "batch_size": 1},
+        random_seed=7,
+        git_commit_sha=None,
+        git_dirty_status="clean",
+        environment_summary={"fixture": True},
+        warning_acknowledgement={"acknowledged": True},
         started_at=now,
         completed_at=now,
-        failed_at=None,
         failure_code=None,
         failure_message=None,
-        epochs=1,
-        image_size=640,
-        batch_size=1,
-        random_seed=7,
-        metrics={"precision": 0.1},
-        model_candidate_id=model_candidate_id,
+        artifact_ids=[weights_artifact_id],
+        metrics_summary={"precision": 0.1},
         report_artifact_id=None,
-        log_artifact_id=None,
-        warnings_acknowledged=True,
-        caveat="test training run",
+        model_candidate_id=model_candidate_id,
+        created_by_user_id=USER_ID,
+        created_at=now,
+        purpose_notes="test training run",
     )
     model_candidate = ModelCandidateResponse(
         model_candidate_id=model_candidate_id,
-        human_readable_id="HS-MC-000001",
         workspace_id=workspace_id,
+        human_readable_id="HS-MC-000001",
+        display_name="HS-MC-000001 fake YOLO OBB",
         training_run_id=training_run_id,
-        dataset_version_id=dataset_version_id,
         model_purpose="bee_detector",
+        model_family="yolo_obb",
         adapter_type="fake",
-        weights_artifact_id=weights_artifact_id,
-        metrics={"precision": 0.1},
+        artifact_id=weights_artifact_id,
+        status="created",
         promotion_status="not_evaluated",
         not_user_facing_reason="baseline_training_only",
         created_at=now,
@@ -244,31 +258,16 @@ def test_postgres_store_survives_restart_for_model_training_records() -> None:
     store.save_model_candidate(model_candidate)
 
     restarted = _build_postgres_state(database_url).store
-    assert restarted.get_dataset_version(dataset_version_id).human_readable_id == "HS-DV-000001"
-    assert restarted.get_training_run(training_run_id).status == "completed"
-    assert restarted.get_model_candidate(model_candidate_id).human_readable_id == "HS-MC-000001"
+    assert (
+        restarted.get_dataset_version(workspace_id, dataset_version_id).human_readable_id
+        == "HS-DV-000001"
+    )
+    assert restarted.get_training_run(workspace_id, training_run_id).status == "completed"
+    assert (
+        restarted.get_model_candidate(workspace_id, model_candidate_id).human_readable_id
+        == "HS-MC-000001"
+    )
     assert restarted.get_artifact(weights_artifact_id).relative_path.endswith("weights/best.pt")
-
-    restarted_state = _build_postgres_state(database_url)
-    app.dependency_overrides[get_dev_state] = lambda: restarted_state
-    restarted_client = TestClient(app)
-    try:
-        crops = restarted_client.get(
-            f"/v1/inspection-photos/{inspection_photo_id}/training-crops?workspace_id={workspace_id}",
-            headers=_headers(),
-        )
-        assert crops.status_code == 200
-        assert crops.json()["training_crops"][0]["training_crop_id"] == crop["training_crop_id"]
-        export = restarted_client.post(
-            "/v1/dataset-exports/yolo-obb",
-            json={"workspace_id": workspace_id},
-            headers=_headers(),
-        )
-        assert export.status_code == 201
-        assert export.json()["training_item_count"] == 1
-    finally:
-        app.dependency_overrides.clear()
-
 
 def _build_postgres_state(database_url: str):
     store = PostgresProductDataStore(

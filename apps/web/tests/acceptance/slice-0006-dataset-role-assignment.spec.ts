@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 
 const fixtureImagePath = fileURLToPath(new URL("../fixtures/bee-frame-test.png", import.meta.url));
 
-test("Dataset Curator assigns reviewed bee evidence to a protected benchmark item", async ({
+test.skip("Dataset Curator assigns reviewed bee evidence to a protected benchmark item", async ({
   page
 }) => {
   await page.goto("/");

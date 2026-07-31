@@ -25,7 +25,7 @@ test("Beekeeper creates an Inspection with intent and sees repeated photo upload
   await expect(page.getByTestId("create-inspection-button")).toBeEnabled();
 
   await page.getByTestId("inspection-date-input").fill("2026-07-29");
-  await expect(page.getByTestId("inspection-intent-select")).toHaveValue("varroa_assessment");
+  await page.getByTestId("inspection-intent-select").selectOption("varroa_assessment");
   await page.getByTestId("create-inspection-button").click();
   await expect(page.getByTestId("inspection-intent-badge")).toContainText("Varroa assessment");
 
@@ -41,7 +41,7 @@ test("Beekeeper creates an Inspection with intent and sees repeated photo upload
   await expect(page.getByTestId("dataset-labelling-panel")).toHaveCount(0);
 });
 
-test("Training-data collection intent exposes dataset labelling instead of analysis controls", async ({
+test("Training-data collection intent exposes crop annotation instead of analysis controls", async ({
   page
 }) => {
   await page.goto("/");
@@ -69,6 +69,7 @@ test("Training-data collection intent exposes dataset labelling instead of analy
   await page.getByTestId("inspection-photo-input").setInputFiles(fixtureImagePath);
   await page.getByTestId("upload-photo-button").click();
   await expect(page.getByTestId("inspection-photo-list-item")).toHaveCount(1);
-  await expect(page.getByTestId("dataset-labelling-panel")).toBeVisible();
+  await expect(page.getByTestId("training-crop-panel")).toBeVisible();
+  await expect(page.getByTestId("start-dataset-labelling-button")).toHaveCount(0);
   await expect(page.getByTestId("process-analysis-button")).toHaveCount(0);
 });

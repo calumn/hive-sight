@@ -59,7 +59,7 @@ Security and architecture.
 
 ## PARK-0003: API Contract Governance Skill
 
-Status: parked
+Status: promoted
 Date parked: 2026-07-30
 Source: skills remediation grilling
 Area: contracts
@@ -404,9 +404,13 @@ Why parked:
 
 Inspection resume introduces another selection layer across inspection date, intent, photo list, and incomplete annotation/model-training work. The immediate usability goal is to stop recreating Apiary and Hive records.
 
+Promotion note:
+
+Promoted into `architecture/vertical-slice-0017-resume-training-inspections-and-crops.md` after crop annotation usability feedback made multi-session annotation safety urgent.
+
 Revisit trigger:
 
-After Slice 0016, when repeated multi-photo Training Data Collection sessions make it painful to create or find the current Inspection.
+Slice 0017 now addresses the Training Data Collection resume path. Any remaining broader Inspection history work should be revisited when Varroa Assessment history, edit/archive flows, or full multi-page navigation become necessary.
 
 Suggested owner or area:
 
@@ -457,3 +461,95 @@ Before introducing richer local-only annotation drafts, bulk editing, keyboard-h
 Suggested owner or area:
 
 Annotation UI and interaction design.
+
+## PARK-0020: Resume Most Recently Active Annotation Work
+
+Status: parked
+Date parked: 2026-07-31
+Source: Slice 0017 grilling
+Area: annotation UI, inspection resume
+
+Context:
+
+Slice 0017 selects the newest Training Data Collection Inspection by `inspection_date`, then id. A more helpful future behaviour may resume the most recently active annotation work by looking across uploads, Training Crops, Oriented Bee Ellipses, Dataset Item assignments, and possibly future draft/edit records.
+
+Why parked:
+
+Activity-derived resume needs a consistent updated-at/read-model story across several entities. Slice 0017 is focused on making saved work reachable before real annotation sessions begin.
+
+Revisit trigger:
+
+When a Hive has enough concurrent or long-running Training Data Collection Inspections that newest-by-date no longer puts the Dataset Curator near the work they expect.
+
+Suggested owner or area:
+
+Web UI, Core API read model, and annotation workflow.
+
+## PARK-0021: Visible Last-Saved Annotation Status
+
+Status: parked
+Date parked: 2026-07-31
+Source: Slice 0017 grilling
+Area: annotation UI, user trust
+
+Context:
+
+A visible "last saved" status for crops and ellipses would help the Dataset Curator trust that long annotation work is safe. Current crop and ellipse actions persist immediately, and Slice 0017 makes saved work visible after reload/restart.
+
+Why parked:
+
+A reliable last-saved display should be based on a consistent updated-at policy across Training Crops, Oriented Bee Ellipses, Dataset Items, and future richer draft edits. That would widen the resume slice.
+
+Revisit trigger:
+
+Before adding richer local-only editing, keyboard-heavy annotation, multi-step draft workflows, or whenever users need stronger save confirmation than seeing the saved crop/ellipse reappear.
+
+Suggested owner or area:
+
+Annotation UI and product workflow.
+
+## PARK-0022: Inspection-Level Annotation Complete Workflow
+
+Status: parked
+Date parked: 2026-07-31
+Source: Slice 0017 grilling
+Area: annotation workflow, dataset curation
+
+Context:
+
+Slice 0017 deliberately does not define when a Training Data Collection Inspection is "annotation complete." Possible meanings include every uploaded photo reviewed, every intended crop completed or excluded, every visible bee circled, every crop dataset-assigned, or some future quality threshold.
+
+Why parked:
+
+The product semantics are not clear enough yet. The immediate need is pause/resume safety for saved crops and ellipses.
+
+Revisit trigger:
+
+After enough real annotation sessions exist to define what "done" means, or before reporting dataset readiness at Inspection level.
+
+Suggested owner or area:
+
+Dataset curation, product requirements, and annotation workflow.
+
+## PARK-0023: Persistence Mode Warning In The UI
+
+Status: parked
+Date parked: 2026-07-31
+Source: Slice 0017 grilling
+Area: developer experience, data safety
+
+Context:
+
+Real annotation work should use the Postgres-backed stack (`pnpm dev:all:yolo-training`). The in-memory stack can only resume while the process stays alive. Slice 0017 requires clear closeout/docs reminders, but does not add an in-app persistence-mode warning.
+
+Why parked:
+
+An in-app banner needs a broader UX decision about showing technical runtime status to the user. The practical minimum for Slice 0017 is explicit documentation and closeout guidance.
+
+Revisit trigger:
+
+Before non-developer annotation sessions, before handing the tool to another curator, or if any annotation work is lost because the wrong local stack was used.
+
+Suggested owner or area:
+
+Developer experience, Web UI, and data safety.

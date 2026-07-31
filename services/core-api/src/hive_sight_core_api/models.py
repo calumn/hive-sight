@@ -196,6 +196,10 @@ class ApiaryResponse(BaseModel):
     name: str
 
 
+class ApiaryListResponse(BaseModel):
+    apiaries: list[ApiaryResponse]
+
+
 class HiveCreateRequest(BaseModel):
     apiary_id: UUID
     name: str = Field(min_length=1, max_length=120)
@@ -206,6 +210,10 @@ class HiveResponse(BaseModel):
     apiary_id: UUID
     workspace_id: UUID
     name: str
+
+
+class HiveListResponse(BaseModel):
+    hives: list[HiveResponse]
 
 
 class FrameStandardResponse(BaseModel):

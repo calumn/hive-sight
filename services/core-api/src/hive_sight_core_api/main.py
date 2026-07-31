@@ -32,6 +32,7 @@ from hive_sight_core_api.models import (
     AnalysisRunRequest,
     AnalysisRunResponse,
     ApiaryCreateRequest,
+    ApiaryListResponse,
     ApiaryResponse,
     DatasetItemCreateRequest,
     DatasetItemResponse,
@@ -47,6 +48,7 @@ from hive_sight_core_api.models import (
     HiveConfigurationResponse,
     HiveConfigurationUpsertRequest,
     HiveCreateRequest,
+    HiveListResponse,
     HiveResponse,
     InspectionCreateRequest,
     InspectionIntentUpdateRequest,
@@ -207,6 +209,17 @@ def create_apiary(
     return state.store.create_apiary(user=user, workspace_id=request.workspace_id, name=request.name)
 
 
+@app.get("/v1/apiaries", response_model=ApiaryListResponse)
+def list_apiaries(
+    workspace_id: UUID,
+    user: AuthenticatedUserDep,
+    state: DevStateDep,
+) -> ApiaryListResponse:
+    return ApiaryListResponse(
+        apiaries=state.store.list_apiaries(user=user, workspace_id=workspace_id)
+    )
+
+
 @app.post("/v1/hives", response_model=HiveResponse, status_code=201)
 def create_hive(
     request: HiveCreateRequest,
@@ -214,6 +227,18 @@ def create_hive(
     state: DevStateDep,
 ) -> HiveResponse:
     return state.store.create_hive(user=user, apiary_id=request.apiary_id, name=request.name)
+
+
+@app.get("/v1/apiaries/{apiary_id}/hives", response_model=HiveListResponse)
+def list_hives(
+    apiary_id: UUID,
+    workspace_id: UUID,
+    user: AuthenticatedUserDep,
+    state: DevStateDep,
+) -> HiveListResponse:
+    return HiveListResponse(
+        hives=state.store.list_hives(user=user, workspace_id=workspace_id, apiary_id=apiary_id)
+    )
 
 
 @app.get("/v1/frame-standards", response_model=list[FrameStandardResponse])

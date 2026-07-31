@@ -23,6 +23,7 @@ test("Reviewer records an annotation Review Decision", async ({ page }) => {
   await expect(page.getByTestId("create-inspection-button")).toBeEnabled();
 
   await page.getByTestId("inspection-date-input").fill("2026-07-29");
+  await page.getByTestId("inspection-intent-select").selectOption("varroa_assessment");
   await page.getByTestId("create-inspection-button").click();
 
   await page.getByTestId("inspection-photo-input").setInputFiles(fixtureImagePath);

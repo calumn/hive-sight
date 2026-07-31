@@ -38,18 +38,33 @@ test("Dataset Curator creates a crop, adds an oriented bee ellipse, and complete
   await page.getByTestId("save-training-crop-button").click();
   await expect(page.getByTestId("training-crop-list-item")).toHaveCount(1);
 
+  const initialCropSurfaceBox = await page.getByTestId("training-crop-surface").boundingBox();
+  expect(initialCropSurfaceBox).not.toBeNull();
+  await expect(page.getByTestId("crop-zoom-slider")).toHaveValue("1");
+  await page.getByTestId("crop-zoom-in-button").click();
+  await expect(page.getByTestId("crop-zoom-slider")).toHaveValue("1.25");
+  const zoomedCropSurfaceBox = await page.getByTestId("training-crop-surface").boundingBox();
+  expect(zoomedCropSurfaceBox).not.toBeNull();
+  expect(zoomedCropSurfaceBox!.width).toBeGreaterThan(initialCropSurfaceBox!.width);
+  await page.getByTestId("crop-pan-right-button").click();
+  await expect.poll(() => cropImageIsClippedToSurface(page)).toBe(true);
+  await page.getByTestId("crop-zoom-reset-button").click();
+  await expect(page.getByTestId("crop-zoom-slider")).toHaveValue("1");
+
   await page.getByTestId("training-crop-surface").click({ position: { x: 180, y: 120 } });
   await expect(page.getByTestId("training-crop-ellipse")).toHaveCount(1);
 
   const cropSurfaceBox = await page.getByTestId("training-crop-surface").boundingBox();
+  const cropViewportBox = await page.getByTestId("training-crop-surface-viewport").boundingBox();
   const controlsBox = await page.getByTestId("training-crop-review-controls").boundingBox();
   const metricsBox = await page.getByTestId("training-crop-metrics").boundingBox();
   expect(cropSurfaceBox).not.toBeNull();
+  expect(cropViewportBox).not.toBeNull();
   expect(controlsBox).not.toBeNull();
   expect(metricsBox).not.toBeNull();
-  expect(controlsBox!.x).toBeGreaterThan(cropSurfaceBox!.x + cropSurfaceBox!.width - 1);
+  expect(controlsBox!.width).toBeGreaterThan(280);
   expect(metricsBox!.y).toBeGreaterThan(
-    Math.max(cropSurfaceBox!.y + cropSurfaceBox!.height, controlsBox!.y + controlsBox!.height) - 1
+    Math.max(cropViewportBox!.y + cropViewportBox!.height, controlsBox!.y + controlsBox!.height) - 1
   );
 
   const initialX = await readGeometryValue(page, "training-ellipse-center-x");
@@ -97,6 +112,23 @@ async function readGeometryValue(page: Page, testId: string): Promise<number> {
   const value = Number(text);
   expect(Number.isFinite(value)).toBe(true);
   return value;
+}
+
+async function cropImageIsClippedToSurface(page: Page): Promise<boolean> {
+  return page.getByTestId("training-crop-surface").evaluate((surface) => {
+    const image = surface.querySelector("img");
+    if (!image) {
+      return false;
+    }
+    const surfaceStyle = window.getComputedStyle(surface);
+    const surfaceBox = surface.getBoundingClientRect();
+    const imageBox = image.getBoundingClientRect();
+    return (
+      surfaceStyle.overflow === "hidden" &&
+      imageBox.width >= surfaceBox.width &&
+      imageBox.height >= surfaceBox.height
+    );
+  });
 }
 
 async function expectGeometryValue(

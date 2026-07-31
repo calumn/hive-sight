@@ -217,10 +217,17 @@ class InMemoryProductDataStore:
         self.apiaries[apiary.apiary_id] = apiary
         return apiary
 
+    def list_apiaries(self, user: UserContext, workspace_id: UUID) -> list[ApiaryResponse]:
+        self.require_workspace_access(user, workspace_id)
+        return sorted(
+            [apiary for apiary in self.apiaries.values() if apiary.workspace_id == workspace_id],
+            key=lambda apiary: (apiary.name.casefold(), str(apiary.apiary_id)),
+        )
+
     def create_hive(self, user: UserContext, apiary_id: UUID, name: str) -> HiveResponse:
         apiary = self.apiaries.get(apiary_id)
         if apiary is None:
-            raise DomainError("inspection_not_found", "The requested apiary was not found.", 404)
+            raise DomainError("apiary_not_found", "The requested Apiary was not found.", 404)
         self.require_workspace_access(user, apiary.workspace_id)
         hive = HiveResponse(
             hive_id=self.id_factory(),
@@ -230,6 +237,31 @@ class InMemoryProductDataStore:
         )
         self.hives[hive.hive_id] = hive
         return hive
+
+    def list_hives(
+        self,
+        user: UserContext,
+        workspace_id: UUID,
+        apiary_id: UUID,
+    ) -> list[HiveResponse]:
+        self.require_workspace_access(user, workspace_id)
+        apiary = self.apiaries.get(apiary_id)
+        if apiary is None:
+            raise DomainError("apiary_not_found", "The requested Apiary was not found.", 404)
+        if apiary.workspace_id != workspace_id:
+            raise DomainError(
+                "workspace_access_denied",
+                "The current User does not have access to this Workspace.",
+                403,
+            )
+        return sorted(
+            [
+                hive
+                for hive in self.hives.values()
+                if hive.workspace_id == workspace_id and hive.apiary_id == apiary_id
+            ],
+            key=lambda hive: (hive.name.casefold(), str(hive.hive_id)),
+        )
 
     def get_hive(self, hive_id: UUID) -> HiveResponse | None:
         return self.hives.get(hive_id)

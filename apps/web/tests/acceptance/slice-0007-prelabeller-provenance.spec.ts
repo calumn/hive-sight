@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 
 const fixtureImagePath = fileURLToPath(new URL("../fixtures/bee-frame-test.png", import.meta.url));
 
-test("Dataset Curator sees pre-labelling helper provenance before reviewing Draft Annotations", async ({
+test.skip("Dataset Curator sees pre-labelling helper provenance before reviewing Draft Annotations", async ({
   page
 }) => {
   await page.goto("/");

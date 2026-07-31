@@ -286,6 +286,17 @@ label span {
   padding: 9px;
 }
 
+.setup-copy {
+  background: #f7f9f5;
+  border: 1px solid #dce2d7;
+  border-radius: 6px;
+  color: #525a4f;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  margin: 0;
+  padding: 10px;
+}
+
 .upload-panel {
   grid-template-columns: minmax(0, 1fr) minmax(160px, 220px);
 }
@@ -805,18 +816,57 @@ label span {
   align-items: start;
   display: grid;
   gap: 12px;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
+  grid-template-columns: minmax(0, 1.5fr) minmax(280px, 360px);
+}
+
+.crop-workspace {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.crop-viewport-toolbar {
+  align-items: end;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(92px, 110px) minmax(180px, 1fr) minmax(92px, 110px) minmax(92px, 110px);
+}
+
+.range-control {
+  min-width: 0;
+}
+
+.range-control input {
+  accent-color: #31572c;
+  min-height: 28px;
+}
+
+.crop-pan-controls {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(4, minmax(44px, 1fr));
+}
+
+.crop-pan-controls button {
+  justify-content: center;
+}
+
+.crop-surface-viewport {
+  background: #151812;
+  border: 1px solid #dce2d7;
+  border-radius: 8px;
+  max-height: min(78vh, 820px);
+  min-height: 360px;
+  overflow: auto;
+  overscroll-behavior: contain;
 }
 
 .crop-surface {
   background: #151812;
-  border: 1px solid #dce2d7;
-  border-radius: 8px;
   cursor: crosshair;
-  max-height: 620px;
+  min-width: 100%;
   overflow: hidden;
   position: relative;
-  width: 100%;
 }
 
 .crop-surface img {
@@ -973,6 +1023,7 @@ label span {
   .crop-completion-controls,
   .crop-dataset-controls,
   .crop-editing-tool,
+  .crop-viewport-toolbar,
   .control-cluster {
     grid-template-columns: 1fr;
   }
