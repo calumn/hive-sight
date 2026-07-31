@@ -277,6 +277,10 @@ class InspectionResponse(BaseModel):
     intent: InspectionIntent
 
 
+class InspectionListResponse(BaseModel):
+    inspections: list[InspectionResponse]
+
+
 class InspectionIntentUpdateRequest(BaseModel):
     workspace_id: UUID
     intent: InspectionIntent

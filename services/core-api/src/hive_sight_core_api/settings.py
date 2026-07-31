@@ -15,6 +15,7 @@ class Settings:
     database_purpose: str
     yolo_base_weights: str
     yolo_device: str
+    object_storage_root: str = "var/object-storage"
     persistence_backend: str = "in_memory"
 
 
@@ -35,6 +36,7 @@ def load_settings() -> Settings:
             "http://localhost:9000",
         ),
         object_storage_bucket=os.getenv("CORE_API_OBJECT_STORAGE_BUCKET", "hive-sight-local"),
+        object_storage_root=os.getenv("HIVESIGHT_OBJECT_STORAGE_ROOT", "var/object-storage"),
         prelabeler=os.getenv("HIVESIGHT_PRELABELER", "deterministic"),
         bee_detector_training_adapter=os.getenv("HIVESIGHT_BEE_TRAINING_ADAPTER", "fake"),
         model_artifact_root=os.getenv("HIVESIGHT_MODEL_ARTIFACT_ROOT", "var/model-runs"),

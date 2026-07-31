@@ -751,7 +751,6 @@ label span {
   border: 1px solid #dce2d7;
   border-radius: 8px;
   cursor: crosshair;
-  max-height: 560px;
   overflow: hidden;
   position: relative;
 }

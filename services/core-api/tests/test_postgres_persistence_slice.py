@@ -10,7 +10,12 @@ from hive_configuration_test_support import configure_hive
 
 from hive_sight_core_api.db import MIGRATIONS_DIR, reset_database
 from hive_sight_core_api.dependencies import get_dev_state
-from hive_sight_core_api.dev_store import InMemoryEventRecorder, InMemoryObjectStorage, UploadPolicy
+from hive_sight_core_api.dev_store import (
+    FileSystemObjectStorage,
+    InMemoryEventRecorder,
+    InMemoryObjectStorage,
+    UploadPolicy,
+)
 from hive_sight_core_api.main import app
 from hive_sight_core_api.models import (
     ArtifactResponse,
@@ -56,12 +61,19 @@ def test_slice_0014_migration_declares_durable_annotation_repository_shape() -> 
 def test_postgres_store_survives_restart_for_training_crop_dataset_item_path() -> None:
     database_url = os.environ["HIVESIGHT_TEST_DATABASE_URL"]
     reset_database(database_url)
-    state = _build_postgres_state(database_url)
+    object_storage_root = Path("/tmp/hive-sight-test-object-storage")
+    state = _build_postgres_state(database_url, object_storage_root=object_storage_root)
     app.dependency_overrides[get_dev_state] = lambda: state
     client = TestClient(app)
 
     try:
         workspace_id = client.get("/v1/dev/session", headers=_headers()).json()["workspace_id"]
+        terms = client.post(
+            "/v1/workspace-data-use-agreements/acceptances",
+            json={"workspace_id": workspace_id, "terms_version": "2026-07-31"},
+            headers=_headers(),
+        )
+        assert terms.status_code == 200
         apiary_id = client.post(
             "/v1/apiaries",
             json={"workspace_id": workspace_id, "name": "Persistence apiary"},
@@ -140,6 +152,52 @@ def test_postgres_store_survives_restart_for_training_crop_dataset_item_path() -
             headers=_headers(),
         )
         assert dataset_item.status_code == 201
+    finally:
+        app.dependency_overrides.clear()
+
+    restarted_state = _build_postgres_state(
+        database_url,
+        object_storage_root=object_storage_root,
+    )
+    app.dependency_overrides[get_dev_state] = lambda: restarted_state
+    restarted_client = TestClient(app)
+    try:
+        inspections = restarted_client.get(
+            f"/v1/hives/{hive_id}/inspections",
+            params={"workspace_id": workspace_id, "intent": "training_data_collection"},
+            headers=_headers(),
+        )
+        photos = restarted_client.get(
+            f"/v1/inspections/{inspection_id}/photos",
+            params={"workspace_id": workspace_id},
+            headers=_headers(),
+        )
+        crops = restarted_client.get(
+            f"/v1/inspection-photos/{inspection_photo_id}/training-crops",
+            params={"workspace_id": workspace_id},
+            headers=_headers(),
+        )
+        evidence = restarted_client.get(
+            f"/v1/training-crops/{crop['training_crop_id']}/evidence",
+            params={"workspace_id": workspace_id},
+            headers=_headers(),
+        )
+        content = restarted_client.get(
+            f"/v1/inspection-photos/{inspection_photo_id}/content",
+            params={"workspace_id": workspace_id},
+            headers=_headers(),
+        )
+
+        assert inspections.status_code == 200
+        assert inspections.json()["inspections"][0]["inspection_id"] == inspection_id
+        assert photos.status_code == 200
+        assert photos.json()["photos"][0]["inspection_photo_id"] == inspection_photo_id
+        assert crops.status_code == 200
+        assert crops.json()["training_crops"][0]["training_crop_id"] == crop["training_crop_id"]
+        assert evidence.status_code == 200
+        assert evidence.json()["bee_ellipses"][0]["rotation_degrees"] == 15
+        assert content.status_code == 200
+        assert content.content == _minimal_png()
     finally:
         app.dependency_overrides.clear()
 
@@ -269,7 +327,7 @@ def test_postgres_store_survives_restart_for_model_training_records() -> None:
     )
     assert restarted.get_artifact(weights_artifact_id).relative_path.endswith("weights/best.pt")
 
-def _build_postgres_state(database_url: str):
+def _build_postgres_state(database_url: str, object_storage_root: Path | None = None):
     store = PostgresProductDataStore(
         database_url=database_url,
         id_factory=_id_factory(),
@@ -279,7 +337,11 @@ def _build_postgres_state(database_url: str):
 
     return DevState(
         store=store,
-        object_storage=InMemoryObjectStorage(),
+        object_storage=(
+            FileSystemObjectStorage(root=object_storage_root)
+            if object_storage_root is not None
+            else InMemoryObjectStorage()
+        ),
         event_recorder=InMemoryEventRecorder(),
         upload_policy=UploadPolicy(),
         dataset_export_root=Path("/tmp/hive-sight-test-exports"),

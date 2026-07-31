@@ -107,7 +107,7 @@ Structured marker data that can be rendered over an inspection photo.
 _Avoid_: Label when the distinction from review status matters.
 
 **Oriented Bee Ellipse**:
-The canonical reviewed geometry for a visible bee, represented by center point, two radii, and rotation.
+The canonical reviewed geometry for a visible bee, represented by center point, two radii, and undirected body-axis rotation. The rotation records body alignment, not which end is the head.
 _Avoid_: Bounding box when the human-reviewed bee shape and orientation are meant.
 
 **Candidate Annotation**:

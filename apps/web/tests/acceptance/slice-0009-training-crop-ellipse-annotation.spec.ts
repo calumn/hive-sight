@@ -32,6 +32,7 @@ test("Dataset Curator creates a crop, adds an oriented bee ellipse, and complete
   await page.getByTestId("upload-photo-button").click();
   await expect(page.getByTestId("training-crop-panel")).toBeVisible();
   await expect(page.getByTestId("training-source-image")).toBeVisible();
+  await expect.poll(() => sourcePhotoPreviewShowsWholeImage(page)).toBe(true);
 
   await page.getByTestId("training-source-photo-preview").click({ position: { x: 180, y: 120 } });
   await expect(page.getByTestId("training-draft-crop-overlay")).toBeVisible();
@@ -53,6 +54,25 @@ test("Dataset Curator creates a crop, adds an oriented bee ellipse, and complete
 
   await page.getByTestId("training-crop-surface").click({ position: { x: 180, y: 120 } });
   await expect(page.getByTestId("training-crop-ellipse")).toHaveCount(1);
+
+  await page.getByTestId("training-ellipse-type-select").selectOption("partial_visible_bee");
+  await expect(page.getByTestId("selected-training-ellipse-label")).toContainText(
+    "partial_visible_bee"
+  );
+  const boundaryStartX = await readGeometryValue(page, "training-ellipse-center-x");
+  const boundaryStartRadiusX = await readGeometryValue(page, "training-ellipse-radius-x");
+  const crossBoundaryClicks = Math.max(1, Math.ceil((boundaryStartX - boundaryStartRadiusX + 5) / 5));
+  for (let index = 0; index < crossBoundaryClicks; index += 1) {
+    await page.getByTestId("nudge-training-ellipse-left-button").click();
+  }
+  await expect
+    .poll(() => readGeometryValue(page, "training-ellipse-center-x"))
+    .toBeLessThan(boundaryStartRadiusX);
+  for (let index = 0; index < crossBoundaryClicks; index += 1) {
+    await page.getByTestId("nudge-training-ellipse-right-button").click();
+  }
+  await expectGeometryValue(page, "training-ellipse-center-x", boundaryStartX);
+  await page.getByTestId("training-ellipse-type-select").selectOption("complete_visible_bee");
 
   const cropSurfaceBox = await page.getByTestId("training-crop-surface").boundingBox();
   const cropViewportBox = await page.getByTestId("training-crop-surface-viewport").boundingBox();
@@ -105,6 +125,10 @@ test("Dataset Curator creates a crop, adds an oriented bee ellipse, and complete
   await page.getByTestId("complete-training-crop-button").click();
   await expect(page.getByTestId("training-crop-list-item")).toContainText("review_complete");
   await expect(page.getByTestId("training-crop-list-item")).toContainText("has_visible_bees");
+  await expect(page.getByTestId("delete-training-ellipse-button")).toBeDisabled();
+  await page.getByTestId("reopen-training-crop-button").click();
+  await expect(page.getByTestId("training-crop-list-item")).toContainText("review_pending");
+  await expect(page.getByTestId("delete-training-ellipse-button")).toBeEnabled();
 });
 
 async function readGeometryValue(page: Page, testId: string): Promise<number> {
@@ -128,6 +152,18 @@ async function cropImageIsClippedToSurface(page: Page): Promise<boolean> {
       imageBox.width >= surfaceBox.width &&
       imageBox.height >= surfaceBox.height
     );
+  });
+}
+
+async function sourcePhotoPreviewShowsWholeImage(page: Page): Promise<boolean> {
+  return page.getByTestId("training-source-photo-preview").evaluate((preview) => {
+    const image = preview.querySelector("img");
+    if (!image) {
+      return false;
+    }
+    const previewBox = preview.getBoundingClientRect();
+    const imageBox = image.getBoundingClientRect();
+    return previewBox.height + 1 >= imageBox.height;
   });
 }
 

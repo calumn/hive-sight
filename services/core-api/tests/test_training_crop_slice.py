@@ -119,7 +119,7 @@ def test_crop_bounds_are_validated_and_lock_after_first_ellipse() -> None:
         app.dependency_overrides.clear()
 
 
-def test_oriented_ellipse_is_persisted_normalized_and_validated_inside_crop() -> None:
+def test_complete_ellipse_is_persisted_normalized_and_validated_inside_crop() -> None:
     state = build_dev_state(
         id_values=[
             UUID("00000000-0000-0000-0000-000000009031"),
@@ -179,6 +179,64 @@ def test_oriented_ellipse_is_persisted_normalized_and_validated_inside_crop() ->
         assert updated.json()["rotation_degrees"] == 5
         assert evidence.status_code == 200
         assert len(evidence.json()["bee_ellipses"]) == 1
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_partial_visible_bee_ellipse_can_cross_crop_boundary() -> None:
+    state = build_dev_state(
+        id_values=[
+            UUID("00000000-0000-0000-0000-000000009061"),
+            UUID("00000000-0000-0000-0000-000000009062"),
+            UUID("00000000-0000-0000-0000-000000009063"),
+            UUID("00000000-0000-0000-0000-000000009064"),
+            UUID("00000000-0000-0000-0000-000000009065"),
+        ],
+        clock=lambda: datetime(2026, 7, 30, 9, 17, tzinfo=UTC),
+    )
+    app.dependency_overrides[get_dev_state] = lambda: state
+    client = TestClient(app)
+
+    try:
+        workspace_id, inspection_photo_id = _upload_photo(client, "training_data_collection")
+        crop = _create_crop(client, workspace_id, inspection_photo_id).json()
+
+        partial = _create_ellipse(
+            client,
+            workspace_id,
+            crop["training_crop_id"],
+            annotation_type="partial_visible_bee",
+            center_x=105,
+            center_y=320,
+            radius_x=40,
+            radius_y=20,
+        )
+        complete = _create_ellipse(
+            client,
+            workspace_id,
+            crop["training_crop_id"],
+            center_x=105,
+            center_y=320,
+            radius_x=40,
+            radius_y=20,
+        )
+        outside_partial = _create_ellipse(
+            client,
+            workspace_id,
+            crop["training_crop_id"],
+            annotation_type="partial_visible_bee",
+            center_x=20,
+            center_y=320,
+            radius_x=40,
+            radius_y=20,
+        )
+
+        assert partial.status_code == 201
+        assert partial.json()["annotation_type"] == "partial_visible_bee"
+        assert complete.status_code == 422
+        assert complete.json()["detail"]["code"] == "ellipse_outside_crop_bounds"
+        assert outside_partial.status_code == 422
+        assert outside_partial.json()["detail"]["code"] == "ellipse_outside_crop_bounds"
     finally:
         app.dependency_overrides.clear()
 
@@ -272,6 +330,64 @@ def test_crop_review_completion_and_zero_bee_rules() -> None:
         assert no_bees_with_ellipse.json()["detail"]["code"] == "no_visible_bees_conflicts_with_ellipses"
         assert terminal_locked.status_code == 409
         assert terminal_locked.json()["detail"]["code"] == "training_crop_locked"
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_completed_crop_can_be_reopened_for_additional_annotation() -> None:
+    state = build_dev_state(
+        id_values=[
+            UUID("00000000-0000-0000-0000-000000009071"),
+            UUID("00000000-0000-0000-0000-000000009072"),
+            UUID("00000000-0000-0000-0000-000000009073"),
+            UUID("00000000-0000-0000-0000-000000009074"),
+            UUID("00000000-0000-0000-0000-000000009075"),
+            UUID("00000000-0000-0000-0000-000000009076"),
+        ],
+        clock=lambda: datetime(2026, 7, 30, 9, 22, tzinfo=UTC),
+    )
+    app.dependency_overrides[get_dev_state] = lambda: state
+    client = TestClient(app)
+
+    try:
+        workspace_id, inspection_photo_id = _upload_photo(client, "training_data_collection")
+        crop = _create_crop(client, workspace_id, inspection_photo_id).json()
+        _create_ellipse(client, workspace_id, crop["training_crop_id"], center_x=300)
+        completed = client.patch(
+            f"/v1/training-crops/{crop['training_crop_id']}",
+            json={
+                "workspace_id": workspace_id,
+                "visible_bee_status": "has_visible_bees",
+                "review_status": "review_complete",
+            },
+            headers={"x-hivesight-dev-user-id": str(USER_ID)},
+        )
+        locked = _create_ellipse(client, workspace_id, crop["training_crop_id"], center_x=360)
+        reopened = client.patch(
+            f"/v1/training-crops/{crop['training_crop_id']}",
+            json={
+                "workspace_id": workspace_id,
+                "review_status": "review_pending",
+            },
+            headers={"x-hivesight-dev-user-id": str(USER_ID)},
+        )
+        additional = _create_ellipse(
+            client,
+            workspace_id,
+            crop["training_crop_id"],
+            annotation_type="partial_visible_bee",
+            center_x=105,
+            center_y=320,
+        )
+
+        assert completed.status_code == 200
+        assert completed.json()["review_status"] == "review_complete"
+        assert locked.status_code == 409
+        assert locked.json()["detail"]["code"] == "training_crop_locked"
+        assert reopened.status_code == 200
+        assert reopened.json()["review_status"] == "review_pending"
+        assert reopened.json()["exclusion_reason"] is None
+        assert additional.status_code == 201
     finally:
         app.dependency_overrides.clear()
 
@@ -390,6 +506,7 @@ def _create_ellipse(
     client: TestClient,
     workspace_id: str,
     training_crop_id: str,
+    annotation_type: str = "complete_visible_bee",
     center_x: float = 300,
     center_y: float = 300,
     radius_x: float = 40,
@@ -400,7 +517,7 @@ def _create_ellipse(
         f"/v1/training-crops/{training_crop_id}/bee-ellipses",
         json={
             "workspace_id": workspace_id,
-            "annotation_type": "complete_visible_bee",
+            "annotation_type": annotation_type,
             "center_x": center_x,
             "center_y": center_y,
             "radius_x": radius_x,

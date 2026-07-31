@@ -40,7 +40,9 @@ Before any ellipse exists, the Dataset Curator can adjust crop bounds using nudg
 
 The Dataset Curator can create an oriented bee ellipse by clicking/tapping inside the crop. A default ellipse is created at that point with `radius_x = 40`, `radius_y = 20`, and `rotation_degrees = 0`. The curator can move, resize, rotate, and delete ellipses before crop completion. Each ellipse is classified as `complete_visible_bee` or `partial_visible_bee`.
 
-When the crop has valid annotation geometry and a consistent visible bee status, the Dataset Curator can mark the crop `review_complete`. If the crop is unsuitable, the Dataset Curator can mark it `excluded` with a reason or note. Terminal crops are locked in this slice; there is no reopen workflow. A review-complete crop is eligible for later Bee Annotation Repository and Dataset Role assignment, but Slice 9 does not assign dataset use.
+Ellipse rotation records the visible bee body's undirected long-axis alignment. It does not record head-to-tail direction, so curators should fit the long axis to the body and should not spend time identifying which end is the head.
+
+When the crop has valid annotation geometry and a consistent visible bee status, the Dataset Curator can mark the crop `review_complete`. If the crop is unsuitable, the Dataset Curator can mark it `excluded` with a reason or note. Later usability fixes allow terminal crops to be reopened for correction. A review-complete crop is eligible for later Bee Annotation Repository and Dataset Role assignment, but Slice 9 does not assign dataset use.
 
 ## Layers Touched
 

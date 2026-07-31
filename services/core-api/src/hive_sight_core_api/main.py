@@ -51,7 +51,9 @@ from hive_sight_core_api.models import (
     HiveListResponse,
     HiveResponse,
     InspectionCreateRequest,
+    InspectionIntent,
     InspectionIntentUpdateRequest,
+    InspectionListResponse,
     InspectionPhotoListResponse,
     InspectionResponse,
     ModelCandidateListResponse,
@@ -285,6 +287,24 @@ def create_inspection(
         hive_id=request.hive_id,
         inspection_date=request.inspection_date,
         intent=request.intent,
+    )
+
+
+@app.get("/v1/hives/{hive_id}/inspections", response_model=InspectionListResponse)
+def list_hive_inspections(
+    hive_id: UUID,
+    workspace_id: UUID,
+    user: AuthenticatedUserDep,
+    state: DevStateDep,
+    intent: InspectionIntent | None = None,
+) -> InspectionListResponse:
+    return InspectionListResponse(
+        inspections=state.store.list_hive_inspections(
+            user=user,
+            workspace_id=workspace_id,
+            hive_id=hive_id,
+            intent=intent,
+        )
     )
 
 

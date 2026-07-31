@@ -125,6 +125,33 @@ class InMemoryObjectStorage:
         return self.objects.get(object_key)
 
 
+@dataclass(frozen=True)
+class FileSystemObjectStorage:
+    root: Path
+
+    def put_object(self, object_key: str, body: bytes) -> None:
+        path = self._path_for_key(object_key)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(body)
+
+    def get_object(self, object_key: str) -> bytes | None:
+        path = self._path_for_key(object_key)
+        if not path.exists() or not path.is_file():
+            return None
+        return path.read_bytes()
+
+    def _path_for_key(self, object_key: str) -> Path:
+        root = self.root.resolve()
+        path = (root / object_key).resolve()
+        if root != path and root not in path.parents:
+            raise DomainError(
+                "invalid_object_key",
+                "Object storage keys must stay inside the configured storage root.",
+                422,
+            )
+        return path
+
+
 @dataclass
 class InMemoryEventRecorder:
     analysis_requested: list[AnalysisRunResponse] = field(default_factory=list)
@@ -351,6 +378,36 @@ class InMemoryProductDataStore:
     def save_inspection(self, inspection: InspectionResponse) -> InspectionResponse:
         self.inspections[inspection.inspection_id] = inspection
         return inspection
+
+    def list_hive_inspections(
+        self,
+        user: UserContext,
+        workspace_id: UUID,
+        hive_id: UUID,
+        intent: InspectionIntent | None = None,
+    ) -> list[InspectionResponse]:
+        self.require_workspace_access(user, workspace_id)
+        hive = self.hives.get(hive_id)
+        if hive is None:
+            raise DomainError("hive_not_found", "The requested Hive was not found.", 404)
+        if hive.workspace_id != workspace_id:
+            raise DomainError(
+                "workspace_access_denied",
+                "The current User does not have access to this Workspace.",
+                403,
+            )
+        inspections = [
+            inspection
+            for inspection in self.inspections.values()
+            if inspection.workspace_id == workspace_id
+            and inspection.hive_id == hive_id
+            and (intent is None or inspection.intent == intent)
+        ]
+        return sorted(
+            inspections,
+            key=lambda inspection: (inspection.inspection_date, str(inspection.inspection_id)),
+            reverse=True,
+        )
 
     def inspection_has_photos(self, inspection_id: UUID) -> bool:
         return any(photo.inspection_id == inspection_id for photo in self.inspection_photos.values())
@@ -1586,7 +1643,7 @@ class UploadPolicy:
 @dataclass
 class DevState:
     store: InMemoryProductDataStore
-    object_storage: InMemoryObjectStorage
+    object_storage: InMemoryObjectStorage | FileSystemObjectStorage
     event_recorder: InMemoryEventRecorder
     upload_policy: UploadPolicy
     dataset_export_root: Path = Path("var/exports/datasets")

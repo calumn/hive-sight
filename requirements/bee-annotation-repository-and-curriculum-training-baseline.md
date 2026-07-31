@@ -92,6 +92,8 @@ Minimum fields:
 - rotation degrees
 - coordinate space
 
+Rotation degrees shall describe the undirected long-axis alignment of the visible bee body, not head-to-tail direction.
+
 Rationale: Bees are elongated and appear at many rotations. Oriented ellipses better express human-reviewed bee evidence than axis-aligned rectangles.
 
 ### BAR-006 Complete Crop Review

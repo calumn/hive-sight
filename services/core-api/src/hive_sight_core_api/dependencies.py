@@ -25,6 +25,7 @@ from hive_sight_core_api.dataset_labelling_workflow import (
 from hive_sight_core_api.dataset_role_assignment_workflow import DatasetRoleAssignmentWorkflow
 from hive_sight_core_api.dev_store import (
     DevState,
+    FileSystemObjectStorage,
     InMemoryEventRecorder,
     InMemoryObjectStorage,
     InMemoryProductDataStore,
@@ -78,7 +79,7 @@ def build_dev_state(
         )
     return DevState(
         store=store,
-        object_storage=InMemoryObjectStorage(),
+        object_storage=_object_storage(settings),
         event_recorder=InMemoryEventRecorder(),
         upload_policy=UploadPolicy(max_size_bytes=max_upload_size_bytes),
         dataset_export_root=dataset_export_root,
@@ -186,3 +187,11 @@ def _model_artifact_root(settings: Settings) -> Path:
     if configured.is_absolute():
         return configured
     return Path(__file__).resolve().parents[4] / configured
+
+
+def _object_storage(settings: Settings) -> InMemoryObjectStorage | FileSystemObjectStorage:
+    if settings.persistence_backend != "postgres":
+        return InMemoryObjectStorage()
+    configured = Path(settings.object_storage_root)
+    root = configured if configured.is_absolute() else Path(__file__).resolve().parents[4] / configured
+    return FileSystemObjectStorage(root=root)

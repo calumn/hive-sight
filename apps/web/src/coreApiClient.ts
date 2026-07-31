@@ -78,6 +78,10 @@ export type Inspection = {
   intent: InspectionIntent;
 };
 
+export type InspectionList = {
+  inspections: Inspection[];
+};
+
 export type InspectionPhoto = {
   inspectionPhotoId: string;
   inspectionId: string;
@@ -747,6 +751,28 @@ export async function createInspection({
   });
   await ensureOk(response);
   return parseInspection(await response.json());
+}
+
+export async function fetchHiveInspections({
+  devUserId,
+  workspaceId,
+  hiveId,
+  intent
+}: {
+  devUserId: string;
+  workspaceId: string;
+  hiveId: string;
+  intent?: InspectionIntent;
+}): Promise<InspectionList> {
+  const params = new URLSearchParams({ workspace_id: workspaceId });
+  if (intent) {
+    params.set("intent", intent);
+  }
+  const response = await fetch(`${coreApiUrl}/v1/hives/${hiveId}/inspections?${params}`, {
+    headers: devAuthHeaders(devUserId)
+  });
+  await ensureOk(response);
+  return parseInspectionList(await response.json());
 }
 
 export async function fetchInspectionPhotos({
@@ -1496,6 +1522,13 @@ function parseInspectionPhotoList(value: unknown): InspectionPhotoList {
   return {
     inspection: parseInspection(record.inspection),
     photos: requireArray(record.photos, "photos").map(parseInspectionPhoto)
+  };
+}
+
+function parseInspectionList(value: unknown): InspectionList {
+  const record = requireRecord(value, "Inspection list response");
+  return {
+    inspections: requireArray(record.inspections, "inspections").map(parseInspection)
   };
 }
 

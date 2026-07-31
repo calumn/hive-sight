@@ -102,8 +102,10 @@ data/cache/
 local-data/
 var/exports/
 var/model-runs/
+var/object-storage/
 **/var/exports/
 **/var/model-runs/
+**/var/object-storage/
 
 # -------------------------
 # Docker

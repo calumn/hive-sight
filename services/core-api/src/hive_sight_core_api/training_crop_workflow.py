@@ -100,7 +100,6 @@ class TrainingCropWorkflow:
             workspace_id=request.workspace_id,
             training_crop_id=training_crop_id,
         )
-        _require_crop_editable(crop)
         existing_ellipses = self.store.get_ellipses_for_training_crop(training_crop_id)
         bounds_updates = {
             key: value
@@ -112,6 +111,9 @@ class TrainingCropWorkflow:
             }.items()
             if value is not None
         }
+        if _crop_is_locked(crop):
+            if request.review_status != TrainingCropReviewStatus.review_pending or bounds_updates:
+                _require_crop_editable(crop)
         if bounds_updates and existing_ellipses:
             raise DomainError(
                 "crop_bounds_locked",
@@ -134,6 +136,8 @@ class TrainingCropWorkflow:
             next_values["visible_bee_status"] = request.visible_bee_status
         if request.review_status is not None:
             next_values["review_status"] = request.review_status
+            if request.review_status == TrainingCropReviewStatus.review_pending:
+                next_values["exclusion_reason"] = None
         if request.exclusion_reason is not None:
             next_values["exclusion_reason"] = request.exclusion_reason
         if request.notes is not None:
@@ -185,13 +189,14 @@ class TrainingCropWorkflow:
             )
         _validate_bee_annotation_type(request.annotation_type)
         rotation = _normalize_rotation(request.rotation_degrees)
-        _validate_ellipse_inside_crop(
+        _validate_ellipse_for_crop(
             crop=crop,
             center_x=request.center_x,
             center_y=request.center_y,
             radius_x=request.radius_x,
             radius_y=request.radius_y,
             rotation_degrees=rotation,
+            annotation_type=request.annotation_type,
         )
         created_at = self.store.clock()
         ellipse = OrientedBeeEllipseResponse(
@@ -258,7 +263,7 @@ class TrainingCropWorkflow:
                 else _normalize_rotation(request.rotation_degrees)
             ),
         }
-        _validate_ellipse_inside_crop(crop=crop, **next_values)
+        _validate_ellipse_for_crop(crop=crop, **next_values)
         updated = ellipse.model_copy(update={**next_values, "updated_at": self.store.clock()})
         self.store.save_training_crop_ellipse(updated)
         return updated
@@ -420,7 +425,7 @@ def _validate_bee_annotation_type(annotation_type: AnnotationType) -> None:
         )
 
 
-def _validate_ellipse_inside_crop(
+def _validate_ellipse_for_crop(
     crop: TrainingCropResponse,
     center_x: float,
     center_y: float,
@@ -429,31 +434,78 @@ def _validate_ellipse_inside_crop(
     rotation_degrees: float,
     annotation_type: AnnotationType | None = None,
 ) -> None:
-    _ = annotation_type
     angle = radians(rotation_degrees)
     x_extent = sqrt((radius_x * cos(angle)) ** 2 + (radius_y * sin(angle)) ** 2)
     y_extent = sqrt((radius_x * sin(angle)) ** 2 + (radius_y * cos(angle)) ** 2)
-    if (
-        center_x - x_extent < crop.crop_x
-        or center_y - y_extent < crop.crop_y
-        or center_x + x_extent > crop.crop_x + crop.crop_width
-        or center_y + y_extent > crop.crop_y + crop.crop_height
-    ):
+    ellipse_bounds = (
+        center_x - x_extent,
+        center_y - y_extent,
+        center_x + x_extent,
+        center_y + y_extent,
+    )
+    crop_bounds = (
+        crop.crop_x,
+        crop.crop_y,
+        crop.crop_x + crop.crop_width,
+        crop.crop_y + crop.crop_height,
+    )
+    if annotation_type == AnnotationType.partial_visible_bee:
+        if not _bounds_overlap(ellipse_bounds, crop_bounds):
+            raise DomainError(
+                "ellipse_outside_crop_bounds",
+                "Partial visible bee ellipses must overlap the Training Crop bounds.",
+                422,
+            )
+        return
+
+    if not _bounds_inside(ellipse_bounds, crop_bounds):
         raise DomainError(
             "ellipse_outside_crop_bounds",
-            "Oriented bee ellipses must stay inside the Training Crop bounds.",
+            "Complete visible bee ellipses must stay inside the Training Crop bounds.",
             422,
         )
 
 
-def _require_crop_editable(crop: TrainingCropResponse) -> None:
-    if crop.review_status in {
+def _bounds_inside(
+    inner_bounds: tuple[float, float, float, float],
+    outer_bounds: tuple[float, float, float, float],
+) -> bool:
+    inner_left, inner_top, inner_right, inner_bottom = inner_bounds
+    outer_left, outer_top, outer_right, outer_bottom = outer_bounds
+    return (
+        inner_left >= outer_left
+        and inner_top >= outer_top
+        and inner_right <= outer_right
+        and inner_bottom <= outer_bottom
+    )
+
+
+def _bounds_overlap(
+    left_bounds: tuple[float, float, float, float],
+    right_bounds: tuple[float, float, float, float],
+) -> bool:
+    left_left, left_top, left_right, left_bottom = left_bounds
+    right_left, right_top, right_right, right_bottom = right_bounds
+    return (
+        left_right > right_left
+        and left_left < right_right
+        and left_bottom > right_top
+        and left_top < right_bottom
+    )
+
+
+def _crop_is_locked(crop: TrainingCropResponse) -> bool:
+    return crop.review_status in {
         TrainingCropReviewStatus.review_complete,
         TrainingCropReviewStatus.excluded,
-    }:
+    }
+
+
+def _require_crop_editable(crop: TrainingCropResponse) -> None:
+    if _crop_is_locked(crop):
         raise DomainError(
             "training_crop_locked",
-            "Completed or excluded Training Crops are locked in this slice.",
+            "Completed or excluded Training Crops must be reopened before editing.",
             409,
         )
 

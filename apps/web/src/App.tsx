@@ -51,6 +51,7 @@ import {
   fetchFrameStandards,
   fetchHiveConfiguration,
   fetchHives,
+  fetchHiveInspections,
   fetchInspectionPhotos,
   fetchInspectionPhotoObjectUrl,
   fetchModelTrainingReadiness,
@@ -119,6 +120,7 @@ type CropDraft = {
 };
 
 export function App() {
+  const trainingCropPanelRef = useRef<HTMLDivElement | null>(null);
   const [loadState, setLoadState] = useState<LoadState>({ kind: "loading" });
   const [actionState, setActionState] = useState<ActionState>({ kind: "idle" });
   const [apiaries, setApiaries] = useState<Apiary[]>([]);
@@ -131,6 +133,7 @@ export function App() {
   );
   const [hiveConfigurationNotes, setHiveConfigurationNotes] = useState("");
   const [hiveConfiguration, setHiveConfiguration] = useState<HiveConfiguration | null>(null);
+  const [trainingInspections, setTrainingInspections] = useState<Inspection[]>([]);
   const [inspection, setInspection] = useState<Inspection | null>(null);
   const [inspectionPhotos, setInspectionPhotos] = useState<InspectionPhoto[]>([]);
   const [analysisDetail, setAnalysisDetail] = useState<AnalysisRunDetail | null>(null);
@@ -191,6 +194,9 @@ export function App() {
   const canUpload = Boolean(termsAccepted && inspection && file);
   const isTrainingDataCollection = inspection?.intent === "training_data_collection";
   const isVarroaAssessment = inspection?.intent === "varroa_assessment";
+  const showTrainingCropPanel = Boolean(
+    isTrainingDataCollection && session?.datasetCuratorCapability
+  );
   const selectedFileLabel = useMemo(() => {
     if (!file) {
       return "No photo selected";
@@ -222,6 +228,7 @@ export function App() {
       setHives([]);
       setHive(null);
       setHiveConfiguration(null);
+      setTrainingInspections([]);
       clearInspectionWorkflow();
       return;
     }
@@ -244,12 +251,14 @@ export function App() {
       listing.hives[0] ??
       null;
     setHive(nextHive);
+    setTrainingInspections([]);
     clearInspectionWorkflow();
     if (!nextHive) {
       setHiveConfiguration(null);
       return;
     }
     await loadHiveConfigurationForSelection(workspaceId, nextHive);
+    await refreshTrainingInspections(workspaceId, nextHive);
   }
 
   async function loadHiveConfigurationForSelection(workspaceId: string, selectedHive: Hive) {
@@ -296,8 +305,77 @@ export function App() {
     }
     await runAction("Selecting hive", async () => {
       setHive(selectedHive);
+      setTrainingInspections([]);
       clearInspectionWorkflow();
       await loadHiveConfigurationForSelection(session.workspaceId, selectedHive);
+      await refreshTrainingInspections(session.workspaceId, selectedHive);
+    });
+  }
+
+  async function refreshTrainingInspections(
+    workspaceId: string,
+    selectedHive: Hive,
+    preferredInspectionId?: string
+  ) {
+    const listing = await fetchHiveInspections({
+      devUserId,
+      workspaceId,
+      hiveId: selectedHive.hiveId,
+      intent: "training_data_collection"
+    });
+    setTrainingInspections(listing.inspections);
+    const nextInspection =
+      listing.inspections.find(
+        (candidate) => candidate.inspectionId === preferredInspectionId
+      ) ??
+      listing.inspections[0] ??
+      null;
+    if (!nextInspection) {
+      clearInspectionWorkflow();
+      return;
+    }
+    await selectInspection(workspaceId, nextInspection, true);
+  }
+
+  async function selectInspection(
+    workspaceId: string,
+    selectedInspection: Inspection,
+    scrollToCrops: boolean
+  ) {
+    setInspection(selectedInspection);
+    setFile(null);
+    setAnalysisDetail(null);
+    setReviewState(null);
+    setLabellingState(null);
+    clearEvidenceImage();
+    clearLabellingImage();
+    setActionState({ kind: "idle" });
+    const listing = await fetchInspectionPhotos({
+      devUserId,
+      workspaceId,
+      inspectionId: selectedInspection.inspectionId
+    });
+    setInspection(listing.inspection);
+    setInspectionPhotos(listing.photos);
+    if (scrollToCrops && listing.photos.length > 0 && selectedInspection.intent === "training_data_collection") {
+      window.setTimeout(() => {
+        trainingCropPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 0);
+    }
+  }
+
+  async function onSelectTrainingInspection(inspectionId: string) {
+    if (!session) {
+      return;
+    }
+    const selectedInspection = trainingInspections.find(
+      (candidate) => candidate.inspectionId === inspectionId
+    );
+    if (!selectedInspection) {
+      return;
+    }
+    await runAction("Resuming Training Inspection", async () => {
+      await selectInspection(session.workspaceId, selectedInspection, true);
     });
   }
 
@@ -364,11 +442,27 @@ export function App() {
         inspectionDate,
         intent: inspectionIntent
       });
-      setInspection(created);
-      setInspectionPhotos([]);
-      setAnalysisDetail(null);
-      clearEvidenceImage();
-      clearLabellingImage();
+      if (hive && created.intent === "training_data_collection") {
+        setInspection(created);
+        setInspectionPhotos([]);
+        setAnalysisDetail(null);
+        clearEvidenceImage();
+        clearLabellingImage();
+        setTrainingInspections((current) =>
+          sortInspectionsNewestFirst([
+            created,
+            ...current.filter(
+              (candidate) => candidate.inspectionId !== created.inspectionId
+            )
+          ])
+        );
+      } else {
+        setInspection(created);
+        setInspectionPhotos([]);
+        setAnalysisDetail(null);
+        clearEvidenceImage();
+        clearLabellingImage();
+      }
     });
   }
 
@@ -842,6 +936,27 @@ export function App() {
 
               <form className="stacked-form" onSubmit={onCreateInspection}>
                 <PanelHeading icon={<Plus size={20} />} title="Inspection" />
+                {hive && trainingInspections.length > 0 ? (
+                  <label>
+                    <span>Resume Training Inspection</span>
+                    <select
+                      value={inspection?.inspectionId ?? ""}
+                      onChange={(event) => void onSelectTrainingInspection(event.target.value)}
+                      disabled={actionState.kind === "working"}
+                      data-testid="resume-training-inspection-select"
+                    >
+                      {trainingInspections.map((candidate) => (
+                        <option key={candidate.inspectionId} value={candidate.inspectionId}>
+                          {formatInspectionOption(candidate)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : hive ? (
+                  <p className="setup-copy" data-testid="resume-training-inspection-empty-state">
+                    No Training Data Collection Inspections to resume for this Hive.
+                  </p>
+                ) : null}
                 <label>
                   <span>Date</span>
                   <input
@@ -924,21 +1039,23 @@ export function App() {
                     onSubmitReviewDecision={onSubmitReviewDecision}
                   />
                 ) : null}
-                {isTrainingDataCollection && loadState.session.datasetCuratorCapability ? (
-                  <TrainingCropAnnotationPanel
-                    devUserId={devUserId}
-                    workspaceId={loadState.session.workspaceId}
-                    photos={inspectionPhotos}
-                    onError={(error) =>
-                      setActionState({
-                        kind: "blocked",
-                        code: error.code,
-                        message: error.message
-                      })
-                    }
-                  />
-                ) : null}
               </>
+            ) : null}
+            {showTrainingCropPanel ? (
+              <div ref={trainingCropPanelRef}>
+                <TrainingCropAnnotationPanel
+                  devUserId={devUserId}
+                  workspaceId={loadState.session.workspaceId}
+                  photos={inspectionPhotos}
+                  onError={(error) =>
+                    setActionState({
+                      kind: "blocked",
+                      code: error.code,
+                      message: error.message
+                    })
+                  }
+                />
+              </div>
             ) : null}
           </section>
         </section>
@@ -1022,6 +1139,19 @@ function formatInspectionIntent(intent: InspectionIntent) {
   return intent === "training_data_collection" ? "Training data collection" : "Varroa assessment";
 }
 
+function formatInspectionOption(inspection: Inspection) {
+  return `${inspection.inspectionDate} / ${formatInspectionIntent(inspection.intent)} / ${inspection.inspectionId.slice(0, 8)}`;
+}
+
+function sortInspectionsNewestFirst(inspections: Inspection[]) {
+  return [...inspections].sort((left, right) => {
+    const dateComparison = right.inspectionDate.localeCompare(left.inspectionDate);
+    return dateComparison === 0
+      ? right.inspectionId.localeCompare(left.inspectionId)
+      : dateComparison;
+  });
+}
+
 function formatMetric(value: unknown) {
   return typeof value === "number" ? value.toFixed(2) : "n/a";
 }
@@ -1093,6 +1223,7 @@ function ellipseStyle(crop: TrainingCrop, ellipse: OrientedBeeEllipse) {
 }
 
 type EllipseGeometry = {
+  annotationType: BeeAnnotationType;
   centerX: number;
   centerY: number;
   radiusX: number;
@@ -1105,6 +1236,7 @@ function nextEllipseGeometry(
   values: Partial<EllipseGeometry>
 ): EllipseGeometry {
   return {
+    annotationType: values.annotationType ?? ellipse.annotationType,
     centerX: values.centerX ?? ellipse.centerX,
     centerY: values.centerY ?? ellipse.centerY,
     radiusX: values.radiusX ?? ellipse.radiusX,
@@ -1113,7 +1245,7 @@ function nextEllipseGeometry(
   };
 }
 
-function ellipseFitsInsideCrop(crop: TrainingCrop, ellipse: EllipseGeometry): boolean {
+function ellipseIsAllowedForCrop(crop: TrainingCrop, ellipse: EllipseGeometry): boolean {
   if (ellipse.radiusX < 5 || ellipse.radiusY < 5) {
     return false;
   }
@@ -1124,12 +1256,22 @@ function ellipseFitsInsideCrop(crop: TrainingCrop, ellipse: EllipseGeometry): bo
   const yExtent = Math.sqrt(
     (ellipse.radiusX * Math.sin(angle)) ** 2 + (ellipse.radiusY * Math.cos(angle)) ** 2
   );
-  return (
-    ellipse.centerX - xExtent >= crop.cropX &&
-    ellipse.centerY - yExtent >= crop.cropY &&
-    ellipse.centerX + xExtent <= crop.cropX + crop.cropWidth &&
-    ellipse.centerY + yExtent <= crop.cropY + crop.cropHeight
-  );
+  const ellipseBounds = {
+    left: ellipse.centerX - xExtent,
+    top: ellipse.centerY - yExtent,
+    right: ellipse.centerX + xExtent,
+    bottom: ellipse.centerY + yExtent
+  };
+  const cropBounds = {
+    left: crop.cropX,
+    top: crop.cropY,
+    right: crop.cropX + crop.cropWidth,
+    bottom: crop.cropY + crop.cropHeight
+  };
+  if (ellipse.annotationType === "partial_visible_bee") {
+    return boundsOverlap(ellipseBounds, cropBounds);
+  }
+  return boundsInside(ellipseBounds, cropBounds);
 }
 
 function canAdjustEllipse(
@@ -1140,7 +1282,31 @@ function canAdjustEllipse(
   if (!crop || !ellipse) {
     return false;
   }
-  return ellipseFitsInsideCrop(crop, nextEllipseGeometry(ellipse, values));
+  return ellipseIsAllowedForCrop(crop, nextEllipseGeometry(ellipse, values));
+}
+
+function boundsInside(
+  inner: { left: number; top: number; right: number; bottom: number },
+  outer: { left: number; top: number; right: number; bottom: number }
+): boolean {
+  return (
+    inner.left >= outer.left &&
+    inner.top >= outer.top &&
+    inner.right <= outer.right &&
+    inner.bottom <= outer.bottom
+  );
+}
+
+function boundsOverlap(
+  left: { left: number; top: number; right: number; bottom: number },
+  right: { left: number; top: number; right: number; bottom: number }
+): boolean {
+  return (
+    left.right > right.left &&
+    left.left < right.right &&
+    left.bottom > right.top &&
+    left.top < right.bottom
+  );
 }
 
 function normalizeRotation(rotationDegrees: number): number {
@@ -1349,6 +1515,7 @@ function TrainingCropAnnotationPanel({
     }
 
     let cancelled = false;
+    void refreshCropsForPhoto(selectedPhoto.inspectionPhotoId);
     fetchInspectionPhotoObjectUrl({
       devUserId,
       viewUrl: `/v1/inspection-photos/${selectedPhoto.inspectionPhotoId}/content?workspace_id=${workspaceId}`
@@ -1365,7 +1532,6 @@ function TrainingCropAnnotationPanel({
         setSourceImageSize(null);
         setDraftCrop(null);
         setSelectedEllipseId(null);
-        void refreshCropsForPhoto(selectedPhoto.inspectionPhotoId);
       })
       .catch((error) => onError(toApiError(error)));
 
@@ -1556,6 +1722,23 @@ function TrainingCropAnnotationPanel({
         trainingCropId: selectedCrop.trainingCropId,
         reviewStatus: "excluded",
         exclusionReason,
+        notes: cropNotes
+      });
+      await refreshEvidence(selectedCrop.trainingCropId);
+      if (selectedPhoto) await refreshCropsForPhoto(selectedPhoto.inspectionPhotoId);
+    });
+  }
+
+  async function reopenCrop() {
+    if (!selectedCrop) {
+      return;
+    }
+    await runCropAction("Reopening Training Crop", async () => {
+      await updateTrainingCrop({
+        devUserId,
+        workspaceId,
+        trainingCropId: selectedCrop.trainingCropId,
+        reviewStatus: "review_pending",
         notes: cropNotes
       });
       await refreshEvidence(selectedCrop.trainingCropId);
@@ -2143,6 +2326,17 @@ function TrainingCropAnnotationPanel({
                   <CircleAlert size={18} />
                   Exclude
                 </button>
+                {cropLocked ? (
+                  <button
+                    type="button"
+                    disabled={Boolean(workingLabel)}
+                    onClick={() => void reopenCrop()}
+                    data-testid="reopen-training-crop-button"
+                  >
+                    <RotateCcw size={18} />
+                    Reopen crop
+                  </button>
+                ) : null}
               </div>
 
               <div className="metadata-panel crop-dataset-controls">

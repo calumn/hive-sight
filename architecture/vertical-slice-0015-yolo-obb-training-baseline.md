@@ -49,6 +49,7 @@ And the report states governance warnings rather than claiming production suitab
 - Active reviewed Dataset Items exist for at least training and validation roles.
 - Benchmark Dataset Items, if present, have `source_group_key` and remain protected.
 - Reviewed bee geometry uses canonical Oriented Bee Ellipses; YOLO OBB labels are a model-specific projection.
+- Ellipse rotation is an undirected bee body-axis alignment, not a head-to-tail direction. Export and training logic must not infer anatomical head direction from the stored rotation.
 - Normal application setup and fast tests do not require YOLO or network access.
 
 ## End-To-End Behaviour
