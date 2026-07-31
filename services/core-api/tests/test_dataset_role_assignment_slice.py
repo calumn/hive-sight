@@ -66,6 +66,15 @@ def test_benchmark_dataset_item_is_projected_as_protected() -> None:
 
     try:
         workspace_id, labelling_session_id, _ = _create_reviewed_labelling(client)
+        metadata = client.patch(
+            f"/v1/dataset-labelling-sessions/{labelling_session_id}",
+            json={
+                "workspace_id": workspace_id,
+                "source_group_key": "benchmark-frame-a",
+                "image_quality_status": "usable",
+            },
+            headers={"x-hivesight-dev-user-id": str(CURATOR_USER_ID)},
+        )
 
         response = client.post(
             "/v1/dataset-items",
@@ -84,8 +93,10 @@ def test_benchmark_dataset_item_is_projected_as_protected() -> None:
             headers={"x-hivesight-dev-user-id": str(CURATOR_USER_ID)},
         )
 
+        assert metadata.status_code == 200
         assert response.status_code == 201
         assert response.json()["benchmark_protected"] is True
+        assert response.json()["source_group_key"] == "benchmark-frame-a"
         assert evidence.status_code == 200
         assert evidence.json()["dataset_item"]["dataset_role"] == "benchmark"
         assert evidence.json()["dataset_item"]["benchmark_protected"] is True

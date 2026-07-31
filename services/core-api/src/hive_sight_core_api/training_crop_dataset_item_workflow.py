@@ -33,10 +33,16 @@ class TrainingCropDatasetItemWorkflow:
             training_crop_id=training_crop_id,
         )
         cleaned_note = _clean_optional_text(request.assignment_note)
+        cleaned_source_group_key = _clean_optional_text(request.source_group_key)
         _validate_dataset_item_exclusion(
             dataset_role=request.dataset_role,
             assignment_note=cleaned_note,
             exclusion_reason=request.exclusion_reason,
+        )
+        self._validate_dataset_role_leakage(
+            crop=crop,
+            dataset_role=request.dataset_role,
+            source_group_key=cleaned_source_group_key,
         )
         ellipses = self.store.get_ellipses_for_training_crop(training_crop_id)
         _validate_training_crop_dataset_item_state(
@@ -87,7 +93,7 @@ class TrainingCropDatasetItemWorkflow:
             crop_image_width_px=crop.crop_image_width_px,
             crop_image_height_px=crop.crop_image_height_px,
             curriculum_stage=crop.curriculum_stage,
-            source_group_key=None,
+            source_group_key=cleaned_source_group_key,
             image_quality_status=(
                 ImageQualityStatus.exclude
                 if request.dataset_role == DatasetRole.excluded
@@ -102,6 +108,47 @@ class TrainingCropDatasetItemWorkflow:
         )
         self.store.save_dataset_item(dataset_item)
         return dataset_item
+
+    def _validate_dataset_role_leakage(
+        self,
+        crop: TrainingCropResponse,
+        dataset_role: DatasetRole,
+        source_group_key: str | None,
+    ) -> None:
+        if dataset_role == DatasetRole.benchmark and source_group_key is None:
+            raise DomainError(
+                "benchmark_source_group_key_required",
+                "Benchmark Dataset Items require a source group key.",
+                422,
+            )
+        if dataset_role not in {DatasetRole.training, DatasetRole.validation, DatasetRole.benchmark}:
+            return
+        conflicting_roles = (
+            {DatasetRole.training, DatasetRole.validation}
+            if dataset_role == DatasetRole.benchmark
+            else {DatasetRole.benchmark}
+        )
+        for existing in self.store.dataset_items.values():
+            if existing.workspace_id != crop.workspace_id:
+                continue
+            if existing.dataset_role not in conflicting_roles:
+                continue
+            if existing.inspection_photo_id == crop.inspection_photo_id:
+                raise DomainError(
+                    "benchmark_source_image_leakage_conflict",
+                    "Benchmark Dataset Items cannot share a Source Image with training or validation Dataset Items.",
+                    409,
+                )
+            if (
+                source_group_key is not None
+                and existing.source_group_key is not None
+                and existing.source_group_key == source_group_key
+            ):
+                raise DomainError(
+                    "benchmark_source_group_leakage_conflict",
+                    "Benchmark Dataset Items cannot share a source group key with training or validation Dataset Items.",
+                    409,
+                )
 
 
 def _validate_dataset_item_exclusion(

@@ -58,10 +58,21 @@ def build_dev_state(
     dataset_export_root: Path = DEFAULT_DATASET_EXPORT_ROOT,
 ) -> DevState:
     id_factory = deterministic_id_factory(id_values) if id_values is not None else None
-    store = InMemoryProductDataStore(
-        id_factory=id_factory or deterministic_id_factory([]),
-        clock=clock,
-    )
+    settings = get_settings()
+    resolved_id_factory = id_factory or deterministic_id_factory([])
+    if settings.persistence_backend == "postgres":
+        from hive_sight_core_api.postgres_store import PostgresProductDataStore
+
+        store = PostgresProductDataStore(
+            database_url=settings.database_url,
+            id_factory=resolved_id_factory,
+            clock=clock,
+        )
+    else:
+        store = InMemoryProductDataStore(
+            id_factory=resolved_id_factory,
+            clock=clock,
+        )
     return DevState(
         store=store,
         object_storage=InMemoryObjectStorage(),

@@ -1,4 +1,7 @@
 from dataclasses import dataclass, field
+from hashlib import sha256
+from io import BytesIO
+from struct import unpack
 from uuid import UUID, uuid4
 
 from hive_sight_core_api.analysis_request_workflow import AnalysisRequestWorkflow
@@ -40,6 +43,7 @@ class InspectionPhotoAccess:
         self.store.require_data_use_agreement(workspace_id)
         inspection = self.store.require_inspection(workspace_id, inspection_id)
         self._validate_upload(content_type=content_type, size_bytes=len(body))
+        source_width_px, source_height_px = _read_image_dimensions(body)
 
         inspection_photo_id = uuid4()
         object_key = self._object_key(
@@ -58,6 +62,10 @@ class InspectionPhotoAccess:
             content_type=content_type,
             size_bytes=len(body),
             uploaded_by_user_id=user.user_id,
+            source_image_width_px=source_width_px,
+            source_image_height_px=source_height_px,
+            content_hash=sha256(body).hexdigest(),
+            content_hash_algorithm="sha256",
         )
         analysis_run = self.analysis_workflow.request_analysis(
             AnalysisRunRequest(
@@ -96,3 +104,15 @@ class InspectionPhotoAccess:
             f"workspaces/{workspace_id}/inspections/{inspection_id}/"
             f"inspection-photos/{inspection_photo_id}/original.{extension}"
         )
+
+
+def _read_image_dimensions(body: bytes) -> tuple[int, int]:
+    if body.startswith(b"\x89PNG\r\n\x1a\n") and len(body) >= 24:
+        return unpack(">II", body[16:24])
+    try:
+        from PIL import Image
+
+        with Image.open(BytesIO(body)) as image:
+            return image.width, image.height
+    except (ImportError, OSError, ValueError):
+        return 1, 1

@@ -812,6 +812,7 @@ export async function createTrainingCropDatasetItem({
   workspaceId,
   trainingCropId,
   datasetRole,
+  sourceGroupKey,
   assignmentNote,
   exclusionReason
 }: {
@@ -819,16 +820,19 @@ export async function createTrainingCropDatasetItem({
   workspaceId: string;
   trainingCropId: string;
   datasetRole: DatasetRole;
+  sourceGroupKey: string;
   assignmentNote: string;
   exclusionReason: DatasetExclusionReason | null;
 }): Promise<DatasetItem> {
   const trimmedNote = assignmentNote.trim();
+  const trimmedSourceGroupKey = sourceGroupKey.trim();
   const response = await fetch(`${coreApiUrl}/v1/training-crops/${trainingCropId}/dataset-item`, {
     method: "POST",
     headers: jsonHeaders(devUserId),
     body: JSON.stringify({
       workspace_id: workspaceId,
       dataset_role: datasetRole,
+      source_group_key: trimmedSourceGroupKey.length > 0 ? trimmedSourceGroupKey : null,
       assignment_note: trimmedNote.length > 0 ? trimmedNote : null,
       exclusion_reason: exclusionReason
     })

@@ -365,7 +365,17 @@ class InMemoryProductDataStore:
         content_type: str,
         size_bytes: int,
         uploaded_by_user_id: UUID,
+        source_image_width_px: int | None = None,
+        source_image_height_px: int | None = None,
+        content_hash: str | None = None,
+        content_hash_algorithm: str | None = None,
     ) -> InspectionPhotoResponse:
+        _ = (
+            source_image_width_px,
+            source_image_height_px,
+            content_hash,
+            content_hash_algorithm,
+        )
         photo = InspectionPhotoResponse(
             inspection_photo_id=inspection_photo_id,
             inspection_id=inspection_id,
@@ -1014,6 +1024,12 @@ class InMemoryProductDataStore:
                 "dataset_item_already_assigned",
                 "This Dataset Labelling Session has already been assigned to a Dataset Item.",
                 409,
+            )
+        if dataset_role == DatasetRole.benchmark and session.source_group_key is None:
+            raise DomainError(
+                "benchmark_source_group_key_required",
+                "Benchmark Dataset Items require a source group key.",
+                422,
             )
         dataset_item = DatasetItemResponse(
             dataset_item_id=self.id_factory(),

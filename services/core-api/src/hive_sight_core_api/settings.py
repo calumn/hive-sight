@@ -18,6 +18,7 @@ class Settings:
     grounding_dino_max_box_area_ratio: float
     grounding_dino_device: str
     grounding_dino_local_files_only: bool
+    persistence_backend: str = "in_memory"
 
 
 def load_settings() -> Settings:
@@ -26,6 +27,7 @@ def load_settings() -> Settings:
             "CORE_API_ALLOWED_ORIGINS",
             "http://localhost:5173,http://127.0.0.1:5173",
         ),
+        persistence_backend=os.getenv("HIVESIGHT_PERSISTENCE_BACKEND", "in_memory"),
         database_url=os.getenv(
             "CORE_API_DATABASE_URL",
             "postgresql://hive_sight:hive_sight@localhost:5432/hive_sight_core",

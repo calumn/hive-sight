@@ -464,6 +464,7 @@ class DatasetItemCreateRequest(BaseModel):
 class TrainingCropDatasetItemCreateRequest(BaseModel):
     workspace_id: UUID
     dataset_role: DatasetRole
+    source_group_key: str | None = Field(default=None, max_length=100)
     assignment_note: str | None = Field(default=None, max_length=500)
     exclusion_reason: DatasetExclusionReason | None = None
 

@@ -45,6 +45,7 @@ def test_physical_yolo_obb_package_writes_crop_images_labels_and_manifest(
             workspace_id,
             benchmark_crop["training_crop_id"],
             dataset_role="benchmark",
+            source_group_key="benchmark-frame-001",
         ).json()
         excluded_item = _assign_crop(
             client,
@@ -290,6 +291,7 @@ def _assign_crop(
     workspace_id: str,
     training_crop_id: str,
     dataset_role: str,
+    source_group_key: str | None = None,
     assignment_note: str | None = None,
     exclusion_reason: str | None = None,
 ) -> object:
@@ -298,6 +300,7 @@ def _assign_crop(
         json={
             "workspace_id": workspace_id,
             "dataset_role": dataset_role,
+            "source_group_key": source_group_key,
             "assignment_note": assignment_note,
             "exclusion_reason": exclusion_reason,
         },

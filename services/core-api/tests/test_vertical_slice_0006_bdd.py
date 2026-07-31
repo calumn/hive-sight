@@ -149,6 +149,16 @@ def curator_has_reviewed_bee_draft_annotations(slice_context: SliceContext) -> N
         headers={"x-hivesight-dev-user-id": str(slice_context.current_user_id)},
     )
     assert review_response.status_code == 201
+    metadata_response = slice_context.client.patch(
+        f"/v1/dataset-labelling-sessions/{slice_context.labelling_session_id}",
+        json={
+            "workspace_id": slice_context.workspace_id,
+            "source_group_key": "benchmark-frame-a",
+            "image_quality_status": "usable",
+        },
+        headers={"x-hivesight-dev-user-id": str(slice_context.current_user_id)},
+    )
+    assert metadata_response.status_code == 200
 
 
 @when("the Dataset Curator assigns the reviewed labelling evidence to benchmark")

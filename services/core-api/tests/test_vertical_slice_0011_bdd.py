@@ -73,7 +73,13 @@ def assigned_training_validation(slice_context: SliceContext) -> None:
 def assigned_all_roles(slice_context: SliceContext) -> None:
     _create_and_assign_crop(slice_context, crop_x=100, crop_y=100, dataset_role="training")
     _create_and_assign_crop(slice_context, crop_x=760, crop_y=100, dataset_role="validation")
-    _create_and_assign_crop(slice_context, crop_x=100, crop_y=520, dataset_role="benchmark")
+    _create_and_assign_crop(
+        slice_context,
+        crop_x=100,
+        crop_y=520,
+        dataset_role="benchmark",
+        source_group_key="benchmark-frame-001",
+    )
     _create_and_assign_crop(
         slice_context,
         crop_x=760,
@@ -150,6 +156,7 @@ def _create_and_assign_crop(
     crop_x: int,
     crop_y: int,
     dataset_role: str,
+    source_group_key: str | None = None,
     exclusion_reason: str | None = None,
 ) -> str:
     assert slice_context.workspace_id is not None
@@ -199,6 +206,7 @@ def _create_and_assign_crop(
         json={
             "workspace_id": slice_context.workspace_id,
             "dataset_role": dataset_role,
+            "source_group_key": source_group_key,
             "assignment_note": "Assigned by Slice 11 BDD.",
             "exclusion_reason": exclusion_reason,
         },

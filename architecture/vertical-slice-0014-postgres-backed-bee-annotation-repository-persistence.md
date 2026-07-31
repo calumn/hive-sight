@@ -1,6 +1,6 @@
 # Vertical Slice 0014: Postgres-Backed Bee Annotation Repository Persistence
 
-Status: implementation-ready after Vertical Slice 0013.5 Domain Model Persistence Stability Gate.
+Status: implemented in code; live Postgres restart verification is ready but was not executed because Docker Desktop was not running locally.
 
 ## Purpose
 
@@ -186,3 +186,17 @@ The exact command names should follow existing repo conventions, but the expecte
 - Should deterministic dev personas be seeded by migration, separate seed script, or reset command? Recommendation: separate seed/reset command so production migrations do not contain dev data.
 - Should repository protocols be formalized before implementation or introduced as each adapter is written?
 - Should training-vs-validation `source_group_key` sharing produce only export/report warnings in Slice 0014, or also API response warnings during assignment?
+
+## Implementation Notes
+
+- Implemented SQL migrations through repo-local migration files and `hive_sight_core_api.db` commands rather than Alembic. This keeps Slice 0014 dependency weight low while preserving migration discipline from day one.
+- Added local commands: `pnpm db:up`, `pnpm db:migrate`, `pnpm db:seed`, and `pnpm db:reset`.
+- Added opt-in Core API Postgres mode through `HIVESIGHT_PERSISTENCE_BACKEND=postgres`.
+- Added a write-through Postgres store adapter for the selected Bee Annotation Repository path while keeping the in-memory adapter for fast workflow/unit tests.
+- Added `source_images` and `inspection_photos` as separate persisted records; image bytes remain in object storage.
+- Added source-image dimensions and content hash capture during photo intake; raw image metadata is not stored.
+- Added immutable human-readable id generation shape for Source Images, Training Crops, and Dataset Items.
+- Enforced benchmark Dataset Item `source_group_key` for both dataset-labelling and Training Crop assignment paths.
+- Added a browser UI field for benchmark Training Crop source group assignment.
+- Added an always-on migration contract test and an opt-in real Postgres restart integration test controlled by `HIVESIGHT_TEST_DATABASE_URL`.
+- `pnpm verify:slice` passed after implementation. The real Postgres integration test remained skipped in automated verification because Docker Desktop was not running in the local environment.

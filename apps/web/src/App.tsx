@@ -1111,6 +1111,7 @@ function TrainingCropAnnotationPanel({
   const [exclusionReason, setExclusionReason] =
     useState<TrainingCropExclusionReason>("unsuitable_crop");
   const [datasetRole, setDatasetRole] = useState<DatasetRole>("training");
+  const [datasetSourceGroupKey, setDatasetSourceGroupKey] = useState("");
   const [datasetAssignmentNote, setDatasetAssignmentNote] = useState(
     "Assigned from completed Training Crop review."
   );
@@ -1402,6 +1403,7 @@ function TrainingCropAnnotationPanel({
         workspaceId,
         trainingCropId: selectedCrop.trainingCropId,
         datasetRole,
+        sourceGroupKey: datasetRole === "benchmark" ? datasetSourceGroupKey : "",
         assignmentNote: datasetAssignmentNote,
         exclusionReason: datasetRole === "excluded" ? datasetExclusionReason : null
       });
@@ -1880,6 +1882,18 @@ function TrainingCropAnnotationPanel({
                     data-testid="training-crop-dataset-assignment-note-input"
                   />
                 </label>
+                {datasetRole === "benchmark" ? (
+                  <label>
+                    <span>Source group key</span>
+                    <input
+                      value={datasetSourceGroupKey}
+                      maxLength={100}
+                      onChange={(event) => setDatasetSourceGroupKey(event.target.value)}
+                      disabled={Boolean(trainingCropDatasetItem) || Boolean(workingLabel)}
+                      data-testid="training-crop-dataset-source-group-key-input"
+                    />
+                  </label>
+                ) : null}
                 {datasetRole === "excluded" ? (
                   <label>
                     <span>Dataset exclusion reason</span>
@@ -1909,7 +1923,8 @@ function TrainingCropAnnotationPanel({
                     !selectedCrop ||
                     Boolean(trainingCropDatasetItem) ||
                     Boolean(workingLabel) ||
-                    selectedCrop.reviewStatus === "review_pending"
+                    selectedCrop.reviewStatus === "review_pending" ||
+                    (datasetRole === "benchmark" && datasetSourceGroupKey.trim().length === 0)
                   }
                   onClick={() => void assignSelectedCropToDataset()}
                   data-testid="assign-training-crop-dataset-role-button"

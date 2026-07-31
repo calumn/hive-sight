@@ -21,6 +21,7 @@ Install these prerequisites first:
 - Python 3.12.
 - Node.js 26 or newer.
 - pnpm.
+- Docker Desktop, for local Postgres metadata persistence.
 
 On macOS with Homebrew, that is typically:
 
@@ -40,7 +41,7 @@ pnpm install
 pnpm --filter @hive-sight/web exec playwright install chromium
 ```
 
-Docker is not required for the current in-memory vertical slices. It will become useful when local infrastructure such as databases, queues, or object storage are added.
+Start Docker Desktop before using the Postgres-backed persistence path.
 
 ## Daily Local Start
 
@@ -72,6 +73,30 @@ Stop the local servers:
 
 ```sh
 pnpm dev:stop
+```
+
+Start local Postgres:
+
+```sh
+pnpm db:up
+```
+
+Apply migrations:
+
+```sh
+pnpm db:migrate
+```
+
+Reset and seed the local development database:
+
+```sh
+pnpm db:reset
+```
+
+Run the Core API against Postgres-backed metadata:
+
+```sh
+HIVESIGHT_PERSISTENCE_BACKEND=postgres pnpm dev:all
 ```
 
 Open the Web UI at:
@@ -157,6 +182,13 @@ pnpm verify:slice
 ```
 
 This runs the Core API tests, Analysis Service tests, Web TypeScript check, and Web browser acceptance tests, then writes a summary report to `reports/slice-verification/latest.md`.
+
+The live Postgres persistence integration test is opt-in so the fast suite still works without Docker. To run it, start Docker Desktop and local Postgres, then provide a test database URL:
+
+```sh
+pnpm db:up
+HIVESIGHT_TEST_DATABASE_URL=postgresql://hive_sight:hive_sight@localhost:5432/hive_sight_core services/core-api/.venv/bin/python -m pytest services/core-api/tests/test_postgres_persistence_slice.py
+```
 
 Run only the Web browser acceptance test:
 

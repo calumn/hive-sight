@@ -79,6 +79,7 @@ def assigned_training_crops(slice_context: SliceContext) -> None:
             slice_context,
             training_crop_id,
             role,
+            source_group_key="benchmark-frame-001" if role == "benchmark" else None,
             exclusion_reason="unsuitable_crop" if role == "excluded" else None,
         )
         assert response.status_code == 201
@@ -237,6 +238,7 @@ def _assign_crop(
     slice_context: SliceContext,
     training_crop_id: str,
     dataset_role: str,
+    source_group_key: str | None = None,
     exclusion_reason: str | None = None,
 ) -> object:
     assert slice_context.workspace_id is not None
@@ -245,6 +247,7 @@ def _assign_crop(
         json={
             "workspace_id": slice_context.workspace_id,
             "dataset_role": dataset_role,
+            "source_group_key": source_group_key,
             "assignment_note": "Assigned by Slice 10 BDD.",
             "exclusion_reason": exclusion_reason,
         },

@@ -258,3 +258,29 @@ Human judgment still required:
 - Revisit detailed Hive Component or Box configuration before supporting mixed brood/super workflows or detailed equipment statistics.
 - Revisit consent withdrawal and deletion enforcement before hosted/user-submitted model improvement or deletion/purge workflows.
 - Revisit stricter split leakage policy before serious benchmark claims or model promotion.
+
+### 2026-07-31 Slice 0014 Postgres-Backed Bee Annotation Repository Persistence
+
+Human-confirmed decisions:
+
+- Use a narrow first durable Postgres schema for Bee Annotation Repository metadata.
+- Keep image bytes outside Postgres and store object keys plus minimised source-image metadata only.
+- Keep in-memory adapters for fast tests and make Postgres mode opt-in for local development.
+- Require `source_group_key` for benchmark Dataset Items across both labelling-session and Training Crop assignment paths.
+
+AI contribution:
+
+- Added SQL migrations and database reset/seed commands.
+- Added a Postgres-backed write-through Core API store adapter for the selected persistence path.
+- Added `source_images` and `inspection_photos` as separate persisted records with dimensions, content hash, permission/minimisation status, and object keys.
+- Added stable human-readable id generation shape for Source Images, Training Crops, and Dataset Items.
+- Updated benchmark leakage/domain rules and the small UI affordance needed for benchmark source-group capture.
+- Added migration contract tests and an opt-in real Postgres restart integration test.
+- Verified the full non-Docker slice suite with `pnpm verify:slice`.
+
+Human judgment still required:
+
+- Start Docker Desktop and run the opt-in `HIVESIGHT_TEST_DATABASE_URL` Postgres restart test once local Docker is available.
+- Decide whether the repo-local migration runner is sufficient for the next few slices or whether to move to Alembic before schema churn increases.
+- Revisit Dataset Versions before Slice 0015 training implementation.
+- Revisit training-versus-validation leakage warnings before serious model quality claims.
