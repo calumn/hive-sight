@@ -19,6 +19,7 @@ from hive_sight_core_api.models import (
     AnnotationWorkflowType,
     ApiaryResponse,
     DatasetExclusionReason,
+    DatasetVersionResponse,
     DatasetItemProvenanceResponse,
     DatasetItemResponse,
     DatasetLabellingSessionResponse,
@@ -38,6 +39,8 @@ from hive_sight_core_api.models import (
     InspectionPhotoListResponse,
     InspectionPhotoResponse,
     InspectionResponse,
+    ArtifactResponse,
+    ModelCandidateResponse,
     OrientedBeeEllipseCreateRequest,
     OrientedBeeEllipseResponse,
     OrientedBeeEllipseUpdateRequest,
@@ -53,6 +56,7 @@ from hive_sight_core_api.models import (
     TrainingCropListResponse,
     TrainingCropResponse,
     TrainingCropUpdateRequest,
+    TrainingRunResponse,
     UploadStatus,
     WorkspaceDataUseAgreementAcceptanceResponse,
     YoloObbExcludedItem,
@@ -149,6 +153,10 @@ class InMemoryProductDataStore:
         default_factory=dict
     )
     dataset_items: dict[UUID, DatasetItemResponse] = field(default_factory=dict)
+    dataset_versions: dict[UUID, DatasetVersionResponse] = field(default_factory=dict)
+    training_runs: dict[UUID, TrainingRunResponse] = field(default_factory=dict)
+    model_candidates: dict[UUID, ModelCandidateResponse] = field(default_factory=dict)
+    artifacts: dict[UUID, ArtifactResponse] = field(default_factory=dict)
     training_crops: dict[UUID, TrainingCropResponse] = field(default_factory=dict)
     training_crop_ellipses: dict[UUID, OrientedBeeEllipseResponse] = field(default_factory=dict)
     reviewer_user_ids: set[UUID] = field(
@@ -1076,6 +1084,88 @@ class InMemoryProductDataStore:
         self.dataset_items[dataset_item.dataset_item_id] = dataset_item
         return dataset_item
 
+    def save_dataset_version(
+        self,
+        dataset_version: DatasetVersionResponse,
+    ) -> DatasetVersionResponse:
+        self.dataset_versions[dataset_version.dataset_version_id] = dataset_version
+        return dataset_version
+
+    def get_dataset_version(
+        self,
+        workspace_id: UUID,
+        dataset_version_id: UUID,
+    ) -> DatasetVersionResponse | None:
+        dataset_version = self.dataset_versions.get(dataset_version_id)
+        if dataset_version is None or dataset_version.workspace_id != workspace_id:
+            return None
+        return dataset_version
+
+    def list_dataset_versions(self, workspace_id: UUID) -> list[DatasetVersionResponse]:
+        versions = [
+            version for version in self.dataset_versions.values() if version.workspace_id == workspace_id
+        ]
+        versions.sort(key=lambda version: version.created_at, reverse=True)
+        return versions
+
+    def save_training_run(self, training_run: TrainingRunResponse) -> TrainingRunResponse:
+        self.training_runs[training_run.training_run_id] = training_run
+        return training_run
+
+    def get_training_run(
+        self,
+        workspace_id: UUID,
+        training_run_id: UUID,
+    ) -> TrainingRunResponse | None:
+        training_run = self.training_runs.get(training_run_id)
+        if training_run is None or training_run.workspace_id != workspace_id:
+            return None
+        return training_run
+
+    def list_training_runs(self, workspace_id: UUID) -> list[TrainingRunResponse]:
+        runs = [run for run in self.training_runs.values() if run.workspace_id == workspace_id]
+        runs.sort(key=lambda run: run.created_at, reverse=True)
+        return runs
+
+    def active_training_run(self, workspace_id: UUID) -> TrainingRunResponse | None:
+        for run in self.training_runs.values():
+            if run.workspace_id == workspace_id and run.status in {"queued", "running"}:
+                return run
+        return None
+
+    def save_model_candidate(
+        self,
+        model_candidate: ModelCandidateResponse,
+    ) -> ModelCandidateResponse:
+        self.model_candidates[model_candidate.model_candidate_id] = model_candidate
+        return model_candidate
+
+    def get_model_candidate(
+        self,
+        workspace_id: UUID,
+        model_candidate_id: UUID,
+    ) -> ModelCandidateResponse | None:
+        candidate = self.model_candidates.get(model_candidate_id)
+        if candidate is None or candidate.workspace_id != workspace_id:
+            return None
+        return candidate
+
+    def list_model_candidates(self, workspace_id: UUID) -> list[ModelCandidateResponse]:
+        candidates = [
+            candidate
+            for candidate in self.model_candidates.values()
+            if candidate.workspace_id == workspace_id
+        ]
+        candidates.sort(key=lambda candidate: candidate.created_at, reverse=True)
+        return candidates
+
+    def save_artifact(self, artifact: ArtifactResponse) -> ArtifactResponse:
+        self.artifacts[artifact.artifact_id] = artifact
+        return artifact
+
+    def get_artifact(self, artifact_id: UUID) -> ArtifactResponse | None:
+        return self.artifacts.get(artifact_id)
+
     def get_dataset_item_for_training_crop(
         self,
         training_crop_id: UUID,
@@ -1468,6 +1558,7 @@ class DevState:
     event_recorder: InMemoryEventRecorder
     upload_policy: UploadPolicy
     dataset_export_root: Path = Path("var/exports/datasets")
+    model_artifact_root: Path = Path("var/model-runs")
 
 
 class DomainError(Exception):
@@ -1649,3 +1740,5 @@ def _dataset_yaml_text(class_map: dict[str, str]) -> str:
         f"{names}\n"
         "# HiveSight: YOLO OBB labels derived from canonical oriented bee ellipses.\n"
     )
+    ModelCandidateResponse,
+    TrainingRunResponse,

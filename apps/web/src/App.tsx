@@ -12,6 +12,7 @@ import {
   Image,
   LoaderCircle,
   Minus,
+  Play,
   Plus,
   RotateCcw,
   RefreshCw,
@@ -30,6 +31,7 @@ import {
   createDatasetItem,
   createTrainingCropDatasetItem,
   createPhysicalYoloObbExport,
+  createDatasetVersion,
   createYoloObbExport,
   createReviewDecision,
   deleteTrainingCropEllipse,
@@ -40,10 +42,12 @@ import {
   fetchFrameStandards,
   fetchInspectionPhotos,
   fetchInspectionPhotoObjectUrl,
+  fetchModelTrainingReadiness,
   fetchTrainingCropEvidence,
   fetchTrainingCropsForPhoto,
   processAnalysisRun,
   startDatasetLabellingSession,
+  startModelTrainingRun,
   updateTrainingCrop,
   updateTrainingCropEllipse,
   upsertHiveConfiguration,
@@ -62,6 +66,7 @@ import {
   type DatasetLabellingEvidence,
   type DatasetExclusionReason,
   type DatasetItem,
+  type DatasetVersion,
   type DatasetRole,
   type ImageQualityStatus,
   type Inspection,
@@ -72,6 +77,8 @@ import {
   type PhysicalYoloObbExport,
   type PhotoIntake,
   type ReviewDecisionValue,
+  type ModelTrainingReadiness,
+  type TrainingRun,
   type TrainingCrop,
   type TrainingCropEvidence,
   type TrainingCropExclusionReason,
@@ -872,6 +879,10 @@ function formatInspectionIntent(intent: InspectionIntent) {
   return intent === "training_data_collection" ? "Training data collection" : "Varroa assessment";
 }
 
+function formatMetric(value: unknown) {
+  return typeof value === "number" ? value.toFixed(2) : "n/a";
+}
+
 function formatFrameStandardDimension(value: number | null): string {
   return value === null ? "Unknown" : `${value} mm`;
 }
@@ -1121,6 +1132,11 @@ function TrainingCropAnnotationPanel({
   const [yoloObbExport, setYoloObbExport] = useState<YoloObbExport | null>(null);
   const [physicalYoloObbExport, setPhysicalYoloObbExport] =
     useState<PhysicalYoloObbExport | null>(null);
+  const [modelTrainingReadiness, setModelTrainingReadiness] =
+    useState<ModelTrainingReadiness | null>(null);
+  const [datasetVersion, setDatasetVersion] = useState<DatasetVersion | null>(null);
+  const [trainingRun, setTrainingRun] = useState<TrainingRun | null>(null);
+  const [acknowledgeModelWarnings, setAcknowledgeModelWarnings] = useState(false);
   const [workingLabel, setWorkingLabel] = useState<string | null>(null);
 
   const selectedPhoto = photos.find((photo) => photo.inspectionPhotoId === selectedPhotoId) ?? null;
@@ -1422,6 +1438,40 @@ function TrainingCropAnnotationPanel({
     await runCropAction("Creating physical export package", async () => {
       const physicalExport = await createPhysicalYoloObbExport({ devUserId, workspaceId });
       setPhysicalYoloObbExport(physicalExport);
+    });
+  }
+
+  async function refreshModelTrainingReadiness() {
+    await runCropAction("Checking model training readiness", async () => {
+      const readiness = await fetchModelTrainingReadiness({ devUserId, workspaceId });
+      setModelTrainingReadiness(readiness);
+    });
+  }
+
+  async function createModelDatasetVersion() {
+    await runCropAction("Creating Dataset Version", async () => {
+      const nextDatasetVersion = await createDatasetVersion({ devUserId, workspaceId });
+      setDatasetVersion(nextDatasetVersion);
+      setTrainingRun(null);
+      const readiness = await fetchModelTrainingReadiness({ devUserId, workspaceId });
+      setModelTrainingReadiness(readiness);
+    });
+  }
+
+  async function startBeeDetectorTrainingRun() {
+    if (!datasetVersion) {
+      return;
+    }
+    await runCropAction("Starting Bee Detector training", async () => {
+      const nextTrainingRun = await startModelTrainingRun({
+        devUserId,
+        workspaceId,
+        datasetVersionId: datasetVersion.datasetVersionId,
+        acknowledgeHighSeverityWarnings: acknowledgeModelWarnings
+      });
+      setTrainingRun(nextTrainingRun);
+      const readiness = await fetchModelTrainingReadiness({ devUserId, workspaceId });
+      setModelTrainingReadiness(readiness);
     });
   }
 
@@ -1985,6 +2035,93 @@ function TrainingCropAnnotationPanel({
                     <p>{physicalYoloObbExport.caveat}</p>
                   </div>
                 ) : null}
+                <div className="model-training-panel" data-testid="model-training-panel">
+                  <div>
+                    <strong>Bee Detector training baseline</strong>
+                    <p>
+                      Create a locked Dataset Version, then run the local YOLO OBB training adapter.
+                    </p>
+                  </div>
+                  <div className="button-row">
+                    <button
+                      type="button"
+                      disabled={Boolean(workingLabel)}
+                      onClick={() => void refreshModelTrainingReadiness()}
+                      data-testid="model-training-readiness-button"
+                    >
+                      <RefreshCw size={18} />
+                      Check readiness
+                    </button>
+                    <button
+                      type="button"
+                      disabled={Boolean(workingLabel)}
+                      onClick={() => void createModelDatasetVersion()}
+                      data-testid="create-dataset-version-button"
+                    >
+                      <FileImage size={18} />
+                      Dataset Version
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!datasetVersion || Boolean(workingLabel)}
+                      onClick={() => void startBeeDetectorTrainingRun()}
+                      data-testid="start-model-training-run-button"
+                    >
+                      <Play size={18} />
+                      Train baseline
+                    </button>
+                  </div>
+                  <label className="checkbox-row">
+                    <input
+                      type="checkbox"
+                      checked={acknowledgeModelWarnings}
+                      onChange={(event) => setAcknowledgeModelWarnings(event.target.checked)}
+                      data-testid="acknowledge-model-training-warnings-checkbox"
+                    />
+                    <span>Acknowledge high-severity dataset warnings for this baseline run</span>
+                  </label>
+                  {modelTrainingReadiness ? (
+                    <div className="export-summary" data-testid="model-training-readiness-summary">
+                      <strong>
+                        {modelTrainingReadiness.adapterType} / {modelTrainingReadiness.databasePurpose}
+                      </strong>
+                      <span>Training {modelTrainingReadiness.trainingItemCount}</span>
+                      <span>Validation {modelTrainingReadiness.validationItemCount}</span>
+                      <span>Benchmark {modelTrainingReadiness.benchmarkItemCount}</span>
+                      <span>
+                        {modelTrainingReadiness.realAdapterAvailable
+                          ? "Real adapter available"
+                          : "Real adapter unavailable"}
+                      </span>
+                      {modelTrainingReadiness.warnings.map((warning) => (
+                        <span key={warning.code}>
+                          {warning.severity}: {warning.code}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+                  {datasetVersion ? (
+                    <div className="export-summary" data-testid="dataset-version-summary">
+                      <strong>{datasetVersion.humanReadableId}</strong>
+                      <span>Training {datasetVersion.trainingItemCount}</span>
+                      <span>Validation {datasetVersion.validationItemCount}</span>
+                      <span>Benchmark protected {datasetVersion.benchmarkItemCount}</span>
+                      <span>Warnings {datasetVersion.warnings.length}</span>
+                      <code>{datasetVersion.exportFormat}</code>
+                    </div>
+                  ) : null}
+                  {trainingRun ? (
+                    <div className="export-summary" data-testid="model-training-run-summary">
+                      <strong>{trainingRun.humanReadableId}</strong>
+                      <span>{trainingRun.status}</span>
+                      <span>{trainingRun.adapterType}</span>
+                      <span>Candidate {trainingRun.modelCandidateId ?? "not created"}</span>
+                      <span>Precision {formatMetric(trainingRun.metricsSummary.precision)}</span>
+                      <span>Recall {formatMetric(trainingRun.metricsSummary.recall)}</span>
+                      <p>Baseline only; not user-facing.</p>
+                    </div>
+                  ) : null}
+                </div>
               </div>
             </section>
           ) : null}
@@ -2666,8 +2803,8 @@ function annotationLabel(annotation: Annotation): string {
   return `${type} / ${annotation.latestReviewDecision?.decision ?? "unreviewed"}`;
 }
 
-function prelabelerProviderLabel(provider: "deterministic" | "grounding_dino"): string {
-  return provider === "grounding_dino" ? "Grounding DINO" : "Deterministic";
+function prelabelerProviderLabel(_provider: "deterministic"): string {
+  return "Deterministic";
 }
 
 function Metric({ label, value }: { label: string; value: number | string }) {

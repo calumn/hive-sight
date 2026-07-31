@@ -17,14 +17,18 @@ from hive_sight_core_api.models import (
     AnalysisRunResponse,
     AnnotationResponse,
     ApiaryResponse,
+    ArtifactResponse,
+    DatasetVersionResponse,
     DatasetItemResponse,
     DatasetLabellingSessionResponse,
     HiveConfigurationResponse,
     HiveResponse,
     InspectionPhotoResponse,
     InspectionResponse,
+    ModelCandidateResponse,
     OrientedBeeEllipseResponse,
     ReviewDecisionResponse,
+    TrainingRunResponse,
     TrainingCropResponse,
 )
 
@@ -42,6 +46,10 @@ MODEL_RECORD_TYPES: dict[str, type] = {
     "training_crop": TrainingCropResponse,
     "training_crop_ellipse": OrientedBeeEllipseResponse,
     "dataset_item": DatasetItemResponse,
+    "dataset_version": DatasetVersionResponse,
+    "training_run": TrainingRunResponse,
+    "model_candidate": ModelCandidateResponse,
+    "artifact": ArtifactResponse,
 }
 
 
@@ -162,6 +170,26 @@ class PostgresProductDataStore(InMemoryProductDataStore):
         self._upsert_dataset_item_projection(response)
         return response
 
+    def save_dataset_version(self, dataset_version: DatasetVersionResponse):
+        response = super().save_dataset_version(dataset_version)
+        self._persist_model("dataset_version", response.dataset_version_id, response)
+        return response
+
+    def save_training_run(self, training_run: TrainingRunResponse):
+        response = super().save_training_run(training_run)
+        self._persist_model("training_run", response.training_run_id, response)
+        return response
+
+    def save_model_candidate(self, model_candidate: ModelCandidateResponse):
+        response = super().save_model_candidate(model_candidate)
+        self._persist_model("model_candidate", response.model_candidate_id, response)
+        return response
+
+    def save_artifact(self, artifact: ArtifactResponse):
+        response = super().save_artifact(artifact)
+        self._persist_model("artifact", response.artifact_id, response)
+        return response
+
     def _connect(self):
         import psycopg
 
@@ -225,6 +253,14 @@ class PostgresProductDataStore(InMemoryProductDataStore):
             self.training_crop_ellipses[model.annotation_id] = model
         elif record_type == "dataset_item":
             self.dataset_items[model.dataset_item_id] = model
+        elif record_type == "dataset_version":
+            self.dataset_versions[model.dataset_version_id] = model
+        elif record_type == "training_run":
+            self.training_runs[model.training_run_id] = model
+        elif record_type == "model_candidate":
+            self.model_candidates[model.model_candidate_id] = model
+        elif record_type == "artifact":
+            self.artifacts[model.artifact_id] = model
 
     def _persist_core_identity(self, user_id: UUID, workspace_id: UUID) -> None:
         self._persist_payload("user", user_id, {"user_id": str(user_id)})

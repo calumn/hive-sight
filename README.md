@@ -87,10 +87,16 @@ Apply migrations:
 pnpm db:migrate
 ```
 
-Reset and seed the local development database:
+Reset and seed the local test database:
 
 ```sh
 pnpm db:reset
+```
+
+Reset and seed the local development database only when you explicitly want to wipe dev data:
+
+```sh
+pnpm db:reset:dev
 ```
 
 Run the Core API against Postgres-backed metadata:
@@ -123,53 +129,44 @@ If you want to run just the Web UI in a separate terminal, use:
 pnpm dev:web
 ```
 
-## Local Grounding DINO Pre-Labelling
+## Local YOLO OBB Bee Detector Training
 
-The normal dev stack uses the fast deterministic pre-labeller. To run a real local Grounding DINO model for dataset labelling, first install the optional Core API model dependencies:
+The normal verification suite uses a fake training adapter so tests stay fast and deterministic. To try a real local YOLO OBB Bee Detector baseline, first install the optional Core API model dependencies:
 
 ```sh
 cd ~/Projects/hive-sight
-services/core-api/.venv/bin/python -m pip install -e "services/core-api[dev,grounding-dino]"
+pnpm model:setup:yolo
 ```
 
-Then start the stack with Grounding DINO enabled:
+Then start the stack with the real training adapter enabled:
 
 ```sh
-pnpm dev:all:grounding-dino
+pnpm dev:all:yolo-training
 ```
 
-For a more permissive "show me whether it sees bees" mode, use:
+After you have at least one reviewed Training Crop assigned to `training` and one assigned to `validation`, start a baseline run:
 
 ```sh
-pnpm dev:bees
+pnpm model:train:bee:yolo
 ```
 
 For LAN testing:
 
 ```sh
-pnpm dev:lan:grounding-dino
+pnpm dev:lan:yolo-training
 ```
 
-For LAN testing with the more permissive bee thresholds:
+The real adapter writes model run artifacts under `var/model-runs/`, which is intentionally ignored by git. Model Candidates produced by this slice are not user-facing and are not promoted into inspection analysis.
+
+Useful local overrides:
 
 ```sh
-pnpm dev:bees:lan
+HIVESIGHT_YOLO_BASE_WEIGHTS=yolo11n-obb.pt
+HIVESIGHT_YOLO_DEVICE=cpu
+HIVESIGHT_MODEL_ARTIFACT_ROOT=var/model-runs
 ```
 
-By default this uses the Hugging Face Transformers Grounding DINO model `IDEA-Research/grounding-dino-tiny` with prompt `honey bee . partial honey bee`. The first run may download model files into your local Hugging Face cache. After that, it runs from the local cache.
-
-Useful overrides:
-
-```sh
-HIVESIGHT_GROUNDING_DINO_MODEL_ID=IDEA-Research/grounding-dino-base
-HIVESIGHT_GROUNDING_DINO_PROMPT="honey bee . partial honey bee"
-HIVESIGHT_GROUNDING_DINO_BOX_THRESHOLD=0.35
-HIVESIGHT_GROUNDING_DINO_TEXT_THRESHOLD=0.25
-HIVESIGHT_GROUNDING_DINO_DEVICE=auto
-HIVESIGHT_GROUNDING_DINO_LOCAL_FILES_ONLY=true
-```
-
-If the optional packages or model files are unavailable, HiveSight records visible `prelabel_failed` evidence instead of silently falling back to deterministic suggestions.
+Grounding DINO was retired from the active solution by ADR 0005 after poor brood-frame bee localisation results.
 
 The first implementation is deliberately a scaffold. It proves the service boundaries before adding persistence, authentication, queues, object-storage signing, and model inference.
 

@@ -123,6 +123,8 @@ class HealthResponse(BaseModel):
     service: str
     status: str
     boundary: str
+    persistence_backend: str | None = None
+    database_purpose: str | None = None
 
 
 class UploadUrlResponse(BaseModel):
@@ -611,6 +613,158 @@ class PhysicalYoloObbExportResponse(BaseModel):
     excluded_dataset_items: list[YoloObbExcludedItem]
     generated_files: list[GeneratedDatasetExportFileEntry]
     caveat: str
+
+
+class ModelTrainingWarningSeverity(StrEnum):
+    info = "info"
+    warning = "warning"
+    high = "high"
+
+
+class ModelTrainingWarningResponse(BaseModel):
+    code: str
+    severity: ModelTrainingWarningSeverity
+    message: str
+
+
+class ArtifactResponse(BaseModel):
+    artifact_id: UUID
+    owner_type: str
+    owner_id: UUID
+    artifact_type: str
+    relative_path: str
+    content_type: str
+    size_bytes: int
+    sha256: str
+    required_or_diagnostic: str
+    availability_status: str
+    created_at: datetime
+
+
+class ModelTrainingReadinessResponse(BaseModel):
+    workspace_id: UUID
+    persistence_backend: str
+    database_purpose: str
+    adapter_type: str
+    real_adapter_available: bool
+    active_training_run_id: UUID | None = None
+    training_item_count: int
+    validation_item_count: int
+    benchmark_item_count: int
+    eligible_to_create_dataset_version: bool
+    eligible_to_start_training: bool
+    warnings: list[ModelTrainingWarningResponse]
+
+
+class DatasetVersionCreateRequest(BaseModel):
+    workspace_id: UUID
+    purpose: str = "bee_detector_training_baseline"
+
+
+class DatasetVersionResponse(BaseModel):
+    dataset_version_id: UUID
+    workspace_id: UUID
+    human_readable_id: str
+    purpose: str
+    model_purpose: str
+    status: str
+    export_format: str
+    selection_criteria: dict[str, object]
+    manifest_hash: str
+    included_dataset_item_ids: list[UUID]
+    training_dataset_item_ids: list[UUID]
+    validation_dataset_item_ids: list[UUID]
+    protected_benchmark_dataset_item_ids: list[UUID]
+    excluded_dataset_items: list[YoloObbExcludedItem]
+    training_item_count: int
+    validation_item_count: int
+    benchmark_item_count: int
+    excluded_item_count: int
+    annotation_class_counts: dict[str, int]
+    annotation_source_counts: dict[str, int]
+    review_method_counts: dict[str, int]
+    source_group_distribution: dict[str, int]
+    hive_configuration_distribution: dict[str, int]
+    curriculum_stage_distribution: dict[str, int]
+    image_quality_distribution: dict[str, int]
+    warnings: list[ModelTrainingWarningResponse]
+    preview_artifact_ids: list[UUID]
+    report_artifact_id: UUID | None = None
+    created_by_user_id: UUID
+    created_at: datetime
+
+
+class TrainingRunStartRequest(BaseModel):
+    workspace_id: UUID
+    dataset_version_id: UUID
+    model_size: str = "nano"
+    epochs: int = Field(default=1, ge=1, le=100)
+    image_size: int = Field(default=640, ge=128, le=2048)
+    batch_size: int = Field(default=1, ge=1, le=64)
+    random_seed: int = Field(default=42, ge=0)
+    purpose_notes: str | None = Field(default=None, max_length=500)
+    acknowledge_high_severity_warnings: bool = False
+
+
+class TrainingRunResponse(BaseModel):
+    training_run_id: UUID
+    workspace_id: UUID
+    human_readable_id: str
+    dataset_version_id: UUID
+    model_purpose: str
+    model_family: str
+    model_size: str
+    base_weights: str
+    base_weights_source: str
+    status: str
+    phase: str
+    adapter_type: str
+    database_purpose: str
+    training_settings: dict[str, object]
+    random_seed: int
+    git_commit_sha: str | None = None
+    git_dirty_status: str
+    environment_summary: dict[str, object]
+    warning_acknowledgement: dict[str, object] | None = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    failure_code: str | None = None
+    failure_message: str | None = None
+    artifact_ids: list[UUID]
+    metrics_summary: dict[str, object]
+    report_artifact_id: UUID | None = None
+    model_candidate_id: UUID | None = None
+    created_by_user_id: UUID
+    created_at: datetime
+    purpose_notes: str | None = None
+
+
+class ModelCandidateResponse(BaseModel):
+    model_candidate_id: UUID
+    workspace_id: UUID
+    human_readable_id: str
+    display_name: str
+    training_run_id: UUID
+    model_purpose: str
+    model_family: str
+    adapter_type: str
+    artifact_id: UUID
+    status: str
+    promotion_status: str
+    not_user_facing_reason: str
+    created_at: datetime
+
+
+class TrainingRunListResponse(BaseModel):
+    training_runs: list[TrainingRunResponse]
+
+
+class DatasetVersionListResponse(BaseModel):
+    dataset_versions: list[DatasetVersionResponse]
+
+
+class ModelCandidateListResponse(BaseModel):
+    model_candidates: list[ModelCandidateResponse]
 
 
 class TrainingCropCreateRequest(BaseModel):

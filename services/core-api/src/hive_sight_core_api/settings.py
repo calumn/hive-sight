@@ -10,14 +10,11 @@ class Settings:
     object_storage_endpoint: str
     object_storage_bucket: str
     prelabeler: str
-    grounding_dino_model_id: str
-    grounding_dino_checkpoint: str
-    grounding_dino_prompt: str
-    grounding_dino_box_threshold: float
-    grounding_dino_text_threshold: float
-    grounding_dino_max_box_area_ratio: float
-    grounding_dino_device: str
-    grounding_dino_local_files_only: bool
+    bee_detector_training_adapter: str
+    model_artifact_root: str
+    database_purpose: str
+    yolo_base_weights: str
+    yolo_device: str
     persistence_backend: str = "in_memory"
 
 
@@ -30,7 +27,7 @@ def load_settings() -> Settings:
         persistence_backend=os.getenv("HIVESIGHT_PERSISTENCE_BACKEND", "in_memory"),
         database_url=os.getenv(
             "CORE_API_DATABASE_URL",
-            "postgresql://hive_sight:hive_sight@localhost:5432/hive_sight_core",
+            "postgresql://hive_sight:hive_sight@localhost:5432/hive_sight_core_dev",
         ),
         redis_url=os.getenv("CORE_API_REDIS_URL", "redis://localhost:6379/0"),
         object_storage_endpoint=os.getenv(
@@ -39,46 +36,14 @@ def load_settings() -> Settings:
         ),
         object_storage_bucket=os.getenv("CORE_API_OBJECT_STORAGE_BUCKET", "hive-sight-local"),
         prelabeler=os.getenv("HIVESIGHT_PRELABELER", "deterministic"),
-        grounding_dino_model_id=os.getenv(
-            "HIVESIGHT_GROUNDING_DINO_MODEL_ID",
-            "IDEA-Research/grounding-dino-tiny",
-        ),
-        grounding_dino_checkpoint=os.getenv("HIVESIGHT_GROUNDING_DINO_CHECKPOINT", ""),
-        grounding_dino_prompt=os.getenv(
-            "HIVESIGHT_GROUNDING_DINO_PROMPT",
-            "honey bee . partial honey bee",
-        ),
-        grounding_dino_box_threshold=_float_env("HIVESIGHT_GROUNDING_DINO_BOX_THRESHOLD", 0.35),
-        grounding_dino_text_threshold=_float_env("HIVESIGHT_GROUNDING_DINO_TEXT_THRESHOLD", 0.25),
-        grounding_dino_max_box_area_ratio=_float_env(
-            "HIVESIGHT_GROUNDING_DINO_MAX_BOX_AREA_RATIO",
-            0.04,
-        ),
-        grounding_dino_device=os.getenv("HIVESIGHT_GROUNDING_DINO_DEVICE", "auto"),
-        grounding_dino_local_files_only=_bool_env(
-            "HIVESIGHT_GROUNDING_DINO_LOCAL_FILES_ONLY",
-            False,
-        ),
+        bee_detector_training_adapter=os.getenv("HIVESIGHT_BEE_TRAINING_ADAPTER", "fake"),
+        model_artifact_root=os.getenv("HIVESIGHT_MODEL_ARTIFACT_ROOT", "var/model-runs"),
+        database_purpose=os.getenv("HIVESIGHT_DATABASE_PURPOSE", "dev"),
+        yolo_base_weights=os.getenv("HIVESIGHT_YOLO_BASE_WEIGHTS", "yolo11n-obb.pt"),
+        yolo_device=os.getenv("HIVESIGHT_YOLO_DEVICE", "cpu"),
     )
 
 
 def _csv_env(name: str, default: str) -> list[str]:
     raw_value = os.getenv(name, default)
     return [item.strip() for item in raw_value.split(",") if item.strip()]
-
-
-def _float_env(name: str, default: float) -> float:
-    raw_value = os.getenv(name)
-    if raw_value is None:
-        return default
-    try:
-        return float(raw_value)
-    except ValueError:
-        return default
-
-
-def _bool_env(name: str, default: bool) -> bool:
-    raw_value = os.getenv(name)
-    if raw_value is None:
-        return default
-    return raw_value.strip().casefold() in {"1", "true", "yes", "on"}

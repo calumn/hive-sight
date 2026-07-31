@@ -13,7 +13,7 @@ const checks = [
     cwd: "services/core-api",
     args: ["./.venv/bin/python", "-m", "pytest", "-p", "no:cacheprovider"],
     note:
-      "Includes API-level BDD scenarios. Slice 7 covers Grounding DINO adapter mapping with fake/unavailable local runners; full local model inference is not executed."
+      "Includes API-level BDD scenarios. Slice 15 covers Dataset Version creation and fake Bee Detector training; real YOLO OBB training is only run through the explicit QA lane."
   },
   {
     name: "Analysis Service tests",

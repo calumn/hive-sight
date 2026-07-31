@@ -2,6 +2,8 @@ export type HealthResponse = {
   service: string;
   status: string;
   boundary: string;
+  persistenceBackend: string | null;
+  databasePurpose: string | null;
 };
 
 export type DevSession = {
@@ -151,7 +153,7 @@ export type PrelabelerRun = {
   prelabelerRunId: string;
   prelabelerName: string;
   prelabelerVersion: string;
-  provider: "deterministic" | "grounding_dino";
+  provider: "deterministic";
   adapterVersion: string;
   modelId: string | null;
   checkpointId: string | null;
@@ -420,6 +422,122 @@ export type PhysicalYoloObbExport = {
   excludedDatasetItems: YoloObbExcludedItem[];
   generatedFiles: GeneratedDatasetExportFile[];
   caveat: string;
+};
+
+export type ModelTrainingWarningSeverity = "info" | "warning" | "high";
+
+export type ModelTrainingWarning = {
+  code: string;
+  severity: ModelTrainingWarningSeverity;
+  message: string;
+};
+
+export type ModelTrainingReadiness = {
+  workspaceId: string;
+  persistenceBackend: string;
+  adapterType: "fake" | "ultralytics_yolo_obb";
+  databasePurpose: string;
+  realAdapterAvailable: boolean;
+  eligibleToCreateDatasetVersion: boolean;
+  eligibleToStartTraining: boolean;
+  activeTrainingRunId: string | null;
+  trainingItemCount: number;
+  validationItemCount: number;
+  benchmarkItemCount: number;
+  warnings: ModelTrainingWarning[];
+};
+
+export type Artifact = {
+  artifactId: string;
+  workspaceId: string;
+  artifactKind: string;
+  relativePath: string;
+  mediaType: string;
+  sizeBytes: number;
+  sha256: string;
+  createdAt: string;
+};
+
+export type DatasetVersion = {
+  datasetVersionId: string;
+  humanReadableId: string;
+  workspaceId: string;
+  purpose: string;
+  modelPurpose: "bee_detector";
+  status: string;
+  exportFormat: "yolo_obb_v1";
+  selectionCriteria: Record<string, unknown>;
+  manifestHash: string;
+  createdByUserId: string;
+  createdAt: string;
+  includedDatasetItemIds: string[];
+  trainingDatasetItemIds: string[];
+  validationDatasetItemIds: string[];
+  protectedBenchmarkDatasetItemIds: string[];
+  excludedDatasetItems: YoloObbExcludedItem[];
+  trainingItemCount: number;
+  validationItemCount: number;
+  benchmarkItemCount: number;
+  excludedItemCount: number;
+  annotationClassCounts: Record<string, number>;
+  annotationSourceCounts: Record<string, number>;
+  reviewMethodCounts: Record<string, number>;
+  sourceGroupDistribution: Record<string, number>;
+  hiveConfigurationDistribution: Record<string, number>;
+  curriculumStageDistribution: Record<string, number>;
+  imageQualityDistribution: Record<string, number>;
+  reportArtifactId: string | null;
+  previewArtifactIds: string[];
+  warnings: ModelTrainingWarning[];
+};
+
+export type TrainingRun = {
+  trainingRunId: string;
+  humanReadableId: string;
+  workspaceId: string;
+  datasetVersionId: string;
+  modelPurpose: "bee_detector";
+  modelFamily: string;
+  modelSize: string;
+  baseWeights: string;
+  baseWeightsSource: string;
+  adapterType: "fake" | "ultralytics_yolo_obb";
+  status: "queued" | "running" | "completed" | "failed";
+  phase: string;
+  databasePurpose: string;
+  trainingSettings: Record<string, unknown>;
+  randomSeed: number;
+  gitCommitSha: string | null;
+  gitDirtyStatus: string;
+  environmentSummary: Record<string, unknown>;
+  warningAcknowledgement: Record<string, unknown> | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  failureCode: string | null;
+  failureMessage: string | null;
+  artifactIds: string[];
+  metricsSummary: Record<string, unknown>;
+  modelCandidateId: string | null;
+  reportArtifactId: string | null;
+  createdByUserId: string;
+  createdAt: string;
+  purposeNotes: string | null;
+};
+
+export type ModelCandidate = {
+  modelCandidateId: string;
+  humanReadableId: string;
+  workspaceId: string;
+  trainingRunId: string;
+  datasetVersionId: string;
+  modelPurpose: "bee_detector";
+  modelFamily: string;
+  adapterType: "fake" | "ultralytics_yolo_obb";
+  artifactId: string;
+  status: string;
+  promotionStatus: string;
+  notUserFacingReason: string;
+  createdAt: string;
 };
 
 export type AnalysisRunDetail = {
@@ -873,6 +991,66 @@ export async function createPhysicalYoloObbExport({
   return parsePhysicalYoloObbExport(await response.json());
 }
 
+export async function fetchModelTrainingReadiness({
+  devUserId,
+  workspaceId
+}: {
+  devUserId: string;
+  workspaceId: string;
+}): Promise<ModelTrainingReadiness> {
+  const params = new URLSearchParams({ workspace_id: workspaceId });
+  const response = await fetch(`${coreApiUrl}/v1/model-training/readiness?${params}`, {
+    headers: devAuthHeaders(devUserId)
+  });
+  await ensureOk(response);
+  return parseModelTrainingReadiness(await response.json());
+}
+
+export async function createDatasetVersion({
+  devUserId,
+  workspaceId,
+  sourceDatasetItemIds
+}: {
+  devUserId: string;
+  workspaceId: string;
+  sourceDatasetItemIds?: string[];
+}): Promise<DatasetVersion> {
+  const response = await fetch(`${coreApiUrl}/v1/model-training/dataset-versions`, {
+    method: "POST",
+    headers: jsonHeaders(devUserId),
+    body: JSON.stringify({
+      workspace_id: workspaceId,
+      source_dataset_item_ids: sourceDatasetItemIds ?? null
+    })
+  });
+  await ensureOk(response);
+  return parseDatasetVersion(await response.json());
+}
+
+export async function startModelTrainingRun({
+  devUserId,
+  workspaceId,
+  datasetVersionId,
+  acknowledgeHighSeverityWarnings
+}: {
+  devUserId: string;
+  workspaceId: string;
+  datasetVersionId: string;
+  acknowledgeHighSeverityWarnings: boolean;
+}): Promise<TrainingRun> {
+  const response = await fetch(`${coreApiUrl}/v1/model-training/training-runs`, {
+    method: "POST",
+    headers: jsonHeaders(devUserId),
+    body: JSON.stringify({
+      workspace_id: workspaceId,
+      dataset_version_id: datasetVersionId,
+      acknowledge_high_severity_warnings: acknowledgeHighSeverityWarnings
+    })
+  });
+  await ensureOk(response);
+  return parseTrainingRun(await response.json());
+}
+
 export async function createTrainingCrop({
   devUserId,
   workspaceId,
@@ -1126,7 +1304,15 @@ function parseHealthResponse(value: unknown): HealthResponse {
   return {
     service: requireString(record.service, "service"),
     status: requireString(record.status, "status"),
-    boundary: requireString(record.boundary, "boundary")
+    boundary: requireString(record.boundary, "boundary"),
+    persistenceBackend:
+      record.persistence_backend === undefined
+        ? null
+        : optionalString(record.persistence_backend, "persistence_backend"),
+    databasePurpose:
+      record.database_purpose === undefined
+        ? null
+        : optionalString(record.database_purpose, "database_purpose")
   };
 }
 
@@ -1532,6 +1718,148 @@ function parsePhysicalYoloObbExport(value: unknown): PhysicalYoloObbExport {
   };
 }
 
+function parseModelTrainingReadiness(value: unknown): ModelTrainingReadiness {
+  const record = requireRecord(value, "Model training readiness response");
+  return {
+    workspaceId: requireString(record.workspace_id, "workspace_id"),
+    persistenceBackend: requireString(record.persistence_backend, "persistence_backend"),
+    adapterType: requireTrainingAdapterType(record.adapter_type),
+    databasePurpose: requireString(record.database_purpose, "database_purpose"),
+    realAdapterAvailable: requireBoolean(record.real_adapter_available, "real_adapter_available"),
+    eligibleToCreateDatasetVersion: requireBoolean(
+      record.eligible_to_create_dataset_version,
+      "eligible_to_create_dataset_version"
+    ),
+    eligibleToStartTraining: requireBoolean(
+      record.eligible_to_start_training,
+      "eligible_to_start_training"
+    ),
+    activeTrainingRunId: optionalString(record.active_training_run_id, "active_training_run_id"),
+    trainingItemCount: requireNumber(record.training_item_count, "training_item_count"),
+    validationItemCount: requireNumber(record.validation_item_count, "validation_item_count"),
+    benchmarkItemCount: requireNumber(record.benchmark_item_count, "benchmark_item_count"),
+    warnings: requireArray(record.warnings, "warnings").map(parseModelTrainingWarning)
+  };
+}
+
+function parseDatasetVersion(value: unknown): DatasetVersion {
+  const record = requireRecord(value, "Dataset Version response");
+  return {
+    datasetVersionId: requireString(record.dataset_version_id, "dataset_version_id"),
+    humanReadableId: requireString(record.human_readable_id, "human_readable_id"),
+    workspaceId: requireString(record.workspace_id, "workspace_id"),
+    purpose: requireString(record.purpose, "purpose"),
+    modelPurpose: requireModelPurpose(record.model_purpose),
+    status: requireString(record.status, "status"),
+    exportFormat: requireTrainingExportFormat(record.export_format),
+    selectionCriteria: requireRecord(record.selection_criteria, "selection_criteria"),
+    manifestHash: requireString(record.manifest_hash, "manifest_hash"),
+    createdByUserId: requireString(record.created_by_user_id, "created_by_user_id"),
+    createdAt: requireString(record.created_at, "created_at"),
+    includedDatasetItemIds: requireArray(
+      record.included_dataset_item_ids,
+      "included_dataset_item_ids"
+    ).map((id) => requireString(id, "included_dataset_item_ids[]")),
+    trainingDatasetItemIds: requireArray(
+      record.training_dataset_item_ids,
+      "training_dataset_item_ids"
+    ).map((id) => requireString(id, "training_dataset_item_ids[]")),
+    validationDatasetItemIds: requireArray(
+      record.validation_dataset_item_ids,
+      "validation_dataset_item_ids"
+    ).map((id) => requireString(id, "validation_dataset_item_ids[]")),
+    protectedBenchmarkDatasetItemIds: requireArray(
+      record.protected_benchmark_dataset_item_ids,
+      "protected_benchmark_dataset_item_ids"
+    ).map((id) => requireString(id, "protected_benchmark_dataset_item_ids[]")),
+    excludedDatasetItems: requireArray(
+      record.excluded_dataset_items,
+      "excluded_dataset_items"
+    ).map(parseYoloObbExcludedItem),
+    trainingItemCount: requireNumber(record.training_item_count, "training_item_count"),
+    validationItemCount: requireNumber(record.validation_item_count, "validation_item_count"),
+    benchmarkItemCount: requireNumber(record.benchmark_item_count, "benchmark_item_count"),
+    excludedItemCount: requireNumber(record.excluded_item_count, "excluded_item_count"),
+    annotationClassCounts: parseNumberMap(record.annotation_class_counts, "annotation_class_counts"),
+    annotationSourceCounts: parseNumberMap(
+      record.annotation_source_counts,
+      "annotation_source_counts"
+    ),
+    reviewMethodCounts: parseNumberMap(record.review_method_counts, "review_method_counts"),
+    sourceGroupDistribution: parseNumberMap(
+      record.source_group_distribution,
+      "source_group_distribution"
+    ),
+    hiveConfigurationDistribution: parseNumberMap(
+      record.hive_configuration_distribution,
+      "hive_configuration_distribution"
+    ),
+    curriculumStageDistribution: parseNumberMap(
+      record.curriculum_stage_distribution,
+      "curriculum_stage_distribution"
+    ),
+    imageQualityDistribution: parseNumberMap(
+      record.image_quality_distribution,
+      "image_quality_distribution"
+    ),
+    reportArtifactId: optionalString(record.report_artifact_id, "report_artifact_id"),
+    previewArtifactIds: requireArray(record.preview_artifact_ids, "preview_artifact_ids").map(
+      (id) => requireString(id, "preview_artifact_ids[]")
+    ),
+    warnings: requireArray(record.warnings, "warnings").map(parseModelTrainingWarning)
+  };
+}
+
+function parseTrainingRun(value: unknown): TrainingRun {
+  const record = requireRecord(value, "Training Run response");
+  return {
+    trainingRunId: requireString(record.training_run_id, "training_run_id"),
+    humanReadableId: requireString(record.human_readable_id, "human_readable_id"),
+    workspaceId: requireString(record.workspace_id, "workspace_id"),
+    datasetVersionId: requireString(record.dataset_version_id, "dataset_version_id"),
+    modelPurpose: requireModelPurpose(record.model_purpose),
+    modelFamily: requireString(record.model_family, "model_family"),
+    modelSize: requireString(record.model_size, "model_size"),
+    baseWeights: requireString(record.base_weights, "base_weights"),
+    baseWeightsSource: requireString(record.base_weights_source, "base_weights_source"),
+    adapterType: requireTrainingAdapterType(record.adapter_type),
+    status: requireTrainingRunStatus(record.status),
+    phase: requireString(record.phase, "phase"),
+    databasePurpose: requireString(record.database_purpose, "database_purpose"),
+    trainingSettings: requireRecord(record.training_settings, "training_settings"),
+    randomSeed: requireNumber(record.random_seed, "random_seed"),
+    gitCommitSha: optionalString(record.git_commit_sha, "git_commit_sha"),
+    gitDirtyStatus: requireString(record.git_dirty_status, "git_dirty_status"),
+    environmentSummary: requireRecord(record.environment_summary, "environment_summary"),
+    warningAcknowledgement:
+      record.warning_acknowledgement === null
+        ? null
+        : requireRecord(record.warning_acknowledgement, "warning_acknowledgement"),
+    startedAt: optionalString(record.started_at, "started_at"),
+    completedAt: optionalString(record.completed_at, "completed_at"),
+    failureCode: optionalString(record.failure_code, "failure_code"),
+    failureMessage: optionalString(record.failure_message, "failure_message"),
+    artifactIds: requireArray(record.artifact_ids, "artifact_ids").map((id) =>
+      requireString(id, "artifact_ids[]")
+    ),
+    metricsSummary: requireRecord(record.metrics_summary, "metrics_summary"),
+    modelCandidateId: optionalString(record.model_candidate_id, "model_candidate_id"),
+    reportArtifactId: optionalString(record.report_artifact_id, "report_artifact_id"),
+    createdByUserId: requireString(record.created_by_user_id, "created_by_user_id"),
+    createdAt: requireString(record.created_at, "created_at"),
+    purposeNotes: optionalString(record.purpose_notes, "purpose_notes")
+  };
+}
+
+function parseModelTrainingWarning(value: unknown): ModelTrainingWarning {
+  const record = requireRecord(value, "Model training warning response");
+  return {
+    code: requireString(record.code, "code"),
+    severity: requireModelTrainingWarningSeverity(record.severity),
+    message: requireString(record.message, "message")
+  };
+}
+
 function parseGeneratedDatasetExportFile(value: unknown): GeneratedDatasetExportFile {
   const record = requireRecord(value, "Generated dataset export file response");
   return {
@@ -1695,6 +2023,13 @@ function parseStringMap(value: unknown, field: string): Record<string, string> {
   const record = requireRecord(value, field);
   return Object.fromEntries(
     Object.entries(record).map(([key, mapValue]) => [key, requireString(mapValue, `${field}.${key}`)])
+  );
+}
+
+function parseNumberMap(value: unknown, field: string): Record<string, number> {
+  const record = requireRecord(value, field);
+  return Object.fromEntries(
+    Object.entries(record).map(([key, mapValue]) => [key, requireNumber(mapValue, `${field}.${key}`)])
   );
 }
 
@@ -1868,6 +2203,41 @@ function requireYoloObbExportFormat(value: unknown): "yolo_obb" {
   throw new Error("Core API response had an unexpected export format");
 }
 
+function requireTrainingExportFormat(value: unknown): "yolo_obb_v1" {
+  if (value === "yolo_obb_v1") {
+    return value;
+  }
+  throw new Error("Core API response had an unexpected training export format");
+}
+
+function requireModelPurpose(value: unknown): "bee_detector" {
+  if (value === "bee_detector") {
+    return value;
+  }
+  throw new Error("Core API response had an unexpected model purpose");
+}
+
+function requireTrainingAdapterType(value: unknown): "fake" | "ultralytics_yolo_obb" {
+  if (value === "fake" || value === "ultralytics_yolo_obb") {
+    return value;
+  }
+  throw new Error("Core API response had an unexpected training adapter type");
+}
+
+function requireModelTrainingWarningSeverity(value: unknown): ModelTrainingWarningSeverity {
+  if (value === "info" || value === "warning" || value === "high") {
+    return value;
+  }
+  throw new Error("Core API response had an unexpected model training warning severity");
+}
+
+function requireTrainingRunStatus(value: unknown): TrainingRun["status"] {
+  if (value === "queued" || value === "running" || value === "completed" || value === "failed") {
+    return value;
+  }
+  throw new Error("Core API response had an unexpected Training Run status");
+}
+
 function requireGeneratedDatasetExportFileKind(
   value: unknown
 ): "manifest" | "dataset_yaml" | "image" | "label" {
@@ -1934,8 +2304,8 @@ function requirePrelabelerRunStatus(value: unknown): "succeeded" | "failed" {
   throw new Error("Core API response had an unexpected prelabeler run status");
 }
 
-function requirePrelabelerProvider(value: unknown): "deterministic" | "grounding_dino" {
-  if (value === "deterministic" || value === "grounding_dino") {
+function requirePrelabelerProvider(value: unknown): "deterministic" {
+  if (value === "deterministic") {
     return value;
   }
   throw new Error("Core API response had an unexpected prelabeler provider");

@@ -13,5 +13,6 @@ def test_healthz_returns_core_api_boundary() -> None:
         "service": "core-api",
         "status": "ok",
         "boundary": "internet-reachable protected API",
+        "persistence_backend": "in_memory",
+        "database_purpose": "dev",
     }
-

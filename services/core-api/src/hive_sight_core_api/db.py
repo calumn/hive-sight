@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from urllib.parse import urlparse, urlunparse
 from pathlib import Path
 
 from hive_sight_core_api.dev_store import FRAME_STANDARDS
@@ -24,7 +25,36 @@ def _connect(database_url: str):
     return psycopg.connect(database_url)
 
 
+def _database_name(database_url: str) -> str:
+    parsed = urlparse(database_url)
+    return parsed.path.lstrip("/")
+
+
+def _maintenance_database_url(database_url: str) -> str:
+    parsed = urlparse(database_url)
+    return urlunparse(parsed._replace(path="/postgres"))
+
+
+def ensure_database_exists(database_url: str) -> None:
+    database_name = _database_name(database_url)
+    if not database_name:
+        return
+    try:
+        import psycopg
+        from psycopg import sql
+    except ImportError as exc:  # pragma: no cover - exercised only before dependencies install.
+        raise PostgresDependencyError(
+            "Install Core API dependencies before running Postgres commands."
+        ) from exc
+    with psycopg.connect(_maintenance_database_url(database_url), autocommit=True) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1 FROM pg_database WHERE datname = %s", (database_name,))
+            if cursor.fetchone() is None:
+                cursor.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(database_name)))
+
+
 def apply_migrations(database_url: str) -> None:
+    ensure_database_exists(database_url)
     with _connect(database_url) as connection, connection.cursor() as cursor:
         cursor.execute(
             """
@@ -186,14 +216,14 @@ def seed_dev_data(database_url: str) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="HiveSight Core API database commands.")
-    parser.add_argument("command", choices=("migrate", "seed-dev", "reset-dev"))
+    parser.add_argument("command", choices=("migrate", "seed-dev", "reset-dev", "reset-test"))
     args = parser.parse_args()
     database_url = load_settings().database_url
     if args.command == "migrate":
         apply_migrations(database_url)
     elif args.command == "seed-dev":
         seed_dev_data(database_url)
-    elif args.command == "reset-dev":
+    elif args.command in {"reset-dev", "reset-test"}:
         reset_database(database_url)
 
 

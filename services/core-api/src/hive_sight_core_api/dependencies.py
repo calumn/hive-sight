@@ -12,6 +12,11 @@ from hive_sight_core_api.analysis_processing_workflow import (
     DeterministicStubAnalysisExecutor,
 )
 from hive_sight_core_api.analysis_request_workflow import AnalysisRequestWorkflow
+from hive_sight_core_api.bee_detector_training_workflow import (
+    BeeDetectorTrainingWorkflow,
+    FakeBeeDetectorTrainingAdapter,
+    UltralyticsYoloObbTrainingAdapter,
+)
 from hive_sight_core_api.dataset_labelling_workflow import (
     BeePrelabeler,
     DatasetLabellingWorkflow,
@@ -26,10 +31,6 @@ from hive_sight_core_api.dev_store import (
     UploadPolicy,
     deterministic_id_factory,
 )
-from hive_sight_core_api.grounding_dino_prelabeler import (
-    GroundingDinoBeePrelabeler,
-    TransformersGroundingDinoRunner,
-)
 from hive_sight_core_api.hive_configuration_workflow import HiveConfigurationWorkflow
 from hive_sight_core_api.inspection_photo_access import InspectionPhotoAccess
 from hive_sight_core_api.settings import Settings, load_settings
@@ -39,6 +40,7 @@ from hive_sight_core_api.training_crop_dataset_item_workflow import (
 from hive_sight_core_api.training_crop_workflow import TrainingCropWorkflow
 
 DEFAULT_DATASET_EXPORT_ROOT = Path(__file__).resolve().parents[4] / "var" / "exports" / "datasets"
+DEFAULT_MODEL_ARTIFACT_ROOT = Path(__file__).resolve().parents[4] / "var" / "model-runs"
 
 
 @lru_cache
@@ -56,6 +58,7 @@ def build_dev_state(
     clock: Callable[[], datetime] = lambda: datetime.now(UTC),
     max_upload_size_bytes: int = 15 * 1024 * 1024,
     dataset_export_root: Path = DEFAULT_DATASET_EXPORT_ROOT,
+    model_artifact_root: Path | None = None,
 ) -> DevState:
     id_factory = deterministic_id_factory(id_values) if id_values is not None else None
     settings = get_settings()
@@ -79,6 +82,7 @@ def build_dev_state(
         event_recorder=InMemoryEventRecorder(),
         upload_policy=UploadPolicy(max_size_bytes=max_upload_size_bytes),
         dataset_export_root=dataset_export_root,
+        model_artifact_root=model_artifact_root or _model_artifact_root(settings),
     )
 
 
@@ -115,21 +119,6 @@ def get_dataset_labelling_workflow(state: DevStateDep) -> DatasetLabellingWorkfl
 def build_bee_prelabeler(settings: Settings) -> BeePrelabeler:
     if settings.prelabeler == "deterministic":
         return DeterministicBeePrelabeler()
-    if settings.prelabeler == "grounding_dino":
-        checkpoint_id = settings.grounding_dino_checkpoint or None
-        return GroundingDinoBeePrelabeler(
-            runner=TransformersGroundingDinoRunner(
-                model_id=settings.grounding_dino_model_id,
-                device=settings.grounding_dino_device,
-                local_files_only=settings.grounding_dino_local_files_only,
-            ),
-            model_id=settings.grounding_dino_model_id,
-            checkpoint_id=checkpoint_id,
-            prompt_text=settings.grounding_dino_prompt,
-            box_threshold=settings.grounding_dino_box_threshold,
-            text_threshold=settings.grounding_dino_text_threshold,
-            max_box_area_ratio=settings.grounding_dino_max_box_area_ratio,
-        )
     raise ValueError(f"Unknown HiveSight pre-labeller provider: {settings.prelabeler}")
 
 
@@ -169,3 +158,31 @@ def get_inspection_photo_access(state: DevStateDep) -> InspectionPhotoAccess:
         analysis_workflow=analysis_workflow,
         upload_policy=state.upload_policy,
     )
+
+
+def get_bee_detector_training_workflow(state: DevStateDep) -> BeeDetectorTrainingWorkflow:
+    settings = get_settings()
+    adapter = (
+        UltralyticsYoloObbTrainingAdapter(
+            base_weights=settings.yolo_base_weights,
+            device=settings.yolo_device,
+        )
+        if settings.bee_detector_training_adapter == "ultralytics_yolo_obb"
+        else FakeBeeDetectorTrainingAdapter()
+    )
+    return BeeDetectorTrainingWorkflow(
+        store=state.store,
+        image_loader=state.object_storage.get_object,
+        artifact_root=state.model_artifact_root,
+        adapter=adapter,
+        persistence_backend=settings.persistence_backend,
+        database_purpose=settings.database_purpose,
+        clock=state.store.clock,
+    )
+
+
+def _model_artifact_root(settings: Settings) -> Path:
+    configured = Path(settings.model_artifact_root)
+    if configured.is_absolute():
+        return configured
+    return Path(__file__).resolve().parents[4] / configured

@@ -12,6 +12,12 @@ from hive_sight_core_api.db import MIGRATIONS_DIR, reset_database
 from hive_sight_core_api.dependencies import get_dev_state
 from hive_sight_core_api.dev_store import InMemoryEventRecorder, InMemoryObjectStorage, UploadPolicy
 from hive_sight_core_api.main import app
+from hive_sight_core_api.models import (
+    ArtifactResponse,
+    DatasetVersionResponse,
+    ModelCandidateResponse,
+    TrainingRunResponse,
+)
 from hive_sight_core_api.postgres_store import PostgresProductDataStore
 
 USER_ID = UUID("00000000-0000-0000-0000-000000000101")
@@ -137,6 +143,112 @@ def test_postgres_store_survives_restart_for_training_crop_dataset_item_path() -
     finally:
         app.dependency_overrides.clear()
 
+
+@pytest.mark.skipif(
+    importlib.util.find_spec("psycopg") is None or not os.getenv("HIVESIGHT_TEST_DATABASE_URL"),
+    reason="Set HIVESIGHT_TEST_DATABASE_URL and install psycopg to run Postgres persistence integration.",
+)
+def test_postgres_store_survives_restart_for_model_training_records() -> None:
+    database_url = os.environ["HIVESIGHT_TEST_DATABASE_URL"]
+    reset_database(database_url)
+    store = _build_postgres_state(database_url).store
+    now = datetime(2026, 7, 31, 10, 0, tzinfo=UTC)
+    workspace_id = UUID("00000000-0000-0000-0000-000000000201")
+    dataset_version_id = UUID("00000000-0000-0000-0000-000000014001")
+    training_run_id = UUID("00000000-0000-0000-0000-000000014002")
+    model_candidate_id = UUID("00000000-0000-0000-0000-000000014003")
+    weights_artifact_id = UUID("00000000-0000-0000-0000-000000014004")
+
+    artifact = ArtifactResponse(
+        artifact_id=weights_artifact_id,
+        workspace_id=workspace_id,
+        artifact_kind="weights",
+        relative_path="training-run-HS-TR-000001/weights/best.pt",
+        media_type="application/octet-stream",
+        size_bytes=9,
+        sha256="fake-sha",
+        created_at=now,
+    )
+    dataset_version = DatasetVersionResponse(
+        dataset_version_id=dataset_version_id,
+        human_readable_id="HS-DV-000001",
+        workspace_id=workspace_id,
+        model_purpose="bee_detector",
+        export_format="yolo_obb_v1",
+        conversion_version="ellipse_to_yolo_obb_v1",
+        dataset_role_policy="training_and_validation_only",
+        created_by_user_id=USER_ID,
+        created_at=now,
+        source_dataset_item_ids=[],
+        included_dataset_item_ids=[],
+        protected_benchmark_dataset_item_ids=[],
+        excluded_dataset_items=[],
+        training_item_count=1,
+        validation_item_count=1,
+        benchmark_item_count=0,
+        class_map={"0": "complete_visible_bee", "1": "partial_visible_bee"},
+        package_artifact_id=weights_artifact_id,
+        manifest_artifact_id=weights_artifact_id,
+        dataset_yaml_artifact_id=weights_artifact_id,
+        report_artifact_id=None,
+        preview_artifact_ids=[],
+        warnings=[],
+        git_commit=None,
+        status="created",
+        caveat="test dataset version",
+    )
+    training_run = TrainingRunResponse(
+        training_run_id=training_run_id,
+        human_readable_id="HS-TR-000001",
+        workspace_id=workspace_id,
+        dataset_version_id=dataset_version_id,
+        model_purpose="bee_detector",
+        adapter_type="fake",
+        status="completed",
+        requested_by_user_id=USER_ID,
+        requested_at=now,
+        started_at=now,
+        completed_at=now,
+        failed_at=None,
+        failure_code=None,
+        failure_message=None,
+        epochs=1,
+        image_size=640,
+        batch_size=1,
+        random_seed=7,
+        metrics={"precision": 0.1},
+        model_candidate_id=model_candidate_id,
+        report_artifact_id=None,
+        log_artifact_id=None,
+        warnings_acknowledged=True,
+        caveat="test training run",
+    )
+    model_candidate = ModelCandidateResponse(
+        model_candidate_id=model_candidate_id,
+        human_readable_id="HS-MC-000001",
+        workspace_id=workspace_id,
+        training_run_id=training_run_id,
+        dataset_version_id=dataset_version_id,
+        model_purpose="bee_detector",
+        adapter_type="fake",
+        weights_artifact_id=weights_artifact_id,
+        metrics={"precision": 0.1},
+        promotion_status="not_evaluated",
+        not_user_facing_reason="baseline_training_only",
+        created_at=now,
+    )
+
+    store.save_artifact(artifact)
+    store.save_dataset_version(dataset_version)
+    store.save_training_run(training_run)
+    store.save_model_candidate(model_candidate)
+
+    restarted = _build_postgres_state(database_url).store
+    assert restarted.get_dataset_version(dataset_version_id).human_readable_id == "HS-DV-000001"
+    assert restarted.get_training_run(training_run_id).status == "completed"
+    assert restarted.get_model_candidate(model_candidate_id).human_readable_id == "HS-MC-000001"
+    assert restarted.get_artifact(weights_artifact_id).relative_path.endswith("weights/best.pt")
+
     restarted_state = _build_postgres_state(database_url)
     app.dependency_overrides[get_dev_state] = lambda: restarted_state
     restarted_client = TestClient(app)
@@ -172,6 +284,7 @@ def _build_postgres_state(database_url: str):
         event_recorder=InMemoryEventRecorder(),
         upload_policy=UploadPolicy(),
         dataset_export_root=Path("/tmp/hive-sight-test-exports"),
+        model_artifact_root=Path("/tmp/hive-sight-test-model-runs"),
     )
 
 

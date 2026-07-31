@@ -7,12 +7,14 @@ from fastapi.responses import JSONResponse, Response
 
 from hive_sight_core_api.analysis_processing_workflow import AnalysisProcessingWorkflow
 from hive_sight_core_api.analysis_request_workflow import AnalysisRequestWorkflow
+from hive_sight_core_api.bee_detector_training_workflow import BeeDetectorTrainingWorkflow
 from hive_sight_core_api.dataset_labelling_workflow import DatasetLabellingWorkflow
 from hive_sight_core_api.dataset_role_assignment_workflow import DatasetRoleAssignmentWorkflow
 from hive_sight_core_api.dependencies import (
     DevStateDep,
     get_analysis_processing_workflow,
     get_analysis_request_workflow,
+    get_bee_detector_training_workflow,
     get_dataset_labelling_workflow,
     get_dataset_role_assignment_workflow,
     get_hive_configuration_workflow,
@@ -33,6 +35,9 @@ from hive_sight_core_api.models import (
     ApiaryResponse,
     DatasetItemCreateRequest,
     DatasetItemResponse,
+    DatasetVersionCreateRequest,
+    DatasetVersionListResponse,
+    DatasetVersionResponse,
     DatasetLabellingEvidenceResponse,
     DatasetLabellingSessionResponse,
     DevSessionResponse,
@@ -47,6 +52,9 @@ from hive_sight_core_api.models import (
     InspectionIntentUpdateRequest,
     InspectionPhotoListResponse,
     InspectionResponse,
+    ModelCandidateListResponse,
+    ModelCandidateResponse,
+    ModelTrainingReadinessResponse,
     OrientedBeeEllipseCreateRequest,
     OrientedBeeEllipseResponse,
     OrientedBeeEllipseUpdateRequest,
@@ -63,6 +71,9 @@ from hive_sight_core_api.models import (
     TrainingCropListResponse,
     TrainingCropResponse,
     TrainingCropUpdateRequest,
+    TrainingRunListResponse,
+    TrainingRunResponse,
+    TrainingRunStartRequest,
     UpdateDatasetLabellingSessionRequest,
     WorkspaceDataUseAgreementAcceptanceRequest,
     WorkspaceDataUseAgreementAcceptanceResponse,
@@ -120,6 +131,10 @@ TrainingCropDatasetItemWorkflowDep = Annotated[
     TrainingCropDatasetItemWorkflow,
     Depends(get_training_crop_dataset_item_workflow),
 ]
+BeeDetectorTrainingWorkflowDep = Annotated[
+    BeeDetectorTrainingWorkflow,
+    Depends(get_bee_detector_training_workflow),
+]
 DevUserIdHeader = Annotated[str | None, Header(alias="x-hivesight-dev-user-id")]
 
 
@@ -157,6 +172,8 @@ def healthz() -> HealthResponse:
         service="core-api",
         status="ok",
         boundary="internet-reachable protected API",
+        persistence_backend=settings.persistence_backend,
+        database_purpose=settings.database_purpose,
     )
 
 
@@ -501,6 +518,159 @@ def create_physical_yolo_obb_export_package(
         image_loader=state.object_storage.get_object,
         export_root=state.dataset_export_root,
     )
+
+
+@app.get(
+    "/v1/model-training/readiness",
+    response_model=ModelTrainingReadinessResponse,
+)
+def get_model_training_readiness(
+    workspace_id: UUID,
+    user: AuthenticatedUserDep,
+    workflow: BeeDetectorTrainingWorkflowDep,
+) -> ModelTrainingReadinessResponse:
+    return workflow.readiness(user=user, workspace_id=workspace_id)
+
+
+@app.post(
+    "/v1/model-training/dataset-versions",
+    response_model=DatasetVersionResponse,
+    status_code=201,
+)
+def create_model_training_dataset_version(
+    request: DatasetVersionCreateRequest,
+    user: AuthenticatedUserDep,
+    workflow: BeeDetectorTrainingWorkflowDep,
+) -> DatasetVersionResponse:
+    return workflow.create_dataset_version(
+        user=user,
+        workspace_id=request.workspace_id,
+        purpose=request.purpose,
+    )
+
+
+@app.get(
+    "/v1/model-training/dataset-versions",
+    response_model=DatasetVersionListResponse,
+)
+def list_model_training_dataset_versions(
+    workspace_id: UUID,
+    user: AuthenticatedUserDep,
+    workflow: BeeDetectorTrainingWorkflowDep,
+) -> DatasetVersionListResponse:
+    return DatasetVersionListResponse(
+        dataset_versions=workflow.list_dataset_versions(
+            user=user,
+            workspace_id=workspace_id,
+        )
+    )
+
+
+@app.get(
+    "/v1/model-training/dataset-versions/{dataset_version_id}",
+    response_model=DatasetVersionResponse,
+)
+def get_model_training_dataset_version(
+    dataset_version_id: UUID,
+    workspace_id: UUID,
+    user: AuthenticatedUserDep,
+    workflow: BeeDetectorTrainingWorkflowDep,
+) -> DatasetVersionResponse:
+    return workflow.get_dataset_version(
+        user=user,
+        workspace_id=workspace_id,
+        dataset_version_id=dataset_version_id,
+    )
+
+
+@app.post(
+    "/v1/model-training/training-runs",
+    response_model=TrainingRunResponse,
+    status_code=202,
+)
+def start_model_training_run(
+    request: TrainingRunStartRequest,
+    user: AuthenticatedUserDep,
+    workflow: BeeDetectorTrainingWorkflowDep,
+) -> TrainingRunResponse:
+    return workflow.start_training_run(user=user, request=request)
+
+
+@app.get(
+    "/v1/model-training/training-runs",
+    response_model=TrainingRunListResponse,
+)
+def list_model_training_runs(
+    workspace_id: UUID,
+    user: AuthenticatedUserDep,
+    workflow: BeeDetectorTrainingWorkflowDep,
+) -> TrainingRunListResponse:
+    return TrainingRunListResponse(
+        training_runs=workflow.list_training_runs(user=user, workspace_id=workspace_id)
+    )
+
+
+@app.get(
+    "/v1/model-training/training-runs/{training_run_id}",
+    response_model=TrainingRunResponse,
+)
+def get_model_training_run(
+    training_run_id: UUID,
+    workspace_id: UUID,
+    user: AuthenticatedUserDep,
+    workflow: BeeDetectorTrainingWorkflowDep,
+) -> TrainingRunResponse:
+    return workflow.get_training_run(
+        user=user,
+        workspace_id=workspace_id,
+        training_run_id=training_run_id,
+    )
+
+
+@app.get(
+    "/v1/model-training/model-candidates",
+    response_model=ModelCandidateListResponse,
+)
+def list_model_candidates(
+    workspace_id: UUID,
+    user: AuthenticatedUserDep,
+    workflow: BeeDetectorTrainingWorkflowDep,
+) -> ModelCandidateListResponse:
+    return ModelCandidateListResponse(
+        model_candidates=workflow.list_model_candidates(user=user, workspace_id=workspace_id)
+    )
+
+
+@app.get(
+    "/v1/model-training/model-candidates/{model_candidate_id}",
+    response_model=ModelCandidateResponse,
+)
+def get_model_candidate(
+    model_candidate_id: UUID,
+    workspace_id: UUID,
+    user: AuthenticatedUserDep,
+    workflow: BeeDetectorTrainingWorkflowDep,
+) -> ModelCandidateResponse:
+    return workflow.get_model_candidate(
+        user=user,
+        workspace_id=workspace_id,
+        model_candidate_id=model_candidate_id,
+    )
+
+
+@app.get("/v1/model-training/artifacts/{artifact_id}")
+def get_model_training_artifact(
+    artifact_id: UUID,
+    workspace_id: UUID,
+    user: AuthenticatedUserDep,
+    workflow: BeeDetectorTrainingWorkflowDep,
+) -> Response:
+    artifact, body = workflow.get_artifact(
+        user=user,
+        workspace_id=workspace_id,
+        artifact_id=artifact_id,
+    )
+    return Response(content=body, media_type=artifact.content_type)
 
 
 @app.get(
