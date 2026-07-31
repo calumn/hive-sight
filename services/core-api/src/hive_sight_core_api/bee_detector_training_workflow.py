@@ -1,14 +1,16 @@
 from __future__ import annotations
 
 import json
+import logging
 import platform
 import shutil
 import subprocess
 import sys
+import threading
 from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from hashlib import sha256
 from io import BytesIO
 from pathlib import Path
@@ -35,6 +37,10 @@ from hive_sight_core_api.models import (
     ModelTrainingReadinessResponse,
     ModelTrainingWarningResponse,
     ModelTrainingWarningSeverity,
+    TrainingRunAbandonRequest,
+    TrainingRunCancelRequest,
+    TrainingRunDeleteResponse,
+    TrainingRunDeleteRequest,
     TrainingRunResponse,
     TrainingRunStartRequest,
     YoloObbExcludedItem,
@@ -44,6 +50,8 @@ from hive_sight_core_api.models import (
 CLASS_MAP = {"0": "complete_visible_bee", "1": "partial_visible_bee"}
 EXPORT_FORMAT = "yolo_obb_v1"
 CONVERSION_VERSION = "ellipse_to_yolo_obb_v1"
+LOGGER = logging.getLogger(__name__)
+TERMINAL_TRAINING_RUN_STATUSES = {"completed", "failed", "cancelled", "abandoned"}
 
 
 class BeeDetectorTrainingAdapter(Protocol):
@@ -91,10 +99,10 @@ class FakeBeeDetectorTrainingAdapter:
             encoding="utf-8",
         )
         log_path = run_dir / "training.log"
-        log_path.write_text(
-            "Fake adapter completed deterministic Bee Detector smoke training.\n",
-            encoding="utf-8",
-        )
+        with log_path.open("a", encoding="utf-8") as log_file:
+            log_file.write(
+                "Fake adapter completed deterministic Bee Detector smoke training.\n"
+            )
         return TrainingAdapterResult(
             metrics={
                 "precision": 0.5,
@@ -160,10 +168,10 @@ class UltralyticsYoloObbTrainingAdapter:
                 500,
             )
         log_path = run_dir / "training.log"
-        log_path.write_text(
-            "Ultralytics YOLO OBB training completed. See ultralytics/train for raw outputs.\n",
-            encoding="utf-8",
-        )
+        with log_path.open("a", encoding="utf-8") as log_file:
+            log_file.write(
+                "Ultralytics YOLO OBB training completed. See ultralytics/train for raw outputs.\n"
+            )
         return TrainingAdapterResult(
             metrics={"metric_scope": "ultralytics_training_smoke_metrics"},
             model_artifact_path=weights_path,
@@ -183,6 +191,8 @@ class BeeDetectorTrainingWorkflow:
         persistence_backend: str,
         database_purpose: str,
         clock: Callable[[], datetime],
+        stale_after_seconds: int = 300,
+        heartbeat_interval_seconds: int = 5,
     ) -> None:
         self.store = store
         self.image_loader = image_loader
@@ -191,9 +201,14 @@ class BeeDetectorTrainingWorkflow:
         self.persistence_backend = persistence_backend
         self.database_purpose = database_purpose
         self.clock = clock
+        self.stale_after_seconds = stale_after_seconds
+        self.heartbeat_interval_seconds = heartbeat_interval_seconds
 
     def readiness(self, user: UserContext, workspace_id: UUID) -> ModelTrainingReadinessResponse:
         self._require_curator(user=user, workspace_id=workspace_id)
+        real_adapter_available = (
+            self.adapter.check_available() if self.adapter.adapter_type != "fake" else False
+        )
         counts = Counter(
             item.dataset_role
             for item in self.store.dataset_items.values()
@@ -210,9 +225,7 @@ class BeeDetectorTrainingWorkflow:
             persistence_backend=self.persistence_backend,
             database_purpose=self.database_purpose,
             adapter_type=self.adapter.adapter_type,
-            real_adapter_available=self.adapter.check_available()
-            if self.adapter.adapter_type != "fake"
-            else False,
+            real_adapter_available=real_adapter_available,
             active_training_run_id=active.training_run_id if active else None,
             training_item_count=counts[DatasetRole.training],
             validation_item_count=counts[DatasetRole.validation],
@@ -220,7 +233,8 @@ class BeeDetectorTrainingWorkflow:
             eligible_to_create_dataset_version=(
                 counts[DatasetRole.training] >= 1 and counts[DatasetRole.validation] >= 1
             ),
-            eligible_to_start_training=active is None,
+            eligible_to_start_training=active is None
+            and (self.adapter.adapter_type == "fake" or real_adapter_available),
             warnings=warnings,
         )
 
@@ -425,6 +439,12 @@ class BeeDetectorTrainingWorkflow:
                 "Real YOLO training must target the dev or QA database, not the resettable test database.",
                 409,
             )
+        if self.adapter.adapter_type != "fake" and not self.adapter.check_available():
+            raise DomainError(
+                "real_adapter_unavailable",
+                "Run pnpm model:setup:yolo before using the real YOLO training adapter.",
+                409,
+            )
         active_run = self.store.active_training_run(request.workspace_id)
         if active_run is not None:
             raise DomainError(
@@ -489,6 +509,12 @@ class BeeDetectorTrainingWorkflow:
             else None,
             started_at=None,
             completed_at=None,
+            last_heartbeat_at=created_at,
+            last_activity_message="Training Run queued.",
+            progress_percent=0,
+            current_epoch=None,
+            total_epochs=request.epochs,
+            latest_log_excerpt=None,
             failure_code=None,
             failure_message=None,
             artifact_ids=[],
@@ -500,7 +526,17 @@ class BeeDetectorTrainingWorkflow:
             purpose_notes=request.purpose_notes,
         )
         self.store.save_training_run(training_run)
-        return self._run_training_now(training_run, dataset_version, run_dir)
+        self._start_background_training(training_run, dataset_version, run_dir)
+        LOGGER.info(
+            "bee_detector_training_run_queued",
+            extra={
+                "workspace_id": str(training_run.workspace_id),
+                "training_run_id": str(training_run.training_run_id),
+                "dataset_version_id": str(training_run.dataset_version_id),
+                "adapter_type": training_run.adapter_type,
+            },
+        )
+        return self._with_runtime_state(training_run)
 
     def list_training_runs(
         self,
@@ -509,7 +545,10 @@ class BeeDetectorTrainingWorkflow:
         workspace_id: UUID,
     ) -> list[TrainingRunResponse]:
         self._require_curator(user=user, workspace_id=workspace_id)
-        return self.store.list_training_runs(workspace_id)
+        return [
+            self._with_runtime_state(training_run)
+            for training_run in self.store.list_training_runs(workspace_id)
+        ]
 
     def get_training_run(
         self,
@@ -522,7 +561,130 @@ class BeeDetectorTrainingWorkflow:
         training_run = self.store.get_training_run(workspace_id, training_run_id)
         if training_run is None:
             raise DomainError("training_run_not_found", "Training Run not found.", 404)
-        return training_run
+        return self._with_runtime_state(training_run)
+
+    def cancel_training_run(
+        self,
+        *,
+        user: UserContext,
+        training_run_id: UUID,
+        request: TrainingRunCancelRequest,
+    ) -> TrainingRunResponse:
+        self._require_curator(user=user, workspace_id=request.workspace_id)
+        training_run = self._require_training_run(request.workspace_id, training_run_id)
+        if training_run.status in TERMINAL_TRAINING_RUN_STATUSES:
+            raise DomainError(
+                "training_run_already_terminal",
+                "Only queued or running Training Runs can be cancelled.",
+                409,
+            )
+        cancelled = training_run.model_copy(
+            update={
+                "status": "cancelling",
+                "phase": "cancelling",
+                "last_heartbeat_at": self.clock(),
+                "last_activity_message": "Cancellation requested.",
+                "cancel_requested_at": self.clock(),
+                "cancel_requested_by_user_id": user.user_id,
+                "cancel_reason": _clean_optional_text(request.reason),
+            }
+        )
+        self.store.save_training_run(cancelled)
+        LOGGER.info(
+            "bee_detector_training_run_cancellation_requested",
+            extra={
+                "workspace_id": str(cancelled.workspace_id),
+                "training_run_id": str(cancelled.training_run_id),
+            },
+        )
+        return self._with_runtime_state(cancelled)
+
+    def abandon_training_run(
+        self,
+        *,
+        user: UserContext,
+        training_run_id: UUID,
+        request: TrainingRunAbandonRequest,
+    ) -> TrainingRunResponse:
+        self._require_curator(user=user, workspace_id=request.workspace_id)
+        training_run = self._require_training_run(request.workspace_id, training_run_id)
+        if training_run.status in TERMINAL_TRAINING_RUN_STATUSES:
+            raise DomainError(
+                "training_run_already_terminal",
+                "Only active Training Runs can be abandoned.",
+                409,
+            )
+        runtime_state = self._with_runtime_state(training_run)
+        if not runtime_state.is_stale and not request.force:
+            raise DomainError(
+                "training_run_not_stale",
+                "Only stale Training Runs can be abandoned without force.",
+                409,
+            )
+        abandoned = training_run.model_copy(
+            update={
+                "status": "abandoned",
+                "phase": "abandoned",
+                "completed_at": self.clock(),
+                "last_heartbeat_at": self.clock(),
+                "last_activity_message": "Training Run abandoned by Dataset Curator.",
+                "abandoned_at": self.clock(),
+                "abandoned_by_user_id": user.user_id,
+                "abandon_reason": request.reason.strip(),
+                "is_stale": False,
+                "stale_after_seconds": self.stale_after_seconds,
+            }
+        )
+        self.store.save_training_run(abandoned)
+        LOGGER.info(
+            "bee_detector_training_run_abandoned",
+            extra={
+                "workspace_id": str(abandoned.workspace_id),
+                "training_run_id": str(abandoned.training_run_id),
+            },
+        )
+        return abandoned
+
+    def delete_training_run(
+        self,
+        *,
+        user: UserContext,
+        training_run_id: UUID,
+        request: TrainingRunDeleteRequest,
+    ) -> TrainingRunDeleteResponse:
+        self._require_curator(user=user, workspace_id=request.workspace_id)
+        training_run = self._require_training_run(request.workspace_id, training_run_id)
+        if not request.confirm_no_candidate_or_required_artifacts:
+            raise DomainError(
+                "training_run_delete_requires_confirmation",
+                "Confirm that the Training Run has no Model Candidate or required artifacts before deleting it.",
+                409,
+            )
+        if training_run.model_candidate_id is not None or training_run.artifact_ids:
+            raise DomainError(
+                "training_run_has_governance_evidence",
+                "Training Runs with Model Candidates or artifacts cannot be deleted.",
+                409,
+            )
+        if training_run.status not in {"queued", "running", "cancelling", "abandoned", "cancelled"}:
+            raise DomainError(
+                "training_run_delete_not_allowed",
+                "Only active, cancelled, or abandoned Training Runs without evidence can be deleted.",
+                409,
+            )
+        self.store.delete_training_run(training_run.training_run_id)
+        LOGGER.info(
+            "bee_detector_training_run_deleted",
+            extra={
+                "workspace_id": str(training_run.workspace_id),
+                "training_run_id": str(training_run.training_run_id),
+            },
+        )
+        return TrainingRunDeleteResponse(
+            training_run_id=training_run.training_run_id,
+            deleted=True,
+            message="Training Run deleted.",
+        )
 
     def list_model_candidates(
         self,
@@ -572,16 +734,69 @@ class BeeDetectorTrainingWorkflow:
         run_dir: Path,
     ) -> TrainingRunResponse:
         run_dir.mkdir(parents=True, exist_ok=True)
+        log_path = run_dir / "training.log"
+        self._append_training_log(log_path, "Training Run worker started.")
         running = training_run.model_copy(
-            update={"status": "running", "phase": "training", "started_at": self.clock()}
+            update={
+                "status": "running",
+                "phase": "exporting_dataset",
+                "started_at": self.clock(),
+                "last_heartbeat_at": self.clock(),
+                "last_activity_message": "Preparing YOLO OBB dataset package.",
+                "progress_percent": 5,
+                "latest_log_excerpt": self._latest_log_excerpt(log_path),
+            }
         )
         self.store.save_training_run(running)
+        heartbeat_stop = threading.Event()
         try:
             dataset_package_dir = self._dataset_package_dir(dataset_version)
+            running = self._mark_training_run_phase(
+                running,
+                phase="training",
+                message="Training adapter is running.",
+                progress_percent=10,
+                log_path=log_path,
+            )
+            heartbeat_thread = threading.Thread(
+                target=self._heartbeat_while_active,
+                args=(running.workspace_id, running.training_run_id, log_path, heartbeat_stop),
+                daemon=True,
+                name=f"hivesight-training-heartbeat-{running.training_run_id}",
+            )
+            heartbeat_thread.start()
             adapter_result = self.adapter.run_training(
                 training_run=running,
                 run_dir=run_dir,
                 dataset_package_dir=dataset_package_dir,
+            )
+            heartbeat_stop.set()
+            heartbeat_thread.join(timeout=1)
+            current_run = self.store.get_training_run(running.workspace_id, running.training_run_id)
+            if current_run is None:
+                return running
+            if current_run.status == "cancelling":
+                cancelled = current_run.model_copy(
+                    update={
+                        "status": "cancelled",
+                        "phase": "cancelled",
+                        "completed_at": self.clock(),
+                        "last_heartbeat_at": self.clock(),
+                        "last_activity_message": "Training stopped after cancellation request.",
+                        "progress_percent": None,
+                        "latest_log_excerpt": self._latest_log_excerpt(log_path),
+                    }
+                )
+                self.store.save_training_run(cancelled)
+                return cancelled
+            if current_run.status in TERMINAL_TRAINING_RUN_STATUSES:
+                return current_run
+            running = self._mark_training_run_phase(
+                current_run,
+                phase="recording_artifacts",
+                message="Recording model artifacts.",
+                progress_percent=90,
+                log_path=adapter_result.log_path,
             )
             if not adapter_result.model_artifact_path.exists():
                 raise DomainError(
@@ -628,6 +843,10 @@ class BeeDetectorTrainingWorkflow:
                     "status": "completed",
                     "phase": "completed",
                     "completed_at": self.clock(),
+                    "last_heartbeat_at": self.clock(),
+                    "last_activity_message": "Training completed and Model Candidate created.",
+                    "progress_percent": 100,
+                    "latest_log_excerpt": self._latest_log_excerpt(adapter_result.log_path),
                     "base_weights_source": adapter_result.base_weights_source,
                     "artifact_ids": [model_artifact.artifact_id, log_artifact.artifact_id],
                     "metrics_summary": adapter_result.metrics,
@@ -645,17 +864,149 @@ class BeeDetectorTrainingWorkflow:
             self.store.save_training_run(updated)
             return updated
         except DomainError as error:
+            heartbeat_stop.set()
             failed = running.model_copy(
                 update={
                     "status": "failed",
                     "phase": "failed",
                     "completed_at": self.clock(),
+                    "last_heartbeat_at": self.clock(),
+                    "last_activity_message": "Training failed.",
+                    "progress_percent": None,
+                    "latest_log_excerpt": self._latest_log_excerpt(log_path),
                     "failure_code": error.code,
                     "failure_message": error.message,
                 }
             )
             self.store.save_training_run(failed)
             return failed
+        except Exception as error:
+            heartbeat_stop.set()
+            failed = running.model_copy(
+                update={
+                    "status": "failed",
+                    "phase": "failed",
+                    "completed_at": self.clock(),
+                    "last_heartbeat_at": self.clock(),
+                    "last_activity_message": "Training failed unexpectedly.",
+                    "progress_percent": None,
+                    "latest_log_excerpt": self._latest_log_excerpt(log_path),
+                    "failure_code": "training_run_failed",
+                    "failure_message": str(error),
+                }
+            )
+            self.store.save_training_run(failed)
+            LOGGER.exception(
+                "bee_detector_training_run_failed",
+                extra={
+                    "workspace_id": str(failed.workspace_id),
+                    "training_run_id": str(failed.training_run_id),
+                },
+            )
+            return failed
+
+    def _start_background_training(
+        self,
+        training_run: TrainingRunResponse,
+        dataset_version: DatasetVersionResponse,
+        run_dir: Path,
+    ) -> None:
+        thread = threading.Thread(
+            target=self._run_training_now,
+            args=(training_run, dataset_version, run_dir),
+            daemon=True,
+            name=f"hivesight-training-run-{training_run.training_run_id}",
+        )
+        thread.start()
+
+    def _heartbeat_while_active(
+        self,
+        workspace_id: UUID,
+        training_run_id: UUID,
+        log_path: Path,
+        stop_event: threading.Event,
+    ) -> None:
+        while not stop_event.wait(self.heartbeat_interval_seconds):
+            current = self.store.get_training_run(workspace_id, training_run_id)
+            if current is None or current.status in TERMINAL_TRAINING_RUN_STATUSES:
+                return
+            self.store.save_training_run(
+                current.model_copy(
+                    update={
+                        "last_heartbeat_at": self.clock(),
+                        "last_activity_message": "Training adapter is still running.",
+                        "latest_log_excerpt": self._latest_log_excerpt(log_path),
+                    }
+                )
+            )
+
+    def _mark_training_run_phase(
+        self,
+        training_run: TrainingRunResponse,
+        *,
+        phase: str,
+        message: str,
+        progress_percent: float | None,
+        log_path: Path,
+    ) -> TrainingRunResponse:
+        self._append_training_log(log_path, message)
+        updated = training_run.model_copy(
+            update={
+                "phase": phase,
+                "last_heartbeat_at": self.clock(),
+                "last_activity_message": message,
+                "progress_percent": progress_percent,
+                "latest_log_excerpt": self._latest_log_excerpt(log_path),
+            }
+        )
+        self.store.save_training_run(updated)
+        LOGGER.info(
+            "bee_detector_training_run_phase_changed",
+            extra={
+                "workspace_id": str(updated.workspace_id),
+                "training_run_id": str(updated.training_run_id),
+                "phase": phase,
+            },
+        )
+        return updated
+
+    def _require_training_run(
+        self,
+        workspace_id: UUID,
+        training_run_id: UUID,
+    ) -> TrainingRunResponse:
+        training_run = self.store.get_training_run(workspace_id, training_run_id)
+        if training_run is None:
+            raise DomainError("training_run_not_found", "Training Run not found.", 404)
+        return training_run
+
+    def _with_runtime_state(self, training_run: TrainingRunResponse) -> TrainingRunResponse:
+        is_stale = False
+        if (
+            training_run.status not in TERMINAL_TRAINING_RUN_STATUSES
+            and training_run.last_heartbeat_at is not None
+        ):
+            is_stale = self.clock() - training_run.last_heartbeat_at > timedelta(
+                seconds=self.stale_after_seconds
+            )
+        return training_run.model_copy(
+            update={
+                "is_stale": is_stale,
+                "stale_after_seconds": self.stale_after_seconds,
+            }
+        )
+
+    def _latest_log_excerpt(self, log_path: Path, max_chars: int = 2000) -> str | None:
+        if not log_path.exists():
+            return None
+        content = log_path.read_text(encoding="utf-8", errors="replace")
+        return content[-max_chars:] if content else None
+
+    def _append_training_log(self, log_path: Path, message: str) -> None:
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        timestamp = self.clock().isoformat()
+        with log_path.open("a", encoding="utf-8") as file:
+            file.write(f"{timestamp} {message}\n")
 
     def _write_dataset_package(
         self,
@@ -712,7 +1063,10 @@ class BeeDetectorTrainingWorkflow:
                     filename_stem=filename_stem,
                 ).model_dump(mode="json")
             )
-        (package_dir / "data.yaml").write_text(_dataset_yaml_text(CLASS_MAP), encoding="utf-8")
+        (package_dir / "data.yaml").write_text(
+            _dataset_yaml_text(CLASS_MAP, dataset_path=str(package_dir.resolve())),
+            encoding="utf-8",
+        )
         sidecar = {
             **manifest_payload,
             "dataset_version_id": str(dataset_version.dataset_version_id),
@@ -1024,6 +1378,13 @@ def _warning(code: str, severity: str, message: str) -> ModelTrainingWarningResp
         severity=ModelTrainingWarningSeverity(severity),
         message=message,
     )
+
+
+def _clean_optional_text(value: str | None) -> str | None:
+    if value is None:
+        return None
+    cleaned = value.strip()
+    return cleaned or None
 
 
 def _excluded_item(item, reason: str) -> YoloObbExcludedItem:

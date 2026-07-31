@@ -412,7 +412,7 @@ Normal verification must continue to run without YOLO installed. The real-adapte
 - Approved user-facing Model Version creation.
 - Production model serving or inference adoption.
 - Selecting the trained Bee Detector as a candidate-annotation generator.
-- Public USDA/XML annotation import; planned as Slice 0015.1.
+- Public USDA/XML annotation import; moved to a later slice because Slice 0015.1 is now Training Run Progress And Recovery.
 - Full-frame or tiled YOLO export; parked for a later model-data slice.
 - Cloud/GPU training infrastructure.
 - Durable external queue orchestration.
@@ -477,7 +477,7 @@ Normal verification must continue to run without YOLO installed. The real-adapte
 - Reports store structured JSON and Markdown artifacts.
 - Artifact metadata uses relative paths from a configurable artifact root.
 - Artifact reports avoid raw personal/location metadata such as EXIF GPS, local source paths, device identifiers, or personal notes.
-- Public dataset annotation import is planned as Slice 0015.1.
+- Public dataset annotation import is moved to a later slice because Slice 0015.1 is now Training Run Progress And Recovery.
 - Full-frame/tiling export is parked for a later model-data slice.
 
 ## Open Questions

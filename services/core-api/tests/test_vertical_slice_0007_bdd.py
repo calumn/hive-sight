@@ -49,4 +49,6 @@ def _settings() -> Settings:
         database_purpose="dev",
         yolo_base_weights="yolo11n-obb.pt",
         yolo_device="cpu",
+        training_run_stale_after_seconds=300,
+        training_run_heartbeat_interval_seconds=5,
     )

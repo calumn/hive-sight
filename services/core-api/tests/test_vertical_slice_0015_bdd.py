@@ -11,6 +11,7 @@ from test_model_training_slice import (
     ORDINARY_USER_ID,
     _create_reviewed_crop_item,
     _headers,
+    _wait_for_training_run_status,
     _workspace,
 )
 
@@ -95,6 +96,14 @@ def start_training_run(slice_context: SliceContext) -> None:
 def training_run_creates_candidate(slice_context: SliceContext) -> None:
     assert slice_context.response_status_code == 202
     assert slice_context.training_run is not None
+    assert slice_context.workspace_id is not None
+    training_run = _wait_for_training_run_status(
+        slice_context.client,
+        slice_context.workspace_id,
+        str(slice_context.training_run["training_run_id"]),
+        "completed",
+    )
+    slice_context.training_run = training_run
     assert slice_context.training_run["status"] == "completed"
     assert slice_context.training_run["model_purpose"] == "bee_detector"
     assert slice_context.training_run["model_candidate_id"] is not None

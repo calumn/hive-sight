@@ -300,6 +300,8 @@ export type TrainingCrop = {
   reviewStatus: TrainingCropReviewStatus;
   visibleBeeStatus: VisibleBeeStatus;
   exclusionReason: TrainingCropExclusionReason | null;
+  datasetItemId: string | null;
+  datasetRole: DatasetRole | null;
   notes: string | null;
   createdByUserId: string;
   createdAt: string;
@@ -514,7 +516,7 @@ export type TrainingRun = {
   baseWeights: string;
   baseWeightsSource: string;
   adapterType: "fake" | "ultralytics_yolo_obb";
-  status: "queued" | "running" | "completed" | "failed";
+  status: "queued" | "running" | "cancelling" | "completed" | "failed" | "cancelled" | "abandoned";
   phase: string;
   databasePurpose: string;
   trainingSettings: Record<string, unknown>;
@@ -525,6 +527,20 @@ export type TrainingRun = {
   warningAcknowledgement: Record<string, unknown> | null;
   startedAt: string | null;
   completedAt: string | null;
+  lastHeartbeatAt: string | null;
+  lastActivityMessage: string | null;
+  progressPercent: number | null;
+  currentEpoch: number | null;
+  totalEpochs: number | null;
+  latestLogExcerpt: string | null;
+  cancelRequestedAt: string | null;
+  cancelRequestedByUserId: string | null;
+  cancelReason: string | null;
+  abandonedAt: string | null;
+  abandonedByUserId: string | null;
+  abandonReason: string | null;
+  isStale: boolean;
+  staleAfterSeconds: number | null;
   failureCode: string | null;
   failureMessage: string | null;
   artifactIds: string[];
@@ -534,6 +550,16 @@ export type TrainingRun = {
   createdByUserId: string;
   createdAt: string;
   purposeNotes: string | null;
+};
+
+export type TrainingRunList = {
+  trainingRuns: TrainingRun[];
+};
+
+export type TrainingRunDeleteResponse = {
+  trainingRunId: string;
+  deleted: boolean;
+  message: string;
 };
 
 export type ModelCandidate = {
@@ -1134,6 +1160,96 @@ export async function startModelTrainingRun({
   return parseTrainingRun(await response.json());
 }
 
+export async function fetchTrainingRuns({
+  devUserId,
+  workspaceId
+}: {
+  devUserId: string;
+  workspaceId: string;
+}): Promise<TrainingRunList> {
+  const params = new URLSearchParams({ workspace_id: workspaceId });
+  const response = await fetch(`${coreApiUrl}/v1/model-training/training-runs?${params}`, {
+    headers: devAuthHeaders(devUserId)
+  });
+  await ensureOk(response);
+  return parseTrainingRunList(await response.json());
+}
+
+export async function cancelTrainingRun({
+  devUserId,
+  workspaceId,
+  trainingRunId,
+  reason
+}: {
+  devUserId: string;
+  workspaceId: string;
+  trainingRunId: string;
+  reason: string;
+}): Promise<TrainingRun> {
+  const response = await fetch(
+    `${coreApiUrl}/v1/model-training/training-runs/${trainingRunId}/cancel`,
+    {
+      method: "POST",
+      headers: jsonHeaders(devUserId),
+      body: JSON.stringify({ workspace_id: workspaceId, reason })
+    }
+  );
+  await ensureOk(response);
+  return parseTrainingRun(await response.json());
+}
+
+export async function abandonTrainingRun({
+  devUserId,
+  workspaceId,
+  trainingRunId,
+  reason,
+  force = false
+}: {
+  devUserId: string;
+  workspaceId: string;
+  trainingRunId: string;
+  reason: string;
+  force?: boolean;
+}): Promise<TrainingRun> {
+  const response = await fetch(
+    `${coreApiUrl}/v1/model-training/training-runs/${trainingRunId}/abandon`,
+    {
+      method: "POST",
+      headers: jsonHeaders(devUserId),
+      body: JSON.stringify({ workspace_id: workspaceId, reason, force })
+    }
+  );
+  await ensureOk(response);
+  return parseTrainingRun(await response.json());
+}
+
+export async function deleteTrainingRun({
+  devUserId,
+  workspaceId,
+  trainingRunId,
+  reason
+}: {
+  devUserId: string;
+  workspaceId: string;
+  trainingRunId: string;
+  reason: string;
+}): Promise<TrainingRunDeleteResponse> {
+  const response = await fetch(
+    `${coreApiUrl}/v1/model-training/training-runs/${trainingRunId}`,
+    {
+      method: "DELETE",
+      headers: jsonHeaders(devUserId),
+      body: JSON.stringify({
+        workspace_id: workspaceId,
+        reason,
+        confirm_no_candidate_or_required_artifacts: true
+      })
+    }
+  );
+  await ensureOk(response);
+  return parseTrainingRunDeleteResponse(await response.json());
+}
+
 export async function createTrainingCrop({
   devUserId,
   workspaceId,
@@ -1670,6 +1786,8 @@ function parseTrainingCrop(value: unknown): TrainingCrop {
       record.exclusion_reason === null
         ? null
         : requireTrainingCropExclusionReason(record.exclusion_reason),
+    datasetItemId: optionalString(record.dataset_item_id, "dataset_item_id"),
+    datasetRole: record.dataset_role === null ? null : requireDatasetRole(record.dataset_role),
     notes: optionalString(record.notes, "notes"),
     createdByUserId: requireString(record.created_by_user_id, "created_by_user_id"),
     createdAt: requireString(record.created_at, "created_at"),
@@ -1941,6 +2059,23 @@ function parseTrainingRun(value: unknown): TrainingRun {
         : requireRecord(record.warning_acknowledgement, "warning_acknowledgement"),
     startedAt: optionalString(record.started_at, "started_at"),
     completedAt: optionalString(record.completed_at, "completed_at"),
+    lastHeartbeatAt: optionalString(record.last_heartbeat_at, "last_heartbeat_at"),
+    lastActivityMessage: optionalString(record.last_activity_message, "last_activity_message"),
+    progressPercent: optionalNumber(record.progress_percent, "progress_percent"),
+    currentEpoch: optionalNumber(record.current_epoch, "current_epoch"),
+    totalEpochs: optionalNumber(record.total_epochs, "total_epochs"),
+    latestLogExcerpt: optionalString(record.latest_log_excerpt, "latest_log_excerpt"),
+    cancelRequestedAt: optionalString(record.cancel_requested_at, "cancel_requested_at"),
+    cancelRequestedByUserId: optionalString(
+      record.cancel_requested_by_user_id,
+      "cancel_requested_by_user_id"
+    ),
+    cancelReason: optionalString(record.cancel_reason, "cancel_reason"),
+    abandonedAt: optionalString(record.abandoned_at, "abandoned_at"),
+    abandonedByUserId: optionalString(record.abandoned_by_user_id, "abandoned_by_user_id"),
+    abandonReason: optionalString(record.abandon_reason, "abandon_reason"),
+    isStale: requireBoolean(record.is_stale, "is_stale"),
+    staleAfterSeconds: optionalNumber(record.stale_after_seconds, "stale_after_seconds"),
     failureCode: optionalString(record.failure_code, "failure_code"),
     failureMessage: optionalString(record.failure_message, "failure_message"),
     artifactIds: requireArray(record.artifact_ids, "artifact_ids").map((id) =>
@@ -1952,6 +2087,22 @@ function parseTrainingRun(value: unknown): TrainingRun {
     createdByUserId: requireString(record.created_by_user_id, "created_by_user_id"),
     createdAt: requireString(record.created_at, "created_at"),
     purposeNotes: optionalString(record.purpose_notes, "purpose_notes")
+  };
+}
+
+function parseTrainingRunDeleteResponse(value: unknown): TrainingRunDeleteResponse {
+  const record = requireRecord(value, "Training Run delete response");
+  return {
+    trainingRunId: requireString(record.training_run_id, "training_run_id"),
+    deleted: requireBoolean(record.deleted, "deleted"),
+    message: requireString(record.message, "message")
+  };
+}
+
+function parseTrainingRunList(value: unknown): TrainingRunList {
+  const record = requireRecord(value, "Training Run list response");
+  return {
+    trainingRuns: requireArray(record.training_runs, "training_runs").map(parseTrainingRun)
   };
 }
 
@@ -2336,7 +2487,15 @@ function requireModelTrainingWarningSeverity(value: unknown): ModelTrainingWarni
 }
 
 function requireTrainingRunStatus(value: unknown): TrainingRun["status"] {
-  if (value === "queued" || value === "running" || value === "completed" || value === "failed") {
+  if (
+    value === "queued" ||
+    value === "running" ||
+    value === "cancelling" ||
+    value === "completed" ||
+    value === "failed" ||
+    value === "cancelled" ||
+    value === "abandoned"
+  ) {
     return value;
   }
   throw new Error("Core API response had an unexpected Training Run status");

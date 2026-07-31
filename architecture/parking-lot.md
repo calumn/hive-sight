@@ -335,7 +335,7 @@ Slice 0015 already includes Dataset Versions, YOLO OBB export, Training Runs, Mo
 
 Revisit trigger:
 
-Planned next as `Slice 0015.1: Public Dataset Candidate Annotation Import`, after the YOLO OBB Training Baseline workflow exists.
+After `Slice 0015.1: Training Run Progress And Recovery` closes, reconsider as a later public dataset import slice before relying only on hand-created HiveSight crops for early Bee Detector growth.
 
 Suggested owner or area:
 

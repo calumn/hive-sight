@@ -31,6 +31,8 @@ test("Dataset Curator creates a Dataset Version and fake Bee Detector training b
 
   await createCompletedDatasetCrop(page, { x: 170, y: 120 }, "training");
   await createCompletedDatasetCrop(page, { x: 650, y: 360 }, "validation");
+  await expect(page.getByTestId("training-crop-list-item").nth(0)).toContainText("Training");
+  await expect(page.getByTestId("training-crop-list-item").nth(1)).toContainText("Validation");
 
   await page.getByTestId("model-training-readiness-button").click();
   await expect(page.getByTestId("model-training-readiness-summary")).toContainText(/Training [1-9]/);
@@ -46,7 +48,36 @@ test("Dataset Curator creates a Dataset Version and fake Bee Detector training b
   await page.getByTestId("start-model-training-run-button").click();
   await expect(page.getByTestId("model-training-run-summary")).toContainText("HS-TR-");
   await expect(page.getByTestId("model-training-run-summary")).toContainText("completed");
+  await expect(page.getByTestId("model-training-run-summary")).toContainText("Phase completed");
+  await expect(page.getByTestId("model-training-run-summary")).toContainText("Progress 100%");
+  await expect(page.getByTestId("model-training-run-summary")).toContainText("Started");
+  await expect(page.getByTestId("model-training-run-summary")).toContainText("Last heartbeat");
+  await expect(page.getByTestId("model-training-run-summary")).toContainText("Elapsed");
+  await expect(page.getByTestId("model-training-activity")).toContainText(
+    "Training completed and Model Candidate created."
+  );
+  await expect(page.getByTestId("model-training-log-excerpt")).toContainText(
+    "Fake adapter completed"
+  );
   await expect(page.getByTestId("model-training-run-summary")).toContainText("fake");
+  await expect(page.getByTestId("model-training-run-list")).toContainText("Training runs");
+  await expect(page.getByTestId("model-training-run-list")).toContainText("Last checked");
+  await expect(page.getByTestId("model-training-run-list-item").first()).toContainText("HS-TR-");
+  await expect(page.getByTestId("model-training-run-list-item").first()).toContainText(
+    "completed"
+  );
+  await expect(page.getByTestId("model-training-run-list-item").first()).toContainText(
+    "Phase completed"
+  );
+  await expect(page.getByTestId("model-training-run-list-item").first()).toContainText(
+    "Progress 100%"
+  );
+  await expect(page.getByTestId("model-training-run-list-item").first()).toContainText(
+    "Heartbeat"
+  );
+  await expect(page.getByTestId("model-training-run-list-item").first()).toContainText(
+    "Candidate"
+  );
 });
 
 async function createCompletedDatasetCrop(
@@ -55,7 +86,12 @@ async function createCompletedDatasetCrop(
   datasetRole: "training" | "validation"
 ) {
   await page.getByTestId("training-source-photo-preview").click({ position });
+  const latestCropIndex = await page.getByTestId("training-crop-list-item").count();
   await page.getByTestId("save-training-crop-button").click();
+  await expect(page.getByTestId("training-crop-list-item")).toHaveCount(latestCropIndex + 1);
+  await expect(page.getByTestId("training-crop-list-item").nth(latestCropIndex)).toContainText(
+    "Unassigned"
+  );
   await page.getByTestId("training-crop-surface").click({ position: { x: 180, y: 120 } });
   await expect(page.getByTestId("training-crop-ellipse")).toHaveCount(1);
   await page.getByTestId("complete-training-crop-button").click();
@@ -65,6 +101,9 @@ async function createCompletedDatasetCrop(
     .fill(`Accepted as ${datasetRole} baseline crop.`);
   await page.getByTestId("assign-training-crop-dataset-role-button").click();
   await expect(page.getByTestId("training-crop-dataset-item-state")).toContainText(
-    `Dataset item: ${datasetRole}`
+    `Dataset item: ${datasetRole === "training" ? "Training" : "Validation"}`
+  );
+  await expect(page.getByTestId("training-crop-list-item").nth(latestCropIndex)).toContainText(
+    datasetRole === "training" ? "Training" : "Validation"
   );
 }

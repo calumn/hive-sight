@@ -1,13 +1,23 @@
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from io import BytesIO
 from pathlib import Path
+import threading
+import time
 from uuid import UUID
 
 from fastapi.testclient import TestClient
 from hive_configuration_test_support import configure_hive
 from PIL import Image
 
-from hive_sight_core_api.dependencies import build_dev_state, get_dev_state
+from hive_sight_core_api.bee_detector_training_workflow import (
+    BeeDetectorTrainingWorkflow,
+    TrainingAdapterResult,
+)
+from hive_sight_core_api.dependencies import (
+    build_dev_state,
+    get_bee_detector_training_workflow,
+    get_dev_state,
+)
 from hive_sight_core_api.main import app
 
 CURATOR_ID = UUID("00000000-0000-0000-0000-000000000101")
@@ -49,6 +59,15 @@ def test_dataset_curator_creates_dataset_version_and_fake_training_run(
         assert dataset_version["report_artifact_id"] is not None
         assert dataset_version["preview_artifact_ids"]
         assert any(warning["code"] == "NO_BENCHMARK_ITEMS" for warning in dataset_version["warnings"])
+        package_dir = (
+            state.model_artifact_root
+            / "dataset-versions"
+            / f"dataset-version-{dataset_version['dataset_version_id']}"
+        )
+        dataset_yaml = (package_dir / "data.yaml").read_text(encoding="utf-8")
+        assert f"path: {package_dir.resolve()}" in dataset_yaml
+        assert (package_dir / "images" / "train").is_dir()
+        assert (package_dir / "images" / "val").is_dir()
 
         blocked_training = client.post(
             "/v1/model-training/training-runs",
@@ -78,11 +97,23 @@ def test_dataset_curator_creates_dataset_version_and_fake_training_run(
             headers=_headers(),
         )
         assert training_response.status_code == 202
-        training_run = training_response.json()
-        assert training_run["human_readable_id"] == "HS-TR-000001"
+        queued_run = training_response.json()
+        assert queued_run["human_readable_id"] == "HS-TR-000001"
+        assert queued_run["status"] == "queued"
+        assert queued_run["last_heartbeat_at"] is not None
+        training_run = _wait_for_training_run_status(
+            client,
+            workspace_id,
+            queued_run["training_run_id"],
+            "completed",
+        )
         assert training_run["status"] == "completed"
         assert training_run["adapter_type"] == "fake"
         assert training_run["model_purpose"] == "bee_detector"
+        assert training_run["phase"] == "completed"
+        assert training_run["last_heartbeat_at"] is not None
+        assert training_run["last_activity_message"] == "Training completed and Model Candidate created."
+        assert training_run["latest_log_excerpt"] is not None
         assert training_run["model_candidate_id"] is not None
         assert training_run["report_artifact_id"] is not None
 
@@ -131,6 +162,54 @@ def test_model_training_requires_dataset_curator_capability(tmp_path: Path) -> N
         app.dependency_overrides.clear()
 
 
+def test_unavailable_real_training_adapter_blocks_training_run_start(tmp_path: Path) -> None:
+    state = _build_state(tmp_path)
+    app.dependency_overrides[get_dev_state] = lambda: state
+    app.dependency_overrides[get_bee_detector_training_workflow] = lambda: BeeDetectorTrainingWorkflow(
+        store=state.store,
+        image_loader=state.object_storage.get_object,
+        artifact_root=state.model_artifact_root,
+        adapter=UnavailableRealTrainingAdapter(),
+        persistence_backend="postgres",
+        database_purpose="dev",
+        clock=state.store.clock,
+    )
+    client = TestClient(app)
+    try:
+        workspace_id = _workspace(client)
+        _create_reviewed_crop_item(client, workspace_id, "training", 10, 10)
+        _create_reviewed_crop_item(client, workspace_id, "validation", 260, 10)
+
+        readiness = client.get(
+            f"/v1/model-training/readiness?workspace_id={workspace_id}",
+            headers=_headers(),
+        )
+        dataset_version_response = client.post(
+            "/v1/model-training/dataset-versions",
+            json={"workspace_id": workspace_id},
+            headers=_headers(),
+        )
+        training_response = client.post(
+            "/v1/model-training/training-runs",
+            json={
+                "workspace_id": workspace_id,
+                "dataset_version_id": dataset_version_response.json()["dataset_version_id"],
+                "acknowledge_high_severity_warnings": True,
+            },
+            headers=_headers(),
+        )
+
+        assert readiness.status_code == 200
+        assert readiness.json()["adapter_type"] == "ultralytics_yolo_obb"
+        assert readiness.json()["real_adapter_available"] is False
+        assert readiness.json()["eligible_to_start_training"] is False
+        assert training_response.status_code == 409
+        assert training_response.json()["detail"]["code"] == "real_adapter_unavailable"
+        assert state.store.list_training_runs(UUID(workspace_id)) == []
+    finally:
+        app.dependency_overrides.clear()
+
+
 def test_artifact_serving_uses_known_artifact_ids(tmp_path: Path) -> None:
     state = _build_state(tmp_path)
     app.dependency_overrides[get_dev_state] = lambda: state
@@ -147,13 +226,298 @@ def test_artifact_serving_uses_known_artifact_ids(tmp_path: Path) -> None:
         app.dependency_overrides.clear()
 
 
-def _build_state(tmp_path: Path):
+def test_dataset_curator_can_cancel_active_training_run(tmp_path: Path) -> None:
+    state = _build_state(tmp_path)
+    adapter = BlockingTrainingAdapter()
+    app.dependency_overrides[get_dev_state] = lambda: state
+    app.dependency_overrides[get_bee_detector_training_workflow] = lambda: BeeDetectorTrainingWorkflow(
+        store=state.store,
+        image_loader=state.object_storage.get_object,
+        artifact_root=state.model_artifact_root,
+        adapter=adapter,
+        persistence_backend="in_memory",
+        database_purpose="dev",
+        clock=state.store.clock,
+    )
+    client = TestClient(app)
+    try:
+        workspace_id, dataset_version_id = _dataset_version_with_minimum_items(client)
+        start_response = client.post(
+            "/v1/model-training/training-runs",
+            json={
+                "workspace_id": workspace_id,
+                "dataset_version_id": dataset_version_id,
+                "acknowledge_high_severity_warnings": True,
+            },
+            headers=_headers(),
+        )
+        assert start_response.status_code == 202
+        training_run_id = start_response.json()["training_run_id"]
+        adapter.started.wait(timeout=2)
+
+        cancel_response = client.post(
+            f"/v1/model-training/training-runs/{training_run_id}/cancel",
+            json={"workspace_id": workspace_id, "reason": "Local smoke run is taking too long."},
+            headers=_headers(),
+        )
+        adapter.release()
+        cancelled = _wait_for_training_run_status(client, workspace_id, training_run_id, "cancelled")
+
+        assert cancel_response.status_code == 200
+        assert cancel_response.json()["status"] == "cancelling"
+        assert cancelled["model_candidate_id"] is None
+        assert cancelled["cancel_reason"] == "Local smoke run is taking too long."
+        assert state.store.active_training_run(UUID(workspace_id)) is None
+    finally:
+        adapter.release()
+        app.dependency_overrides.clear()
+
+
+def test_dataset_curator_can_abandon_stale_training_run(tmp_path: Path) -> None:
+    clock = MutableClock(datetime(2026, 7, 31, 12, 0, tzinfo=UTC))
+    state = _build_state(tmp_path, clock=clock)
+    adapter = BlockingTrainingAdapter()
+    app.dependency_overrides[get_dev_state] = lambda: state
+    app.dependency_overrides[get_bee_detector_training_workflow] = lambda: BeeDetectorTrainingWorkflow(
+        store=state.store,
+        image_loader=state.object_storage.get_object,
+        artifact_root=state.model_artifact_root,
+        adapter=adapter,
+        persistence_backend="in_memory",
+        database_purpose="dev",
+        clock=state.store.clock,
+        stale_after_seconds=60,
+    )
+    client = TestClient(app)
+    try:
+        workspace_id, dataset_version_id = _dataset_version_with_minimum_items(client)
+        start_response = client.post(
+            "/v1/model-training/training-runs",
+            json={
+                "workspace_id": workspace_id,
+                "dataset_version_id": dataset_version_id,
+                "acknowledge_high_severity_warnings": True,
+            },
+            headers=_headers(),
+        )
+        training_run_id = start_response.json()["training_run_id"]
+        adapter.started.wait(timeout=2)
+
+        too_early = client.post(
+            f"/v1/model-training/training-runs/{training_run_id}/abandon",
+            json={"workspace_id": workspace_id, "reason": "No worker exists."},
+            headers=_headers(),
+        )
+        clock.advance(seconds=120)
+        stale_detail = client.get(
+            f"/v1/model-training/training-runs/{training_run_id}?workspace_id={workspace_id}",
+            headers=_headers(),
+        )
+        abandon_response = client.post(
+            f"/v1/model-training/training-runs/{training_run_id}/abandon",
+            json={"workspace_id": workspace_id, "reason": "No heartbeat after local restart."},
+            headers=_headers(),
+        )
+        adapter.release()
+
+        assert too_early.status_code == 409
+        assert too_early.json()["detail"]["code"] == "training_run_not_stale"
+        assert stale_detail.status_code == 200
+        assert stale_detail.json()["is_stale"] is True
+        assert abandon_response.status_code == 200
+        assert abandon_response.json()["status"] == "abandoned"
+        assert abandon_response.json()["abandon_reason"] == "No heartbeat after local restart."
+        assert state.store.active_training_run(UUID(workspace_id)) is None
+    finally:
+        adapter.release()
+        app.dependency_overrides.clear()
+
+
+def test_dataset_curator_can_force_abandon_cancelling_training_run(tmp_path: Path) -> None:
+    state = _build_state(tmp_path)
+    adapter = BlockingTrainingAdapter()
+    app.dependency_overrides[get_dev_state] = lambda: state
+    app.dependency_overrides[get_bee_detector_training_workflow] = lambda: BeeDetectorTrainingWorkflow(
+        store=state.store,
+        image_loader=state.object_storage.get_object,
+        artifact_root=state.model_artifact_root,
+        adapter=adapter,
+        persistence_backend="in_memory",
+        database_purpose="dev",
+        clock=state.store.clock,
+    )
+    client = TestClient(app)
+    try:
+        workspace_id, dataset_version_id = _dataset_version_with_minimum_items(client)
+        start_response = client.post(
+            "/v1/model-training/training-runs",
+            json={
+                "workspace_id": workspace_id,
+                "dataset_version_id": dataset_version_id,
+                "acknowledge_high_severity_warnings": True,
+            },
+            headers=_headers(),
+        )
+        training_run_id = start_response.json()["training_run_id"]
+        adapter.started.wait(timeout=2)
+
+        cancel_response = client.post(
+            f"/v1/model-training/training-runs/{training_run_id}/cancel",
+            json={"workspace_id": workspace_id, "reason": "Real adapter did not stop promptly."},
+            headers=_headers(),
+        )
+        abandon_response = client.post(
+            f"/v1/model-training/training-runs/{training_run_id}/abandon",
+            json={
+                "workspace_id": workspace_id,
+                "reason": "Clear cancelling local run so the next baseline can start.",
+                "force": True,
+            },
+            headers=_headers(),
+        )
+        adapter.release()
+
+        assert cancel_response.status_code == 200
+        assert cancel_response.json()["status"] == "cancelling"
+        assert abandon_response.status_code == 200
+        assert abandon_response.json()["status"] == "abandoned"
+        assert abandon_response.json()["model_candidate_id"] is None
+        assert state.store.active_training_run(UUID(workspace_id)) is None
+    finally:
+        adapter.release()
+        app.dependency_overrides.clear()
+
+
+def test_dataset_curator_can_delete_unevidenced_active_training_run(tmp_path: Path) -> None:
+    state = _build_state(tmp_path)
+    adapter = BlockingTrainingAdapter()
+    app.dependency_overrides[get_dev_state] = lambda: state
+    app.dependency_overrides[get_bee_detector_training_workflow] = lambda: BeeDetectorTrainingWorkflow(
+        store=state.store,
+        image_loader=state.object_storage.get_object,
+        artifact_root=state.model_artifact_root,
+        adapter=adapter,
+        persistence_backend="in_memory",
+        database_purpose="dev",
+        clock=state.store.clock,
+    )
+    client = TestClient(app)
+    try:
+        workspace_id, dataset_version_id = _dataset_version_with_minimum_items(client)
+        start_response = client.post(
+            "/v1/model-training/training-runs",
+            json={
+                "workspace_id": workspace_id,
+                "dataset_version_id": dataset_version_id,
+                "acknowledge_high_severity_warnings": True,
+            },
+            headers=_headers(),
+        )
+        training_run_id = start_response.json()["training_run_id"]
+        adapter.started.wait(timeout=2)
+
+        delete_response = client.request(
+            "DELETE",
+            f"/v1/model-training/training-runs/{training_run_id}",
+            json={
+                "workspace_id": workspace_id,
+                "reason": "Delete orphaned local run before any candidate exists.",
+                "confirm_no_candidate_or_required_artifacts": True,
+            },
+            headers=_headers(),
+        )
+        adapter.release()
+        detail = client.get(
+            f"/v1/model-training/training-runs/{training_run_id}?workspace_id={workspace_id}",
+            headers=_headers(),
+        )
+
+        assert delete_response.status_code == 200
+        assert delete_response.json()["deleted"] is True
+        assert detail.status_code == 404
+        assert state.store.active_training_run(UUID(workspace_id)) is None
+    finally:
+        adapter.release()
+        app.dependency_overrides.clear()
+
+
+class UnavailableRealTrainingAdapter:
+    adapter_type = "ultralytics_yolo_obb"
+
+    def check_available(self) -> bool:
+        return False
+
+    def run_training(self, **kwargs) -> TrainingAdapterResult:
+        raise AssertionError("Unavailable adapter should not be asked to run training.")
+
+
+class BlockingTrainingAdapter:
+    adapter_type = "fake"
+
+    def __init__(self) -> None:
+        self.started = threading.Event()
+        self._released = threading.Event()
+
+    def check_available(self) -> bool:
+        return True
+
+    def release(self) -> None:
+        self._released.set()
+
+    def run_training(
+        self,
+        *,
+        training_run,
+        run_dir: Path,
+        dataset_package_dir: Path,
+    ) -> TrainingAdapterResult:
+        _ = dataset_package_dir
+        self.started.set()
+        self._released.wait(timeout=5)
+        weights_path = run_dir / "weights" / "best.pt"
+        weights_path.parent.mkdir(parents=True, exist_ok=True)
+        weights_path.write_text("blocking fake weights\n", encoding="utf-8")
+        log_path = run_dir / "training.log"
+        log_path.write_text("Blocking fake adapter released.\n", encoding="utf-8")
+        return TrainingAdapterResult(
+            metrics={"metric_scope": "blocking_fake"},
+            model_artifact_path=weights_path,
+            log_path=log_path,
+            base_weights_source="blocking_fake_generated",
+        )
+
+
+class MutableClock:
+    def __init__(self, value: datetime) -> None:
+        self.value = value
+
+    def __call__(self) -> datetime:
+        return self.value
+
+    def advance(self, *, seconds: int) -> None:
+        self.value = self.value.replace() + timedelta(seconds=seconds)
+
+
+def _build_state(tmp_path: Path, clock=None):
     return build_dev_state(
         id_values=[UUID(f"00000000-0000-0000-0000-000000015{i:03d}") for i in range(1, 240)],
-        clock=lambda: datetime(2026, 7, 31, 12, 0, tzinfo=UTC),
+        clock=clock or (lambda: datetime(2026, 7, 31, 12, 0, tzinfo=UTC)),
         dataset_export_root=tmp_path / "exports",
         model_artifact_root=tmp_path / "model-runs",
     )
+
+
+def _dataset_version_with_minimum_items(client: TestClient) -> tuple[str, str]:
+    workspace_id = _workspace(client)
+    _create_reviewed_crop_item(client, workspace_id, "training", 10, 10)
+    _create_reviewed_crop_item(client, workspace_id, "validation", 260, 10)
+    response = client.post(
+        "/v1/model-training/dataset-versions",
+        json={"workspace_id": workspace_id},
+        headers=_headers(),
+    )
+    assert response.status_code == 201
+    return workspace_id, response.json()["dataset_version_id"]
 
 
 def _workspace(client: TestClient) -> str:
@@ -255,6 +619,25 @@ def _create_reviewed_crop_item(
 
 def _headers() -> dict[str, str]:
     return {"x-hivesight-dev-user-id": str(CURATOR_ID)}
+
+
+def _wait_for_training_run_status(
+    client: TestClient,
+    workspace_id: str,
+    training_run_id: str,
+    expected_status: str,
+) -> dict:
+    for _ in range(50):
+        response = client.get(
+            f"/v1/model-training/training-runs/{training_run_id}?workspace_id={workspace_id}",
+            headers=_headers(),
+        )
+        assert response.status_code == 200
+        body = response.json()
+        if body["status"] == expected_status:
+            return body
+        time.sleep(0.02)
+    raise AssertionError(f"Training Run did not reach {expected_status}.")
 
 
 def _source_png() -> bytes:

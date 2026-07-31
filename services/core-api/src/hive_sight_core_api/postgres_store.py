@@ -180,6 +180,10 @@ class PostgresProductDataStore(InMemoryProductDataStore):
         self._persist_model("training_run", response.training_run_id, response)
         return response
 
+    def delete_training_run(self, training_run_id: UUID) -> None:
+        super().delete_training_run(training_run_id)
+        self._delete_record("training_run", training_run_id)
+
     def save_model_candidate(self, model_candidate: ModelCandidateResponse):
         response = super().save_model_candidate(model_candidate)
         self._persist_model("model_candidate", response.model_candidate_id, response)

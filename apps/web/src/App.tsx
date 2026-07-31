@@ -31,6 +31,8 @@ import {
 } from "react";
 import {
   acceptWorkspaceDataUseAgreement,
+  abandonTrainingRun,
+  cancelTrainingRun,
   createTrainingCrop,
   createTrainingCropEllipse,
   createApiary,
@@ -42,6 +44,7 @@ import {
   createDatasetVersion,
   createYoloObbExport,
   createReviewDecision,
+  deleteTrainingRun,
   deleteTrainingCropEllipse,
   fetchAnalysisEvidence,
   fetchApiaries,
@@ -55,6 +58,7 @@ import {
   fetchInspectionPhotos,
   fetchInspectionPhotoObjectUrl,
   fetchModelTrainingReadiness,
+  fetchTrainingRuns,
   fetchTrainingCropEvidence,
   fetchTrainingCropsForPhoto,
   processAnalysisRun,
@@ -1156,6 +1160,51 @@ function formatMetric(value: unknown) {
   return typeof value === "number" ? value.toFixed(2) : "n/a";
 }
 
+function formatDatasetRoleLabel(role: DatasetRole | null) {
+  if (role === "training") return "Training";
+  if (role === "validation") return "Validation";
+  if (role === "benchmark") return "Benchmark";
+  if (role === "excluded") return "Excluded";
+  return "Unassigned";
+}
+
+function formatDateTime(value: string | null) {
+  return value ? new Date(value).toLocaleString() : "n/a";
+}
+
+function formatElapsedTime(startedAt: string | null, completedAt: string | null, tick: number) {
+  if (!startedAt) {
+    return "n/a";
+  }
+  void tick;
+  const start = new Date(startedAt).getTime();
+  const end = completedAt ? new Date(completedAt).getTime() : Date.now();
+  const totalSeconds = Math.max(0, Math.floor((end - start) / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}m ${seconds.toString().padStart(2, "0")}s`;
+}
+
+function isActiveTrainingRun(run: TrainingRun) {
+  return run.status === "queued" || run.status === "running" || run.status === "cancelling";
+}
+
+function trainingRunCanBeDeleted(run: TrainingRun) {
+  return (
+    run.modelCandidateId === null &&
+    run.artifactIds.length === 0 &&
+    ["queued", "running", "cancelling", "cancelled", "abandoned"].includes(run.status)
+  );
+}
+
+function trainingRunCanBeAbandoned(run: TrainingRun) {
+  return isActiveTrainingRun(run) && (run.isStale || run.status === "cancelling");
+}
+
+function formatProgressPercent(value: number | null) {
+  return value === null ? "n/a" : `${Math.round(value)}%`;
+}
+
 function formatFrameStandardDimension(value: number | null): string {
   return value === null ? "Unknown" : `${value} mm`;
 }
@@ -1446,12 +1495,27 @@ function TrainingCropAnnotationPanel({
     useState<ModelTrainingReadiness | null>(null);
   const [datasetVersion, setDatasetVersion] = useState<DatasetVersion | null>(null);
   const [trainingRun, setTrainingRun] = useState<TrainingRun | null>(null);
+  const [trainingRuns, setTrainingRuns] = useState<TrainingRun[]>([]);
+  const [trainingRunsLastCheckedAt, setTrainingRunsLastCheckedAt] = useState<string | null>(null);
+  const [trainingRunPollError, setTrainingRunPollError] = useState<string | null>(null);
+  const [trainingRunClockTick, setTrainingRunClockTick] = useState(0);
   const [acknowledgeModelWarnings, setAcknowledgeModelWarnings] = useState(false);
   const [workingLabel, setWorkingLabel] = useState<string | null>(null);
   const [cropZoom, setCropZoom] = useState(1);
+  const hasActiveTrainingRun = trainingRuns.some(isActiveTrainingRun);
+  const shouldPollTrainingRuns =
+    hasActiveTrainingRun || workingLabel === "Starting Bee Detector training";
+  const canStartModelTraining =
+    Boolean(datasetVersion) &&
+    (modelTrainingReadiness?.eligibleToStartTraining ?? true) &&
+    !Boolean(workingLabel);
 
   const selectedPhoto = photos.find((photo) => photo.inspectionPhotoId === selectedPhotoId) ?? null;
   const selectedCrop = evidence?.trainingCrop ?? crops.find((crop) => crop.trainingCropId === selectedCropId) ?? null;
+  const selectedCropDatasetRole = trainingCropDatasetItem?.datasetRole ?? selectedCrop?.datasetRole ?? null;
+  const selectedCropDatasetItemId =
+    trainingCropDatasetItem?.datasetItemId ?? selectedCrop?.datasetItemId ?? null;
+  const selectedCropIsAssigned = Boolean(selectedCropDatasetItemId);
   const selectedEllipse =
     evidence?.beeEllipses.find((ellipse) => ellipse.annotationId === selectedEllipseId) ?? null;
   const cropLocked =
@@ -1550,6 +1614,23 @@ function TrainingCropAnnotationPanel({
     setCropZoom(1);
     void refreshEvidence(selectedCropId);
   }, [selectedCropId]);
+
+  useEffect(() => {
+    refreshTrainingRuns().catch((error) => onError(toApiError(error)));
+  }, [workspaceId]);
+
+  useEffect(() => {
+    if (!shouldPollTrainingRuns) {
+      return;
+    }
+    const interval = window.setInterval(() => {
+      setTrainingRunClockTick((current) => current + 1);
+      refreshTrainingRuns().catch((error) => {
+        setTrainingRunPollError(toApiError(error).message);
+      });
+    }, 3000);
+    return () => window.clearInterval(interval);
+  }, [shouldPollTrainingRuns, workspaceId]);
 
   async function runCropAction(label: string, action: () => Promise<void>) {
     setWorkingLabel(label);
@@ -1761,6 +1842,8 @@ function TrainingCropAnnotationPanel({
         exclusionReason: datasetRole === "excluded" ? datasetExclusionReason : null
       });
       setTrainingCropDatasetItem(datasetItem);
+      await refreshEvidence(selectedCrop.trainingCropId);
+      if (selectedPhoto) await refreshCropsForPhoto(selectedPhoto.inspectionPhotoId);
     });
   }
 
@@ -1782,6 +1865,20 @@ function TrainingCropAnnotationPanel({
     await runCropAction("Checking model training readiness", async () => {
       const readiness = await fetchModelTrainingReadiness({ devUserId, workspaceId });
       setModelTrainingReadiness(readiness);
+      await refreshTrainingRuns();
+    });
+  }
+
+  async function refreshTrainingRuns() {
+    const listing = await fetchTrainingRuns({ devUserId, workspaceId });
+    setTrainingRuns(listing.trainingRuns);
+    setTrainingRunsLastCheckedAt(new Date().toISOString());
+    setTrainingRunPollError(null);
+    setTrainingRun((current) => {
+      const refreshedCurrent = current
+        ? listing.trainingRuns.find((run) => run.trainingRunId === current.trainingRunId)
+        : null;
+      return refreshedCurrent ?? listing.trainingRuns.at(0) ?? null;
     });
   }
 
@@ -1792,6 +1889,7 @@ function TrainingCropAnnotationPanel({
       setTrainingRun(null);
       const readiness = await fetchModelTrainingReadiness({ devUserId, workspaceId });
       setModelTrainingReadiness(readiness);
+      await refreshTrainingRuns();
     });
   }
 
@@ -1809,6 +1907,65 @@ function TrainingCropAnnotationPanel({
       setTrainingRun(nextTrainingRun);
       const readiness = await fetchModelTrainingReadiness({ devUserId, workspaceId });
       setModelTrainingReadiness(readiness);
+      await refreshTrainingRuns();
+    });
+  }
+
+  async function cancelSelectedTrainingRun() {
+    if (!trainingRun) {
+      return;
+    }
+    await runCropAction("Cancelling Bee Detector training", async () => {
+      const cancelled = await cancelTrainingRun({
+        devUserId,
+        workspaceId,
+        trainingRunId: trainingRun.trainingRunId,
+        reason: "Cancelled from local training UI."
+      });
+      setTrainingRun(cancelled);
+      const readiness = await fetchModelTrainingReadiness({ devUserId, workspaceId });
+      setModelTrainingReadiness(readiness);
+      await refreshTrainingRuns();
+    });
+  }
+
+  async function abandonSelectedTrainingRun() {
+    if (!trainingRun) {
+      return;
+    }
+    await runCropAction("Abandoning stale Bee Detector training", async () => {
+      const abandoned = await abandonTrainingRun({
+        devUserId,
+        workspaceId,
+        trainingRunId: trainingRun.trainingRunId,
+        reason:
+          trainingRun.status === "cancelling"
+            ? "Marked abandoned from local training UI after cancellation did not stop promptly."
+            : "Marked abandoned from local training UI after stale heartbeat.",
+        force: trainingRun.status === "cancelling"
+      });
+      setTrainingRun(abandoned);
+      const readiness = await fetchModelTrainingReadiness({ devUserId, workspaceId });
+      setModelTrainingReadiness(readiness);
+      await refreshTrainingRuns();
+    });
+  }
+
+  async function deleteSelectedTrainingRun() {
+    if (!trainingRun) {
+      return;
+    }
+    await runCropAction("Deleting unevidenced Bee Detector training run", async () => {
+      await deleteTrainingRun({
+        devUserId,
+        workspaceId,
+        trainingRunId: trainingRun.trainingRunId,
+        reason: "Deleted unevidenced local training run from UI."
+      });
+      setTrainingRun(null);
+      const readiness = await fetchModelTrainingReadiness({ devUserId, workspaceId });
+      setModelTrainingReadiness(readiness);
+      await refreshTrainingRuns();
     });
   }
 
@@ -1920,7 +2077,8 @@ function TrainingCropAnnotationPanel({
                     onClick={() => setSelectedCropId(crop.trainingCropId)}
                     data-testid="training-crop-list-item"
                   >
-                    Crop {index + 1} / {crop.reviewStatus} / {crop.visibleBeeStatus}
+                    Crop {index + 1} / {crop.reviewStatus} / {crop.visibleBeeStatus} /{" "}
+                    {formatDatasetRoleLabel(crop.datasetRole)}
                   </button>
                 </li>
               ))}
@@ -2272,6 +2430,7 @@ function TrainingCropAnnotationPanel({
               <div className="result-grid crop-metrics" data-testid="training-crop-metrics">
                 <Metric label="Review" value={selectedCrop.reviewStatus} />
                 <Metric label="Visible bees" value={selectedCrop.visibleBeeStatus} />
+                <Metric label="Dataset role" value={formatDatasetRoleLabel(selectedCropDatasetRole)} />
                 <Metric label="Ellipses" value={evidence?.beeEllipses.length ?? 0} />
                 <Metric label="Coordinates" value="source px" />
               </div>
@@ -2352,7 +2511,7 @@ function TrainingCropAnnotationPanel({
                   <select
                     value={datasetRole}
                     onChange={(event) => setDatasetRole(event.target.value as DatasetRole)}
-                    disabled={Boolean(trainingCropDatasetItem) || Boolean(workingLabel)}
+                    disabled={selectedCropIsAssigned || Boolean(workingLabel)}
                     data-testid="training-crop-dataset-role-select"
                   >
                     <option value="training">Training</option>
@@ -2367,7 +2526,7 @@ function TrainingCropAnnotationPanel({
                     value={datasetAssignmentNote}
                     maxLength={500}
                     onChange={(event) => setDatasetAssignmentNote(event.target.value)}
-                    disabled={Boolean(trainingCropDatasetItem) || Boolean(workingLabel)}
+                    disabled={selectedCropIsAssigned || Boolean(workingLabel)}
                     data-testid="training-crop-dataset-assignment-note-input"
                   />
                 </label>
@@ -2378,7 +2537,7 @@ function TrainingCropAnnotationPanel({
                       value={datasetSourceGroupKey}
                       maxLength={100}
                       onChange={(event) => setDatasetSourceGroupKey(event.target.value)}
-                      disabled={Boolean(trainingCropDatasetItem) || Boolean(workingLabel)}
+                      disabled={selectedCropIsAssigned || Boolean(workingLabel)}
                       data-testid="training-crop-dataset-source-group-key-input"
                     />
                   </label>
@@ -2391,7 +2550,7 @@ function TrainingCropAnnotationPanel({
                       onChange={(event) =>
                         setDatasetExclusionReason(event.target.value as DatasetExclusionReason)
                       }
-                      disabled={Boolean(trainingCropDatasetItem) || Boolean(workingLabel)}
+                      disabled={selectedCropIsAssigned || Boolean(workingLabel)}
                       data-testid="training-crop-dataset-exclusion-reason-select"
                     >
                       <option value="poor_image_quality">Poor image quality</option>
@@ -2410,7 +2569,7 @@ function TrainingCropAnnotationPanel({
                   type="button"
                   disabled={
                     !selectedCrop ||
-                    Boolean(trainingCropDatasetItem) ||
+                    selectedCropIsAssigned ||
                     Boolean(workingLabel) ||
                     selectedCrop.reviewStatus === "review_pending" ||
                     (datasetRole === "benchmark" && datasetSourceGroupKey.trim().length === 0)
@@ -2440,8 +2599,12 @@ function TrainingCropAnnotationPanel({
                   Export package
                 </button>
                 <div className="review-state" data-testid="training-crop-dataset-item-state">
-                  {trainingCropDatasetItem
-                    ? `Dataset item: ${trainingCropDatasetItem.datasetRole} / ${trainingCropDatasetItem.reviewedEllipseSnapshots.length} ellipse snapshots`
+                  {selectedCropDatasetRole
+                    ? `Dataset item: ${formatDatasetRoleLabel(selectedCropDatasetRole)}${
+                        trainingCropDatasetItem
+                          ? ` / ${trainingCropDatasetItem.reviewedEllipseSnapshots.length} ellipse snapshots`
+                          : ""
+                      }`
                     : selectedCrop.reviewStatus === "review_pending"
                       ? "Complete or exclude the Training Crop before assigning a Dataset Item."
                       : "Ready for Dataset Item assignment."}
@@ -2502,7 +2665,7 @@ function TrainingCropAnnotationPanel({
                     </button>
                     <button
                       type="button"
-                      disabled={!datasetVersion || Boolean(workingLabel)}
+                      disabled={!canStartModelTraining}
                       onClick={() => void startBeeDetectorTrainingRun()}
                       data-testid="start-model-training-run-button"
                     >
@@ -2537,6 +2700,11 @@ function TrainingCropAnnotationPanel({
                           {warning.severity}: {warning.code}
                         </span>
                       ))}
+                      {!modelTrainingReadiness.eligibleToStartTraining ? (
+                        <p data-testid="model-training-blocker">
+                          Training cannot start until readiness blockers are resolved.
+                        </p>
+                      ) : null}
                     </div>
                   ) : null}
                   {datasetVersion ? (
@@ -2553,11 +2721,140 @@ function TrainingCropAnnotationPanel({
                     <div className="export-summary" data-testid="model-training-run-summary">
                       <strong>{trainingRun.humanReadableId}</strong>
                       <span>{trainingRun.status}</span>
+                      <span>Phase {trainingRun.phase}</span>
+                      <span>Progress {formatProgressPercent(trainingRun.progressPercent)}</span>
                       <span>{trainingRun.adapterType}</span>
                       <span>Candidate {trainingRun.modelCandidateId ?? "not created"}</span>
+                      <span>Started {formatDateTime(trainingRun.startedAt)}</span>
+                      <span>Last heartbeat {formatDateTime(trainingRun.lastHeartbeatAt)}</span>
+                      <span>
+                        Elapsed{" "}
+                        {formatElapsedTime(
+                          trainingRun.startedAt,
+                          trainingRun.completedAt,
+                          trainingRunClockTick
+                        )}
+                      </span>
                       <span>Precision {formatMetric(trainingRun.metricsSummary.precision)}</span>
                       <span>Recall {formatMetric(trainingRun.metricsSummary.recall)}</span>
+                      {trainingRun.lastActivityMessage ? (
+                        <p data-testid="model-training-activity">
+                          Activity: {trainingRun.lastActivityMessage}
+                        </p>
+                      ) : null}
+                      {isActiveTrainingRun(trainingRun) ? (
+                        <p data-testid="model-training-active-status">
+                          Training is active. Polling the Core API every 3 seconds for updates.
+                        </p>
+                      ) : null}
+                      {trainingRun.isStale ? (
+                        <p className="analysis-caveat failed" data-testid="model-training-stale">
+                          No heartbeat within {trainingRun.staleAfterSeconds ?? "the configured"}{" "}
+                          seconds. This run may be orphaned.
+                        </p>
+                      ) : null}
+                      {trainingRun.status === "failed" ? (
+                        <p className="analysis-caveat failed" data-testid="model-training-failure">
+                          {trainingRun.failureCode ?? "training_failed"}:{" "}
+                          {trainingRun.failureMessage ?? "Training failed before a model candidate was created."}
+                        </p>
+                      ) : null}
+                      {trainingRun.cancelReason ? (
+                        <p data-testid="model-training-cancel-reason">
+                          Cancel reason: {trainingRun.cancelReason}
+                        </p>
+                      ) : null}
+                      {trainingRun.abandonReason ? (
+                        <p data-testid="model-training-abandon-reason">
+                          Abandon reason: {trainingRun.abandonReason}
+                        </p>
+                      ) : null}
+                      {trainingRun.latestLogExcerpt ? (
+                        <pre className="training-log-excerpt" data-testid="model-training-log-excerpt">
+                          {trainingRun.latestLogExcerpt}
+                        </pre>
+                      ) : null}
+                      <div className="button-row">
+                        <button
+                          type="button"
+                          disabled={!isActiveTrainingRun(trainingRun) || Boolean(workingLabel)}
+                          onClick={() => void cancelSelectedTrainingRun()}
+                          data-testid="cancel-model-training-run-button"
+                        >
+                          <CircleAlert size={18} />
+                          Cancel run
+                        </button>
+                        <button
+                          type="button"
+                          disabled={
+                            !trainingRunCanBeAbandoned(trainingRun) || Boolean(workingLabel)
+                          }
+                          onClick={() => void abandonSelectedTrainingRun()}
+                          data-testid="abandon-model-training-run-button"
+                        >
+                          <RotateCcw size={18} />
+                          {trainingRun.status === "cancelling"
+                            ? "Abandon cancelling run"
+                            : "Abandon stale run"}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={!trainingRunCanBeDeleted(trainingRun) || Boolean(workingLabel)}
+                          onClick={() => void deleteSelectedTrainingRun()}
+                          data-testid="delete-model-training-run-button"
+                        >
+                          <Trash2 size={18} />
+                          Delete run
+                        </button>
+                      </div>
                       <p>Baseline only; not user-facing.</p>
+                    </div>
+                  ) : null}
+                  {trainingRuns.length > 0 ? (
+                    <div className="export-summary" data-testid="model-training-run-list">
+                      <strong>Training runs</strong>
+                      {trainingRunsLastCheckedAt ? (
+                        <span data-testid="model-training-runs-last-checked">
+                          Last checked {formatDateTime(trainingRunsLastCheckedAt)}
+                        </span>
+                      ) : null}
+                      {hasActiveTrainingRun ? (
+                        <span data-testid="model-training-runs-polling">Auto-refreshing</span>
+                      ) : null}
+                      {trainingRunPollError ? (
+                        <p className="analysis-caveat failed" data-testid="model-training-poll-error">
+                          Could not refresh Training Runs: {trainingRunPollError}
+                        </p>
+                      ) : null}
+                      {trainingRuns.map((run) => (
+                        <div
+                          className="training-run-row"
+                          data-testid="model-training-run-list-item"
+                          key={run.trainingRunId}
+                        >
+                          <span>{run.humanReadableId}</span>
+                          <span>{run.status}</span>
+                          <span>Phase {run.phase}</span>
+                          <span>Progress {formatProgressPercent(run.progressPercent)}</span>
+                          <span>{run.adapterType}</span>
+                          <span>Dataset {run.datasetVersionId.slice(0, 8)}</span>
+                          <span>Candidate {run.modelCandidateId ?? "not created"}</span>
+                          <span>Started {formatDateTime(run.startedAt)}</span>
+                          <span>Heartbeat {formatDateTime(run.lastHeartbeatAt)}</span>
+                          <span>
+                            Elapsed{" "}
+                            {formatElapsedTime(run.startedAt, run.completedAt, trainingRunClockTick)}
+                          </span>
+                          {run.lastActivityMessage ? <span>{run.lastActivityMessage}</span> : null}
+                          {run.isStale ? <span>stale</span> : null}
+                          {run.failureCode || run.failureMessage ? (
+                            <span>
+                              {run.failureCode ?? "training_failed"}:{" "}
+                              {run.failureMessage ?? "No failure message recorded."}
+                            </span>
+                          ) : null}
+                        </div>
+                      ))}
                     </div>
                   ) : null}
                 </div>

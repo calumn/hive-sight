@@ -75,6 +75,10 @@ from hive_sight_core_api.models import (
     TrainingCropListResponse,
     TrainingCropResponse,
     TrainingCropUpdateRequest,
+    TrainingRunAbandonRequest,
+    TrainingRunCancelRequest,
+    TrainingRunDeleteRequest,
+    TrainingRunDeleteResponse,
     TrainingRunListResponse,
     TrainingRunResponse,
     TrainingRunStartRequest,
@@ -669,6 +673,57 @@ def get_model_training_run(
         user=user,
         workspace_id=workspace_id,
         training_run_id=training_run_id,
+    )
+
+
+@app.post(
+    "/v1/model-training/training-runs/{training_run_id}/cancel",
+    response_model=TrainingRunResponse,
+)
+def cancel_model_training_run(
+    training_run_id: UUID,
+    request: TrainingRunCancelRequest,
+    user: AuthenticatedUserDep,
+    workflow: BeeDetectorTrainingWorkflowDep,
+) -> TrainingRunResponse:
+    return workflow.cancel_training_run(
+        user=user,
+        training_run_id=training_run_id,
+        request=request,
+    )
+
+
+@app.post(
+    "/v1/model-training/training-runs/{training_run_id}/abandon",
+    response_model=TrainingRunResponse,
+)
+def abandon_model_training_run(
+    training_run_id: UUID,
+    request: TrainingRunAbandonRequest,
+    user: AuthenticatedUserDep,
+    workflow: BeeDetectorTrainingWorkflowDep,
+) -> TrainingRunResponse:
+    return workflow.abandon_training_run(
+        user=user,
+        training_run_id=training_run_id,
+        request=request,
+    )
+
+
+@app.delete(
+    "/v1/model-training/training-runs/{training_run_id}",
+    response_model=TrainingRunDeleteResponse,
+)
+def delete_model_training_run(
+    training_run_id: UUID,
+    request: TrainingRunDeleteRequest,
+    user: AuthenticatedUserDep,
+    workflow: BeeDetectorTrainingWorkflowDep,
+) -> TrainingRunDeleteResponse:
+    return workflow.delete_training_run(
+        user=user,
+        training_run_id=training_run_id,
+        request=request,
     )
 
 

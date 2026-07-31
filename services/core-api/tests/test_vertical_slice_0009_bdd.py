@@ -175,7 +175,8 @@ def core_api_shows_completed_training_crop_evidence(slice_context: SliceContext)
 @then("the Training Crop evidence is not assigned to dataset use")
 def training_crop_evidence_not_assigned_to_dataset_use(slice_context: SliceContext) -> None:
     assert slice_context.response_body is not None
-    assert "dataset_role" not in slice_context.response_body["training_crop"]
+    assert slice_context.response_body["training_crop"]["dataset_role"] is None
+    assert slice_context.response_body["training_crop"]["dataset_item_id"] is None
     assert "Dataset use is assigned later" in str(slice_context.response_body["caveat"])
 
 

@@ -15,6 +15,8 @@ class Settings:
     database_purpose: str
     yolo_base_weights: str
     yolo_device: str
+    training_run_stale_after_seconds: int
+    training_run_heartbeat_interval_seconds: int
     object_storage_root: str = "var/object-storage"
     persistence_backend: str = "in_memory"
 
@@ -43,6 +45,12 @@ def load_settings() -> Settings:
         database_purpose=os.getenv("HIVESIGHT_DATABASE_PURPOSE", "dev"),
         yolo_base_weights=os.getenv("HIVESIGHT_YOLO_BASE_WEIGHTS", "yolo11n-obb.pt"),
         yolo_device=os.getenv("HIVESIGHT_YOLO_DEVICE", "cpu"),
+        training_run_stale_after_seconds=int(
+            os.getenv("HIVESIGHT_TRAINING_RUN_STALE_AFTER_SECONDS", "300")
+        ),
+        training_run_heartbeat_interval_seconds=int(
+            os.getenv("HIVESIGHT_TRAINING_RUN_HEARTBEAT_INTERVAL_SECONDS", "5")
+        ),
     )
 
 

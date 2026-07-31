@@ -434,6 +434,78 @@ def test_excluded_crop_records_reason_and_is_locked() -> None:
         app.dependency_overrides.clear()
 
 
+def test_training_crop_listing_includes_dataset_assignment_role() -> None:
+    state = build_dev_state(
+        id_values=[
+            UUID("00000000-0000-0000-0000-000000009081"),
+            UUID("00000000-0000-0000-0000-000000009082"),
+            UUID("00000000-0000-0000-0000-000000009083"),
+            UUID("00000000-0000-0000-0000-000000009084"),
+            UUID("00000000-0000-0000-0000-000000009085"),
+            UUID("00000000-0000-0000-0000-000000009086"),
+            UUID("00000000-0000-0000-0000-000000009087"),
+            UUID("00000000-0000-0000-0000-000000009088"),
+            UUID("00000000-0000-0000-0000-000000009089"),
+            UUID("00000000-0000-0000-0000-000000009090"),
+        ],
+        clock=lambda: datetime(2026, 7, 30, 9, 30, tzinfo=UTC),
+    )
+    app.dependency_overrides[get_dev_state] = lambda: state
+    client = TestClient(app)
+
+    try:
+        workspace_id, inspection_photo_id = _upload_photo(client, "training_data_collection")
+        training_crop = _create_completed_crop(
+            client,
+            workspace_id,
+            inspection_photo_id,
+            crop_x=100,
+        )
+        validation_crop = _create_completed_crop(
+            client,
+            workspace_id,
+            inspection_photo_id,
+            crop_x=760,
+        )
+
+        training_item = _assign_training_crop_to_dataset(
+            client,
+            workspace_id,
+            training_crop["training_crop_id"],
+            "training",
+        )
+        validation_item = _assign_training_crop_to_dataset(
+            client,
+            workspace_id,
+            validation_crop["training_crop_id"],
+            "validation",
+        )
+        listing = client.get(
+            f"/v1/inspection-photos/{inspection_photo_id}/training-crops"
+            f"?workspace_id={workspace_id}",
+            headers={"x-hivesight-dev-user-id": str(USER_ID)},
+        )
+        evidence = client.get(
+            f"/v1/training-crops/{validation_crop['training_crop_id']}/evidence"
+            f"?workspace_id={workspace_id}",
+            headers={"x-hivesight-dev-user-id": str(USER_ID)},
+        )
+
+        assert training_item.status_code == 201
+        assert validation_item.status_code == 201
+        assert listing.status_code == 200
+        crops = listing.json()["training_crops"]
+        assert [crop["dataset_role"] for crop in crops] == ["training", "validation"]
+        assert [crop["dataset_item_id"] for crop in crops] == [
+            training_item.json()["dataset_item_id"],
+            validation_item.json()["dataset_item_id"],
+        ]
+        assert evidence.status_code == 200
+        assert evidence.json()["training_crop"]["dataset_role"] == "validation"
+    finally:
+        app.dependency_overrides.clear()
+
+
 def _upload_photo(client: TestClient, intent: str) -> tuple[str, str]:
     workspace_id = client.get(
         "/v1/dev/session",
@@ -497,6 +569,44 @@ def _create_crop(
             "crop_height": crop_height,
             "source_image_width_px": 1600,
             "source_image_height_px": 1200,
+        },
+        headers={"x-hivesight-dev-user-id": str(USER_ID)},
+    )
+
+
+def _create_completed_crop(
+    client: TestClient,
+    workspace_id: str,
+    inspection_photo_id: str,
+    crop_x: int,
+) -> dict:
+    crop = _create_crop(client, workspace_id, inspection_photo_id, crop_x=crop_x).json()
+    _create_ellipse(client, workspace_id, crop["training_crop_id"], center_x=crop_x + 200)
+    completed = client.patch(
+        f"/v1/training-crops/{crop['training_crop_id']}",
+        json={
+            "workspace_id": workspace_id,
+            "visible_bee_status": "has_visible_bees",
+            "review_status": "review_complete",
+        },
+        headers={"x-hivesight-dev-user-id": str(USER_ID)},
+    )
+    assert completed.status_code == 200
+    return completed.json()
+
+
+def _assign_training_crop_to_dataset(
+    client: TestClient,
+    workspace_id: str,
+    training_crop_id: str,
+    dataset_role: str,
+) -> object:
+    return client.post(
+        f"/v1/training-crops/{training_crop_id}/dataset-item",
+        json={
+            "workspace_id": workspace_id,
+            "dataset_role": dataset_role,
+            "assignment_note": f"Accepted as {dataset_role} crop.",
         },
         headers={"x-hivesight-dev-user-id": str(USER_ID)},
     )

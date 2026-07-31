@@ -179,6 +179,8 @@ def get_bee_detector_training_workflow(state: DevStateDep) -> BeeDetectorTrainin
         persistence_backend=settings.persistence_backend,
         database_purpose=settings.database_purpose,
         clock=state.store.clock,
+        stale_after_seconds=settings.training_run_stale_after_seconds,
+        heartbeat_interval_seconds=settings.training_run_heartbeat_interval_seconds,
     )
 
 

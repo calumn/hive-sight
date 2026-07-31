@@ -47,7 +47,7 @@ test("Dataset Curator creates a physical YOLO OBB package from a completed Train
   await page.getByTestId("assign-training-crop-dataset-role-button").click();
 
   await expect(page.getByTestId("training-crop-dataset-item-state")).toContainText(
-    "Dataset item: training"
+    "Dataset item: Training"
   );
 
   await page.getByTestId("create-physical-yolo-obb-export-button").click();

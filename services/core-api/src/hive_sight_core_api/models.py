@@ -718,6 +718,29 @@ class TrainingRunStartRequest(BaseModel):
     acknowledge_high_severity_warnings: bool = False
 
 
+class TrainingRunCancelRequest(BaseModel):
+    workspace_id: UUID
+    reason: str | None = Field(default=None, max_length=500)
+
+
+class TrainingRunAbandonRequest(BaseModel):
+    workspace_id: UUID
+    reason: str = Field(min_length=1, max_length=500)
+    force: bool = False
+
+
+class TrainingRunDeleteRequest(BaseModel):
+    workspace_id: UUID
+    reason: str = Field(min_length=1, max_length=500)
+    confirm_no_candidate_or_required_artifacts: bool = False
+
+
+class TrainingRunDeleteResponse(BaseModel):
+    training_run_id: UUID
+    deleted: bool
+    message: str
+
+
 class TrainingRunResponse(BaseModel):
     training_run_id: UUID
     workspace_id: UUID
@@ -740,6 +763,20 @@ class TrainingRunResponse(BaseModel):
     warning_acknowledgement: dict[str, object] | None = None
     started_at: datetime | None = None
     completed_at: datetime | None = None
+    last_heartbeat_at: datetime | None = None
+    last_activity_message: str | None = None
+    progress_percent: float | None = None
+    current_epoch: int | None = None
+    total_epochs: int | None = None
+    latest_log_excerpt: str | None = None
+    cancel_requested_at: datetime | None = None
+    cancel_requested_by_user_id: UUID | None = None
+    cancel_reason: str | None = None
+    abandoned_at: datetime | None = None
+    abandoned_by_user_id: UUID | None = None
+    abandon_reason: str | None = None
+    is_stale: bool = False
+    stale_after_seconds: int | None = None
     failure_code: str | None = None
     failure_message: str | None = None
     artifact_ids: list[UUID]
@@ -820,6 +857,8 @@ class TrainingCropResponse(BaseModel):
     review_status: TrainingCropReviewStatus
     visible_bee_status: VisibleBeeStatus
     exclusion_reason: TrainingCropExclusionReason | None = None
+    dataset_item_id: UUID | None = None
+    dataset_role: DatasetRole | None = None
     notes: str | None = None
     created_by_user_id: UUID
     created_at: datetime

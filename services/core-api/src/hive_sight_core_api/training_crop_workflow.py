@@ -83,10 +83,13 @@ class TrainingCropWorkflow:
         )
         return TrainingCropListResponse(
             inspection_photo=photo,
-            training_crops=self.store.list_training_crops_for_photo_id(
-                workspace_id=workspace_id,
-                inspection_photo_id=inspection_photo_id,
-            ),
+            training_crops=[
+                self._with_dataset_assignment(crop)
+                for crop in self.store.list_training_crops_for_photo_id(
+                    workspace_id=workspace_id,
+                    inspection_photo_id=inspection_photo_id,
+                )
+            ],
         )
 
     def update_training_crop(
@@ -317,12 +320,23 @@ class TrainingCropWorkflow:
                 width=crop.source_image_width_px,
                 height=crop.source_image_height_px,
             ),
-            training_crop=crop,
+            training_crop=self._with_dataset_assignment(crop),
             bee_ellipses=self.store.get_ellipses_for_training_crop(training_crop_id),
             caveat=(
                 "Training Crop annotations are human-created review evidence. "
                 "Dataset use is assigned later through Bee Annotation Repository workflows."
             ),
+        )
+
+    def _with_dataset_assignment(self, crop: TrainingCropResponse) -> TrainingCropResponse:
+        dataset_item = self.store.get_dataset_item_for_training_crop(crop.training_crop_id)
+        if dataset_item is None:
+            return crop.model_copy(update={"dataset_item_id": None, "dataset_role": None})
+        return crop.model_copy(
+            update={
+                "dataset_item_id": dataset_item.dataset_item_id,
+                "dataset_role": dataset_item.dataset_role,
+            }
         )
 
     def _require_training_crop_photo(

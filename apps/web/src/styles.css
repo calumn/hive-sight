@@ -709,6 +709,29 @@ label span {
   overflow-wrap: anywhere;
 }
 
+.training-run-row {
+  align-items: center;
+  display: flex;
+  flex-basis: 100%;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.training-log-excerpt {
+  background: #162016;
+  border-radius: 6px;
+  color: #f3f6ef;
+  flex-basis: 100%;
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  margin: 0;
+  max-height: 180px;
+  overflow: auto;
+  padding: 10px;
+  white-space: pre-wrap;
+}
+
 .package-summary p {
   color: #515b4c;
   flex-basis: 100%;

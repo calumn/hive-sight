@@ -33,6 +33,7 @@ test("Dataset Curator assigns a completed Training Crop and sees a YOLO OBB expo
   await page.getByTestId("training-source-photo-preview").click({ position: { x: 180, y: 120 } });
   await page.getByTestId("save-training-crop-button").click();
   await expect(page.getByTestId("training-crop-list-item")).toHaveCount(1);
+  await expect(page.getByTestId("training-crop-list-item")).toContainText("Unassigned");
 
   await page.getByTestId("training-crop-surface").click({ position: { x: 180, y: 120 } });
   await expect(page.getByTestId("training-crop-ellipse")).toHaveCount(1);
@@ -47,8 +48,9 @@ test("Dataset Curator assigns a completed Training Crop and sees a YOLO OBB expo
   await page.getByTestId("assign-training-crop-dataset-role-button").click();
 
   await expect(page.getByTestId("training-crop-dataset-item-state")).toContainText(
-    "Dataset item: training"
+    "Dataset item: Training"
   );
+  await expect(page.getByTestId("training-crop-list-item")).toContainText("Training");
   await expect(page.getByTestId("training-crop-dataset-item-state")).toContainText(
     "1 ellipse snapshots"
   );

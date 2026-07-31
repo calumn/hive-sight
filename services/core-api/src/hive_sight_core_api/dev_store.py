@@ -1218,9 +1218,12 @@ class InMemoryProductDataStore:
 
     def active_training_run(self, workspace_id: UUID) -> TrainingRunResponse | None:
         for run in self.training_runs.values():
-            if run.workspace_id == workspace_id and run.status in {"queued", "running"}:
+            if run.workspace_id == workspace_id and run.status in {"queued", "running", "cancelling"}:
                 return run
         return None
+
+    def delete_training_run(self, training_run_id: UUID) -> None:
+        self.training_runs.pop(training_run_id, None)
 
     def save_model_candidate(
         self,
@@ -1817,12 +1820,12 @@ def _generated_file_entry(
     )
 
 
-def _dataset_yaml_text(class_map: dict[str, str]) -> str:
+def _dataset_yaml_text(class_map: dict[str, str], dataset_path: str = ".") -> str:
     names = "\n".join(
         f"  {class_id}: {class_name}" for class_id, class_name in sorted(class_map.items())
     )
     return (
-        "path: .\n"
+        f"path: {dataset_path}\n"
         "train: images/train\n"
         "val: images/val\n"
         "names:\n"
