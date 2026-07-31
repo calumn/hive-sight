@@ -363,3 +363,97 @@ Before training from full-frame regions or full frame sides, before using large 
 Suggested owner or area:
 
 Model training, dataset export, and annotation UI.
+
+## PARK-0016: Modern Candidate Annotation Review Workflow
+
+Status: parked
+Date parked: 2026-07-31
+Source: Slice 0016 grilling
+Area: dataset curation, annotation review, model governance
+
+Context:
+
+Slice 0016 hides the older Dataset Labelling Session UI from the normal Training Data Collection path because the current YOLO OBB training-data workflow uses Training Crops, Oriented Bee Ellipses, Dataset Role assignment, Dataset Versions, and Bee Detector Training Runs.
+
+The older Dataset Labelling backend and tests remain for historical/API continuity, but the product language has moved toward Candidate Annotation rather than Draft Annotation or pre-labelling.
+
+Why parked:
+
+Redesigning Dataset Labelling into a modern Candidate Annotation Review workflow would widen Slice 0016 beyond Workspace resume and Apiary/Hive selection.
+
+Revisit trigger:
+
+Before reintroducing model-proposed annotations into the normal UI, before using a trained HiveSight Bee Detector to propose Candidate Annotations, or before importing public dataset annotations for human review.
+
+Suggested owner or area:
+
+Dataset curation, annotation UI, and model governance.
+
+## PARK-0017: Inspection List And Resume For Selected Hive
+
+Status: parked
+Date parked: 2026-07-31
+Source: Slice 0016 grilling
+Area: inspection workflow, UI usability
+
+Context:
+
+Slice 0016 resumes Workspace, Apiary, Hive, and Hive Configuration context, but it does not list or resume existing Inspections for the selected Hive.
+
+Why parked:
+
+Inspection resume introduces another selection layer across inspection date, intent, photo list, and incomplete annotation/model-training work. The immediate usability goal is to stop recreating Apiary and Hive records.
+
+Revisit trigger:
+
+After Slice 0016, when repeated multi-photo Training Data Collection sessions make it painful to create or find the current Inspection.
+
+Suggested owner or area:
+
+Web UI, Core API inspection read side, and browser acceptance.
+
+## PARK-0018: Hive Setup Edit And Rename Workflow
+
+Status: parked
+Date parked: 2026-07-31
+Source: Slice 0016 grilling
+Area: hive equipment, UI usability, provenance
+
+Context:
+
+Slice 0016 keeps Hive creation and initial Hive Configuration combined, and displays existing Hive Configuration without making edit a first-class flow. It also does not support Apiary/Hive rename.
+
+Why parked:
+
+Changing Hive Configuration is domain-significant because Dataset Items snapshot Hive Configuration for provenance. Rename/edit flows introduce update endpoints, validation, audit questions, and UI states that are not needed to unblock first training-data collection.
+
+Revisit trigger:
+
+When persisted setup mistakes become annoying, before broader hive-equipment management, or before users outside the developer workflow need to maintain Apiary/Hive records.
+
+Suggested owner or area:
+
+Product workflow, hive equipment domain model, and UI usability.
+
+## PARK-0019: Unsaved Annotation Edit Warning
+
+Status: parked
+Date parked: 2026-07-31
+Source: Slice 0016 grilling
+Area: annotation UI, user experience
+
+Context:
+
+Slice 0016 clears downstream state aggressively when Apiary or Hive selection changes. Current annotation actions are mostly saved immediately through API calls, but richer local draft editing may later create unsaved work that should warn before context changes.
+
+Why parked:
+
+Defining dirty-state semantics for crop drafts, ellipse edits, pending file input, and future richer editors would widen Slice 0016 beyond context selection.
+
+Revisit trigger:
+
+Before introducing richer local-only annotation drafts, bulk editing, keyboard-heavy editing, or multi-step unsaved annotation workflows.
+
+Suggested owner or area:
+
+Annotation UI and interaction design.
