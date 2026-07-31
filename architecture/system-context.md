@@ -83,7 +83,7 @@ The frontend should not call storage or analysis services directly except throug
 
 ### Analysis Boundary
 
-The Analysis Service is private. It receives work through the queue or trusted service calls, reads source photos through controlled storage access, writes detailed analysis outputs to the Analysis Store, and records the Model Version used for each Analysis Result.
+The Analysis Service is private. It receives work through the queue or trusted service calls, reads Source Images through controlled storage access, writes detailed analysis outputs to the Analysis Store, and records the Model Version used for each Analysis Result.
 
 One Inspection Photo can have multiple analysis runs. Older runs are preserved. Re-analysis with a newer model is a deliberate action, not an automatic overwrite.
 

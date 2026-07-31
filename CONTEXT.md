@@ -58,9 +58,13 @@ _Avoid_: Training data collection when the purpose is product analysis.
 An optional label that groups photos believed to show the same frame during one inspection.
 _Avoid_: Frame record, frame inventory.
 
+**Source Image**:
+The underlying original image evidence record used by inspection, dataset, and model-governance workflows. In Slice 0014, every Source Image is an Inspection Photo source image. Later, imported, public, or bootstrap Source Images may exist outside the inspection workflow.
+_Avoid_: Inspection Photo when referring to image file evidence that may later come from non-inspection sources.
+
 **Inspection Photo**:
-An original uploaded image associated with one inspection.
-_Avoid_: Image when the original uploaded inspection evidence is meant.
+The beekeeper/product-facing role a Source Image plays when it is attached to an Inspection.
+_Avoid_: Source Image when the product workflow context of an inspection upload is meant.
 
 ### Analysis Evidence
 
@@ -147,12 +151,12 @@ A reviewed image-and-annotation unit assigned to a Dataset Role and eligible for
 _Avoid_: Photo when the dataset eligibility decision is meant.
 
 **Bee Annotation Repository**:
-The growing set of reviewed bee annotation evidence, including source photos, crop provenance, canonical oriented bee ellipses, and dataset roles.
+The growing set of reviewed bee annotation evidence, including Source Images, crop provenance, canonical oriented bee ellipses, and dataset roles.
 _Avoid_: Training set when validation, benchmark, excluded, or unassigned reviewed evidence is also included.
 
 **Training Crop**:
-A cropped region from an original inspection photo used for manageable bee annotation and curriculum training.
-_Avoid_: Photo when the dataset item is a crop derived from a larger source photo.
+A cropped region from a Source Image used for manageable bee annotation and curriculum training.
+_Avoid_: Photo when the dataset item is a crop derived from a larger Source Image.
 
 **Curriculum Stage**:
 The training-data difficulty stage for an image or crop, such as small crop, medium crop, large crop, full-frame region, or full-frame side.

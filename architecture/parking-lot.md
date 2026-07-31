@@ -171,3 +171,118 @@ Slice 0013 closeout decision: keep this after Slice 0014 unless role-specific UI
 Suggested owner or area:
 
 Web UI, Core API dev session, and test automation.
+
+## PARK-0008: Dataset Item Audit Events
+
+Status: parked
+Date parked: 2026-07-31
+Source: Slice 0013.5 domain model persistence stability grilling
+Area: model governance, persistence
+
+Context:
+
+Slice 0013.5 decided that Dataset Items are immutable after assignment and include actor, timestamp, permission snapshot, provenance snapshot, status, and supersession fields. A dedicated `dataset_item_events` or audit-event table is useful later, but not needed for the first durable repository slice.
+
+Why parked:
+
+Adding an event table now would widen Slice 0014 beyond the narrow persistence path needed before the first model baseline.
+
+Revisit trigger:
+
+Before implementing Dataset Item supersession workflow, Dataset Versions, Training Runs, benchmark governance, consent withdrawal enforcement, or any external audit/reporting requirement.
+
+Suggested owner or area:
+
+Model governance and persistence.
+
+## PARK-0009: Dataset Versions
+
+Status: parked
+Date parked: 2026-07-31
+Source: Slice 0013.5 domain model persistence stability grilling
+Area: model training, model governance
+
+Context:
+
+Slice 0014 persists Dataset Items, but not Dataset Versions. Dataset Versions become load-bearing when a Training Run or Benchmark Evaluation consumes a frozen set of Dataset Items.
+
+Why parked:
+
+Persisting Dataset Versions belongs with the YOLO OBB Training Baseline or a nearby model-training slice, not the first repository persistence slice.
+
+Revisit trigger:
+
+Before Slice 0015 training implementation creates Training Runs or Benchmark Evaluations.
+
+Suggested owner or area:
+
+Model training and model governance.
+
+## PARK-0010: Hive Component Or Box Configuration
+
+Status: parked
+Date parked: 2026-07-31
+Source: Slice 0013.5 domain model persistence stability grilling
+Area: domain model, hive equipment
+
+Context:
+
+Slice 0013.5 kept one active Hive Configuration per Hive for now, with `box_use` on Hive Configuration. A real hive may have brood boxes and supers at the same time, and future statistics may need more precise component-level equipment modelling.
+
+Why parked:
+
+Detailed Hive Component or Box modelling would widen the persistence slice into full hive equipment inventory, which the project has deliberately deferred.
+
+Revisit trigger:
+
+Before supporting inspections that mix brood and super material in the same hive workflow, frame-level calibration, detailed equipment statistics, or multi-box hive modelling.
+
+Suggested owner or area:
+
+Domain model and product requirements.
+
+## PARK-0011: Consent Withdrawal And Deletion Enforcement
+
+Status: parked
+Date parked: 2026-07-31
+Source: Slice 0013.5 domain model persistence stability grilling
+Area: privacy, model governance
+
+Context:
+
+Slice 0014 snapshots Workspace Data Use Agreement eligibility at Dataset Item assignment time, but does not automatically propagate later consent withdrawal or deletion requests into exports, Training Runs, benchmark records, or already-trained artifacts.
+
+Why parked:
+
+Withdrawal and deletion enforcement require product, policy, legal, and technical decisions. A simple database rule would be misleading.
+
+Revisit trigger:
+
+Before user-submitted data is used for model improvement beyond local/project-owned development, before hosted training/sharing/publication, or before implementing deletion/purge workflows.
+
+Suggested owner or area:
+
+Privacy, product policy, and model governance.
+
+## PARK-0012: Stricter Dataset Split Leakage Policy
+
+Status: parked
+Date parked: 2026-07-31
+Source: Slice 0013.5 domain model persistence stability grilling
+Area: model evaluation, dataset governance
+
+Context:
+
+Slice 0014 will hard-block benchmark conflicts for the same Source Image or same `source_group_key`. Same Hive, same Inspection, and training-versus-validation leakage are documented risks but not hard-blocked in the first durable schema.
+
+Why parked:
+
+The first seed dataset is small, and overly strict split rules could make early learning awkward. The benchmark protection hook is enough for the first local repository persistence slice.
+
+Revisit trigger:
+
+Before serious benchmark claims, protected benchmark reporting, model promotion, or publication of model-quality metrics.
+
+Suggested owner or area:
+
+Model evaluation and dataset governance.

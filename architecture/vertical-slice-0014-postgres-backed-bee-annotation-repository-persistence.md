@@ -1,6 +1,6 @@
 # Vertical Slice 0014: Postgres-Backed Bee Annotation Repository Persistence
 
-Status: provisional pending Vertical Slice 0013 closeout.
+Status: implementation-ready after Vertical Slice 0013.5 Domain Model Persistence Stability Gate.
 
 ## Purpose
 
@@ -11,6 +11,7 @@ This slice makes reviewed bee evidence durable before Slice 0015 YOLO OBB Traini
 ## Source Inputs
 
 - `architecture/vertical-slice-0013-review-recommendations-architecture-decision-pass.md`
+- `architecture/vertical-slice-0013.5-domain-model-persistence-stability-gate.md`
 - `architecture/adr/0003-postgres-for-durable-product-and-model-governance-metadata.md`
 - `architecture/postgres-persistence-design.md`
 - `architecture/current-system-architecture.md`
@@ -30,7 +31,8 @@ And local dev acceptance tests exercise the Postgres-backed path.
 
 - Slice 0013 has accepted Postgres for durable metadata.
 - Slice 0013 has produced the Postgres persistence design.
-- Slice 0013 has classified domain records into stable records, version/history-sensitive records, and volatile/deferred records before schema implementation starts.
+- Slice 0013.5 has reviewed and hardened the domain model for persistence stability.
+- Slice 0013.5 has classified domain records into stable records, version/history-sensitive records, and volatile/deferred records before schema implementation starts.
 - Docker is available for local Postgres development.
 - The existing local object-storage adapter remains available for image bytes.
 - Dev auth remains explicitly dev-only through `x-hivesight-dev-user-id`.
@@ -49,7 +51,8 @@ Core API uses Postgres-backed repositories for the Bee Annotation Repository pat
 - Hive
 - Hive Configuration
 - Inspection
-- Inspection Photo metadata and object key
+- Source Image metadata and object key
+- Inspection Photo product context
 - Training Crop
 - Oriented Bee Ellipse
 - Dataset Item
@@ -96,9 +99,25 @@ Local network/mobile UI testing must remain available after Postgres is introduc
 
 Postgres stores metadata, relationships, status, object keys, provenance, and timestamps.
 
+Slice 0014 must persist `Source Image` and `Inspection Photo` separately:
+
+- `Source Image` owns image/file evidence, dimensions, content hash, provenance, permission status, metadata minimisation status, lifecycle status, and object key.
+- `Inspection Photo` owns beekeeper/product inspection context and points to one Source Image.
+- Slice 0014 implements only `source_type = inspection_photo`, while preserving the future ability to add public/imported/bootstrap source image types.
+- Training Crop points to Source Image directly and may also reference Inspection Photo when the source type is `inspection_photo`.
+- Training Crop and Dataset Item keep direct `workspace_id`, matching Source Image workspace for Slice 0014.
+- Source Image, Training Crop, and Dataset Item have immutable generated human-readable ids.
+- Accepted Source Images require dimensions, `content_hash`, and `content_hash_algorithm`.
+- Raw EXIF/image metadata is not stored in Postgres; only metadata minimisation status is stored.
+- Hive Configuration is effective-dated history with one active configuration per Hive.
+- Dataset Items are immutable after assignment and include supersession/withdrawal shape.
+- Benchmark Dataset Items require `source_group_key`.
+- Dataset Role assignment hard-blocks benchmark conflicts for the same Source Image or same `source_group_key`.
+
 Postgres does not store:
 
 - image bytes
+- raw EXIF/image metadata
 - dataset export package file contents
 - Training Run records
 - Model Candidate records
@@ -141,6 +160,16 @@ The exact command names should follow existing repo conventions, but the expecte
 - [ ] The first schema follows the Slice 0013 domain stability classification and does not persist volatile/deferred records.
 - [ ] A reset/seed command rebuilds the schema and creates deterministic dev personas and Internal Capabilities.
 - [ ] Core API uses Postgres-backed persistence for the selected Bee Annotation Repository metadata path.
+- [ ] Source Image and Inspection Photo are separate persisted records, with Inspection Photo referencing Source Image.
+- [ ] Training Crop references Source Image directly.
+- [ ] Source Image, Training Crop, and Dataset Item have immutable generated human-readable ids.
+- [ ] Accepted Source Images store mandatory dimensions, content hash, and content hash algorithm.
+- [ ] Raw EXIF/image metadata is not stored in Postgres.
+- [ ] Hive Configuration persistence is effective-dated and enforces one active configuration per Hive.
+- [ ] Dataset Item assignment snapshots permission, provenance, reviewed ellipses, source group key, and resolved Hive Configuration.
+- [ ] Dataset Items are immutable after assignment and include `active`, `superseded`, and `withdrawn` status shape.
+- [ ] Benchmark Dataset Item assignment requires `source_group_key`.
+- [ ] Benchmark leakage conflicts are hard-blocked for same Source Image and same `source_group_key`.
 - [ ] Image bytes remain outside Postgres and are referenced by object key.
 - [ ] Existing public Core API request/response shapes remain unchanged.
 - [ ] Existing API-level BDD scenarios pass against the Postgres-backed path.
@@ -156,3 +185,4 @@ The exact command names should follow existing repo conventions, but the expecte
 - Should Postgres test setup use one shared test database with schema reset, or per-test temporary schemas?
 - Should deterministic dev personas be seeded by migration, separate seed script, or reset command? Recommendation: separate seed/reset command so production migrations do not contain dev data.
 - Should repository protocols be formalized before implementation or introduced as each adapter is written?
+- Should training-vs-validation `source_group_key` sharing produce only export/report warnings in Slice 0014, or also API response warnings during assignment?

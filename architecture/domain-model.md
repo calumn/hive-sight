@@ -229,7 +229,8 @@ Essential fields:
 Relationships:
 
 - belongs to one apiary
-- may have one current hive configuration
+- has many hive configurations over time
+- has one active hive configuration at a time
 - has many inspections
 
 ### Hive Configuration
@@ -245,6 +246,7 @@ Essential fields:
 - optional frame standard id
 - status
 - effective from
+- effective to
 - created at
 
 Initial hive types may include:
@@ -272,9 +274,14 @@ Relationships:
 
 Rules:
 
-- Hive Configuration is model context and provenance, not a requirement for Slice 9 annotation.
+- Hive Configuration is model context and provenance.
 - A Hive may start with `unknown` equipment context and be refined later.
-- Training data should preserve whatever Hive Configuration was known when the source photo was captured or reviewed.
+- Inspection creation requires an active Hive Configuration.
+- Hive Configuration is effective-dated history, not a mutable single current record.
+- At most one Hive Configuration may be active for a Hive at a time.
+- Replacing a Hive Configuration supersedes the previous active configuration and records its `effective_to`.
+- Training data should preserve whatever Hive Configuration was known when the source image was captured. If capture-time configuration cannot be resolved, Dataset Item provenance may fall back to assignment-time configuration and must record that fallback.
+- Detailed Hive Component or Box configuration is deferred; for Slice 0014, `box/use` remains on Hive Configuration and is snapshotted into Dataset Item provenance.
 
 ### Frame Standard
 
@@ -353,20 +360,72 @@ Rules:
 - Frame labels are lightweight grouping hints, not frame inventory records.
 - A frame label does not prove that photos are non-overlapping or safe to aggregate without caution.
 
+### Source Image
+
+The underlying original image evidence record used by inspection, dataset, and model-governance workflows.
+
+Essential fields:
+
+- id
+- human-readable id
+- workspace id
+- source type
+- original file reference or object key
+- original filename
+- media type
+- file size
+- source image width
+- source image height
+- content hash
+- content hash algorithm
+- source group key
+- provenance summary
+- permission status
+- metadata status
+- metadata checked at
+- status
+- created at
+
+Source types:
+
+- `inspection_photo`
+
+Future source types:
+
+- `project_import`
+- `public_dataset`
+- `external_annotation_import`
+
+Statuses:
+
+- `accepted`
+- `rejected`
+- `archived`
+
+Rules:
+
+- Source Image is image-only for now.
+- In Slice 0014, every Source Image is also an Inspection Photo because only the `inspection_photo` source type is implemented.
+- Later, not every Source Image will be an Inspection Photo.
+- `workspace_id` is required for `inspection_photo` Source Images; future public/imported source ownership may differ.
+- Accepted Source Images require dimensions, `content_hash`, and `content_hash_algorithm`.
+- Source Image has its own provenance and permission status, separate from Dataset Item permission snapshots.
+- Source Image may exist without dataset eligibility, but Dataset Item creation requires eligible permission.
+- Raw EXIF or image metadata should not be stored in Postgres by default because image metadata may contain personally identifiable information, location, device, or private apiary signals.
+- `metadata_status` records minimisation/check status only.
+- `source_group_key` is a broad manual grouping hook for likely related images, such as the same physical frame, near-duplicate photo burst, same imported source unit, or same frame side.
+
 ### Inspection Photo
 
-The original uploaded photo evidence for an inspection.
+The beekeeper/product-facing role a Source Image plays when it is attached to an Inspection.
 
 Essential fields:
 
 - id
 - workspace id
+- source image id
 - inspection id
 - optional frame label id
-- original file reference
-- original filename
-- media type
-- file size
 - upload status
 - image quality status
 - uploaded at
@@ -374,10 +433,10 @@ Essential fields:
 
 Relationships:
 
+- references one source image
 - belongs to one inspection
 - may reference one frame label
 - may have many analysis results over time
-- may have many training crops
 - may have many annotations through analysis results
 - may have many user corrections
 - inherits data-use eligibility from the workspace data-use agreement
@@ -385,17 +444,22 @@ Relationships:
 Rules:
 
 - Accepted original photos are preserved.
+- Product workflows and UI language should continue to use Inspection Photo.
+- In Slice 0014, every persisted Source Image is an Inspection Photo source image.
 - Tagged photos are rendered views, not replacements for the original.
 
 ### Training Crop
 
-A bounded image region derived from an Inspection Photo for focused dataset annotation.
+A bounded image region derived from a Source Image for focused dataset annotation.
 
 Essential fields:
 
 - id
-- source inspection photo id
-- crop bounds in source-photo coordinates
+- human-readable id
+- workspace id
+- source image id
+- optional inspection photo id
+- crop bounds in source-image coordinates
 - crop image dimensions
 - curriculum stage
 - created by user id
@@ -412,15 +476,18 @@ Curriculum stages:
 
 Relationships:
 
-- belongs to one inspection photo
+- belongs to one source image
+- may reference one inspection photo when the source type is `inspection_photo`
 - may have many bee annotations
 - may become a dataset item after complete review and dataset role assignment
 
 Rules:
 
-- A Training Crop preserves provenance back to the original Inspection Photo.
+- A Training Crop preserves provenance back to the original Source Image and, when applicable, its Inspection Photo context.
 - A Training Crop is a review unit, not a replacement for the original photo.
 - Before a Training Crop becomes dataset-eligible, a Dataset Curator should mark all visible bees in the crop or explicitly exclude the crop.
+- A Training Crop is mutable during review.
+- Once a Dataset Item has been assigned from a Training Crop, the Training Crop is locked for mutations that would affect evidence. Future corrections require a supersession/reopening workflow.
 
 ### Analysis Result
 
@@ -520,6 +587,7 @@ Rules:
 - AI-assisted Draft Annotations are not ground truth until human reviewed.
 - Reviewed Annotations still require Dataset Role assignment before dataset use.
 - Model-specific exports may project oriented ellipses into other shapes such as YOLO OBB labels.
+- Bee annotation geometry remains mutable during Training Crop review and is locked once a Dataset Item snapshots it.
 
 ### Varroa Annotation
 
@@ -676,14 +744,23 @@ A reviewed image-and-annotation unit assigned to a dataset role.
 Essential fields:
 
 - id
-- workspace id or source id
-- inspection photo id, training crop id, or external image reference
+- human-readable id
+- workspace id
+- source image id
+- optional inspection photo id
+- training crop id
 - reviewed annotation references
 - dataset role
 - optional curriculum stage
 - provenance
 - permission status
+- source group key
+- hive configuration snapshot
+- hive configuration resolution
 - exclusion reason
+- status
+- supersedes dataset item id
+- superseded by dataset item id
 - created at
 
 Dataset roles:
@@ -696,8 +773,16 @@ Dataset roles:
 Rules:
 
 - A Dataset Item requires reviewed annotation evidence.
+- Dataset Items are immutable after assignment.
+- Later corrections use supersession or withdrawal rather than in-place mutation.
+- Initial statuses are `active`, `superseded`, and `withdrawn`.
 - Benchmark Dataset Items must not be used for training or routine tuning.
-- Duplicate or near-duplicate frame photos must be handled before split assignment.
+- Benchmark Dataset Items require a `source_group_key`.
+- Dataset Role assignment must hard-block benchmark leakage conflicts for the same Source Image or same `source_group_key` across benchmark versus training/validation.
+- Training and validation may share a `source_group_key` in Slice 0014, but exports or reports must flag that as a leakage warning.
+- Duplicate or near-duplicate frame photos must be handled before serious benchmark claims.
+- Dataset Items snapshot Workspace Data Use Agreement eligibility at assignment time.
+- Consent withdrawal does not automatically remove Dataset Items from future training/export in Slice 0014; withdrawal and deletion enforcement remain explicit policy gaps.
 - Model-specific training files are derived artifacts, not the canonical Dataset Item evidence.
 
 ### Training Run

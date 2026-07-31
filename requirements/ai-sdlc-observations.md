@@ -224,3 +224,37 @@ Human judgment still required:
 - Choose durable queue, production auth, object-storage provider, deployment platform, and Analysis Store ownership when their parked triggers arrive.
 - Revisit the dev persona switcher before the next role-specific UI acceptance flow.
 - Revisit Varroa-specific slices only after the bee-detector and dataset foundations are sufficiently real.
+
+### 2026-07-31 Slice 0013.5 Domain Model Persistence Stability Gate
+
+Human-confirmed decisions:
+
+- Add `Source Image` as canonical domain language.
+- Keep `Inspection Photo` as the product-facing term; an Inspection Photo is the role a Source Image plays when attached to an Inspection.
+- Persist `source_images` and `inspection_photos` separately from Slice 0014.
+- Implement only `inspection_photo` Source Images in Slice 0014, while preserving the ability to add public/imported/bootstrap Source Images later.
+- Source Image owns image/file evidence, dimensions, content hash, provenance, permission status, metadata minimisation status, lifecycle status, and object key.
+- Training Crop points directly to Source Image and may also reference Inspection Photo when applicable.
+- Hive Configuration is effective-dated history with one active configuration per Hive.
+- Dataset Item snapshots capture-time Hive Configuration when resolvable, otherwise assignment-time fallback, otherwise unknown.
+- Add one broad `source_group_key`; benchmark Dataset Items require it.
+- Hard-block benchmark leakage conflicts by same Source Image or same `source_group_key`; allow training/validation sharing with warning.
+- Dataset Items are immutable after assignment and use supersession/withdrawal rather than in-place mutation.
+- Source Image, Training Crop, and Dataset Item receive stable immutable human-readable ids.
+- Source Image records metadata minimisation status only; raw EXIF/image metadata must not be stored in Postgres.
+- Slice 0014 persists a narrow Oriented Bee Ellipse table, not a generic annotation table.
+
+AI contribution:
+
+- Identified persistence edges that could distort the first durable schema.
+- Used the grilling workflow to resolve each high-impact modelling decision one at a time.
+- Updated glossary, domain model, domain diagram, Postgres persistence design, Slice 0013.5, Slice 0014, and parking-lot artifacts.
+
+Human judgment still required:
+
+- Implement Slice 0014 using the Source Image-aware schema.
+- Revisit full Dataset Item audit events before supersession workflow, Dataset Versions, Training Runs, or audit/reporting requirements.
+- Revisit Dataset Versions before Slice 0015 training implementation.
+- Revisit detailed Hive Component or Box configuration before supporting mixed brood/super workflows or detailed equipment statistics.
+- Revisit consent withdrawal and deletion enforcement before hosted/user-submitted model improvement or deletion/purge workflows.
+- Revisit stricter split leakage policy before serious benchmark claims or model promotion.

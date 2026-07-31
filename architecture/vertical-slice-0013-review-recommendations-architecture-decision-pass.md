@@ -317,7 +317,8 @@ Slice 0014 provisional persisted aggregate scope:
 - Hive
 - Hive Configuration
 - Inspection
-- Inspection Photo metadata and object key
+- Source Image metadata and object key
+- Inspection Photo product context
 - Training Crop
 - Oriented Bee Ellipse
 - Dataset Item

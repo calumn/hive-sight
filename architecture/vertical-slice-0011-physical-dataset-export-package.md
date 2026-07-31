@@ -66,9 +66,9 @@ var/exports/datasets/
         bee-crop-000002-<short_dataset_item_id>.txt
 ```
 
-Dataset Item ids remain opaque UUIDs and remain the true internal identity. Exported image and label filenames use deterministic human-readable names with a short Dataset Item id suffix. The manifest maps each generated filename back to the full Dataset Item id, Training Crop id, Inspection Photo id, original filename, and provenance.
+Dataset Item ids retain opaque UUIDs as internal identity, and Slice 0013.5 adds immutable generated human-readable Dataset Item ids for curation, export QA, and reports. Exported image and label filenames use deterministic human-readable names. The manifest maps each generated filename back to the full Dataset Item id, human-readable Dataset Item id where available, Training Crop id, Source Image id where available, Inspection Photo id, original filename, and provenance.
 
-The manifest records counts, class map, source Dataset Item ids, source Training Crop ids, source Inspection Photo ids, protected benchmark ids, excluded item ids/reasons, generated YOLO label rows, file sizes, SHA-256 hashes, and caveats. The generated `dataset.yaml` is a first local YOLO-compatible descriptor for the package.
+The manifest records counts, class map, source Dataset Item ids, human-readable Dataset Item ids where available, source Training Crop ids, Source Image ids where available, source Inspection Photo ids, protected benchmark ids, excluded item ids/reasons, generated YOLO label rows, file sizes, SHA-256 hashes, and caveats. The generated `dataset.yaml` is a first local YOLO-compatible descriptor for the package.
 
 The physical export is all-or-nothing. If any included Dataset Item cannot be cropped, has invalid label state, has no reviewed ellipse snapshots, cannot read its source image, or cannot write its generated files, the export fails and HiveSight attempts to remove the partial package folder. The failed export must not be reported as a successful package.
 

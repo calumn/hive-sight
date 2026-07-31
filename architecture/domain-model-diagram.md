@@ -12,6 +12,8 @@ erDiagram
     INSPECTION ||--o{ INSPECTION_PHOTO : contains
     INSPECTION ||--o{ FRAME_LABEL : defines
     FRAME_LABEL ||--o{ INSPECTION_PHOTO : groups
+    SOURCE_IMAGE ||--o| INSPECTION_PHOTO : plays_role_as
+    SOURCE_IMAGE ||--o{ TRAINING_CROP : yields
 
     INSPECTION_PHOTO ||--o{ ANALYSIS_RESULT : has
     MODEL_VERSION ||--o{ ANALYSIS_RESULT : produces
@@ -32,6 +34,10 @@ erDiagram
     WORKSPACE ||--o{ DATA_DELETION_REQUEST : may_request
 
     DATASET_VERSION ||--o{ REVIEW_DECISION : includes_approved_evidence
+    TRAINING_CROP ||--o{ BEE_ANNOTATION : reviewed_with
+    TRAINING_CROP ||--o| DATASET_ITEM : becomes
+    SOURCE_IMAGE ||--o{ DATASET_ITEM : sources
+    DATASET_ITEM ||--o{ REVIEW_DECISION : may_be_reviewed_by
     DATASET_VERSION ||--o{ BENCHMARK_EVALUATION : used_by
     MODEL_VERSION ||--o{ BENCHMARK_EVALUATION : evaluated_by
     BENCHMARK_EVALUATION ||--o{ REVIEW_DECISION : approved_by
@@ -94,10 +100,29 @@ erDiagram
 
     INSPECTION_PHOTO {
         string id
+        string source_image_id
         string inspection_id
-        string original_file_reference
         string upload_status
         string image_quality_status
+    }
+
+    SOURCE_IMAGE {
+        string id
+        string human_readable_id
+        string source_type
+        string object_key
+        string source_group_key
+        string permission_status
+        string metadata_status
+        string status
+    }
+
+    TRAINING_CROP {
+        string id
+        string human_readable_id
+        string source_image_id
+        string curriculum_stage
+        string review_status
     }
 
     ANALYSIS_RESULT {
@@ -120,6 +145,7 @@ erDiagram
     BEE_ANNOTATION {
         string id
         string analysis_result_id
+        string training_crop_id
         string visibility_class
         string source
         string review_status
@@ -173,6 +199,15 @@ erDiagram
         string dataset_role
     }
 
+    DATASET_ITEM {
+        string id
+        string human_readable_id
+        string source_image_id
+        string training_crop_id
+        string dataset_role
+        string status
+    }
+
     BENCHMARK_EVALUATION {
         string id
         string model_version_id
@@ -187,5 +222,6 @@ erDiagram
 - The middle is the evidence layer: analysis results, bee annotations, Varroa annotations, summaries, and corrections.
 - The lower/right side is model governance: review decisions, workspace data-use agreements, deletion requests, dataset versions, model versions, and benchmark evaluations.
 - `User` is the login identity. `Workspace Membership` grants access to a workspace. `Beekeeper` remains a persona/product actor, not a persisted version-one entity.
+- `Source Image` is the underlying image evidence record. `Inspection Photo` is the product-facing role a Source Image plays when attached to an Inspection.
 - `Inspection Summary` is derived from photo-level analysis results and should be recalculable.
 - `User Correction` is review evidence, not ground truth or training data until the workspace data-use agreement and review decisions allow it.

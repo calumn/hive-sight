@@ -47,6 +47,7 @@ HiveSight creates a Dataset Item that belongs to the Bee Annotation Repository. 
 The Dataset Item snapshots the crop-level reviewed evidence needed for dataset governance:
 
 - Training Crop identity and bounds
+- Source Image identity where available after Slice 0013.5
 - source Inspection Photo identity
 - source Workspace, Apiary, Hive, and Inspection path where available
 - Curriculum Stage
@@ -124,7 +125,7 @@ Minimum fields:
 - workspace id
 - inspection photo id
 - training crop id
-- crop bounds in source-photo coordinates
+- crop bounds in source-image coordinates
 - crop image width px
 - crop image height px
 - curriculum stage
@@ -153,9 +154,9 @@ Initial permission status:
 
 Initial provenance summary must preserve traceability to:
 
-`Dataset Item -> Training Crop -> Inspection Photo -> Inspection -> Hive -> Apiary -> Workspace`
+`Dataset Item -> Training Crop -> Source Image -> Inspection Photo -> Inspection -> Hive -> Apiary -> Workspace`
 
-If some upstream display fields are unavailable in the current dev store, the item must still preserve the known ids.
+If some upstream display fields are unavailable in the current dev store, the item must still preserve the known ids. After Slice 0013.5, Source Image is the underlying image evidence record and Inspection Photo is the product inspection context for `inspection_photo` source images.
 
 ### Reviewed Ellipse Snapshot
 
@@ -224,7 +225,7 @@ For each reviewed oriented bee ellipse:
 - class id: from initial class map
 - label convention: `class x1 y1 x2 y2 x3 y3 x4 y4`
 - coordinates: four rotated rectangle corner points normalized against the crop image width and height
-- coordinate origin: the top-left of the Training Crop, not the original source photo
+- coordinate origin: the top-left of the Training Crop, not the original Source Image
 
 The Dataset Item snapshot stores source-image pixel geometry for traceability. The export converts source-image pixel geometry to crop-relative pixels, then normalizes by crop width and crop height.
 

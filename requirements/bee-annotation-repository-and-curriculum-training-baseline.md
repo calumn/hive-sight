@@ -60,7 +60,7 @@ The dataset workflow shall support Training Crops derived from original Inspecti
 A Training Crop records:
 
 - source Inspection Photo
-- crop bounds in source-photo coordinates
+- crop bounds in source-image coordinates
 - crop image dimensions
 - Curriculum Stage
 - creator/reviewer provenance
