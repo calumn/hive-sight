@@ -109,6 +109,23 @@ class TrainingCropExclusionReason(StrEnum):
     other = "other"
 
 
+class BeeEllipseAnnotationSource(StrEnum):
+    human_from_scratch = "human_from_scratch"
+    model_candidate = "model_candidate"
+    imported_public_dataset = "imported_public_dataset"
+
+
+class BeeEllipseReviewMethod(StrEnum):
+    human_from_scratch = "human_from_scratch"
+    human_reviewed_candidate = "human_reviewed_candidate"
+    imported_reviewed = "imported_reviewed"
+
+
+class CandidateAnnotationReviewDecision(StrEnum):
+    accepted = "accepted"
+    accepted_with_edits = "accepted_with_edits"
+
+
 class FrameStandardStatus(StrEnum):
     known = "known"
     unknown = "unknown"
@@ -495,6 +512,13 @@ class ReviewedEllipseSnapshot(BaseModel):
     source_image_width_px: int
     source_image_height_px: int
     source: str
+    review_method: BeeEllipseReviewMethod = BeeEllipseReviewMethod.human_from_scratch
+    model_candidate_id: UUID | None = None
+    candidate_confidence: float | None = None
+    candidate_threshold: float | None = None
+    raw_model_class: str | None = None
+    raw_yolo_obb: list[float] | None = None
+    candidate_review_decision: CandidateAnnotationReviewDecision | None = None
     created_by_user_id: UUID
     created_at: datetime
     updated_at: datetime
@@ -878,6 +902,14 @@ class OrientedBeeEllipseCreateRequest(BaseModel):
     radius_x: float = Field(gt=0)
     radius_y: float = Field(gt=0)
     rotation_degrees: float = 0
+    source: BeeEllipseAnnotationSource = BeeEllipseAnnotationSource.human_from_scratch
+    review_method: BeeEllipseReviewMethod = BeeEllipseReviewMethod.human_from_scratch
+    model_candidate_id: UUID | None = None
+    candidate_confidence: float | None = Field(default=None, ge=0, le=1)
+    candidate_threshold: float | None = Field(default=None, ge=0, le=1)
+    raw_model_class: str | None = Field(default=None, max_length=100)
+    raw_yolo_obb: list[float] | None = Field(default=None, min_length=5, max_length=8)
+    candidate_review_decision: CandidateAnnotationReviewDecision | None = None
 
 
 class OrientedBeeEllipseUpdateRequest(BaseModel):
@@ -905,9 +937,52 @@ class OrientedBeeEllipseResponse(BaseModel):
     source_image_width_px: int
     source_image_height_px: int
     source: str
+    review_method: BeeEllipseReviewMethod = BeeEllipseReviewMethod.human_from_scratch
+    model_candidate_id: UUID | None = None
+    candidate_confidence: float | None = None
+    candidate_threshold: float | None = None
+    raw_model_class: str | None = None
+    raw_yolo_obb: list[float] | None = None
+    candidate_review_decision: CandidateAnnotationReviewDecision | None = None
     created_by_user_id: UUID
     created_at: datetime
     updated_at: datetime
+
+
+class BeeAnnotationProposalResponse(BaseModel):
+    proposal_id: str
+    workspace_id: UUID
+    training_crop_id: UUID
+    model_candidate_id: UUID
+    model_candidate_human_readable_id: str
+    annotation_type: AnnotationType
+    center_x: float
+    center_y: float
+    radius_x: float
+    radius_y: float
+    rotation_degrees: float
+    coordinate_space: CoordinateSpace
+    confidence: float
+    threshold: float
+    raw_model_class: str
+    raw_yolo_obb: list[float]
+
+
+class BeeAnnotationProposalRequest(BaseModel):
+    workspace_id: UUID
+    model_candidate_id: UUID | None = None
+    confidence_threshold: float = Field(default=0.10, ge=0, le=1)
+    max_suggestions: int = Field(default=50, ge=1, le=50)
+
+
+class BeeAnnotationProposalListResponse(BaseModel):
+    workspace_id: UUID
+    training_crop_id: UUID
+    model_candidate_id: UUID
+    model_candidate_human_readable_id: str
+    threshold: float
+    suggestions: list[BeeAnnotationProposalResponse]
+    caveat: str
 
 
 class TrainingCropEvidenceResponse(BaseModel):

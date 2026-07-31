@@ -27,6 +27,7 @@
     "model:setup:yolo": "node scripts/model-setup-yolo.mjs",
     "model:train:bee:yolo": "node scripts/model-train-bee-yolo.mjs",
     "model:qa:bee:yolo": "node scripts/model-qa-bee-yolo.mjs",
+    "model:qa:bee:prelabel": "node scripts/model-qa-bee-prelabel.mjs",
     "verify:slice": "node scripts/verify-slice.mjs"
   }
 }

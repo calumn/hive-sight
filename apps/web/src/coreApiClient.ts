@@ -328,9 +328,45 @@ export type OrientedBeeEllipse = {
   sourceImageWidthPx: number;
   sourceImageHeightPx: number;
   source: string;
+  reviewMethod: "human_from_scratch" | "human_reviewed_candidate" | "imported_reviewed";
+  modelCandidateId: string | null;
+  candidateConfidence: number | null;
+  candidateThreshold: number | null;
+  rawModelClass: string | null;
+  rawYoloObb: number[] | null;
+  candidateReviewDecision: "accepted" | "accepted_with_edits" | null;
   createdByUserId: string;
   createdAt: string;
   updatedAt: string;
+};
+
+export type BeeAnnotationProposal = {
+  proposalId: string;
+  workspaceId: string;
+  trainingCropId: string;
+  modelCandidateId: string;
+  modelCandidateHumanReadableId: string;
+  annotationType: BeeAnnotationType;
+  centerX: number;
+  centerY: number;
+  radiusX: number;
+  radiusY: number;
+  rotationDegrees: number;
+  coordinateSpace: "source_image_pixels";
+  confidence: number;
+  threshold: number;
+  rawModelClass: string;
+  rawYoloObb: number[];
+};
+
+export type BeeAnnotationProposalList = {
+  workspaceId: string;
+  trainingCropId: string;
+  modelCandidateId: string;
+  modelCandidateHumanReadableId: string;
+  threshold: number;
+  suggestions: BeeAnnotationProposal[];
+  caveat: string;
 };
 
 export type ReviewedEllipseSnapshot = {
@@ -565,9 +601,9 @@ export type TrainingRunDeleteResponse = {
 export type ModelCandidate = {
   modelCandidateId: string;
   humanReadableId: string;
+  displayName: string;
   workspaceId: string;
   trainingRunId: string;
-  datasetVersionId: string;
   modelPurpose: "bee_detector";
   modelFamily: string;
   adapterType: "fake" | "ultralytics_yolo_obb";
@@ -576,6 +612,10 @@ export type ModelCandidate = {
   promotionStatus: string;
   notUserFacingReason: string;
   createdAt: string;
+};
+
+export type ModelCandidateList = {
+  modelCandidates: ModelCandidate[];
 };
 
 export type AnalysisRunDetail = {
@@ -1175,6 +1215,21 @@ export async function fetchTrainingRuns({
   return parseTrainingRunList(await response.json());
 }
 
+export async function fetchModelCandidates({
+  devUserId,
+  workspaceId
+}: {
+  devUserId: string;
+  workspaceId: string;
+}): Promise<ModelCandidateList> {
+  const params = new URLSearchParams({ workspace_id: workspaceId });
+  const response = await fetch(`${coreApiUrl}/v1/model-training/model-candidates?${params}`, {
+    headers: devAuthHeaders(devUserId)
+  });
+  await ensureOk(response);
+  return parseModelCandidateList(await response.json());
+}
+
 export async function cancelTrainingRun({
   devUserId,
   workspaceId,
@@ -1381,7 +1436,8 @@ export async function createTrainingCropEllipse({
   centerY,
   radiusX,
   radiusY,
-  rotationDegrees
+  rotationDegrees,
+  provenance
 }: {
   devUserId: string;
   workspaceId: string;
@@ -1392,22 +1448,75 @@ export async function createTrainingCropEllipse({
   radiusX: number;
   radiusY: number;
   rotationDegrees: number;
+  provenance?: {
+    source: "model_candidate";
+    reviewMethod: "human_reviewed_candidate";
+    modelCandidateId: string;
+    candidateConfidence: number;
+    candidateThreshold: number;
+    rawModelClass: string;
+    rawYoloObb: number[];
+    candidateReviewDecision: "accepted" | "accepted_with_edits";
+  };
 }): Promise<OrientedBeeEllipse> {
+  const body: Record<string, unknown> = {
+    workspace_id: workspaceId,
+    annotation_type: annotationType,
+    center_x: centerX,
+    center_y: centerY,
+    radius_x: radiusX,
+    radius_y: radiusY,
+    rotation_degrees: rotationDegrees
+  };
+  if (provenance) {
+    body.source = provenance.source;
+    body.review_method = provenance.reviewMethod;
+    body.model_candidate_id = provenance.modelCandidateId;
+    body.candidate_confidence = provenance.candidateConfidence;
+    body.candidate_threshold = provenance.candidateThreshold;
+    body.raw_model_class = provenance.rawModelClass;
+    body.raw_yolo_obb = provenance.rawYoloObb;
+    body.candidate_review_decision = provenance.candidateReviewDecision;
+  }
   const response = await fetch(`${coreApiUrl}/v1/training-crops/${trainingCropId}/bee-ellipses`, {
     method: "POST",
     headers: jsonHeaders(devUserId),
-    body: JSON.stringify({
-      workspace_id: workspaceId,
-      annotation_type: annotationType,
-      center_x: centerX,
-      center_y: centerY,
-      radius_x: radiusX,
-      radius_y: radiusY,
-      rotation_degrees: rotationDegrees
-    })
+    body: JSON.stringify(body)
   });
   await ensureOk(response);
   return parseOrientedBeeEllipse(await response.json());
+}
+
+export async function suggestTrainingCropBeeAnnotations({
+  devUserId,
+  workspaceId,
+  trainingCropId,
+  modelCandidateId,
+  confidenceThreshold,
+  maxSuggestions = 50
+}: {
+  devUserId: string;
+  workspaceId: string;
+  trainingCropId: string;
+  modelCandidateId: string | null;
+  confidenceThreshold: number;
+  maxSuggestions?: number;
+}): Promise<BeeAnnotationProposalList> {
+  const response = await fetch(
+    `${coreApiUrl}/v1/training-crops/${trainingCropId}/candidate-bee-annotations`,
+    {
+      method: "POST",
+      headers: jsonHeaders(devUserId),
+      body: JSON.stringify({
+        workspace_id: workspaceId,
+        model_candidate_id: modelCandidateId,
+        confidence_threshold: confidenceThreshold,
+        max_suggestions: maxSuggestions
+      })
+    }
+  );
+  await ensureOk(response);
+  return parseBeeAnnotationProposalList(await response.json());
 }
 
 export async function updateTrainingCropEllipse({
@@ -1812,9 +1921,64 @@ function parseOrientedBeeEllipse(value: unknown): OrientedBeeEllipse {
     sourceImageWidthPx: requireNumber(record.source_image_width_px, "source_image_width_px"),
     sourceImageHeightPx: requireNumber(record.source_image_height_px, "source_image_height_px"),
     source: requireString(record.source, "source"),
+    reviewMethod: requireReviewMethod(record.review_method),
+    modelCandidateId: optionalString(record.model_candidate_id, "model_candidate_id"),
+    candidateConfidence: optionalNumber(record.candidate_confidence, "candidate_confidence"),
+    candidateThreshold: optionalNumber(record.candidate_threshold, "candidate_threshold"),
+    rawModelClass: optionalString(record.raw_model_class, "raw_model_class"),
+    rawYoloObb:
+      record.raw_yolo_obb === null || record.raw_yolo_obb === undefined
+        ? null
+        : requireArray(record.raw_yolo_obb, "raw_yolo_obb").map((point) =>
+            requireNumber(point, "raw_yolo_obb point")
+          ),
+    candidateReviewDecision: requireCandidateReviewDecision(record.candidate_review_decision),
     createdByUserId: requireString(record.created_by_user_id, "created_by_user_id"),
     createdAt: requireString(record.created_at, "created_at"),
     updatedAt: requireString(record.updated_at, "updated_at")
+  };
+}
+
+function parseBeeAnnotationProposalList(value: unknown): BeeAnnotationProposalList {
+  const record = requireRecord(value, "Bee annotation proposal list response");
+  return {
+    workspaceId: requireString(record.workspace_id, "workspace_id"),
+    trainingCropId: requireString(record.training_crop_id, "training_crop_id"),
+    modelCandidateId: requireString(record.model_candidate_id, "model_candidate_id"),
+    modelCandidateHumanReadableId: requireString(
+      record.model_candidate_human_readable_id,
+      "model_candidate_human_readable_id"
+    ),
+    threshold: requireNumber(record.threshold, "threshold"),
+    suggestions: requireArray(record.suggestions, "suggestions").map(parseBeeAnnotationProposal),
+    caveat: requireString(record.caveat, "caveat")
+  };
+}
+
+function parseBeeAnnotationProposal(value: unknown): BeeAnnotationProposal {
+  const record = requireRecord(value, "Bee annotation proposal response");
+  return {
+    proposalId: requireString(record.proposal_id, "proposal_id"),
+    workspaceId: requireString(record.workspace_id, "workspace_id"),
+    trainingCropId: requireString(record.training_crop_id, "training_crop_id"),
+    modelCandidateId: requireString(record.model_candidate_id, "model_candidate_id"),
+    modelCandidateHumanReadableId: requireString(
+      record.model_candidate_human_readable_id,
+      "model_candidate_human_readable_id"
+    ),
+    annotationType: requireBeeAnnotationType(record.annotation_type),
+    centerX: requireNumber(record.center_x, "center_x"),
+    centerY: requireNumber(record.center_y, "center_y"),
+    radiusX: requireNumber(record.radius_x, "radius_x"),
+    radiusY: requireNumber(record.radius_y, "radius_y"),
+    rotationDegrees: requireNumber(record.rotation_degrees, "rotation_degrees"),
+    coordinateSpace: requireSourceImagePixelCoordinateSpace(record.coordinate_space),
+    confidence: requireNumber(record.confidence, "confidence"),
+    threshold: requireNumber(record.threshold, "threshold"),
+    rawModelClass: requireString(record.raw_model_class, "raw_model_class"),
+    rawYoloObb: requireArray(record.raw_yolo_obb, "raw_yolo_obb").map((point) =>
+      requireNumber(point, "raw_yolo_obb point")
+    )
   };
 }
 
@@ -2103,6 +2267,37 @@ function parseTrainingRunList(value: unknown): TrainingRunList {
   const record = requireRecord(value, "Training Run list response");
   return {
     trainingRuns: requireArray(record.training_runs, "training_runs").map(parseTrainingRun)
+  };
+}
+
+function parseModelCandidate(value: unknown): ModelCandidate {
+  const record = requireRecord(value, "Model Candidate response");
+  return {
+    modelCandidateId: requireString(record.model_candidate_id, "model_candidate_id"),
+    humanReadableId: requireString(record.human_readable_id, "human_readable_id"),
+    displayName: requireString(record.display_name, "display_name"),
+    workspaceId: requireString(record.workspace_id, "workspace_id"),
+    trainingRunId: requireString(record.training_run_id, "training_run_id"),
+    modelPurpose: requireModelPurpose(record.model_purpose),
+    modelFamily: requireString(record.model_family, "model_family"),
+    adapterType: requireTrainingAdapterType(record.adapter_type),
+    artifactId: requireString(record.artifact_id, "artifact_id"),
+    status: requireString(record.status, "status"),
+    promotionStatus: requireString(record.promotion_status, "promotion_status"),
+    notUserFacingReason: requireString(
+      record.not_user_facing_reason,
+      "not_user_facing_reason"
+    ),
+    createdAt: requireString(record.created_at, "created_at")
+  };
+}
+
+function parseModelCandidateList(value: unknown): ModelCandidateList {
+  const record = requireRecord(value, "Model Candidate list response");
+  return {
+    modelCandidates: requireArray(record.model_candidates, "model_candidates").map(
+      parseModelCandidate
+    )
   };
 }
 
@@ -2477,6 +2672,31 @@ function requireTrainingAdapterType(value: unknown): "fake" | "ultralytics_yolo_
     return value;
   }
   throw new Error("Core API response had an unexpected training adapter type");
+}
+
+function requireReviewMethod(
+  value: unknown
+): "human_from_scratch" | "human_reviewed_candidate" | "imported_reviewed" {
+  if (
+    value === "human_from_scratch" ||
+    value === "human_reviewed_candidate" ||
+    value === "imported_reviewed"
+  ) {
+    return value;
+  }
+  throw new Error("Core API response had an unexpected ellipse review method");
+}
+
+function requireCandidateReviewDecision(
+  value: unknown
+): "accepted" | "accepted_with_edits" | null {
+  if (value === null) {
+    return null;
+  }
+  if (value === "accepted" || value === "accepted_with_edits") {
+    return value;
+  }
+  throw new Error("Core API response had an unexpected candidate review decision");
 }
 
 function requireModelTrainingWarningSeverity(value: unknown): ModelTrainingWarningSeverity {

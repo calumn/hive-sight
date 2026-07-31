@@ -296,7 +296,7 @@ class BeeDetectorTrainingWorkflow:
             for ellipse in item.reviewed_ellipse_snapshots:
                 class_counts[str(ellipse.annotation_type)] += 1
                 source_counts[ellipse.source] += 1
-                review_counts[_review_method_for_source(ellipse.source)] += 1
+                review_counts[str(ellipse.review_method or _review_method_for_source(ellipse.source))] += 1
                 points = _ellipse_to_crop_normalized_obb_points(item, ellipse)
                 if any(point < 0 or point > 1 for point in points):
                     excluded_items.append(_excluded_item(item, "invalid_label_geometry"))

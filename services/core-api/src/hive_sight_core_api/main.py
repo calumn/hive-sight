@@ -7,6 +7,9 @@ from fastapi.responses import JSONResponse, Response
 
 from hive_sight_core_api.analysis_processing_workflow import AnalysisProcessingWorkflow
 from hive_sight_core_api.analysis_request_workflow import AnalysisRequestWorkflow
+from hive_sight_core_api.bee_detector_candidate_annotation_workflow import (
+    BeeDetectorCandidateAnnotationWorkflow,
+)
 from hive_sight_core_api.bee_detector_training_workflow import BeeDetectorTrainingWorkflow
 from hive_sight_core_api.dataset_labelling_workflow import DatasetLabellingWorkflow
 from hive_sight_core_api.dataset_role_assignment_workflow import DatasetRoleAssignmentWorkflow
@@ -14,6 +17,7 @@ from hive_sight_core_api.dependencies import (
     DevStateDep,
     get_analysis_processing_workflow,
     get_analysis_request_workflow,
+    get_bee_detector_candidate_annotation_workflow,
     get_bee_detector_training_workflow,
     get_dataset_labelling_workflow,
     get_dataset_role_assignment_workflow,
@@ -34,6 +38,8 @@ from hive_sight_core_api.models import (
     ApiaryCreateRequest,
     ApiaryListResponse,
     ApiaryResponse,
+    BeeAnnotationProposalListResponse,
+    BeeAnnotationProposalRequest,
     DatasetItemCreateRequest,
     DatasetItemResponse,
     DatasetVersionCreateRequest,
@@ -142,6 +148,10 @@ TrainingCropDatasetItemWorkflowDep = Annotated[
 BeeDetectorTrainingWorkflowDep = Annotated[
     BeeDetectorTrainingWorkflow,
     Depends(get_bee_detector_training_workflow),
+]
+BeeDetectorCandidateAnnotationWorkflowDep = Annotated[
+    BeeDetectorCandidateAnnotationWorkflow,
+    Depends(get_bee_detector_candidate_annotation_workflow),
 ]
 DevUserIdHeader = Annotated[str | None, Header(alias="x-hivesight-dev-user-id")]
 
@@ -787,6 +797,23 @@ def get_training_crop_evidence(
         user=user,
         workspace_id=workspace_id,
         training_crop_id=training_crop_id,
+    )
+
+
+@app.post(
+    "/v1/training-crops/{training_crop_id}/candidate-bee-annotations",
+    response_model=BeeAnnotationProposalListResponse,
+)
+def suggest_training_crop_bee_annotations(
+    training_crop_id: UUID,
+    request: BeeAnnotationProposalRequest,
+    user: AuthenticatedUserDep,
+    workflow: BeeDetectorCandidateAnnotationWorkflowDep,
+) -> BeeAnnotationProposalListResponse:
+    return workflow.suggest_bee_annotations(
+        user=user,
+        training_crop_id=training_crop_id,
+        request=request,
     )
 
 

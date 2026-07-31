@@ -12,6 +12,11 @@ from hive_sight_core_api.analysis_processing_workflow import (
     DeterministicStubAnalysisExecutor,
 )
 from hive_sight_core_api.analysis_request_workflow import AnalysisRequestWorkflow
+from hive_sight_core_api.bee_detector_candidate_annotation_workflow import (
+    BeeDetectorCandidateAnnotationWorkflow,
+    FakeBeeDetectorInferenceAdapter,
+    UltralyticsYoloObbInferenceAdapter,
+)
 from hive_sight_core_api.bee_detector_training_workflow import (
     BeeDetectorTrainingWorkflow,
     FakeBeeDetectorTrainingAdapter,
@@ -181,6 +186,23 @@ def get_bee_detector_training_workflow(state: DevStateDep) -> BeeDetectorTrainin
         clock=state.store.clock,
         stale_after_seconds=settings.training_run_stale_after_seconds,
         heartbeat_interval_seconds=settings.training_run_heartbeat_interval_seconds,
+    )
+
+
+def get_bee_detector_candidate_annotation_workflow(
+    state: DevStateDep,
+) -> BeeDetectorCandidateAnnotationWorkflow:
+    settings = get_settings()
+    adapter = (
+        UltralyticsYoloObbInferenceAdapter(device=settings.yolo_device)
+        if settings.bee_detector_training_adapter == "ultralytics_yolo_obb"
+        else FakeBeeDetectorInferenceAdapter()
+    )
+    return BeeDetectorCandidateAnnotationWorkflow(
+        store=state.store,
+        image_loader=state.object_storage.get_object,
+        artifact_root=state.model_artifact_root,
+        adapter=adapter,
     )
 
 

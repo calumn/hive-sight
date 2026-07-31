@@ -917,6 +917,15 @@ label span {
   border-style: dashed;
 }
 
+.bee-ellipse.candidate {
+  background: rgba(47, 128, 237, 0.12);
+  border-color: #1f6fbd;
+  border-style: dashed;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.9),
+    0 0 0 4px rgba(47, 128, 237, 0.18);
+}
+
 .bee-ellipse.selected {
   box-shadow:
     0 0 0 3px rgba(255, 255, 255, 0.9),
@@ -937,6 +946,14 @@ label span {
   color: #515b4c;
   line-height: 1.4;
   margin-bottom: 0;
+}
+
+.candidate-controls {
+  border-color: #b8d3eb;
+}
+
+.candidate-summary {
+  align-items: start;
 }
 
 .geometry-values {

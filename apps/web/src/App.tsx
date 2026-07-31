@@ -57,6 +57,7 @@ import {
   fetchHiveInspections,
   fetchInspectionPhotos,
   fetchInspectionPhotoObjectUrl,
+  fetchModelCandidates,
   fetchModelTrainingReadiness,
   fetchTrainingRuns,
   fetchTrainingCropEvidence,
@@ -64,6 +65,7 @@ import {
   processAnalysisRun,
   startDatasetLabellingSession,
   startModelTrainingRun,
+  suggestTrainingCropBeeAnnotations,
   updateTrainingCrop,
   updateTrainingCropEllipse,
   upsertHiveConfiguration,
@@ -75,6 +77,7 @@ import {
   type Apiary,
   type ApiError,
   type BeeAnnotationType,
+  type BeeAnnotationProposal,
   type DevSession,
   type HealthResponse,
   type Hive,
@@ -94,6 +97,7 @@ import {
   type PhotoIntake,
   type ReviewDecisionValue,
   type ModelTrainingReadiness,
+  type ModelCandidate,
   type TrainingRun,
   type TrainingCrop,
   type TrainingCropEvidence,
@@ -1271,6 +1275,16 @@ function ellipseStyle(crop: TrainingCrop, ellipse: OrientedBeeEllipse) {
   };
 }
 
+function proposalStyle(crop: TrainingCrop, proposal: BeeAnnotationProposal) {
+  return {
+    left: `${((proposal.centerX - crop.cropX - proposal.radiusX) / crop.cropWidth) * 100}%`,
+    top: `${((proposal.centerY - crop.cropY - proposal.radiusY) / crop.cropHeight) * 100}%`,
+    width: `${((proposal.radiusX * 2) / crop.cropWidth) * 100}%`,
+    height: `${((proposal.radiusY * 2) / crop.cropHeight) * 100}%`,
+    transform: `rotate(${proposal.rotationDegrees}deg)`
+  };
+}
+
 type EllipseGeometry = {
   annotationType: BeeAnnotationType;
   centerX: number;
@@ -1499,6 +1513,13 @@ function TrainingCropAnnotationPanel({
   const [trainingRunsLastCheckedAt, setTrainingRunsLastCheckedAt] = useState<string | null>(null);
   const [trainingRunPollError, setTrainingRunPollError] = useState<string | null>(null);
   const [trainingRunClockTick, setTrainingRunClockTick] = useState(0);
+  const [modelCandidates, setModelCandidates] = useState<ModelCandidate[]>([]);
+  const [selectedModelCandidateId, setSelectedModelCandidateId] = useState<string | null>(null);
+  const [candidateThreshold, setCandidateThreshold] = useState(0.1);
+  const [candidateProposals, setCandidateProposals] = useState<BeeAnnotationProposal[]>([]);
+  const [selectedProposalId, setSelectedProposalId] = useState<string | null>(null);
+  const [editedProposalIds, setEditedProposalIds] = useState<Set<string>>(() => new Set());
+  const [candidateProposalMessage, setCandidateProposalMessage] = useState<string | null>(null);
   const [acknowledgeModelWarnings, setAcknowledgeModelWarnings] = useState(false);
   const [workingLabel, setWorkingLabel] = useState<string | null>(null);
   const [cropZoom, setCropZoom] = useState(1);
@@ -1518,6 +1539,8 @@ function TrainingCropAnnotationPanel({
   const selectedCropIsAssigned = Boolean(selectedCropDatasetItemId);
   const selectedEllipse =
     evidence?.beeEllipses.find((ellipse) => ellipse.annotationId === selectedEllipseId) ?? null;
+  const selectedProposal =
+    candidateProposals.find((proposal) => proposal.proposalId === selectedProposalId) ?? null;
   const cropLocked =
     selectedCrop?.reviewStatus === "review_complete" || selectedCrop?.reviewStatus === "excluded";
   const controlLocked = !selectedEllipse || cropLocked || Boolean(workingLabel);
@@ -1612,11 +1635,16 @@ function TrainingCropAnnotationPanel({
     }
     setTrainingCropDatasetItem(null);
     setCropZoom(1);
+    setCandidateProposals([]);
+    setSelectedProposalId(null);
+    setEditedProposalIds(new Set());
+    setCandidateProposalMessage(null);
     void refreshEvidence(selectedCropId);
   }, [selectedCropId]);
 
   useEffect(() => {
     refreshTrainingRuns().catch((error) => onError(toApiError(error)));
+    refreshModelCandidates().catch((error) => onError(toApiError(error)));
   }, [workspaceId]);
 
   useEffect(() => {
@@ -1774,6 +1802,99 @@ function TrainingCropAnnotationPanel({
     });
   }
 
+  async function suggestBeeAnnotationsForSelectedCrop() {
+    if (!selectedCrop || cropLocked) {
+      return;
+    }
+    await runCropAction("Suggesting bee ellipses", async () => {
+      const response = await suggestTrainingCropBeeAnnotations({
+        devUserId,
+        workspaceId,
+        trainingCropId: selectedCrop.trainingCropId,
+        modelCandidateId: selectedModelCandidateId,
+        confidenceThreshold: candidateThreshold,
+        maxSuggestions: 50
+      });
+      setSelectedModelCandidateId(response.modelCandidateId);
+      setCandidateProposals(response.suggestions);
+      setEditedProposalIds(new Set());
+      setSelectedProposalId(response.suggestions[0]?.proposalId ?? null);
+      setCandidateProposalMessage(
+        response.suggestions.length === 0
+          ? `No suggestions above ${Math.round(response.threshold * 100)}% confidence.`
+          : `${response.suggestions.length} suggestion${
+              response.suggestions.length === 1 ? "" : "s"
+            } from ${response.modelCandidateHumanReadableId}.`
+      );
+    });
+  }
+
+  function updateSelectedProposal(values: Partial<EllipseGeometry>) {
+    if (!selectedCrop || !selectedProposal || cropLocked) {
+      return;
+    }
+    const nextProposal: BeeAnnotationProposal = {
+      ...selectedProposal,
+      centerX: values.centerX ?? selectedProposal.centerX,
+      centerY: values.centerY ?? selectedProposal.centerY,
+      radiusX: values.radiusX ?? selectedProposal.radiusX,
+      radiusY: values.radiusY ?? selectedProposal.radiusY,
+      rotationDegrees: values.rotationDegrees ?? selectedProposal.rotationDegrees
+    };
+    if (!ellipseIsAllowedForCrop(selectedCrop, { ...nextProposal, annotationType: "partial_visible_bee" })) {
+      return;
+    }
+    setCandidateProposals((current) =>
+      current.map((proposal) =>
+        proposal.proposalId === selectedProposal.proposalId ? nextProposal : proposal
+      )
+    );
+    setEditedProposalIds((current) => new Set([...current, selectedProposal.proposalId]));
+  }
+
+  async function acceptSelectedProposal(annotationType: BeeAnnotationType) {
+    if (!selectedCrop || !selectedProposal || cropLocked) {
+      return;
+    }
+    const edited =
+      editedProposalIds.has(selectedProposal.proposalId) ||
+      annotationType !== selectedProposal.annotationType;
+    await runCropAction("Accepting suggested bee ellipse", async () => {
+      const ellipse = await createTrainingCropEllipse({
+        devUserId,
+        workspaceId,
+        trainingCropId: selectedCrop.trainingCropId,
+        annotationType,
+        centerX: selectedProposal.centerX,
+        centerY: selectedProposal.centerY,
+        radiusX: selectedProposal.radiusX,
+        radiusY: selectedProposal.radiusY,
+        rotationDegrees: selectedProposal.rotationDegrees,
+        provenance: {
+          source: "model_candidate",
+          reviewMethod: "human_reviewed_candidate",
+          modelCandidateId: selectedProposal.modelCandidateId,
+          candidateConfidence: selectedProposal.confidence,
+          candidateThreshold: selectedProposal.threshold,
+          rawModelClass: selectedProposal.rawModelClass,
+          rawYoloObb: selectedProposal.rawYoloObb,
+          candidateReviewDecision: edited ? "accepted_with_edits" : "accepted"
+        }
+      });
+      setSelectedEllipseId(ellipse.annotationId);
+      setCandidateProposals((current) =>
+        current.filter((proposal) => proposal.proposalId !== selectedProposal.proposalId)
+      );
+      setEditedProposalIds((current) => {
+        const next = new Set(current);
+        next.delete(selectedProposal.proposalId);
+        return next;
+      });
+      setSelectedProposalId(null);
+      await refreshEvidence(selectedCrop.trainingCropId);
+    });
+  }
+
   async function completeCrop(reviewVisibleBeeStatus: VisibleBeeStatus) {
     if (!selectedCrop) {
       return;
@@ -1880,6 +2001,19 @@ function TrainingCropAnnotationPanel({
         : null;
       return refreshedCurrent ?? listing.trainingRuns.at(0) ?? null;
     });
+    if (listing.trainingRuns.some((run) => run.modelCandidateId)) {
+      await refreshModelCandidates();
+    }
+  }
+
+  async function refreshModelCandidates() {
+    const listing = await fetchModelCandidates({ devUserId, workspaceId });
+    setModelCandidates(listing.modelCandidates);
+    setSelectedModelCandidateId((current) =>
+      current && listing.modelCandidates.some((candidate) => candidate.modelCandidateId === current)
+        ? current
+        : (listing.modelCandidates[0]?.modelCandidateId ?? null)
+    );
   }
 
   async function createModelDatasetVersion() {
@@ -1890,6 +2024,7 @@ function TrainingCropAnnotationPanel({
       const readiness = await fetchModelTrainingReadiness({ devUserId, workspaceId });
       setModelTrainingReadiness(readiness);
       await refreshTrainingRuns();
+      await refreshModelCandidates();
     });
   }
 
@@ -2205,6 +2340,23 @@ function TrainingCropAnnotationPanel({
                           aria-label={ellipse.annotationType}
                         />
                       ))}
+                      {candidateProposals.map((proposal) => (
+                        <button
+                          key={proposal.proposalId}
+                          type="button"
+                          className={`bee-ellipse candidate ${
+                            proposal.proposalId === selectedProposalId ? "selected" : ""
+                          }`}
+                          style={proposalStyle(selectedCrop, proposal)}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setSelectedProposalId(proposal.proposalId);
+                            setSelectedEllipseId(null);
+                          }}
+                          data-testid="candidate-bee-proposal"
+                          aria-label={`Suggested bee ${Math.round(proposal.confidence * 100)}% confidence`}
+                        />
+                      ))}
                     </div>
                   </div>
                 </div>
@@ -2424,6 +2576,193 @@ function TrainingCropAnnotationPanel({
                     <Trash2 size={18} />
                     Delete ellipse
                   </button>
+                </div>
+                <div
+                  className="crop-ellipse-controls candidate-controls"
+                  data-testid="candidate-prelabel-controls"
+                  aria-label="Model Candidate pre-labelling controls"
+                >
+                  <div>
+                    <strong>Candidate pre-labels</strong>
+                    <p data-testid="candidate-prelabel-message">
+                      {candidateProposalMessage ??
+                        "Ask the latest Bee Detector Model Candidate for suggested bee ellipses."}
+                    </p>
+                  </div>
+                  <label>
+                    <span>Model Candidate</span>
+                    <select
+                      value={selectedModelCandidateId ?? ""}
+                      onChange={(event) => setSelectedModelCandidateId(event.target.value || null)}
+                      disabled={cropLocked || Boolean(workingLabel) || modelCandidates.length === 0}
+                      data-testid="candidate-model-select"
+                    >
+                      {modelCandidates.length === 0 ? (
+                        <option value="">No candidates</option>
+                      ) : null}
+                      {modelCandidates.map((candidate) => (
+                        <option key={candidate.modelCandidateId} value={candidate.modelCandidateId}>
+                          {candidate.humanReadableId} / {candidate.adapterType}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="range-control">
+                    <span>Confidence {Math.round(candidateThreshold * 100)}%</span>
+                    <input
+                      type="range"
+                      min={0.01}
+                      max={0.9}
+                      step={0.01}
+                      value={candidateThreshold}
+                      onChange={(event) => setCandidateThreshold(Number(event.target.value))}
+                      data-testid="candidate-confidence-threshold-slider"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    disabled={cropLocked || Boolean(workingLabel) || modelCandidates.length === 0}
+                    onClick={() => void suggestBeeAnnotationsForSelectedCrop()}
+                    data-testid="suggest-bees-button"
+                  >
+                    <Play size={18} />
+                    Suggest bees
+                  </button>
+                  {selectedProposal ? (
+                    <>
+                      <div className="export-summary candidate-summary" data-testid="selected-candidate-proposal">
+                        <strong>{selectedProposal.modelCandidateHumanReadableId}</strong>
+                        <span>Confidence {Math.round(selectedProposal.confidence * 100)}%</span>
+                        <span>Threshold {Math.round(selectedProposal.threshold * 100)}%</span>
+                        <span>{selectedProposal.rawModelClass}</span>
+                        <span>
+                          {editedProposalIds.has(selectedProposal.proposalId)
+                            ? "edited"
+                            : "unchanged"}
+                        </span>
+                      </div>
+                      <div className="control-cluster" aria-label="Move selected candidate proposal">
+                        <button
+                          type="button"
+                          disabled={cropLocked || Boolean(workingLabel)}
+                          onClick={() =>
+                            updateSelectedProposal({ centerY: selectedProposal.centerY - 5 })
+                          }
+                          data-testid="nudge-candidate-proposal-up-button"
+                          title="Nudge suggestion up"
+                        >
+                          <ArrowUp size={18} />
+                        </button>
+                        <button
+                          type="button"
+                          disabled={cropLocked || Boolean(workingLabel)}
+                          onClick={() =>
+                            updateSelectedProposal({ centerX: selectedProposal.centerX - 5 })
+                          }
+                          data-testid="nudge-candidate-proposal-left-button"
+                          title="Nudge suggestion left"
+                        >
+                          <ArrowLeft size={18} />
+                        </button>
+                        <button
+                          type="button"
+                          disabled={cropLocked || Boolean(workingLabel)}
+                          onClick={() =>
+                            updateSelectedProposal({ centerX: selectedProposal.centerX + 5 })
+                          }
+                          data-testid="nudge-candidate-proposal-right-button"
+                          title="Nudge suggestion right"
+                        >
+                          <ArrowRight size={18} />
+                        </button>
+                        <button
+                          type="button"
+                          disabled={cropLocked || Boolean(workingLabel)}
+                          onClick={() =>
+                            updateSelectedProposal({ centerY: selectedProposal.centerY + 5 })
+                          }
+                          data-testid="nudge-candidate-proposal-down-button"
+                          title="Nudge suggestion down"
+                        >
+                          <ArrowDown size={18} />
+                        </button>
+                      </div>
+                      <div className="control-cluster" aria-label="Shape selected candidate proposal">
+                        <button
+                          type="button"
+                          disabled={cropLocked || Boolean(workingLabel)}
+                          onClick={() =>
+                            updateSelectedProposal({
+                              rotationDegrees: selectedProposal.rotationDegrees - 5
+                            })
+                          }
+                          data-testid="rotate-candidate-proposal-anticlockwise-button"
+                          title="Rotate suggestion anti-clockwise"
+                        >
+                          <RotateCcw size={18} />
+                        </button>
+                        <button
+                          type="button"
+                          disabled={cropLocked || Boolean(workingLabel)}
+                          onClick={() =>
+                            updateSelectedProposal({
+                              rotationDegrees: selectedProposal.rotationDegrees + 5
+                            })
+                          }
+                          data-testid="rotate-candidate-proposal-clockwise-button"
+                          title="Rotate suggestion clockwise"
+                        >
+                          <RotateCw size={18} />
+                        </button>
+                        <button
+                          type="button"
+                          disabled={cropLocked || Boolean(workingLabel)}
+                          onClick={() =>
+                            updateSelectedProposal({
+                              radiusX: Math.max(5, selectedProposal.radiusX - 5)
+                            })
+                          }
+                          data-testid="shrink-candidate-proposal-x-button"
+                          title="Reduce suggested horizontal radius"
+                        >
+                          <Minus size={18} />
+                          Rx
+                        </button>
+                        <button
+                          type="button"
+                          disabled={cropLocked || Boolean(workingLabel)}
+                          onClick={() =>
+                            updateSelectedProposal({ radiusX: selectedProposal.radiusX + 5 })
+                          }
+                          data-testid="grow-candidate-proposal-x-button"
+                          title="Increase suggested horizontal radius"
+                        >
+                          <Plus size={18} />
+                          Rx
+                        </button>
+                      </div>
+                      <div className="button-row">
+                        <button
+                          type="button"
+                          disabled={cropLocked || Boolean(workingLabel)}
+                          onClick={() => void acceptSelectedProposal("complete_visible_bee")}
+                          data-testid="accept-candidate-proposal-complete-button"
+                        >
+                          <Check size={18} />
+                          Accept complete
+                        </button>
+                        <button
+                          type="button"
+                          disabled={cropLocked || Boolean(workingLabel)}
+                          onClick={() => void acceptSelectedProposal("partial_visible_bee")}
+                          data-testid="accept-candidate-proposal-partial-button"
+                        >
+                          <Check size={18} />
+                          Accept partial
+                        </button>
+                      </div>
+                    </>
+                  ) : null}
                 </div>
               </div>
 

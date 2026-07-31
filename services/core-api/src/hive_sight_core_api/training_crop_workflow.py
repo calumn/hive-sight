@@ -5,6 +5,9 @@ from uuid import UUID
 from hive_sight_core_api.dev_store import DomainError, InMemoryProductDataStore, UserContext
 from hive_sight_core_api.models import (
     AnnotationType,
+    BeeEllipseAnnotationSource,
+    BeeEllipseReviewMethod,
+    CandidateAnnotationReviewDecision,
     CoordinateSpace,
     InspectionIntent,
     InspectionPhotoEvidenceResponse,
@@ -191,6 +194,7 @@ class TrainingCropWorkflow:
                 409,
             )
         _validate_bee_annotation_type(request.annotation_type)
+        _validate_ellipse_provenance(request)
         rotation = _normalize_rotation(request.rotation_degrees)
         _validate_ellipse_for_crop(
             crop=crop,
@@ -216,7 +220,14 @@ class TrainingCropWorkflow:
             coordinate_space=CoordinateSpace.source_image_pixels,
             source_image_width_px=crop.source_image_width_px,
             source_image_height_px=crop.source_image_height_px,
-            source="human_from_scratch",
+            source=request.source,
+            review_method=request.review_method,
+            model_candidate_id=request.model_candidate_id,
+            candidate_confidence=request.candidate_confidence,
+            candidate_threshold=request.candidate_threshold,
+            raw_model_class=_clean_optional_text(request.raw_model_class),
+            raw_yolo_obb=request.raw_yolo_obb,
+            candidate_review_decision=request.candidate_review_decision,
             created_by_user_id=user.user_id,
             created_at=created_at,
             updated_at=created_at,
@@ -437,6 +448,59 @@ def _validate_bee_annotation_type(annotation_type: AnnotationType) -> None:
             "Training Crop annotation supports complete and partial visible bees only.",
             422,
         )
+
+
+def _validate_ellipse_provenance(request: OrientedBeeEllipseCreateRequest) -> None:
+    if request.source == BeeEllipseAnnotationSource.human_from_scratch:
+        if request.review_method != BeeEllipseReviewMethod.human_from_scratch:
+            raise DomainError(
+                "invalid_ellipse_provenance",
+                "Human-from-scratch ellipses must use the human_from_scratch review method.",
+                422,
+            )
+        if any(
+            value is not None
+            for value in (
+                request.model_candidate_id,
+                request.candidate_confidence,
+                request.candidate_threshold,
+                request.raw_model_class,
+                request.raw_yolo_obb,
+                request.candidate_review_decision,
+            )
+        ):
+            raise DomainError(
+                "invalid_ellipse_provenance",
+                "Human-from-scratch ellipses cannot carry Model Candidate provenance.",
+                422,
+            )
+        return
+    if request.source == BeeEllipseAnnotationSource.model_candidate:
+        if request.review_method != BeeEllipseReviewMethod.human_reviewed_candidate:
+            raise DomainError(
+                "invalid_ellipse_provenance",
+                "Model Candidate ellipses must be recorded as human-reviewed candidates.",
+                422,
+            )
+        if (
+            request.model_candidate_id is None
+            or request.candidate_confidence is None
+            or request.candidate_threshold is None
+            or request.raw_model_class is None
+            or request.raw_yolo_obb is None
+            or request.candidate_review_decision is None
+        ):
+            raise DomainError(
+                "invalid_ellipse_provenance",
+                "Model Candidate ellipses require candidate confidence, threshold, raw class, raw OBB, and review decision.",
+                422,
+            )
+        return
+    raise DomainError(
+        "invalid_ellipse_provenance",
+        "Only human-from-scratch and Model Candidate ellipse sources are supported for Training Crop review.",
+        422,
+    )
 
 
 def _validate_ellipse_for_crop(
