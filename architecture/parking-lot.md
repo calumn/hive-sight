@@ -553,3 +553,49 @@ Before non-developer annotation sessions, before handing the tool to another cur
 Suggested owner or area:
 
 Developer experience, Web UI, and data safety.
+
+## PARK-0024: Durable Candidate Annotation Audit History
+
+Status: parked
+Date parked: 2026-07-31
+Source: Slice 0015.2 grilling
+Area: model governance, annotation workflow
+
+Context:
+
+Slice 0015.2 keeps model-generated Candidate Annotations transient and persists only accepted or edited proposals as reviewed Oriented Bee Ellipses with model-candidate provenance. Rejected suggestions are not durably recorded.
+
+Why parked:
+
+A full Candidate Annotation audit ledger would widen the crop pre-labelling slice into durable proposal lifecycle design, rejection history, blind-review comparison support, and active-learning evidence. The immediate learning goal is whether a completed Model Candidate can help annotate new crops under human review.
+
+Revisit trigger:
+
+Before blind-review comparison, model-assisted benchmark governance, active-learning workflows, persisted rejection analytics, or any workflow that needs to prove which model suggestions were rejected rather than simply absent from reviewed evidence.
+
+Suggested owner or area:
+
+Model governance, annotation workflow, and persistence design.
+
+## PARK-0025: Bee Detector Complete/Partial Classification Reliability
+
+Status: parked
+Date parked: 2026-07-31
+Source: Slice 0015.2 grilling
+Area: model quality, Varroa pipeline
+
+Context:
+
+Slice 0015.2 treats YOLO OBB Model Candidate output primarily as bee geometry suggestions. Suggested annotations default to `complete_visible_bee`, while the curator can accept as `partial_visible_bee`. The raw model-proposed class is retained as provenance, but the model is not trusted to distinguish complete and partial bees.
+
+Why parked:
+
+Complete visible bees and partial visible bees may have different downstream behaviour for Varroa denominator logic, Varroa crop generation, benchmark reporting, and user-facing analysis. The current seed dataset is too small to rely on model classification quality.
+
+Revisit trigger:
+
+Before using Bee Detector outputs for Varroa denominator logic, Varroa crop generation, model-quality benchmark reporting, or user-facing analysis.
+
+Suggested owner or area:
+
+Bee Detector evaluation, Varroa Detector planning, and model governance.
