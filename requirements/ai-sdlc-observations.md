@@ -278,9 +278,70 @@ AI contribution:
 - Added migration contract tests and an opt-in real Postgres restart integration test.
 - Verified the full non-Docker slice suite with `pnpm verify:slice`.
 
+Closeout verification:
+
+- Docker was available for local Postgres verification.
+- `pnpm db:reset` rebuilt and seeded the local Postgres schema.
+- `HIVESIGHT_TEST_DATABASE_URL=postgresql://hive_sight:hive_sight@localhost:5432/hive_sight_core services/core-api/.venv/bin/python -m pytest services/core-api/tests/test_postgres_persistence_slice.py -p no:cacheprovider` passed with `2 passed`.
+- Slice 0014 is now acceptance-closed for the live Postgres restart path.
+
 Human judgment still required:
 
-- Start Docker Desktop and run the opt-in `HIVESIGHT_TEST_DATABASE_URL` Postgres restart test once local Docker is available.
 - Decide whether the repo-local migration runner is sufficient for the next few slices or whether to move to Alembic before schema churn increases.
 - Revisit Dataset Versions before Slice 0015 training implementation.
 - Revisit training-versus-validation leakage warnings before serious model quality claims.
+
+### 2026-07-31 Slice 0015 YOLO OBB Training Baseline Planning
+
+Human-confirmed direction:
+
+- Proceed toward the first HiveSight Bee Detector training baseline using YOLO OBB.
+- Keep bee detection and Varroa mite detection as separate logical model stages.
+- Do not use generative AI as the planned baseline approach.
+- Use reviewed Training Crops with canonical Oriented Bee Ellipses as the training evidence.
+- Treat Candidate Annotations as useful acceleration only after human governance.
+
+AI contribution:
+
+- Reshaped Slice 0015 around a repeatable local Bee Detector training pipeline rather than a vague "train a model" milestone.
+- Added automation-bias controls to the slice plan: the baseline report must distinguish human-from-scratch and AI-assisted-reviewed evidence, and warn when blind-review comparison evidence is absent.
+- Added benchmark realism controls: benchmark data must remain protected from training and the report must warn if benchmark evidence is empty or easy-only.
+- Added the future Varroa training dependency risk to the parking lot so mite training is not built solely from Bee Detector-found bees by accident.
+
+Human judgment still required:
+
+- Implement the Slice 0015 planning decisions after the follow-up grilling pass.
+- Keep Varroa training source independence parked until before the first Varroa-specific slice.
+
+### 2026-07-31 Slice 0015 Grilling Closeout
+
+Human-confirmed decisions:
+
+- Slice 0015 will implement durable Dataset Versions, not just export manifests.
+- Dataset Versions freeze active reviewed Training Crop evidence, protected benchmark metadata, exclusions, selection criteria, review provenance, Hive Configuration context, source group context, and manifest hashes.
+- Unreviewed Candidate Annotations are excluded from Dataset Versions.
+- Grounding DINO is retired from the active solution and recorded in ADR 0005.
+- The active model direction is a HiveSight-owned Bee Detector, with YOLO OBB as the first replaceable implementation candidate.
+- YOLO training is opt-in. Normal app startup and fast tests use a fake adapter and do not require YOLO dependencies or network access.
+- Real YOLO setup/training should have memorable commands rather than long environment-variable incantations.
+- Real-adapter QA is a separate verification lane, distinct from the default CI/fast test lane.
+- Local Postgres should separate dev, test, and QA databases so automated tests do not wipe curator or QA model evidence.
+- Training artifacts live outside Postgres under a configurable artifact root; Postgres stores metadata, relative paths, hashes, status, settings, warnings, and provenance.
+- Reports must distinguish hard failures from governance warnings, use stable warning codes, and avoid raw personal/location metadata.
+- Model Candidates created by Slice 0015 are Bee Detector candidates only, not user-facing Model Versions and not Varroa assessment capability.
+- Public dataset annotation import is deferred to Slice 0015.1.
+- Full-frame/tiling export is parked for a later model-data slice.
+
+AI contribution:
+
+- Used the grilling workflow to resolve implementation-affecting edge cases one at a time.
+- Identified database purpose separation as a safety prerequisite for model-training work.
+- Proposed the Candidate Annotation domain language to replace "AI guess" and Grounding DINO-specific pre-labelling language.
+- Separated fake-adapter verification, real-adapter QA, and production-readiness claims.
+- Added artifact-serving and report-safety guardrails before local model artifacts become part of the workflow.
+
+Human judgment still required:
+
+- During implementation, decide whether local database purpose separation remains small enough to stay in Slice 0015 or should be split into Slice 0014.6.
+- Choose the exact pinned Ultralytics dependency version.
+- Decide whether the first real-adapter QA command can be fully automated in Slice 0015 or should be a command plus manual QA script.

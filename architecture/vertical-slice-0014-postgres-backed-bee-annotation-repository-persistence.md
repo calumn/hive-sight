@@ -1,6 +1,6 @@
 # Vertical Slice 0014: Postgres-Backed Bee Annotation Repository Persistence
 
-Status: implemented in code; live Postgres restart verification is ready but was not executed because Docker Desktop was not running locally.
+Status: closed. Implemented, fast-suite verified, browser-verified, and live Postgres restart verified.
 
 ## Purpose
 
@@ -199,4 +199,10 @@ The exact command names should follow existing repo conventions, but the expecte
 - Enforced benchmark Dataset Item `source_group_key` for both dataset-labelling and Training Crop assignment paths.
 - Added a browser UI field for benchmark Training Crop source group assignment.
 - Added an always-on migration contract test and an opt-in real Postgres restart integration test controlled by `HIVESIGHT_TEST_DATABASE_URL`.
-- `pnpm verify:slice` passed after implementation. The real Postgres integration test remained skipped in automated verification because Docker Desktop was not running in the local environment.
+- `pnpm verify:slice` passed after implementation.
+- Live Postgres closeout verification passed on 2026-07-31:
+  - Docker was available.
+  - `docker compose up -d postgres` confirmed the local Postgres container was running.
+  - `docker compose exec -T postgres pg_isready -U hive_sight` confirmed Postgres was accepting connections.
+  - `pnpm db:reset` rebuilt and seeded the local schema.
+  - `HIVESIGHT_TEST_DATABASE_URL=postgresql://hive_sight:hive_sight@localhost:5432/hive_sight_core services/core-api/.venv/bin/python -m pytest services/core-api/tests/test_postgres_persistence_slice.py -p no:cacheprovider` passed with `2 passed`.

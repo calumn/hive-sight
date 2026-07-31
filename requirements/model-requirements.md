@@ -17,7 +17,9 @@ The logical model pipeline has two stages:
 
 The implementation may use one model or multiple models. The requirements should preserve the logical separation between bee detection and Varroa detection so each can be measured, improved, and governed independently.
 
-Implementation traceability note: as of Slice 0013, HiveSight has implemented bee annotation and dataset foundations for a future Bee Detector baseline. The Varroa detection requirements remain product/model requirements, not implemented runtime capability.
+Implementation traceability note: as of Slice 0015 planning, HiveSight has implemented bee annotation, dataset foundations, Hive Configuration context, and Postgres-backed repository metadata for a future Bee Detector baseline. The first model-training baseline is Bee Detector only. The Varroa detection requirements remain product/model requirements, not implemented runtime capability.
+
+Grounding DINO was tried as a local pre-labelling adapter and retired by ADR 0005 after poor brood-frame bee localisation results. The active model direction is a HiveSight-owned Bee Detector trained from reviewed HiveSight annotation evidence, with YOLO OBB as the first replaceable implementation candidate.
 
 ## Model Objectives
 
@@ -119,17 +121,23 @@ Ground truth shall require human-reviewed annotations.
 
 Rationale: AI-generated labels and user corrections are useful signals, but they should not become trusted ground truth without review.
 
-### MR-012A AI-Assisted Draft Labels Are Allowed
+### MR-012A Candidate Annotations Are Allowed
 
-The project may use AI-assisted Draft Annotations to accelerate initial dataset creation.
+The project may use Candidate Annotations to accelerate initial dataset creation.
 
-Rationale: Pre-labelling can make the first bee and Varroa datasets practical to create.
+Rationale: Candidate annotations can make the first bee and Varroa datasets practical to create while keeping human review as the trust boundary.
 
-### MR-012B Draft Labels Are Not Ground Truth
+### MR-012B Candidate Annotations Are Not Ground Truth
 
-Draft Annotations shall remain distinct from Reviewed Annotations until a human reviewer checks or corrects them.
+Candidate Annotations shall remain distinct from Reviewed Annotations until a human reviewer checks or corrects them.
 
 Rationale: AI assistance should reduce annotation effort without creating circular or unverified labels.
+
+### MR-012C Automation-Bias Warning
+
+Training and evaluation reports shall distinguish human-from-scratch review from human-reviewed candidate annotations.
+
+Rationale: A human approving an existing machine proposal is not equivalent to drawing the annotation blind. Reports should warn when reviewed data lacks human-from-scratch or blind-review comparison evidence.
 
 ### MR-013 User Corrections As Review Candidates
 
@@ -215,11 +223,29 @@ The first trainable HiveSight Bee Detector should use oriented object detection,
 
 Rationale: YOLO OBB gives a practical local baseline for rotated bee-like objects while preserving the option to change model family once better project data exists.
 
+### MR-017F Dataset Version Freezing
+
+Any Dataset Version used by a Training Run shall freeze the included Dataset Item ids and the key metadata needed to reproduce and explain the run.
+
+Rationale: Later Dataset Item withdrawal, supersession, correction, or role changes must not silently change historical training evidence.
+
 ### MR-018 Protected Benchmark
 
 The benchmark dataset should be protected from training and routine threshold tuning.
 
 Rationale: Benchmark leakage would compromise the project's ability to measure real model improvement.
+
+### MR-018A Representative Benchmark Sourcing
+
+Benchmark data should include realistic dense, occluded, shadowed, poor-light, and varied source-group examples rather than only easy sparse crops.
+
+Rationale: A model that looks good only on easy curriculum data may fail on real inspection photos.
+
+### MR-018B Varroa Training Source Independence
+
+Before the first Varroa Detector training slice, the project shall decide how mite-training crops are sourced so the Varroa Detector does not inherit Bee Detector blind spots by construction.
+
+Rationale: If all mite-training crops come only from bees found by the Bee Detector, missed bee populations may never reach Varroa training or evaluation.
 
 ## Privacy And Consent
 
@@ -343,6 +369,8 @@ Every model training or fine-tuning execution shall record the Dataset Versions,
 
 Rationale: Model candidates must be reproducible and comparable.
 
+At minimum, a Training Run should record model purpose, model family, adapter type, dataset version, settings, base weights, random seed, artifact manifest, environment summary, git state, database purpose, warnings, metrics, and failure details.
+
 ### MR-029B Model Candidate Records
 
 Trained or configured models shall be tracked as Model Candidates until they pass benchmark evaluation and human promotion approval.
@@ -371,12 +399,12 @@ Rationale: Premature thresholds may be arbitrary before the project has represen
 
 - Which public or externally sourced datasets are legally usable for bootstrapping?
 - What annotation tool should be used for the first reviewed dataset?
-- Which AI-assisted pre-labelling approach should be used first?
 - What minimum image quality guidance should be given to users?
 - Should user corrections ever be used for training without a second reviewer, or is one reviewer enough for this project?
 - How large should the first protected benchmark set be?
-- What model family or service should be used for the first prototype?
 - Should dataset splits happen at photo, frame, inspection, hive, workspace, or source level?
 - How should duplicate or near-duplicate frame photos be detected?
 - How should model results be compared when a newer model re-analyses older photos?
 - Where should consent be captured in the product workflow?
+- What blind-review sample size is sufficient to measure automation bias once the workflow exists?
+- What independent sampling policy should govern future Varroa Detector training crops?

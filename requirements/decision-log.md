@@ -2,9 +2,9 @@
 
 ## 2026-07-29 AI-Assisted Annotation Is The Initial Dataset Bootstrap Path
 
-Decision: HiveSight will use AI-assisted annotation as the intended bootstrap path for creating the first reviewed bee and Varroa datasets. A model, hosted vision service, generative AI tool, or other pre-labelling mechanism may create Draft Annotations, but those Draft Annotations are not ground truth until a human reviewer checks, corrects, approves, rejects, marks uncertain, or excludes them.
+Decision: HiveSight will use AI-assisted annotation as the intended bootstrap path for creating the first reviewed bee and Varroa datasets. A model, hosted vision service, generative AI tool, or other candidate-generation mechanism may create Candidate Annotations, but those Candidate Annotations are not ground truth until a human reviewer checks, corrects, approves, rejects, marks uncertain, or excludes them.
 
-Rationale: Manually drawing every bee and Varroa annotation from scratch across the initial dataset would be too slow and would make model viability hard to explore. AI-assisted pre-labelling can reduce annotation effort while preserving human review as the trust boundary.
+Rationale: Manually drawing every bee and Varroa annotation from scratch across the initial dataset would be too slow and would make model viability hard to explore. Candidate-generation helpers can reduce annotation effort while preserving human review as the trust boundary.
 
 Implications:
 
@@ -273,11 +273,25 @@ Rationale: Bees are elongated and appear at many rotations. Axis-aligned boxes a
 
 Implications:
 
-- Grounding DINO remains an experimental pre-labelling adapter and comparison point, not the primary model strategy.
-- Draft model output is never ground truth without human review.
+- Grounding DINO was initially treated as an experimental pre-labelling adapter and comparison point, but ADR 0005 later retired it from the active solution after poor brood-frame bee localisation results.
+- Candidate Annotation output is never ground truth without human review.
 - The annotation UI must support fast creation and adjustment of rotated ellipses.
 - Dataset exports must distinguish canonical reviewed annotation evidence from model-specific training labels.
 - The first dataset bootstrap should start with small reviewed Training Crops and grow toward larger crops, frame regions, and full frame sides.
+
+## 2026-07-31 Grounding DINO Retired From Active Model Direction
+
+Decision: HiveSight will remove Grounding DINO from the active pre-labelling/model-training solution. The replacement direction is a project-owned Bee Detector trained from reviewed HiveSight annotation evidence, with YOLO OBB as the first implementation candidate behind an adapter seam.
+
+Rationale: Real brood-frame trial images showed that Grounding DINO was not useful enough at localising bees in HiveSight's target imagery. Continuing to tune it would distract from the stronger path: build a detector that can improve from reviewed Oriented Bee Ellipse evidence governed inside HiveSight.
+
+Implications:
+
+- Active docs, commands, adapter registration, and dependencies should stop presenting Grounding DINO as supported.
+- Historical Slice 0007 documentation may remain as a record of the spike.
+- New domain language should prefer Candidate Annotation over Grounding DINO-specific pre-labelling language.
+- YOLO OBB is the first Bee Detector baseline, not a permanent commitment to one model family.
+- The decision is captured in `architecture/adr/0005-retire-grounding-dino-for-bee-candidate-annotation.md`.
 
 ## 2026-07-29 Inspection Intent And Multi-Photo Inspections
 

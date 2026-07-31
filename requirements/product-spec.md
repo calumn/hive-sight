@@ -197,9 +197,9 @@ Feature: AI-assisted annotation and dataset bootstrap
     Then the reviewed oriented bee ellipses become reviewed annotation evidence
     And the crop can become eligible for Dataset Role assignment
 
-  Scenario: Reviewer creates reviewed bee annotations from AI-assisted draft annotations
+  Scenario: Reviewer creates reviewed bee annotations from Candidate Annotations
     Given an original inspection photo is selected for dataset labelling
-    When the system creates AI-assisted Draft Annotations for visible bees
+    When the system creates Candidate Annotations for visible bees
     And a human reviewer corrects and approves the useful annotations
     Then the approved annotations become Reviewed Annotations
     And the system records the Annotation Source for each annotation
@@ -237,6 +237,26 @@ Feature: AI-assisted annotation and dataset bootstrap
     When the project prepares the first HiveSight Bee Detector training run
     Then the reviewed ellipses are exported as oriented bounding boxes
     And the exported YOLO OBB labels remain a model-specific projection of the reviewed evidence
+
+  Scenario: Dataset curator runs a Bee Detector training baseline
+    Given a Dataset Curator has created a Dataset Version from active reviewed Training Crop evidence
+    And the Dataset Version contains training and validation items
+    When the Dataset Curator starts a YOLO OBB Bee Detector Training Run
+    Then the system records the Training Run and its artifacts
+    And a completed run creates a Model Candidate that is not user-facing
+    And the report states that the run trains bee localisation only, not Varroa assessment
+
+  Scenario: Candidate annotations are excluded until reviewed
+    Given a Training Crop contains Candidate Annotations that have not been human reviewed
+    When a Dataset Curator creates a Dataset Version
+    Then the unreviewed Candidate Annotations are excluded from training evidence
+    And the exclusion reason is recorded
+
+  Scenario: Benchmark evidence is protected during Bee Detector training
+    Given a Dataset Version contains protected benchmark items
+    When the Dataset Curator starts a Bee Detector Training Run
+    Then benchmark items are not exported into the trainer-facing train or validation data
+    And the report records benchmark protection and any benchmark realism warnings
 
 Feature: Workspace data-use agreement and model governance
 
@@ -317,8 +337,10 @@ Feature: Deferred guest trial analysis
 - The analysis output should include estimated complete visible bee count, partial visible bee count where possible, likely Varroa count, Varroa association state, and likely mites per 100 complete visible bees.
 - The system should store original photos and structured annotation data rather than relying only on flattened annotated images.
 - Tagged-up photos should be rendered from original photos plus annotation data.
-- AI-assisted annotation is the intended bootstrap path for the first reviewed datasets, but Draft Annotations require human review before they become Reviewed Annotations.
-- Canonical reviewed bee annotations use oriented bee ellipses. The first trainable bee detector baseline is YOLO OBB, using an exported oriented bounding-box projection derived from those ellipses.
+- AI-assisted annotation is the intended bootstrap path for the first reviewed datasets, but Candidate Annotations require human review before they become Reviewed Annotations.
+- Canonical reviewed bee annotations use oriented bee ellipses. The first trainable Bee Detector baseline is YOLO OBB, using an exported oriented bounding-box projection derived from those ellipses.
+- Early model training is a Dataset Curator/admin workflow, not an ordinary beekeeper inspection workflow.
+- The first model-training baseline is Bee Detector only. It does not produce Varroa assessment, infestation results, or a user-facing Model Version.
 - The dataset bootstrap should start with small reviewed Training Crops and grow toward larger crops, frame regions, and full frame sides as model quality improves.
 - Dataset-labelling workflows and beekeeper product-feedback workflows may reuse UI components, but their provenance and dataset-governance records must remain distinct.
 - The first correction loop should support marking false Varroa detections and missed likely Varroa locations.

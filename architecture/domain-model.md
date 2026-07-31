@@ -25,7 +25,7 @@ In scope:
 - explicit privacy/deletion gap capture
 - model version, dataset version, benchmark, and review concepts needed for model governance
 
-Implementation traceability note: some domain concepts are future-state concepts. As of Slice 0013, the implemented path is bee annotation, dataset foundations, Hive Configuration metadata, and preparation for a Bee Detector baseline. Real Varroa detection, Varroa Annotation review, Visible Varroa Rate calculation, Training Runs, Model Candidates, Model Versions, and Benchmark Evaluations are modelled concepts, not completed runtime behaviour.
+Implementation traceability note: some domain concepts are future-state concepts. As of Slice 0015 planning, the implemented path is bee annotation, dataset foundations, Hive Configuration metadata, Postgres-backed repository metadata, and preparation for a Bee Detector baseline. Real Varroa detection, Varroa Annotation review, Visible Varroa Rate calculation, user-facing Model Versions, and Benchmark Evaluations are modelled concepts, not completed runtime behaviour.
 
 Out of scope:
 
@@ -572,22 +572,63 @@ Visibility classes:
 - `partial_visible_bee`
 - `uncertain_bee`
 
-Sources:
+Annotation sources:
 
 - `human_from_scratch`
-- `ai_assisted_draft`
-- `model_suggested`
+- `model_candidate`
+- `imported_public_dataset`
 - `user_corrected`
 - `reviewer_corrected`
-- `reviewed`
+- `unknown_legacy`
+
+Review methods:
+
+- `human_from_scratch`
+- `human_reviewed_candidate`
+- `imported_reviewed`
 
 Rules:
 
 - The canonical reviewed geometry for bee annotations is an oriented bee ellipse.
-- AI-assisted Draft Annotations are not ground truth until human reviewed.
+- Candidate Annotations are not ground truth until human reviewed.
 - Reviewed Annotations still require Dataset Role assignment before dataset use.
 - Model-specific exports may project oriented ellipses into other shapes such as YOLO OBB labels.
 - Bee annotation geometry remains mutable during Training Crop review and is locked once a Dataset Item snapshots it.
+- `partial_visible_bee` requires enough visible body to draw a meaningful ellipse. Ambiguous fragments should be uncertain or excluded rather than guessed into training evidence.
+
+### Candidate Annotation
+
+A proposed Annotation awaiting human review.
+
+Essential fields:
+
+- id
+- workspace id
+- source image id
+- optional inspection photo id
+- optional training crop id
+- annotation type
+- proposed geometry
+- annotation source
+- optional proposing model candidate id
+- confidence
+- status
+- created at
+
+Sources:
+
+- `model_candidate`
+- `imported_public_dataset`
+- `human_from_scratch`
+- `unknown_legacy`
+
+Rules:
+
+- Candidate Annotations are untrusted proposed evidence.
+- Candidate Annotations may accelerate review but must not enter Dataset Versions until human reviewed.
+- Grounding DINO is retired from the active solution and should not be modelled as an active Candidate Annotation source.
+- Imported public dataset annotations may enter as Candidate Annotations only; they become reviewed evidence only after HiveSight review.
+- Candidate Annotation is independent of any one model run or model family.
 
 ### Varroa Annotation
 
@@ -615,7 +656,7 @@ Rules:
 
 - Only likely Varroa detections associated with complete visible bees contribute to the headline numerator.
 - Partial or unassociated Varroa detections are additional evidence.
-- AI-assisted Draft Annotations are not ground truth until human reviewed.
+- Candidate Annotations are not ground truth until human reviewed.
 - Reviewed Annotations still require Dataset Role assignment before dataset use.
 
 ### User Correction
@@ -785,6 +826,50 @@ Rules:
 - Consent withdrawal does not automatically remove Dataset Items from future training/export in Slice 0014; withdrawal and deletion enforcement remain explicit policy gaps.
 - Model-specific training files are derived artifacts, not the canonical Dataset Item evidence.
 
+### Dataset Version
+
+A frozen, named version of reviewed data used for a Training Run or protected Benchmark Evaluation.
+
+Essential fields:
+
+- id
+- human-readable id
+- workspace id
+- purpose
+- model purpose
+- status
+- export format
+- selection criteria
+- manifest hash
+- included dataset item snapshots
+- excluded dataset items and reasons
+- protected benchmark dataset item ids
+- source group distribution
+- hive configuration distribution
+- curriculum stage distribution
+- annotation class counts
+- annotation source counts
+- review method counts
+- warning summary
+- created by user id
+- created at
+
+Statuses:
+
+- `active`
+- `obsolete`
+
+Rules:
+
+- A Dataset Version is explicit and durable.
+- A Dataset Version freezes the evidence and explanatory metadata used at creation time.
+- Only active, reviewed Dataset Items may be included.
+- Candidate Annotations that have not been reviewed are excluded from Dataset Versions.
+- Dataset Versions used by Training Runs are immutable. Changed evidence or changed selection criteria require a new Dataset Version.
+- Benchmark Dataset Items may be recorded as protected metadata, but must not be exported into trainer-facing training or validation data.
+- A Dataset Version may be marked obsolete as metadata, but its frozen manifest must not be changed.
+- Model-specific export packages are physical artifacts derived from a Dataset Version, not the Dataset Version itself.
+
 ### Training Run
 
 A recorded execution that trains or fine-tunes a model candidate.
@@ -792,21 +877,39 @@ A recorded execution that trains or fine-tunes a model candidate.
 Essential fields:
 
 - id
-- model candidate id
-- training dataset version id
-- validation dataset version id
+- human-readable id
+- workspace id
+- dataset version id
+- model purpose
+- model family
+- adapter type
 - training settings summary
+- base weights and source
+- random seed
+- database purpose
+- artifact manifest reference
 - code or artifact reference
+- git commit sha and dirty status
+- environment summary
 - status
+- phase
 - started at
 - completed at
+- failure code
+- failure message
 - outcome summary
+- optional retry-of training run id
 
 Rules:
 
 - Training Runs must not use benchmark Dataset Items.
 - Training Runs should be repeatable enough to compare candidates.
 - The first bee detector baseline is expected to use YOLO OBB as a model-specific export from reviewed oriented bee ellipses.
+- Slice 0015 Training Runs create non-user-facing Model Candidates only.
+- Failed Training Runs do not create Model Candidates.
+- Training Runs are immutable once terminal except for derived artifact availability.
+- One queued/running local Training Run may exist at a time in Slice 0015.
+- Real YOLO training should not run against the disposable test database by default.
 
 ### Model Candidate
 
@@ -815,17 +918,28 @@ A model or model pipeline version under evaluation before user-facing approval.
 Essential fields:
 
 - id
-- name
-- candidate label
+- human-readable id
+- display name
+- workspace id
+- model purpose
 - model family or service
 - training run id
-- release status
+- adapter type
+- artifact reference
+- status
+- promotion status
+- not user-facing reason
 - created at
 
-Release statuses:
+Statuses:
 
-- `draft`
-- `training_complete`
+- `created`
+- `failed`
+- `withdrawn`
+
+Promotion statuses:
+
+- `not_evaluated`
 - `benchmark_pending`
 - `approved_for_user_facing_analysis`
 - `rejected`
@@ -833,6 +947,9 @@ Release statuses:
 Rules:
 
 - A Model Candidate becomes user-facing only after Benchmark Evaluation and human approval.
+- The Slice 0015 Bee Detector baseline creates Model Candidates with `promotion_status=not_evaluated`.
+- A Model Candidate is not a Model Version.
+- Fake-adapter Model Candidates must remain visibly fake/test-only and ineligible for real promotion.
 
 ### Model Version
 
@@ -861,30 +978,6 @@ Relationships:
 
 - produces many analysis results
 - has many benchmark evaluations
-
-### Dataset Version
-
-A named version of reviewed data used for training, validation, benchmark evaluation, or exclusion.
-
-Essential fields:
-
-- id
-- name
-- version label
-- dataset role
-- source summary
-- created at
-
-Dataset roles:
-
-- `training`
-- `validation`
-- `benchmark`
-- `excluded`
-
-Rules:
-
-- Benchmark datasets must be protected from training and routine threshold tuning.
 
 ### Benchmark Evaluation
 
@@ -921,7 +1014,8 @@ Rules:
 - Inspection may define many frame labels.
 - Frame label may group many inspection photos within one inspection.
 - Inspection photo may have many analysis results.
-- Inspection photo may have many training crops.
+- Source image may have many training crops.
+- Inspection photo may be referenced by many training crops when the source image is an inspection photo.
 - Analysis result belongs to exactly one model version.
 - Analysis result has many bee annotations and Varroa annotations.
 - Training crop may have many bee annotations.
@@ -931,9 +1025,9 @@ Rules:
 - Data deletion request belongs to one workspace.
 - Review decision applies to one review subject.
 - Dataset item references reviewed image and annotation evidence.
-- Dataset version contains many dataset items.
-- Training run uses training and validation dataset versions.
-- Training run produces or updates one model candidate.
+- Dataset version contains frozen snapshots of many dataset items.
+- Training run uses one Dataset Version containing training, validation, protected benchmark metadata, and exclusions.
+- Training run may produce one model candidate.
 - Model candidate may become a model version after benchmark evaluation and human approval.
 - Model version may have many benchmark evaluations.
 - Benchmark evaluation uses one dataset version.
@@ -1018,7 +1112,8 @@ Rules:
 - Every inspection has exactly one intent.
 - An inspection must not mix training data collection and Varroa assessment intents.
 - Every inspection photo belongs to exactly one inspection.
-- Every training crop belongs to exactly one inspection photo.
+- Every training crop belongs to exactly one source image.
+- A training crop may reference one inspection photo when the source image is an inspection photo.
 - Every accepted inspection photo has a preserved original file reference.
 - Every analysis result belongs to exactly one inspection photo.
 - Every analysis result records the model version that produced it.
@@ -1028,12 +1123,18 @@ Rules:
 - Every user correction records the user who created it once authentication exists.
 - A user correction is never ground truth without review.
 - A user correction is never training, validation, or benchmark data without an active workspace data-use agreement and review.
-- A Draft Annotation is never ground truth without human review.
+- A Candidate Annotation is never ground truth without human review.
 - A Reviewed Annotation is never training, validation, or benchmark data without Dataset Role assignment.
 - A reviewed bee annotation uses an oriented bee ellipse as its canonical geometry.
 - YOLO OBB labels are derived training exports, not canonical annotation evidence.
 - A Dataset Item must have exactly one Dataset Role.
 - Benchmark Dataset Items must not be used for training or routine tuning.
+- A Dataset Version includes only active reviewed Dataset Items as training or validation evidence.
+- A Dataset Version freezes the metadata needed to explain a Training Run.
+- A Dataset Version referenced by a Training Run is immutable.
+- A Training Run creates a Model Candidate, not an approved Model Version.
+- Bee Detector and Varroa Detector are separate model purposes.
+- The Bee Detector does not assess Varroa infestation.
 - Workspace ownership does not grant internal dataset/model governance capability.
 - A user must be registered, logged in, and authorized through an active workspace membership before uploading inspection photos.
 - A workspace without an accepted workspace data-use agreement must not upload new photos or receive new analysis.
@@ -1114,7 +1215,8 @@ Deferred privacy decisions:
 - Upload status supports FR-018 and NFR-006.
 - `Model Version` supports MR-028.
 - `Dataset Item` supports MR-017, MR-017A, and the AI-assisted annotation baseline.
-- `Dataset Version` supports MR-017 and MR-029.
+- `Candidate Annotation` supports AI-assisted annotation while preserving human review as the trust boundary.
+- `Dataset Version` supports MR-017, MR-017F, MR-029, and Slice 0015 Training Run governance.
 - `Training Run` and `Model Candidate` support MR-029A, MR-029B, and the AI-assisted annotation baseline.
 - `Benchmark Evaluation` supports MR-030 and MR-031.
 

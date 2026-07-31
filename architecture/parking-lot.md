@@ -13,7 +13,7 @@ Use this when something is out of scope now but expected later. Prefer ADRs or t
 
 ## PARK-0001: UI-Level Gherkin Harness
 
-Status: parked
+Status: promoted
 Date parked: 2026-07-30
 Source: Slice 0003.5, Slice 0009.5, skills remediation
 Area: testing
@@ -36,7 +36,7 @@ Delivery test automation and acceptance BDD.
 
 ## PARK-0002: Security Threat-Modelling Skill
 
-Status: parked
+Status: promoted
 Date parked: 2026-07-30
 Source: HiveSight review, skills remediation grilling
 Area: security
@@ -145,13 +145,17 @@ Revisit trigger:
 
 Slice 0013 closeout decision: `go after Slice 0014`. Revisit after Slice 0014 Postgres-backed Bee Annotation Repository persistence is complete.
 
+Promotion note:
+
+Promoted into active planning as `architecture/vertical-slice-0015-yolo-obb-training-baseline.md` after Slice 0014 live Postgres closeout passed. Slice 0015 planning now also retires Grounding DINO from the active solution and adds a project-owned Bee Detector training baseline.
+
 Suggested owner or area:
 
 Model governance and architecture.
 
 ## PARK-0007: Dev Persona Switcher
 
-Status: parked
+Status: promoted
 Date parked: 2026-07-30
 Source: Slice 0013 grilling
 Area: developer experience, UI acceptance, authorization simulation
@@ -209,6 +213,10 @@ Slice 0014 persists Dataset Items, but not Dataset Versions. Dataset Versions be
 Why parked:
 
 Persisting Dataset Versions belongs with the YOLO OBB Training Baseline or a nearby model-training slice, not the first repository persistence slice.
+
+Promotion note:
+
+Promoted into Slice 0015 planning. Dataset Versions are now planned as durable first-class records that freeze active reviewed Dataset Items, protected benchmark metadata, exclusions, selection criteria, and report/preview artifacts before a Training Run consumes them.
 
 Revisit trigger:
 
@@ -286,3 +294,72 @@ Before serious benchmark claims, protected benchmark reporting, model promotion,
 Suggested owner or area:
 
 Model evaluation and dataset governance.
+
+## PARK-0013: Varroa Training Source Independence
+
+Status: parked
+Date parked: 2026-07-31
+Source: Slice 0015 planning feedback
+Area: model training, model evaluation, dataset governance
+
+Context:
+
+Bee detection and Varroa detection are separate logical model stages. That split helps measure each stage independently, but it does not automatically prevent the mite-training dataset from inheriting Bee Detector blind spots. If mite-training crops are selected only from bees found by the Bee Detector, the Varroa detector may never learn from missed bee populations such as shadowed, occluded, dense, or unusual-angle bees.
+
+Why parked:
+
+Slice 0015 trains only the HiveSight Bee Detector. Varroa mite annotation, mite crops, mite detector training, and bee-to-mite association are out of scope for the first YOLO OBB bee baseline.
+
+Revisit trigger:
+
+Before the first Varroa detector training slice, before creating a mite benchmark Dataset Version, or before using Bee Detector output as the sole source of mite-training crops.
+
+Suggested owner or area:
+
+Model governance, dataset curation, and architecture ADR review.
+
+## PARK-0014: Public Dataset Candidate Annotation Import
+
+Status: parked
+Date parked: 2026-07-31
+Source: Slice 0015 grilling
+Area: model training, dataset bootstrap, provenance
+
+Context:
+
+The user has a public USDA-ARS Tucson annotated hive-frame dataset available locally, with PNG images and XML annotations. These annotations may help bootstrap HiveSight's Bee Detector, but they must be treated as Candidate Annotations requiring HiveSight human review before becoming trusted training evidence.
+
+Why parked:
+
+Slice 0015 already includes Dataset Versions, YOLO OBB export, Training Runs, Model Candidates, reporting, local database purpose separation, and Grounding DINO retirement. Public XML import has separate parsing, provenance, licensing, source-group, and review-quality questions.
+
+Revisit trigger:
+
+Planned next as `Slice 0015.1: Public Dataset Candidate Annotation Import`, after the YOLO OBB Training Baseline workflow exists.
+
+Suggested owner or area:
+
+Dataset curation and model governance.
+
+## PARK-0015: Full-Frame And Tiled YOLO Export
+
+Status: parked
+Date parked: 2026-07-31
+Source: Slice 0015 grilling
+Area: model data pipeline
+
+Context:
+
+Slice 0015 trains from reviewed Training Crops only. Scaling toward dense full-frame brood photos may require full-frame annotations, tiling, different preview/quality checks, and stronger leakage controls.
+
+Why parked:
+
+The first Bee Detector baseline should prove the reproducible governed training pipeline on small crops before widening to full-frame export complexity.
+
+Revisit trigger:
+
+Before training from full-frame regions or full frame sides, before using large dense brood-frame photos as trainer-facing input, or before evaluating whether crop-trained models transfer to real inspection photos.
+
+Suggested owner or area:
+
+Model training, dataset export, and annotation UI.

@@ -121,6 +121,55 @@ Design warning:
 
 Do not make the Core API route handler know the queue payload shape in detail. The route should call the workflow interface; the workflow owns event construction.
 
+### Bee Detector Training
+
+Candidate module:
+
+`BeeDetectorTrainingWorkflow`
+
+External interface:
+
+```text
+get_training_readiness(workspace_id, requested_adapter)
+create_dataset_version(workspace_id, selection_criteria)
+start_training_run(workspace_id, dataset_version_id, training_settings, warning_acknowledgement)
+get_training_run(workspace_id, training_run_id)
+get_model_candidate(workspace_id, model_candidate_id)
+get_artifact(workspace_id, artifact_id)
+```
+
+Behaviour hidden behind the interface:
+
+- Dataset Curator/internal capability authorization
+- Dataset Version selection, frozen snapshotting, manifest hashing, and exclusion reasons
+- benchmark protection and dataset leakage warnings
+- Training Crop image/dimension validation
+- oriented ellipse to YOLO OBB projection
+- local export package and preview artifact generation
+- high-severity warning acknowledgement
+- one-active-training-run lock
+- model-training adapter selection
+- Training Run lifecycle and Model Candidate creation
+- artifact record validation and safe artifact serving
+
+Dependencies:
+
+- Postgres-backed product/model governance store
+- local filesystem artifact storage
+- `BeeDetectorTrainingAdapter`
+- authorization/dev-session context
+
+Adapter strategy:
+
+- fast tests: fake `BeeDetectorTrainingAdapter` that writes deterministic fake weights, logs, metrics, report, and artifact manifest
+- explicit local real path: Ultralytics YOLO OBB adapter using optional pinned dependencies
+
+Design warning:
+
+Do not make route handlers, UI components, or persistence adapters know YOLO-specific file layout details. YOLO OBB export is a derived projection from canonical Oriented Bee Ellipses. Keep the model-family details inside export/training adapters so HiveSight can change model family later.
+
+Slice 0015 keeps this workflow inside Core API because Dataset Versions, Training Runs, Model Candidates, reports, and artifact metadata are Core API governance records. If training becomes heavy enough to require process isolation, GPU scheduling, or durable job queues, move the adapter execution behind the Analysis Service or a dedicated training worker without changing the public model-training contract.
+
 ## Analysis Service Modules
 
 ### Analysis Job Runner
@@ -274,8 +323,10 @@ Before adding persistence, queueing, storage signing, or model stubs, create the
 
 - Core API: `inspection_photo_access.py`
 - Core API: `analysis_request_workflow.py`
+- Core API: `bee_detector_training_workflow.py`
 - Core API: `adapters/object_storage.py`
 - Core API: `adapters/analysis_queue.py`
+- Core API: `adapters/bee_detector_training.py`
 - Analysis Service: `analysis_job_runner.py`
 - Analysis Service: `model_runtime.py`
 - Analysis Service: `adapters/object_storage.py`

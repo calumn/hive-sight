@@ -27,18 +27,23 @@ erDiagram
     BEE_ANNOTATION ||--o{ USER_CORRECTION : may_be_corrected_by
     VARROA_ANNOTATION ||--o{ USER_CORRECTION : may_be_corrected_by
     USER_CORRECTION ||--o{ REVIEW_DECISION : reviewed_by
+    CANDIDATE_ANNOTATION ||--o{ REVIEW_DECISION : reviewed_by
     BEE_ANNOTATION ||--o{ REVIEW_DECISION : reviewed_by
     VARROA_ANNOTATION ||--o{ REVIEW_DECISION : reviewed_by
 
     WORKSPACE ||--o{ WORKSPACE_DATA_USE_AGREEMENT : accepts
     WORKSPACE ||--o{ DATA_DELETION_REQUEST : may_request
 
-    DATASET_VERSION ||--o{ REVIEW_DECISION : includes_approved_evidence
     TRAINING_CROP ||--o{ BEE_ANNOTATION : reviewed_with
+    TRAINING_CROP ||--o{ CANDIDATE_ANNOTATION : may_have
     TRAINING_CROP ||--o| DATASET_ITEM : becomes
     SOURCE_IMAGE ||--o{ DATASET_ITEM : sources
     DATASET_ITEM ||--o{ REVIEW_DECISION : may_be_reviewed_by
+    DATASET_VERSION ||--o{ DATASET_ITEM : freezes
+    DATASET_VERSION ||--o{ TRAINING_RUN : used_by
+    TRAINING_RUN ||--o| MODEL_CANDIDATE : produces
     DATASET_VERSION ||--o{ BENCHMARK_EVALUATION : used_by
+    MODEL_CANDIDATE ||--o{ BENCHMARK_EVALUATION : evaluated_by
     MODEL_VERSION ||--o{ BENCHMARK_EVALUATION : evaluated_by
     BENCHMARK_EVALUATION ||--o{ REVIEW_DECISION : approved_by
 
@@ -148,7 +153,17 @@ erDiagram
         string training_crop_id
         string visibility_class
         string source
+        string review_method
         string review_status
+    }
+
+    CANDIDATE_ANNOTATION {
+        string id
+        string source_image_id
+        string training_crop_id
+        string annotation_type
+        string annotation_source
+        string status
     }
 
     VARROA_ANNOTATION {
@@ -195,8 +210,10 @@ erDiagram
 
     DATASET_VERSION {
         string id
-        string version_label
-        string dataset_role
+        string human_readable_id
+        string model_purpose
+        string export_format
+        string status
     }
 
     DATASET_ITEM {
@@ -214,14 +231,35 @@ erDiagram
         string dataset_version_id
         string status
     }
+
+    TRAINING_RUN {
+        string id
+        string human_readable_id
+        string dataset_version_id
+        string model_purpose
+        string model_family
+        string adapter_type
+        string status
+    }
+
+    MODEL_CANDIDATE {
+        string id
+        string human_readable_id
+        string model_purpose
+        string model_family
+        string promotion_status
+    }
 ```
 
 ## Reading The Diagram
 
 - The left side is the identity and beekeeper workflow: registered user, workspace membership, workspace, apiary, hive, inspection, photos, and analysis.
 - The middle is the evidence layer: analysis results, bee annotations, Varroa annotations, summaries, and corrections.
-- The lower/right side is model governance: review decisions, workspace data-use agreements, deletion requests, dataset versions, model versions, and benchmark evaluations.
+- The lower/right side is model governance: review decisions, workspace data-use agreements, deletion requests, dataset versions, training runs, model candidates, model versions, and benchmark evaluations.
 - `User` is the login identity. `Workspace Membership` grants access to a workspace. `Beekeeper` remains a persona/product actor, not a persisted version-one entity.
 - `Source Image` is the underlying image evidence record. `Inspection Photo` is the product-facing role a Source Image plays when attached to an Inspection.
 - `Inspection Summary` is derived from photo-level analysis results and should be recalculable.
 - `User Correction` is review evidence, not ground truth or training data until the workspace data-use agreement and review decisions allow it.
+- `Candidate Annotation` is proposed evidence only. It must be human reviewed before it can become Dataset Item evidence.
+- `Dataset Version` freezes reviewed Dataset Item evidence before a Training Run or Benchmark Evaluation consumes it.
+- Slice 0015 trains Bee Detector Model Candidates only. Varroa Detector training and user-facing Model Versions remain future work.

@@ -4,11 +4,11 @@
 
 HiveSight will build its bee detector from a growing repository of human-reviewed bee annotations. The project will start with small, manageable crop images and gradually move toward larger crops, full-frame regions, and whole frame sides as model quality improves.
 
-This baseline refines the AI-assisted annotation strategy after the Grounding DINO spike. Grounding DINO remains useful as an experimental helper, but the intended path is to train the HiveSight Bee Detector from reviewed HiveSight data.
+This baseline refines the AI-assisted annotation strategy after the Grounding DINO spike. Grounding DINO has been retired from the active solution by ADR 0005. The intended path is to train the HiveSight Bee Detector from reviewed HiveSight data.
 
 ## Core Principles
 
-- Model suggestions are Draft Annotations only.
+- Model suggestions are Candidate Annotations only until human reviewed.
 - Human-reviewed annotations are the trusted evidence.
 - Canonical bee geometry is an oriented bee ellipse, not an axis-aligned rectangle.
 - Dataset Role assignment remains separate from review approval.
@@ -20,7 +20,7 @@ This baseline refines the AI-assisted annotation strategy after the Grounding DI
 ```text
 source inspection photo
 -> training crop selection
--> HiveSight Bee Detector draft oriented bee ellipses, if a pre-labelling model exists
+-> HiveSight Bee Detector candidate oriented bee ellipses, if a candidate-generation model exists
 -> human correction and complete review
 -> reviewed oriented bee ellipses
 -> Bee Annotation Repository item
@@ -120,15 +120,17 @@ HiveSight shall be able to export reviewed oriented bee ellipses as oriented bou
 
 The exported model format is not the canonical domain truth. It is a model-specific training projection.
 
-### BAR-010 Trainable Pre-Labelling Model
+### BAR-010 Trainable Candidate Annotation Model
 
-The HiveSight Bee Detector should become the primary pre-labelling helper once the first viable model exists.
+The HiveSight Bee Detector should become the primary Candidate Annotation helper once the first viable model exists and is approved for that use.
 
 Rationale: A project-owned model can improve with the reviewed annotation repository. Generic pre-labelling helpers cannot learn from HiveSight corrections unless separately fine-tuned.
 
-### BAR-011 Grounding DINO Role
+### BAR-011 Grounding DINO Retirement
 
-Grounding DINO remains an experimental pre-labelling adapter and comparison point, not the main HiveSight training strategy.
+Grounding DINO is retired from the active HiveSight solution.
+
+Rationale: Trial use on real brood-frame photos produced poor bee localisation, and continuing to tune it would distract from the project-owned Bee Detector path.
 
 ### BAR-012 Rebuild Loop
 
@@ -147,7 +149,7 @@ The first model baseline should be:
   - `complete_visible_bee`
   - `partial_visible_bee`
 - training data: reviewed crop-level oriented bee ellipses exported as oriented bounding boxes
-- pre-labelling output: Draft Annotations only
+- candidate output: Candidate Annotations only
 
 ## Out Of Scope
 
@@ -162,5 +164,4 @@ The first model baseline should be:
 
 - What crop dimensions should define `small_crop`, `medium_crop`, and `large_crop`?
 - How many reviewed crops are enough for the first YOLO OBB baseline?
-- Should `complete_visible_bee` and `partial_visible_bee` be separate classes from the first training run, or should the first baseline train a single `visible_bee` class and classify completeness later?
 - What annotation UI gesture best supports fast oriented ellipse creation and adjustment?
