@@ -599,3 +599,26 @@ Before using Bee Detector outputs for Varroa denominator logic, Varroa crop gene
 Suggested owner or area:
 
 Bee Detector evaluation, Varroa Detector planning, and model governance.
+
+## PARK-0026: Dataset Item Reassignment And Supersession UI
+
+Status: parked
+Date parked: 2026-08-01
+Source: Slice 0015.3 grilling
+Area: dataset governance, annotation repository, UI usability
+
+Context:
+
+Slice 0015.3 introduces a read-only Bee Annotation Repository page. The browser will make it obvious when a Dataset Item appears to have the wrong Dataset Role, note, or dataset eligibility state, but changing that evidence is not a simple edit. Dataset Items are immutable once assigned; correction should use a deliberate supersession workflow, especially once Dataset Versions and Training Runs may have consumed the original item.
+
+Why parked:
+
+Adding reassignment, supersession, deletion, or bulk actions would turn the repository browser into a write-side governance workflow. That would widen Slice 0015.3 beyond visibility and could undermine Dataset Version traceability.
+
+Revisit trigger:
+
+When curator review of the Bee Annotation Repository shows real assignment mistakes that need correction, before supporting dataset-quality cleanup at scale, or before allowing external/non-developer curators to maintain Dataset Items.
+
+Suggested owner or area:
+
+Dataset governance, persistence design, and Web UI.

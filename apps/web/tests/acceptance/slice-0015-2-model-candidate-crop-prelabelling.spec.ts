@@ -36,6 +36,13 @@ test("Dataset Curator previews Model Candidate bee suggestions before accepting 
   await page.getByTestId("acknowledge-model-training-warnings-checkbox").check();
   await page.getByTestId("start-model-training-run-button").click();
   await expect(page.getByTestId("model-training-run-summary")).toContainText("completed");
+  await page.getByTestId("use-model-candidate-for-crop-yolo-button").click();
+  await expect(page.getByTestId("model-candidate-selection-confirmation")).toContainText(
+    "Now using HS-MC-"
+  );
+  await expect(page.getByTestId("selected-crop-yolo-candidate-state")).toContainText(
+    "Using HS-MC-"
+  );
 
   await page.getByTestId("training-source-photo-preview").click({ position: { x: 720, y: 300 } });
   const latestCropIndex = await page.getByTestId("training-crop-list-item").count();
@@ -43,6 +50,8 @@ test("Dataset Curator previews Model Candidate bee suggestions before accepting 
   await expect(page.getByTestId("training-crop-list-item")).toHaveCount(latestCropIndex + 1);
   await page.getByTestId("training-crop-list-item").nth(latestCropIndex).click();
 
+  await page.getByTestId("candidate-prelabel-controls").scrollIntoViewIfNeeded();
+  await expect(page.getByTestId("suggest-bees-button")).toBeInViewport();
   await page.getByTestId("suggest-bees-button").click();
   await expect(page.getByTestId("candidate-prelabel-message")).toContainText("suggestions");
   await expect(page.getByTestId("candidate-bee-proposal")).toHaveCount(2);

@@ -11,6 +11,7 @@ The first codebase follows [ADR-0001](architecture/adr/0001-service-oriented-arc
 - `services/analysis-service`: private analysis runtime boundary for image-analysis jobs, detections, tagged outputs, and model-version traceability.
 - `contracts`: shared API/event contract notes and schemas.
 - `infra`: local development infrastructure notes.
+- `docs`: task-oriented user guide and operator-facing instructions.
 - `architecture`: architecture decisions and diagrams.
 - `requirements`: requirements and product specification artifacts.
 
@@ -111,6 +112,8 @@ Open the Web UI at:
 http://127.0.0.1:5173/
 ```
 
+For task-by-task product usage, see the [HiveSight User Guide](docs/user-guide.md).
+
 When using `pnpm dev:lan`, the terminal prints the LAN Web UI URL, for example:
 
 ```text
@@ -167,6 +170,12 @@ HIVESIGHT_MODEL_ARTIFACT_ROOT=var/model-runs
 ```
 
 Grounding DINO was retired from the active solution by ADR 0005 after poor brood-frame bee localisation results.
+
+To check whether the latest Bee Detector Model Candidate can propose bee ellipses for an editable Training Crop:
+
+```sh
+pnpm model:qa:bee:prelabel
+```
 
 The first implementation is deliberately a scaffold. It proves the service boundaries before adding persistence, authentication, queues, object-storage signing, and model inference.
 

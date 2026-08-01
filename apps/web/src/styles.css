@@ -952,6 +952,17 @@ label span {
   border-color: #b8d3eb;
 }
 
+.candidate-control-header {
+  align-items: flex-start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.candidate-control-header button {
+  flex: 0 0 auto;
+}
+
 .candidate-summary {
   align-items: start;
 }
@@ -1025,6 +1036,12 @@ label span {
   font-weight: 800;
   min-height: 38px;
   padding: 9px;
+}
+
+.review-state.success {
+  background: #ecf8ee;
+  border-color: #9fd3a8;
+  color: #275f31;
 }
 
 .loading-panel {

@@ -1520,6 +1520,9 @@ function TrainingCropAnnotationPanel({
   const [selectedProposalId, setSelectedProposalId] = useState<string | null>(null);
   const [editedProposalIds, setEditedProposalIds] = useState<Set<string>>(() => new Set());
   const [candidateProposalMessage, setCandidateProposalMessage] = useState<string | null>(null);
+  const [modelCandidateSelectionMessage, setModelCandidateSelectionMessage] = useState<string | null>(
+    null
+  );
   const [acknowledgeModelWarnings, setAcknowledgeModelWarnings] = useState(false);
   const [workingLabel, setWorkingLabel] = useState<string | null>(null);
   const [cropZoom, setCropZoom] = useState(1);
@@ -2014,6 +2017,18 @@ function TrainingCropAnnotationPanel({
         ? current
         : (listing.modelCandidates[0]?.modelCandidateId ?? null)
     );
+    return listing.modelCandidates;
+  }
+
+  async function useTrainingRunCandidateForCropYolo(candidateId: string) {
+    const candidates = await refreshModelCandidates();
+    setSelectedModelCandidateId(candidateId);
+    const matchingCandidate =
+      candidates.find((candidate) => candidate.modelCandidateId === candidateId) ?? null;
+    const candidateLabel = matchingCandidate?.humanReadableId ?? candidateId;
+    const message = `Now using ${candidateLabel} for crop YOLO.`;
+    setModelCandidateSelectionMessage(message);
+    setCandidateProposalMessage(message);
   }
 
   async function createModelDatasetVersion() {
@@ -2582,12 +2597,32 @@ function TrainingCropAnnotationPanel({
                   data-testid="candidate-prelabel-controls"
                   aria-label="Model Candidate pre-labelling controls"
                 >
-                  <div>
-                    <strong>Candidate pre-labels</strong>
-                    <p data-testid="candidate-prelabel-message">
-                      {candidateProposalMessage ??
-                        "Ask the latest Bee Detector Model Candidate for suggested bee ellipses."}
-                    </p>
+                  <div className="candidate-control-header">
+                    <div>
+                      <strong>YOLO crop pre-labels</strong>
+                      <p data-testid="candidate-prelabel-message">
+                        {candidateProposalMessage ??
+                          "Run the selected Bee Detector Model Candidate on this crop."}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={cropLocked || Boolean(workingLabel) || modelCandidates.length === 0}
+                      onClick={() => void suggestBeeAnnotationsForSelectedCrop()}
+                      data-testid="suggest-bees-button"
+                    >
+                      <Play size={18} />
+                      YOLO this crop
+                    </button>
+                  </div>
+                  <div className="review-state" data-testid="selected-crop-yolo-candidate-state">
+                    {selectedModelCandidateId
+                      ? `Using ${
+                          modelCandidates.find(
+                            (candidate) => candidate.modelCandidateId === selectedModelCandidateId
+                          )?.humanReadableId ?? selectedModelCandidateId
+                        } for crop YOLO.`
+                      : "No Model Candidate selected. Train a baseline or refresh candidates first."}
                   </div>
                   <label>
                     <span>Model Candidate</span>
@@ -2619,15 +2654,6 @@ function TrainingCropAnnotationPanel({
                       data-testid="candidate-confidence-threshold-slider"
                     />
                   </label>
-                  <button
-                    type="button"
-                    disabled={cropLocked || Boolean(workingLabel) || modelCandidates.length === 0}
-                    onClick={() => void suggestBeeAnnotationsForSelectedCrop()}
-                    data-testid="suggest-bees-button"
-                  >
-                    <Play size={18} />
-                    Suggest bees
-                  </button>
                   {selectedProposal ? (
                     <>
                       <div className="export-summary candidate-summary" data-testid="selected-candidate-proposal">
@@ -3114,6 +3140,19 @@ function TrainingCropAnnotationPanel({
                         </pre>
                       ) : null}
                       <div className="button-row">
+                        {trainingRun.modelCandidateId ? (
+                          <button
+                            type="button"
+                            disabled={Boolean(workingLabel)}
+                            onClick={() =>
+                              void useTrainingRunCandidateForCropYolo(trainingRun.modelCandidateId!)
+                            }
+                            data-testid="use-model-candidate-for-crop-yolo-button"
+                          >
+                            <Check size={18} />
+                            Use candidate for crop YOLO
+                          </button>
+                        ) : null}
                         <button
                           type="button"
                           disabled={!isActiveTrainingRun(trainingRun) || Boolean(workingLabel)}
@@ -3146,6 +3185,15 @@ function TrainingCropAnnotationPanel({
                           Delete run
                         </button>
                       </div>
+                      {modelCandidateSelectionMessage ? (
+                        <p
+                          className="review-state success"
+                          role="status"
+                          data-testid="model-candidate-selection-confirmation"
+                        >
+                          {modelCandidateSelectionMessage}
+                        </p>
+                      ) : null}
                       <p>Baseline only; not user-facing.</p>
                     </div>
                   ) : null}
