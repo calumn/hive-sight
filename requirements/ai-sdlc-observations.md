@@ -345,3 +345,24 @@ Human judgment still required:
 - During implementation, decide whether local database purpose separation remains small enough to stay in Slice 0015 or should be split into Slice 0014.6.
 - Choose the exact pinned Ultralytics dependency version.
 - Decide whether the first real-adapter QA command can be fully automated in Slice 0015 or should be a command plus manual QA script.
+
+### 2026-08-02 Slice 0015.35 Directed Bee Ellipse Orientation Planning
+
+Human input changed Oriented Bee Ellipse semantics from undirected body-axis alignment to directed center-to-head orientation.
+
+Key decisions:
+
+- `rotation_degrees` now points from ellipse center toward the bee's head along the major axis.
+- The opposite end of the same axis is the tail.
+- No separate head marker is required in the data model; the ellipse itself carries direction.
+- The UI must make head/tail direction visible and provide a flip head/tail control.
+- The rationale is future Varroa detection: likely mite location may be bee-orientation dependent, so preserving head direction may strengthen later Varroa training and inference.
+- Existing early local downstream dataset/model evidence should be removed and rebuilt rather than migrated.
+- Uploaded photos, Training Crops, and existing ellipses should be preserved as review starting points.
+- No persistent "head direction review needed" status is needed for the current seven-crop one-user cleanup.
+- Candidate Annotation geometry from YOLO OBB is not trusted as biological head direction; human review decides final directed orientation.
+
+Follow-up:
+
+- Implement Slice 0015.35 before relying on model-candidate evaluation or Varroa-direction-dependent evidence.
+- PARK-0028 records that future real hive inspections need automated bee head-direction prediction, not just human-reviewed directed ellipses, before the Varroa Detector can rely on consistently oriented bee crops without human intervention.

@@ -590,6 +590,7 @@ Review methods:
 Rules:
 
 - The canonical reviewed geometry for bee annotations is an oriented bee ellipse.
+- Oriented Bee Ellipse rotation is directed: `rotation_degrees` points from the ellipse center toward the bee's head along the major axis; the opposite end is the tail.
 - Candidate Annotations are not ground truth until human reviewed.
 - Reviewed Annotations still require Dataset Role assignment before dataset use.
 - Model-specific exports may project oriented ellipses into other shapes such as YOLO OBB labels.

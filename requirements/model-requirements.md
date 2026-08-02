@@ -87,9 +87,9 @@ Rationale: The system should not pretend that ambiguous image evidence is cleane
 
 Visible bees shall be reviewed as oriented bee ellipses in the canonical annotation model.
 
-Ellipse orientation shall represent the undirected long-axis alignment of the visible bee body. HiveSight shall not require curators to identify the head end for the first Bee Detector dataset.
+Ellipse orientation shall represent the directed long-axis alignment of the visible bee body. `rotation_degrees` points from the ellipse center toward the bee's head along the major axis; the opposite end is the tail.
 
-Rationale: Bees are elongated and appear at many rotations. Oriented ellipses better express human-reviewed bee evidence than axis-aligned rectangles.
+Rationale: Bees are elongated and appear at many rotations. Directed oriented ellipses better express human-reviewed bee evidence than axis-aligned rectangles, and preserve head/tail orientation that may strengthen later Varroa detection because likely mite location can be bee-orientation dependent.
 
 ### MR-008A Bee Annotation Export Shape
 

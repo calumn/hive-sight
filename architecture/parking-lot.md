@@ -622,3 +622,51 @@ When curator review of the Bee Annotation Repository shows real assignment mista
 Suggested owner or area:
 
 Dataset governance, persistence design, and Web UI.
+
+## PARK-0027: Legacy Ellipse Head Direction Review
+
+Status: superseded
+Date parked: 2026-08-02
+Source: Slice 0015.35 Directed Bee Ellipse Orientation planning
+Area: annotation quality, model governance, Varroa pipeline
+
+Context:
+
+ADR 0006 changes Oriented Bee Ellipse rotation semantics from undirected body-axis alignment to directed center-to-head orientation. Existing reviewed ellipses created before this decision may have useful body-axis geometry but ambiguous head/tail direction.
+
+Why superseded:
+
+Slice 0015.35 now includes a one-time local cleanup instead of parking a legacy-review workflow: remove stale Dataset Items, Dataset Versions, Training Runs, Model Candidates, and derived artifacts, while preserving photos, Training Crops, and ellipses for manual review and fresh Dataset Role assignment.
+
+Revisit trigger:
+
+Before using pre-Slice-0015.35 Dataset Items for Varroa-direction-dependent training, before creating a benchmark claim that relies on bee head/tail direction, or when enough legacy annotated crops exist that manual re-review becomes necessary.
+
+Suggested owner or area:
+
+Dataset curation, annotation UI, and model governance.
+
+## PARK-0028: Automated Bee Head Direction Prediction
+
+Status: parked
+Date parked: 2026-08-02
+Source: Slice 0015.35 grilling
+Area: model capability, Varroa pipeline, inspection automation
+
+Context:
+
+Slice 0015.35 makes reviewed Oriented Bee Ellipses direction-aware by defining `rotation_degrees` as center-to-head orientation. The first implementation keeps head/tail direction under human review. YOLO OBB can propose bee geometry and body-axis alignment, but it should not be assumed to predict biologically meaningful head direction reliably.
+
+For future real hive inspections, HiveSight needs a model pipeline that can identify every visible bee and its correct head/tail orientation without human intervention. This matters because the future Varroa Detector is expected to work on bee-relative crops: each bee image may be extracted, rotated into a consistent head/tail orientation, and then passed into Varroa mite detection. If head direction is wrong, Varroa-location evidence and mite detection quality may degrade.
+
+Why parked:
+
+The current training-data workflow is still building the first governed bee dataset. Predicting head direction may require a different model task or multi-model pipeline, such as bee detection plus keypoint/pose prediction, a head/tail classifier on bee crops, or another specialist orientation model. Designing that before there is enough reviewed directed-ellipse evidence would be premature.
+
+Revisit trigger:
+
+Before the first user-facing Varroa Assessment pipeline, before automated bee crop normalization for Varroa detection, before replacing human-reviewed head direction with model-predicted direction, or when enough directed bee annotations exist to evaluate head-direction prediction.
+
+Suggested owner or area:
+
+Bee Detector model design, Varroa Detector planning, dataset curation, and model evaluation.
