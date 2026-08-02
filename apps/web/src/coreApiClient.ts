@@ -232,6 +232,120 @@ export type DatasetItem = {
   benchmarkProtected: boolean;
 };
 
+export type DatasetVersionMembership = {
+  datasetVersionId: string;
+  humanReadableId: string;
+  purpose: string;
+  status: string;
+  membership:
+    | "included"
+    | "training"
+    | "validation"
+    | "protected_benchmark"
+    | "excluded"
+    | "not_in_version";
+  excludedReason: string | null;
+  createdAt: string;
+};
+
+export type DatasetRepositoryWarning = {
+  code: string;
+  severity: "info" | "warning";
+  message: string;
+  affectedDatasetItemIds: string[];
+};
+
+export type DatasetRepositoryLatestVersionSummary = {
+  datasetVersionId: string;
+  humanReadableId: string;
+  status: string;
+  createdAt: string;
+  trainingItemCount: number;
+  validationItemCount: number;
+  benchmarkItemCount: number;
+  excludedItemCount: number;
+};
+
+export type DatasetRepositorySummary = {
+  workspaceId: string;
+  datasetItemCount: number;
+  activeDatasetItemCount: number;
+  unassignedCompletedCropCount: number;
+  newSinceLatestDatasetVersionCount: number;
+  roleCounts: Record<string, number>;
+  annotationClassCounts: Record<string, number>;
+  annotationSourceCounts: Record<string, number>;
+  reviewMethodCounts: Record<string, number>;
+  curriculumStageDistribution: Record<string, number>;
+  imageQualityDistribution: Record<string, number>;
+  hiveConfigurationDistribution: Record<string, number>;
+  sourceGroupDistribution: Record<string, number>;
+  inspectionDistribution: Record<string, number>;
+  inspectionIntentDistribution: Record<string, number>;
+  hiveDistribution: Record<string, number>;
+  sourceImageDistribution: Record<string, number>;
+  latestDatasetVersion: DatasetRepositoryLatestVersionSummary | null;
+  persistenceBackend: string;
+  databasePurpose: string;
+  warnings: DatasetRepositoryWarning[];
+};
+
+export type DatasetRepositoryItem = {
+  datasetItemId: string;
+  humanReadableId: string;
+  workspaceId: string;
+  datasetRole: DatasetRole;
+  status: string;
+  sourceEvidenceType: string;
+  inspectionId: string | null;
+  inspectionDate: string | null;
+  inspectionIntent: InspectionIntent | null;
+  inspectionPhotoId: string;
+  sourceImageId: string;
+  sourceFilename: string | null;
+  apiaryId: string | null;
+  apiaryName: string | null;
+  hiveId: string | null;
+  hiveName: string | null;
+  hiveConfigurationSummary: string | null;
+  trainingCropId: string | null;
+  cropX: number | null;
+  cropY: number | null;
+  cropWidth: number | null;
+  cropHeight: number | null;
+  cropImageWidthPx: number | null;
+  cropImageHeightPx: number | null;
+  curriculumStage: string | null;
+  completeVisibleBeeCount: number;
+  partialVisibleBeeCount: number;
+  annotationSourceCounts: Record<string, number>;
+  reviewMethodCounts: Record<string, number>;
+  sourceGroupKey: string | null;
+  imageQualityStatus: ImageQualityStatus;
+  assignedByUserId: string;
+  assignedAt: string;
+  assignmentNote: string | null;
+  exclusionReason: DatasetExclusionReason | null;
+  benchmarkProtected: boolean;
+  exportEligibility: string;
+  latestDatasetVersionMembership: DatasetVersionMembership | null;
+  datasetVersionMemberships: DatasetVersionMembership[];
+  isNewSinceLatestDatasetVersion: boolean;
+  previewStatus: string;
+  thumbnailUrl: string | null;
+};
+
+export type DatasetRepositoryItemDetail = DatasetRepositoryItem & {
+  reviewedEllipseSnapshots: ReviewedEllipseSnapshot[];
+  permissionStatus: string;
+  previewUrl: string | null;
+};
+
+export type DatasetRepositoryItemList = {
+  summary: DatasetRepositorySummary;
+  items: DatasetRepositoryItem[];
+};
+
 export type Annotation = {
   annotationId: string;
   workspaceId: string;
@@ -1106,6 +1220,59 @@ export async function createTrainingCropDatasetItem({
   });
   await ensureOk(response);
   return parseDatasetItem(await response.json());
+}
+
+export async function fetchDatasetRepositorySummary({
+  devUserId,
+  workspaceId
+}: {
+  devUserId: string;
+  workspaceId: string;
+}): Promise<DatasetRepositorySummary> {
+  const params = new URLSearchParams({ workspace_id: workspaceId });
+  const response = await fetch(`${coreApiUrl}/v1/dataset-repository/summary?${params}`, {
+    headers: devAuthHeaders(devUserId)
+  });
+  await ensureOk(response);
+  return parseDatasetRepositorySummary(await response.json());
+}
+
+export async function fetchDatasetRepositoryItems({
+  devUserId,
+  workspaceId,
+  datasetRole
+}: {
+  devUserId: string;
+  workspaceId: string;
+  datasetRole?: DatasetRole;
+}): Promise<DatasetRepositoryItemList> {
+  const params = new URLSearchParams({ workspace_id: workspaceId });
+  if (datasetRole) {
+    params.set("dataset_role", datasetRole);
+  }
+  const response = await fetch(`${coreApiUrl}/v1/dataset-repository/items?${params}`, {
+    headers: devAuthHeaders(devUserId)
+  });
+  await ensureOk(response);
+  return parseDatasetRepositoryItemList(await response.json());
+}
+
+export async function fetchDatasetRepositoryItemDetail({
+  devUserId,
+  workspaceId,
+  datasetItemId
+}: {
+  devUserId: string;
+  workspaceId: string;
+  datasetItemId: string;
+}): Promise<DatasetRepositoryItemDetail> {
+  const params = new URLSearchParams({ workspace_id: workspaceId });
+  const response = await fetch(
+    `${coreApiUrl}/v1/dataset-repository/items/${datasetItemId}?${params}`,
+    { headers: devAuthHeaders(devUserId) }
+  );
+  await ensureOk(response);
+  return parseDatasetRepositoryItemDetail(await response.json());
 }
 
 export async function createYoloObbExport({
@@ -2041,6 +2208,208 @@ function parseDatasetItem(value: unknown): DatasetItem {
   };
 }
 
+function parseDatasetVersionMembership(value: unknown): DatasetVersionMembership {
+  const record = requireRecord(value, "Dataset Version membership response");
+  return {
+    datasetVersionId: requireString(record.dataset_version_id, "dataset_version_id"),
+    humanReadableId: requireString(record.human_readable_id, "human_readable_id"),
+    purpose: requireString(record.purpose, "purpose"),
+    status: requireString(record.status, "status"),
+    membership: requireDatasetVersionMembership(record.membership),
+    excludedReason: optionalString(record.excluded_reason, "excluded_reason"),
+    createdAt: requireString(record.created_at, "created_at")
+  };
+}
+
+function parseDatasetRepositoryWarning(value: unknown): DatasetRepositoryWarning {
+  const record = requireRecord(value, "Dataset repository warning response");
+  return {
+    code: requireString(record.code, "code"),
+    severity: requireDatasetRepositoryWarningSeverity(record.severity),
+    message: requireString(record.message, "message"),
+    affectedDatasetItemIds: requireArray(
+      record.affected_dataset_item_ids,
+      "affected_dataset_item_ids"
+    ).map((id) => requireString(id, "affected_dataset_item_ids[]"))
+  };
+}
+
+function parseDatasetRepositoryLatestVersionSummary(
+  value: unknown
+): DatasetRepositoryLatestVersionSummary {
+  const record = requireRecord(value, "Dataset repository latest version response");
+  return {
+    datasetVersionId: requireString(record.dataset_version_id, "dataset_version_id"),
+    humanReadableId: requireString(record.human_readable_id, "human_readable_id"),
+    status: requireString(record.status, "status"),
+    createdAt: requireString(record.created_at, "created_at"),
+    trainingItemCount: requireNumber(record.training_item_count, "training_item_count"),
+    validationItemCount: requireNumber(record.validation_item_count, "validation_item_count"),
+    benchmarkItemCount: requireNumber(record.benchmark_item_count, "benchmark_item_count"),
+    excludedItemCount: requireNumber(record.excluded_item_count, "excluded_item_count")
+  };
+}
+
+function parseDatasetRepositorySummary(value: unknown): DatasetRepositorySummary {
+  const record = requireRecord(value, "Dataset repository summary response");
+  return {
+    workspaceId: requireString(record.workspace_id, "workspace_id"),
+    datasetItemCount: requireNumber(record.dataset_item_count, "dataset_item_count"),
+    activeDatasetItemCount: requireNumber(
+      record.active_dataset_item_count,
+      "active_dataset_item_count"
+    ),
+    unassignedCompletedCropCount: requireNumber(
+      record.unassigned_completed_crop_count,
+      "unassigned_completed_crop_count"
+    ),
+    newSinceLatestDatasetVersionCount: requireNumber(
+      record.new_since_latest_dataset_version_count,
+      "new_since_latest_dataset_version_count"
+    ),
+    roleCounts: parseNumberMap(record.role_counts, "role_counts"),
+    annotationClassCounts: parseNumberMap(
+      record.annotation_class_counts,
+      "annotation_class_counts"
+    ),
+    annotationSourceCounts: parseNumberMap(
+      record.annotation_source_counts,
+      "annotation_source_counts"
+    ),
+    reviewMethodCounts: parseNumberMap(record.review_method_counts, "review_method_counts"),
+    curriculumStageDistribution: parseNumberMap(
+      record.curriculum_stage_distribution,
+      "curriculum_stage_distribution"
+    ),
+    imageQualityDistribution: parseNumberMap(
+      record.image_quality_distribution,
+      "image_quality_distribution"
+    ),
+    hiveConfigurationDistribution: parseNumberMap(
+      record.hive_configuration_distribution,
+      "hive_configuration_distribution"
+    ),
+    sourceGroupDistribution: parseNumberMap(
+      record.source_group_distribution,
+      "source_group_distribution"
+    ),
+    inspectionDistribution: parseNumberMap(
+      record.inspection_distribution,
+      "inspection_distribution"
+    ),
+    inspectionIntentDistribution: parseNumberMap(
+      record.inspection_intent_distribution,
+      "inspection_intent_distribution"
+    ),
+    hiveDistribution: parseNumberMap(record.hive_distribution, "hive_distribution"),
+    sourceImageDistribution: parseNumberMap(
+      record.source_image_distribution,
+      "source_image_distribution"
+    ),
+    latestDatasetVersion:
+      record.latest_dataset_version === null
+        ? null
+        : parseDatasetRepositoryLatestVersionSummary(record.latest_dataset_version),
+    persistenceBackend: requireString(record.persistence_backend, "persistence_backend"),
+    databasePurpose: requireString(record.database_purpose, "database_purpose"),
+    warnings: requireArray(record.warnings, "warnings").map(parseDatasetRepositoryWarning)
+  };
+}
+
+function parseDatasetRepositoryItem(value: unknown): DatasetRepositoryItem {
+  const record = requireRecord(value, "Dataset repository item response");
+  return {
+    datasetItemId: requireString(record.dataset_item_id, "dataset_item_id"),
+    humanReadableId: requireString(record.human_readable_id, "human_readable_id"),
+    workspaceId: requireString(record.workspace_id, "workspace_id"),
+    datasetRole: requireDatasetRole(record.dataset_role),
+    status: requireString(record.status, "status"),
+    sourceEvidenceType: requireString(record.source_evidence_type, "source_evidence_type"),
+    inspectionId: optionalString(record.inspection_id, "inspection_id"),
+    inspectionDate: optionalString(record.inspection_date, "inspection_date"),
+    inspectionIntent:
+      record.inspection_intent === null ? null : requireInspectionIntent(record.inspection_intent),
+    inspectionPhotoId: requireString(record.inspection_photo_id, "inspection_photo_id"),
+    sourceImageId: requireString(record.source_image_id, "source_image_id"),
+    sourceFilename: optionalString(record.source_filename, "source_filename"),
+    apiaryId: optionalString(record.apiary_id, "apiary_id"),
+    apiaryName: optionalString(record.apiary_name, "apiary_name"),
+    hiveId: optionalString(record.hive_id, "hive_id"),
+    hiveName: optionalString(record.hive_name, "hive_name"),
+    hiveConfigurationSummary: optionalString(
+      record.hive_configuration_summary,
+      "hive_configuration_summary"
+    ),
+    trainingCropId: optionalString(record.training_crop_id, "training_crop_id"),
+    cropX: optionalNumber(record.crop_x, "crop_x"),
+    cropY: optionalNumber(record.crop_y, "crop_y"),
+    cropWidth: optionalNumber(record.crop_width, "crop_width"),
+    cropHeight: optionalNumber(record.crop_height, "crop_height"),
+    cropImageWidthPx: optionalNumber(record.crop_image_width_px, "crop_image_width_px"),
+    cropImageHeightPx: optionalNumber(record.crop_image_height_px, "crop_image_height_px"),
+    curriculumStage: optionalString(record.curriculum_stage, "curriculum_stage"),
+    completeVisibleBeeCount: requireNumber(
+      record.complete_visible_bee_count,
+      "complete_visible_bee_count"
+    ),
+    partialVisibleBeeCount: requireNumber(
+      record.partial_visible_bee_count,
+      "partial_visible_bee_count"
+    ),
+    annotationSourceCounts: parseNumberMap(
+      record.annotation_source_counts,
+      "annotation_source_counts"
+    ),
+    reviewMethodCounts: parseNumberMap(record.review_method_counts, "review_method_counts"),
+    sourceGroupKey: optionalString(record.source_group_key, "source_group_key"),
+    imageQualityStatus: requireImageQualityStatus(record.image_quality_status),
+    assignedByUserId: requireString(record.assigned_by_user_id, "assigned_by_user_id"),
+    assignedAt: requireString(record.assigned_at, "assigned_at"),
+    assignmentNote: optionalString(record.assignment_note, "assignment_note"),
+    exclusionReason:
+      record.exclusion_reason === null
+        ? null
+        : requireDatasetExclusionReason(record.exclusion_reason),
+    benchmarkProtected: requireBoolean(record.benchmark_protected, "benchmark_protected"),
+    exportEligibility: requireString(record.export_eligibility, "export_eligibility"),
+    latestDatasetVersionMembership:
+      record.latest_dataset_version_membership === null
+        ? null
+        : parseDatasetVersionMembership(record.latest_dataset_version_membership),
+    datasetVersionMemberships: requireArray(
+      record.dataset_version_memberships,
+      "dataset_version_memberships"
+    ).map(parseDatasetVersionMembership),
+    isNewSinceLatestDatasetVersion: requireBoolean(
+      record.is_new_since_latest_dataset_version,
+      "is_new_since_latest_dataset_version"
+    ),
+    previewStatus: requireString(record.preview_status, "preview_status"),
+    thumbnailUrl: optionalString(record.thumbnail_url, "thumbnail_url")
+  };
+}
+
+function parseDatasetRepositoryItemList(value: unknown): DatasetRepositoryItemList {
+  const record = requireRecord(value, "Dataset repository item list response");
+  return {
+    summary: parseDatasetRepositorySummary(record.summary),
+    items: requireArray(record.items, "items").map(parseDatasetRepositoryItem)
+  };
+}
+
+function parseDatasetRepositoryItemDetail(value: unknown): DatasetRepositoryItemDetail {
+  const record = requireRecord(value, "Dataset repository item detail response");
+  return {
+    ...parseDatasetRepositoryItem(value),
+    reviewedEllipseSnapshots: requireArray(
+      record.reviewed_ellipse_snapshots,
+      "reviewed_ellipse_snapshots"
+    ).map(parseReviewedEllipseSnapshot),
+    permissionStatus: requireString(record.permission_status, "permission_status"),
+    previewUrl: optionalString(record.preview_url, "preview_url")
+  };
+}
+
 function parseYoloObbExport(value: unknown): YoloObbExport {
   const record = requireRecord(value, "YOLO OBB export response");
   return {
@@ -2637,6 +3006,31 @@ function requireDatasetRole(value: unknown): DatasetRole {
   throw new Error("Core API response had an unexpected dataset role");
 }
 
+function requireDatasetVersionMembership(
+  value: unknown
+): DatasetVersionMembership["membership"] {
+  if (
+    value === "included" ||
+    value === "training" ||
+    value === "validation" ||
+    value === "protected_benchmark" ||
+    value === "excluded" ||
+    value === "not_in_version"
+  ) {
+    return value;
+  }
+  throw new Error("Core API response had an unexpected Dataset Version membership");
+}
+
+function requireDatasetRepositoryWarningSeverity(
+  value: unknown
+): DatasetRepositoryWarning["severity"] {
+  if (value === "info" || value === "warning") {
+    return value;
+  }
+  throw new Error("Core API response had an unexpected repository warning severity");
+}
+
 function requireDatasetItemSourceEvidenceType(
   value: unknown
 ): "dataset_labelling_session" | "training_crop" {
@@ -2825,6 +3219,10 @@ function toCoreApiUrl(pathOrUrl: string): string {
     return pathOrUrl;
   }
   return `${coreApiUrl}${pathOrUrl}`;
+}
+
+export function toCoreApiContentUrl(pathOrUrl: string): string {
+  return toCoreApiUrl(pathOrUrl);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

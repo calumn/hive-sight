@@ -12,6 +12,7 @@ from hive_sight_core_api.bee_detector_candidate_annotation_workflow import (
 )
 from hive_sight_core_api.bee_detector_training_workflow import BeeDetectorTrainingWorkflow
 from hive_sight_core_api.dataset_labelling_workflow import DatasetLabellingWorkflow
+from hive_sight_core_api.dataset_repository_workflow import DatasetRepositoryWorkflow
 from hive_sight_core_api.dataset_role_assignment_workflow import DatasetRoleAssignmentWorkflow
 from hive_sight_core_api.dependencies import (
     DevStateDep,
@@ -20,6 +21,7 @@ from hive_sight_core_api.dependencies import (
     get_bee_detector_candidate_annotation_workflow,
     get_bee_detector_training_workflow,
     get_dataset_labelling_workflow,
+    get_dataset_repository_workflow,
     get_dataset_role_assignment_workflow,
     get_hive_configuration_workflow,
     get_inspection_photo_access,
@@ -42,6 +44,10 @@ from hive_sight_core_api.models import (
     BeeAnnotationProposalRequest,
     DatasetItemCreateRequest,
     DatasetItemResponse,
+    DatasetRepositoryItemDetail,
+    DatasetRepositoryItemListResponse,
+    DatasetRepositorySummaryResponse,
+    DatasetRole,
     DatasetVersionCreateRequest,
     DatasetVersionListResponse,
     DatasetVersionResponse,
@@ -132,6 +138,10 @@ DatasetLabellingWorkflowDep = Annotated[
 DatasetRoleAssignmentWorkflowDep = Annotated[
     DatasetRoleAssignmentWorkflow,
     Depends(get_dataset_role_assignment_workflow),
+]
+DatasetRepositoryWorkflowDep = Annotated[
+    DatasetRepositoryWorkflow,
+    Depends(get_dataset_repository_workflow),
 ]
 HiveConfigurationWorkflowDep = Annotated[
     HiveConfigurationWorkflow,
@@ -545,6 +555,52 @@ def create_training_crop_dataset_item(
         user=user,
         training_crop_id=training_crop_id,
         request=request,
+    )
+
+
+@app.get(
+    "/v1/dataset-repository/summary",
+    response_model=DatasetRepositorySummaryResponse,
+)
+def get_dataset_repository_summary(
+    workspace_id: UUID,
+    user: AuthenticatedUserDep,
+    workflow: DatasetRepositoryWorkflowDep,
+) -> DatasetRepositorySummaryResponse:
+    return workflow.summary(user=user, workspace_id=workspace_id)
+
+
+@app.get(
+    "/v1/dataset-repository/items",
+    response_model=DatasetRepositoryItemListResponse,
+)
+def list_dataset_repository_items(
+    workspace_id: UUID,
+    user: AuthenticatedUserDep,
+    workflow: DatasetRepositoryWorkflowDep,
+    dataset_role: DatasetRole | None = None,
+) -> DatasetRepositoryItemListResponse:
+    return workflow.list_items(
+        user=user,
+        workspace_id=workspace_id,
+        dataset_role=dataset_role,
+    )
+
+
+@app.get(
+    "/v1/dataset-repository/items/{dataset_item_id}",
+    response_model=DatasetRepositoryItemDetail,
+)
+def get_dataset_repository_item(
+    dataset_item_id: UUID,
+    workspace_id: UUID,
+    user: AuthenticatedUserDep,
+    workflow: DatasetRepositoryWorkflowDep,
+) -> DatasetRepositoryItemDetail:
+    return workflow.detail(
+        user=user,
+        workspace_id=workspace_id,
+        dataset_item_id=dataset_item_id,
     )
 
 

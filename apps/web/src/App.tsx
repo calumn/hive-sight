@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   ArrowRight,
   ArrowUp,
+  BookOpen,
   Check,
   CircleAlert,
   CloudUpload,
@@ -50,6 +51,8 @@ import {
   fetchApiaries,
   fetchCoreHealth,
   fetchDatasetLabellingEvidence,
+  fetchDatasetRepositoryItemDetail,
+  fetchDatasetRepositoryItems,
   fetchDevSession,
   fetchFrameStandards,
   fetchHiveConfiguration,
@@ -66,6 +69,7 @@ import {
   startDatasetLabellingSession,
   startModelTrainingRun,
   suggestTrainingCropBeeAnnotations,
+  toCoreApiContentUrl,
   updateTrainingCrop,
   updateTrainingCropEllipse,
   upsertHiveConfiguration,
@@ -85,7 +89,11 @@ import {
   type DatasetLabellingEvidence,
   type DatasetExclusionReason,
   type DatasetItem,
+  type DatasetRepositoryItem,
+  type DatasetRepositoryItemDetail,
+  type DatasetRepositorySummary,
   type DatasetVersion,
+  type DatasetVersionMembership,
   type DatasetRole,
   type ImageQualityStatus,
   type Inspection,
@@ -127,9 +135,12 @@ type CropDraft = {
   cropHeight: number;
 };
 
+type AppView = "inspection" | "repository";
+
 export function App() {
   const trainingCropPanelRef = useRef<HTMLDivElement | null>(null);
   const [loadState, setLoadState] = useState<LoadState>({ kind: "loading" });
+  const [appView, setAppView] = useState<AppView>("inspection");
   const [actionState, setActionState] = useState<ActionState>({ kind: "idle" });
   const [apiaries, setApiaries] = useState<Apiary[]>([]);
   const [apiary, setApiary] = useState<Apiary | null>(null);
@@ -764,7 +775,7 @@ export function App() {
       <header className="topbar" aria-label="Workspace status">
         <div>
           <p className="eyebrow">HiveSight</p>
-          <h1>Inspection photo intake</h1>
+          <h1>{appView === "repository" ? "Bee Annotation Repository" : "Inspection photo intake"}</h1>
         </div>
         <StatusPill loadState={loadState} />
       </header>
@@ -773,6 +784,27 @@ export function App() {
         <section className="intake-layout" aria-label="Inspection photo intake workflow">
           <aside className="workspace-panel">
             <PanelHeading icon={<ShieldCheck size={20} />} title="Workspace gate" />
+            <nav className="view-switcher" aria-label="HiveSight local pages">
+              <button
+                type="button"
+                className={appView === "inspection" ? "selected" : ""}
+                onClick={() => setAppView("inspection")}
+                data-testid="inspection-page-button"
+              >
+                <FileImage size={18} />
+                Inspection
+              </button>
+              <button
+                type="button"
+                className={appView === "repository" ? "selected" : ""}
+                onClick={() => setAppView("repository")}
+                disabled={!loadState.session.datasetCuratorCapability}
+                data-testid="bee-annotation-repository-page-button"
+              >
+                <BookOpen size={18} />
+                Repository
+              </button>
+            </nav>
             <dl className="facts">
               <div>
                 <dt>User</dt>
@@ -800,6 +832,21 @@ export function App() {
           </aside>
 
           <section className="workflow-panel">
+            {appView === "repository" ? (
+              <BeeAnnotationRepositoryPage
+                devUserId={devUserId}
+                workspaceId={loadState.session.workspaceId}
+                datasetCuratorCapability={loadState.session.datasetCuratorCapability}
+                onError={(error) =>
+                  setActionState({
+                    kind: "blocked",
+                    code: error.code,
+                    message: error.message
+                  })
+                }
+              />
+            ) : (
+              <>
             <div className="form-grid">
               <form className="stacked-form" onSubmit={onCreateApiary}>
                 <PanelHeading icon={<Plus size={20} />} title="Apiary" />
@@ -1065,6 +1112,8 @@ export function App() {
                 />
               </div>
             ) : null}
+              </>
+            )}
           </section>
         </section>
       ) : (
@@ -1158,6 +1207,424 @@ function sortInspectionsNewestFirst(inspections: Inspection[]) {
       ? right.inspectionId.localeCompare(left.inspectionId)
       : dateComparison;
   });
+}
+
+function BeeAnnotationRepositoryPage({
+  devUserId,
+  workspaceId,
+  datasetCuratorCapability,
+  onError
+}: {
+  devUserId: string;
+  workspaceId: string;
+  datasetCuratorCapability: boolean;
+  onError: (error: ApiError) => void;
+}) {
+  const [listing, setListing] = useState<{
+    summary: DatasetRepositorySummary;
+    items: DatasetRepositoryItem[];
+  } | null>(null);
+  const [selectedDatasetItemId, setSelectedDatasetItemId] = useState<string | null>(null);
+  const [detail, setDetail] = useState<DatasetRepositoryItemDetail | null>(null);
+  const [roleFilter, setRoleFilter] = useState<DatasetRole | "all">("all");
+  const [membershipFilter, setMembershipFilter] = useState<"all" | "latest" | "new">("all");
+  const [beeClassFilter, setBeeClassFilter] = useState<"all" | "complete" | "partial">("all");
+  const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
+
+  async function refreshRepository() {
+    if (!datasetCuratorCapability) {
+      return;
+    }
+    setLoading(true);
+    try {
+      const nextListing = await fetchDatasetRepositoryItems({ devUserId, workspaceId });
+      setListing(nextListing);
+      setSelectedDatasetItemId((current) => current ?? nextListing.items[0]?.datasetItemId ?? null);
+    } catch (error) {
+      onError(toApiError(error));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void refreshRepository();
+  }, [workspaceId, datasetCuratorCapability]);
+
+  useEffect(() => {
+    if (!selectedDatasetItemId) {
+      setDetail(null);
+      return;
+    }
+    setDetailLoading(true);
+    fetchDatasetRepositoryItemDetail({ devUserId, workspaceId, datasetItemId: selectedDatasetItemId })
+      .then(setDetail)
+      .catch((error) => onError(toApiError(error)))
+      .finally(() => setDetailLoading(false));
+  }, [devUserId, workspaceId, selectedDatasetItemId]);
+
+  const filteredItems = useMemo(() => {
+    const searchTerm = search.trim().toLowerCase();
+    return (listing?.items ?? []).filter((item) => {
+      if (roleFilter !== "all" && item.datasetRole !== roleFilter) return false;
+      if (membershipFilter === "latest" && item.isNewSinceLatestDatasetVersion) return false;
+      if (membershipFilter === "new" && !item.isNewSinceLatestDatasetVersion) return false;
+      if (beeClassFilter === "complete" && item.completeVisibleBeeCount === 0) return false;
+      if (beeClassFilter === "partial" && item.partialVisibleBeeCount === 0) return false;
+      if (!searchTerm) return true;
+      return [
+        item.humanReadableId,
+        item.sourceFilename,
+        item.hiveName,
+        item.apiaryName,
+        item.assignmentNote,
+        item.sourceGroupKey
+      ]
+        .filter(Boolean)
+        .some((value) => value!.toLowerCase().includes(searchTerm));
+    });
+  }, [beeClassFilter, listing, membershipFilter, roleFilter, search]);
+
+  useEffect(() => {
+    if (filteredItems.length === 0) {
+      setSelectedDatasetItemId(null);
+      return;
+    }
+    if (
+      !filteredItems.some((item) => item.datasetItemId === selectedDatasetItemId)
+    ) {
+      setSelectedDatasetItemId(filteredItems[0].datasetItemId);
+    }
+  }, [filteredItems, selectedDatasetItemId]);
+
+  if (!datasetCuratorCapability) {
+    return (
+      <section className="repository-page" data-testid="bee-annotation-repository-page">
+        <PanelHeading icon={<BookOpen size={20} />} title="Bee Annotation Repository" />
+        <p className="setup-copy">Dataset Curator capability is required.</p>
+      </section>
+    );
+  }
+
+  const summary = listing?.summary ?? null;
+
+  return (
+    <section className="repository-page" data-testid="bee-annotation-repository-page">
+      <div className="repository-header">
+        <div>
+          <PanelHeading icon={<BookOpen size={20} />} title="Bee Annotation Repository" />
+          <p className="setup-copy">
+            Dataset items for training, validation, benchmark, and excluded evidence.
+          </p>
+        </div>
+        <button type="button" onClick={() => void refreshRepository()} disabled={loading}>
+          <RefreshCw size={18} />
+          Refresh
+        </button>
+      </div>
+
+      {summary ? (
+        <>
+          <div className="repository-summary" data-testid="repository-summary">
+            <Metric label="Training" value={summary.roleCounts.training ?? 0} />
+            <Metric label="Validation" value={summary.roleCounts.validation ?? 0} />
+            <Metric label="Benchmark" value={summary.roleCounts.benchmark ?? 0} />
+            <Metric label="Excluded" value={summary.roleCounts.excluded ?? 0} />
+            <Metric label="New items" value={summary.newSinceLatestDatasetVersionCount} />
+            <Metric label="Unassigned crops" value={summary.unassignedCompletedCropCount} />
+          </div>
+          <div className="repository-chip-row" data-testid="repository-diversity-chips">
+            <span>{Object.keys(summary.inspectionDistribution).length} inspections</span>
+            <span>{Object.keys(summary.hiveDistribution).length} hives</span>
+            <span>{Object.keys(summary.sourceImageDistribution).length} source images</span>
+            <span>
+              {summary.persistenceBackend} / {summary.databasePurpose}
+            </span>
+            {summary.latestDatasetVersion ? (
+              <span>Latest {summary.latestDatasetVersion.humanReadableId}</span>
+            ) : (
+              <span>No Dataset Version</span>
+            )}
+          </div>
+          {summary.warnings.length > 0 ? (
+            <div className="repository-warnings" data-testid="repository-warnings">
+              {summary.warnings.map((warning) => (
+                <p key={warning.code}>
+                  <CircleAlert size={16} />
+                  {warning.message}
+                </p>
+              ))}
+            </div>
+          ) : null}
+        </>
+      ) : null}
+
+      <div className="repository-filters">
+        <label>
+          <span>Dataset Role</span>
+          <select
+            value={roleFilter}
+            onChange={(event) => setRoleFilter(event.target.value as DatasetRole | "all")}
+            data-testid="repository-role-filter"
+          >
+            <option value="all">All roles</option>
+            <option value="training">Training</option>
+            <option value="validation">Validation</option>
+            <option value="benchmark">Benchmark</option>
+            <option value="excluded">Excluded</option>
+          </select>
+        </label>
+        <label>
+          <span>Dataset Version</span>
+          <select
+            value={membershipFilter}
+            onChange={(event) => setMembershipFilter(event.target.value as "all" | "latest" | "new")}
+            data-testid="repository-membership-filter"
+          >
+            <option value="all">All membership states</option>
+            <option value="latest">In latest Dataset Version</option>
+            <option value="new">New since latest version</option>
+          </select>
+        </label>
+        <label>
+          <span>Bee class</span>
+          <select
+            value={beeClassFilter}
+            onChange={(event) => setBeeClassFilter(event.target.value as "all" | "complete" | "partial")}
+            data-testid="repository-bee-class-filter"
+          >
+            <option value="all">All bee evidence</option>
+            <option value="complete">Has complete bees</option>
+            <option value="partial">Has partial bees</option>
+          </select>
+        </label>
+        <label>
+          <span>Search</span>
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="ID, filename, hive, source group, note"
+            data-testid="repository-search-input"
+          />
+        </label>
+      </div>
+
+      {loading ? <p className="setup-copy">Loading repository</p> : null}
+      {summary && summary.datasetItemCount === 0 ? (
+        <p className="setup-copy" data-testid="repository-empty-state">
+          {summary.unassignedCompletedCropCount > 0
+            ? "Completed Training Crops exist but none have been assigned to a Dataset Role."
+            : "Create and annotate Training Crops before reviewing the repository."}
+        </p>
+      ) : null}
+
+      <div className="repository-browser">
+        <div className="repository-list" data-testid="repository-item-list">
+          {filteredItems.map((item) => (
+            <button
+              key={item.datasetItemId}
+              type="button"
+              className={item.datasetItemId === selectedDatasetItemId ? "selected" : ""}
+              onClick={() => setSelectedDatasetItemId(item.datasetItemId)}
+              data-testid="repository-item-card"
+            >
+              <RepositoryThumbnail item={item} />
+              <span>
+                <strong>{item.humanReadableId}</strong>
+                <span>
+                  {formatDatasetRoleLabel(item.datasetRole)} / {item.completeVisibleBeeCount} complete /{" "}
+                  {item.partialVisibleBeeCount} partial
+                </span>
+                <span>{item.sourceFilename ?? item.inspectionPhotoId.slice(0, 8)}</span>
+                <span>
+                  {item.latestDatasetVersionMembership
+                    ? `${item.latestDatasetVersionMembership.humanReadableId}: ${formatMembership(item.latestDatasetVersionMembership.membership)}`
+                    : "Not versioned"}
+                </span>
+              </span>
+            </button>
+          ))}
+        </div>
+
+        <div className="repository-detail" data-testid="repository-item-detail">
+          {detailLoading ? <p className="setup-copy">Loading item detail</p> : null}
+          {detail ? (
+            <>
+              <div className="repository-detail-header">
+                <div>
+                  <h2>{detail.humanReadableId}</h2>
+                  <p>
+                    {formatDatasetRoleLabel(detail.datasetRole)} / {detail.exportEligibility}
+                  </p>
+                </div>
+                {detail.benchmarkProtected ? (
+                  <span className="intent-badge">Protected benchmark</span>
+                ) : null}
+              </div>
+              <RepositoryCropPreview detail={detail} />
+              <div className="repository-summary">
+                <Metric label="Complete bees" value={detail.completeVisibleBeeCount} />
+                <Metric label="Partial bees" value={detail.partialVisibleBeeCount} />
+                <Metric label="Image" value={detail.previewStatus} />
+                <Metric
+                  label="Latest"
+                  value={
+                    detail.latestDatasetVersionMembership
+                      ? formatMembership(detail.latestDatasetVersionMembership.membership)
+                      : "not versioned"
+                  }
+                />
+              </div>
+              <dl className="compact-facts" data-testid="repository-item-provenance">
+                <div>
+                  <dt>Source</dt>
+                  <dd>{detail.sourceFilename ?? detail.sourceImageId.slice(0, 8)}</dd>
+                </div>
+                <div>
+                  <dt>Inspection</dt>
+                  <dd>
+                    {detail.inspectionDate ?? "n/a"} /{" "}
+                    {detail.inspectionIntent ? formatInspectionIntent(detail.inspectionIntent) : "n/a"}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Hive</dt>
+                  <dd>{detail.hiveName ?? "n/a"}</dd>
+                </div>
+                <div>
+                  <dt>Hive configuration</dt>
+                  <dd>{detail.hiveConfigurationSummary ?? "n/a"}</dd>
+                </div>
+                <div>
+                  <dt>Source group</dt>
+                  <dd>{detail.sourceGroupKey ?? "n/a"}</dd>
+                </div>
+                <div>
+                  <dt>Assigned</dt>
+                  <dd>{formatDateTime(detail.assignedAt)}</dd>
+                </div>
+              </dl>
+              <div className="repository-chip-row" data-testid="repository-provenance-chips">
+                {Object.entries(detail.annotationSourceCounts).map(([source, count]) => (
+                  <span key={source}>{source}: {count}</span>
+                ))}
+                {Object.entries(detail.reviewMethodCounts).map(([method, count]) => (
+                  <span key={method}>{method}: {count}</span>
+                ))}
+              </div>
+              <div className="repository-version-list" data-testid="repository-version-memberships">
+                {detail.datasetVersionMemberships.length === 0 ? (
+                  <p className="setup-copy">No Dataset Versions contain this item yet.</p>
+                ) : (
+                  detail.datasetVersionMemberships.map((membership) => (
+                    <span key={membership.datasetVersionId}>
+                      {membership.humanReadableId}: {formatMembership(membership.membership)}
+                    </span>
+                  ))
+                )}
+              </div>
+            </>
+          ) : (
+            <p className="setup-copy">Select a Dataset Item to inspect its evidence.</p>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function RepositoryThumbnail({ item }: { item: DatasetRepositoryItem }) {
+  if (!item.thumbnailUrl || item.previewStatus !== "available") {
+    return (
+      <span className="repository-thumbnail unavailable">
+        <Image size={18} />
+      </span>
+    );
+  }
+  return (
+    <span className="repository-thumbnail">
+      <img src={toCoreApiContentUrl(item.thumbnailUrl)} alt="" />
+    </span>
+  );
+}
+
+function RepositoryCropPreview({ detail }: { detail: DatasetRepositoryItemDetail }) {
+  const basis = detail.reviewedEllipseSnapshots[0];
+  if (!detail.previewUrl || detail.previewStatus !== "available" || !basis) {
+    return (
+      <div className="repository-crop-preview unavailable" data-testid="repository-crop-preview">
+        <Image size={24} />
+        <span>Image unavailable</span>
+      </div>
+    );
+  }
+  return (
+    <div
+      className="repository-crop-preview"
+      style={{
+        aspectRatio: `${detail.cropWidth ?? detail.cropImageWidthPx ?? 1} / ${
+          detail.cropHeight ?? detail.cropImageHeightPx ?? 1
+        }`
+      }}
+      data-testid="repository-crop-preview"
+    >
+      <img
+        src={toCoreApiContentUrl(detail.previewUrl)}
+        alt=""
+        style={repositoryCropImageStyle(detail, basis)}
+      />
+      {detail.reviewedEllipseSnapshots.map((ellipse) => (
+        <span
+          key={ellipse.annotationId}
+          className={`repository-ellipse ${ellipse.annotationType}`}
+          style={repositoryEllipseStyle(detail, ellipse)}
+          data-testid="repository-crop-ellipse"
+        />
+      ))}
+    </div>
+  );
+}
+
+function repositoryCropImageStyle(
+  detail: DatasetRepositoryItemDetail,
+  basis: OrientedBeeEllipse | DatasetRepositoryItemDetail["reviewedEllipseSnapshots"][number]
+) {
+  const cropWidth = detail.cropWidth ?? detail.cropImageWidthPx ?? basis.sourceImageWidthPx;
+  const cropHeight = detail.cropHeight ?? detail.cropImageHeightPx ?? basis.sourceImageHeightPx;
+  const cropX = detail.cropX ?? 0;
+  const cropY = detail.cropY ?? 0;
+  return {
+    height: `${(basis.sourceImageHeightPx / cropHeight) * 100}%`,
+    left: `${-(cropX / cropWidth) * 100}%`,
+    position: "absolute" as const,
+    top: `${-(cropY / cropHeight) * 100}%`,
+    width: `${(basis.sourceImageWidthPx / cropWidth) * 100}%`
+  };
+}
+
+function repositoryEllipseStyle(
+  detail: DatasetRepositoryItemDetail,
+  ellipse: DatasetRepositoryItemDetail["reviewedEllipseSnapshots"][number]
+) {
+  const cropWidth = detail.cropWidth ?? detail.cropImageWidthPx ?? ellipse.sourceImageWidthPx;
+  const cropHeight = detail.cropHeight ?? detail.cropImageHeightPx ?? ellipse.sourceImageHeightPx;
+  const cropX = detail.cropX ?? 0;
+  const cropY = detail.cropY ?? 0;
+  return {
+    height: `${(ellipse.radiusY * 2 / cropHeight) * 100}%`,
+    left: `${((ellipse.centerX - cropX - ellipse.radiusX) / cropWidth) * 100}%`,
+    top: `${((ellipse.centerY - cropY - ellipse.radiusY) / cropHeight) * 100}%`,
+    transform: `rotate(${ellipse.rotationDegrees}deg)`,
+    width: `${(ellipse.radiusX * 2 / cropWidth) * 100}%`
+  };
+}
+
+function formatMembership(membership: DatasetVersionMembership["membership"]) {
+  if (membership === "protected_benchmark") return "protected benchmark";
+  if (membership === "not_in_version") return "not in version";
+  return membership.replaceAll("_", " ");
 }
 
 function formatMetric(value: unknown) {

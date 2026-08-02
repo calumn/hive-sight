@@ -27,6 +27,7 @@ from hive_sight_core_api.dataset_labelling_workflow import (
     DatasetLabellingWorkflow,
     DeterministicBeePrelabeler,
 )
+from hive_sight_core_api.dataset_repository_workflow import DatasetRepositoryWorkflow
 from hive_sight_core_api.dataset_role_assignment_workflow import DatasetRoleAssignmentWorkflow
 from hive_sight_core_api.dev_store import (
     DevState,
@@ -146,6 +147,16 @@ def get_training_crop_dataset_item_workflow(
     state: DevStateDep,
 ) -> TrainingCropDatasetItemWorkflow:
     return TrainingCropDatasetItemWorkflow(store=state.store)
+
+
+def get_dataset_repository_workflow(state: DevStateDep) -> DatasetRepositoryWorkflow:
+    settings = get_settings()
+    return DatasetRepositoryWorkflow(
+        store=state.store,
+        image_loader=state.object_storage.get_object,
+        persistence_backend=settings.persistence_backend,
+        database_purpose=settings.database_purpose,
+    )
 
 
 def get_inspection_photo_access(state: DevStateDep) -> InspectionPhotoAccess:

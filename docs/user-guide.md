@@ -122,6 +122,20 @@ Use this when completed crop evidence is ready to become model training data.
 
 The assignment snapshots the reviewed ellipses at that point. Later edits to the crop do not change an already-created Dataset Item.
 
+## Review The Bee Annotation Repository
+
+Use this when you want to see what is actually in the workspace dataset across multiple Training Data Collection inspections.
+
+1. Open the Web UI.
+2. Click `Bee Annotation Repository` in the Workspace gate panel.
+3. Review the Training, Validation, Benchmark, Excluded, New items, and Unassigned crops counts.
+4. Use the Dataset Role, Dataset Version, Bee class, and Search filters to narrow the list.
+5. Select a Dataset Item to inspect its crop preview, reviewed bee ellipses, source photo, inspection, hive, hive configuration, source group, assignment note, and Dataset Version membership.
+6. Check repository warnings for non-blocking data quality concerns, such as all items coming from one source image or having no benchmark items yet.
+7. Click `Inspection` to return to crop annotation.
+
+The repository browser is read-only. It does not change Dataset Item assignments or affect Dataset Version creation rules.
+
 ## Create A YOLO OBB Dataset Version
 
 Use this when you have at least one Training item and one Validation item.

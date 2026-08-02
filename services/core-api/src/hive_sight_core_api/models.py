@@ -562,6 +562,115 @@ class DatasetItemResponse(BaseModel):
     benchmark_protected: bool
 
 
+class DatasetRepositoryWarningResponse(BaseModel):
+    code: str
+    severity: str
+    message: str
+    affected_dataset_item_ids: list[UUID] = Field(default_factory=list)
+
+
+class DatasetVersionMembershipResponse(BaseModel):
+    dataset_version_id: UUID
+    human_readable_id: str
+    purpose: str
+    status: str
+    membership: str
+    excluded_reason: str | None = None
+    created_at: datetime
+
+
+class DatasetRepositoryLatestVersionSummary(BaseModel):
+    dataset_version_id: UUID
+    human_readable_id: str
+    status: str
+    created_at: datetime
+    training_item_count: int
+    validation_item_count: int
+    benchmark_item_count: int
+    excluded_item_count: int
+
+
+class DatasetRepositoryItemListEntry(BaseModel):
+    dataset_item_id: UUID
+    human_readable_id: str
+    workspace_id: UUID
+    dataset_role: DatasetRole
+    status: str = "active"
+    source_evidence_type: str
+    inspection_id: UUID | None = None
+    inspection_date: date | None = None
+    inspection_intent: InspectionIntent | None = None
+    inspection_photo_id: UUID
+    source_image_id: UUID
+    source_filename: str | None = None
+    apiary_id: UUID | None = None
+    apiary_name: str | None = None
+    hive_id: UUID | None = None
+    hive_name: str | None = None
+    hive_configuration_summary: str | None = None
+    training_crop_id: UUID | None = None
+    crop_x: int | None = None
+    crop_y: int | None = None
+    crop_width: int | None = None
+    crop_height: int | None = None
+    crop_image_width_px: int | None = None
+    crop_image_height_px: int | None = None
+    curriculum_stage: str | None = None
+    complete_visible_bee_count: int
+    partial_visible_bee_count: int
+    annotation_source_counts: dict[str, int]
+    review_method_counts: dict[str, int]
+    source_group_key: str | None = None
+    image_quality_status: ImageQualityStatus
+    assigned_by_user_id: UUID
+    assigned_at: datetime
+    assignment_note: str | None = None
+    exclusion_reason: DatasetExclusionReason | None = None
+    benchmark_protected: bool
+    export_eligibility: str
+    latest_dataset_version_membership: DatasetVersionMembershipResponse | None = None
+    dataset_version_memberships: list[DatasetVersionMembershipResponse] = Field(default_factory=list)
+    is_new_since_latest_dataset_version: bool
+    preview_status: str
+    thumbnail_url: str | None = None
+
+
+class DatasetRepositoryItemDetail(DatasetRepositoryItemListEntry):
+    reviewed_ellipse_snapshots: list[ReviewedEllipseSnapshot]
+    provenance: DatasetItemProvenanceResponse | None = None
+    permission_status: str
+    preview_url: str | None = None
+
+
+class DatasetRepositorySummaryResponse(BaseModel):
+    workspace_id: UUID
+    dataset_item_count: int
+    active_dataset_item_count: int
+    unassigned_completed_crop_count: int
+    new_since_latest_dataset_version_count: int
+    role_counts: dict[str, int]
+    annotation_class_counts: dict[str, int]
+    annotation_source_counts: dict[str, int]
+    review_method_counts: dict[str, int]
+    curriculum_stage_distribution: dict[str, int]
+    image_quality_distribution: dict[str, int]
+    hive_configuration_distribution: dict[str, int]
+    source_group_distribution: dict[str, int]
+    inspection_distribution: dict[str, int]
+    inspection_intent_distribution: dict[str, int]
+    hive_distribution: dict[str, int]
+    source_image_distribution: dict[str, int]
+    latest_dataset_version: DatasetRepositoryLatestVersionSummary | None = None
+    persistence_backend: str
+    database_purpose: str
+    warnings: list[DatasetRepositoryWarningResponse]
+
+
+class DatasetRepositoryItemListResponse(BaseModel):
+    summary: DatasetRepositorySummaryResponse
+    items: list[DatasetRepositoryItemListEntry]
+
+
 class YoloObbExportRequest(BaseModel):
     workspace_id: UUID
 

@@ -232,6 +232,23 @@ h1 {
   width: 100%;
 }
 
+.view-switcher {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.view-switcher button {
+  justify-content: flex-start;
+  width: 100%;
+}
+
+.view-switcher button.selected {
+  background: #eaf7ec;
+  border-color: #9fd3a8;
+  color: #24592d;
+}
+
 .form-grid {
   display: grid;
   gap: 14px;
@@ -748,6 +765,177 @@ label span {
   padding: 12px;
 }
 
+.repository-page {
+  display: grid;
+  gap: 14px;
+}
+
+.repository-header,
+.repository-detail-header {
+  align-items: flex-start;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+}
+
+.repository-header .panel-heading {
+  margin-bottom: 8px;
+}
+
+.repository-summary {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.repository-chip-row,
+.repository-version-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.repository-chip-row span,
+.repository-version-list span {
+  background: #f7f9f5;
+  border: 1px solid #dce2d7;
+  border-radius: 6px;
+  color: #33402f;
+  font-size: 0.86rem;
+  font-weight: 800;
+  padding: 7px 9px;
+}
+
+.repository-warnings {
+  display: grid;
+  gap: 8px;
+}
+
+.repository-warnings p {
+  align-items: center;
+  background: #fff8df;
+  border: 1px solid #eadb9a;
+  border-radius: 6px;
+  color: #665519;
+  display: flex;
+  gap: 8px;
+  margin-bottom: 0;
+  padding: 9px;
+}
+
+.repository-filters {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.repository-browser {
+  align-items: start;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(320px, 0.8fr) minmax(0, 1.2fr);
+}
+
+.repository-list {
+  display: grid;
+  gap: 8px;
+}
+
+.repository-list button {
+  align-items: stretch;
+  justify-content: flex-start;
+  min-height: 92px;
+  text-align: left;
+}
+
+.repository-list button.selected {
+  background: #eef7ef;
+  border-color: #9fd3a8;
+}
+
+.repository-list button > span:last-child {
+  display: grid;
+  gap: 4px;
+}
+
+.repository-list button span span {
+  color: #566052;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.repository-thumbnail {
+  background: #eef1eb;
+  border: 1px solid #dce2d7;
+  border-radius: 6px;
+  display: inline-flex;
+  flex: 0 0 86px;
+  height: 68px;
+  overflow: hidden;
+}
+
+.repository-thumbnail img {
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+
+.repository-thumbnail.unavailable {
+  align-items: center;
+  color: #6a7366;
+  justify-content: center;
+}
+
+.repository-detail {
+  background: #ffffff;
+  border: 1px solid #dce2d7;
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.repository-detail-header h2,
+.repository-detail-header p {
+  margin-bottom: 0;
+}
+
+.repository-crop-preview {
+  background: #11170f;
+  border: 1px solid #dce2d7;
+  border-radius: 8px;
+  min-height: 220px;
+  overflow: hidden;
+  position: relative;
+  width: 100%;
+}
+
+.repository-crop-preview.unavailable {
+  align-items: center;
+  color: #dce2d7;
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.repository-crop-preview img {
+  display: block;
+  object-fit: fill;
+}
+
+.repository-ellipse {
+  border: 3px solid #5aa2ff;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.7);
+  pointer-events: none;
+  position: absolute;
+  transform-origin: center;
+}
+
+.repository-ellipse.partial_visible_bee {
+  border-style: dashed;
+}
+
 .button-row {
   display: flex;
   flex-wrap: wrap;
@@ -1080,6 +1268,9 @@ label span {
   .crop-dataset-controls,
   .crop-editing-tool,
   .crop-viewport-toolbar,
+  .repository-summary,
+  .repository-filters,
+  .repository-browser,
   .control-cluster {
     grid-template-columns: 1fr;
   }

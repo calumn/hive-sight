@@ -152,6 +152,41 @@ def test_postgres_store_survives_restart_for_training_crop_dataset_item_path() -
             headers=_headers(),
         )
         assert dataset_item.status_code == 201
+        dataset_item_id = dataset_item.json()["dataset_item_id"]
+        state.store.save_dataset_version(
+            DatasetVersionResponse(
+                dataset_version_id=UUID("00000000-0000-0000-0000-000000014999"),
+                workspace_id=UUID(workspace_id),
+                human_readable_id="HS-DV-PERSIST",
+                purpose="bee_detector_training_baseline",
+                model_purpose="bee_detector",
+                status="created",
+                export_format="yolo_obb_v1",
+                selection_criteria={"dataset_role_policy": "training_and_validation_only"},
+                manifest_hash="persistent-manifest-hash",
+                included_dataset_item_ids=[UUID(dataset_item_id)],
+                training_dataset_item_ids=[UUID(dataset_item_id)],
+                validation_dataset_item_ids=[],
+                protected_benchmark_dataset_item_ids=[],
+                excluded_dataset_items=[],
+                training_item_count=1,
+                validation_item_count=0,
+                benchmark_item_count=0,
+                excluded_item_count=0,
+                annotation_class_counts={"complete_visible_bee": 1},
+                annotation_source_counts={"human_from_scratch": 1},
+                review_method_counts={"human_review": 1},
+                source_group_distribution={"post-restart-frame": 1},
+                hive_configuration_distribution={"British National deep brood": 1},
+                curriculum_stage_distribution={"sparse_bees": 1},
+                image_quality_distribution={"usable": 1},
+                warnings=[],
+                preview_artifact_ids=[],
+                report_artifact_id=None,
+                created_by_user_id=USER_ID,
+                created_at=datetime(2026, 7, 31, 10, 0, tzinfo=UTC),
+            )
+        )
     finally:
         app.dependency_overrides.clear()
 
@@ -187,6 +222,11 @@ def test_postgres_store_survives_restart_for_training_crop_dataset_item_path() -
             params={"workspace_id": workspace_id},
             headers=_headers(),
         )
+        repository = restarted_client.get(
+            "/v1/dataset-repository/items",
+            params={"workspace_id": workspace_id},
+            headers=_headers(),
+        )
 
         assert inspections.status_code == 200
         assert inspections.json()["inspections"][0]["inspection_id"] == inspection_id
@@ -198,6 +238,11 @@ def test_postgres_store_survives_restart_for_training_crop_dataset_item_path() -
         assert evidence.json()["bee_ellipses"][0]["rotation_degrees"] == 15
         assert content.status_code == 200
         assert content.content == _minimal_png()
+        assert repository.status_code == 200
+        repository_body = repository.json()
+        assert repository_body["summary"]["latest_dataset_version"]["human_readable_id"] == "HS-DV-PERSIST"
+        assert repository_body["items"][0]["dataset_item_id"] == dataset_item_id
+        assert repository_body["items"][0]["latest_dataset_version_membership"]["membership"] == "training"
     finally:
         app.dependency_overrides.clear()
 
