@@ -153,6 +153,38 @@ Use this when you want to see what is actually in the workspace dataset across m
 
 The repository browser is read-only. It does not change Dataset Item assignments or affect Dataset Version creation rules.
 
+## Request Independent Review Of A Completed Training Crop
+
+Use this when a Dataset Curator wants another Reviewer to check completed bee annotations before those annotations are treated as trusted training evidence.
+
+1. Switch to a User with Dataset Curator capability.
+2. Resume or create a Training Data Collection inspection.
+3. Select a completed Training Crop that has visible bees and reviewed ellipses.
+4. In `Independent crop review`, add request notes if useful.
+5. Click `Request review`.
+6. Check the requested review summary for the `HS-RQ-...` item and its current status.
+
+While a review request is available, the crop is locked from editing so the Reviewer sees the exact evidence that was submitted.
+
+If the request was made too early, add cancellation notes and click `Cancel request`. The crop can then be reopened, edited, completed again, and submitted for review again.
+
+## Complete Shared Reviewer Work
+
+Use this when a Reviewer wants to pick up available review work from the shared pool.
+
+1. Switch to a User with Reviewer capability.
+2. Click `Review Work`.
+3. Select an available `HS-RQ-...` item.
+4. Review the crop image, safe source label, crop dimensions, and submitted bee ellipses.
+5. Choose an outcome:
+   - `Approved`
+   - `Changes requested`
+   - `Not determined`
+6. Add notes when the outcome is `Changes requested` or `Not determined`.
+7. Click `Complete review`.
+
+The queue is shared. Once one eligible Reviewer completes an item, it disappears for other Reviewers. Reviewers cannot see work they requested or originally annotated.
+
 ## Create A YOLO OBB Dataset Version
 
 Use this when you have at least one Training item and one Validation item.

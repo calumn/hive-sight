@@ -704,6 +704,7 @@ label span {
 .crop-dataset-controls > div:first-child,
 .crop-dataset-controls .review-state,
 .crop-dataset-controls .export-summary,
+.crop-dataset-controls .review-request-panel,
 .crop-dataset-controls .model-training-panel {
   grid-column: 1 / -1;
 }
@@ -776,6 +777,53 @@ label span {
   display: grid;
   gap: 10px;
   padding: 12px;
+}
+
+.review-request-panel {
+  background: #ffffff;
+  border: 1px solid #dce2d7;
+  border-radius: 6px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) minmax(160px, 220px);
+  padding: 12px;
+}
+
+.review-request-panel > div:first-child,
+.review-request-panel .export-summary {
+  grid-column: 1 / -1;
+}
+
+.review-work-panel {
+  align-content: start;
+}
+
+.review-work-evidence {
+  border: 1px solid #dce2d7;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.review-crop-surface {
+  background: #151812;
+  border: 1px solid #dce2d7;
+  border-radius: 8px;
+  max-height: min(72vh, 760px);
+  overflow: hidden;
+  position: relative;
+  width: 100%;
+}
+
+.review-crop-surface img {
+  display: block;
+  max-width: none;
+  object-fit: fill;
+  position: absolute;
+  user-select: none;
+}
+
+.bee-ellipse.review-evidence {
+  pointer-events: none;
 }
 
 .repository-page {

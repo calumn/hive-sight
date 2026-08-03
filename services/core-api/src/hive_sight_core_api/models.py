@@ -48,6 +48,22 @@ class ReviewSubjectType(StrEnum):
     annotation = "annotation"
 
 
+class ReviewQueueSubjectType(StrEnum):
+    training_crop = "training_crop"
+
+
+class ReviewQueueItemStatus(StrEnum):
+    available = "available"
+    completed = "completed"
+    cancelled = "cancelled"
+
+
+class ReviewQueueOutcomeValue(StrEnum):
+    approved = "approved"
+    changes_requested = "changes_requested"
+    not_determined = "not_determined"
+
+
 class AnnotationWorkflowType(StrEnum):
     analysis_result = "analysis_result"
     dataset_labelling = "dataset_labelling"
@@ -1228,6 +1244,105 @@ class TrainingCropEvidenceResponse(BaseModel):
     training_crop: TrainingCropResponse
     bee_ellipses: list[OrientedBeeEllipseResponse]
     caveat: str
+
+
+class ReviewQueueEllipseEvidence(BaseModel):
+    annotation_id: UUID
+    annotation_type: AnnotationType
+    center_x: float
+    center_y: float
+    radius_x: float
+    radius_y: float
+    rotation_degrees: float
+    coordinate_space: CoordinateSpace
+    source_image_width_px: int
+    source_image_height_px: int
+
+
+class ReviewQueueEvidenceSnapshot(BaseModel):
+    safe_source_label: str
+    training_crop_id: UUID
+    training_crop_label: str
+    inspection_photo_id: UUID
+    image_view_url: str
+    crop_x: int
+    crop_y: int
+    crop_width: int
+    crop_height: int
+    source_image_width_px: int
+    source_image_height_px: int
+    crop_image_width_px: int
+    crop_image_height_px: int
+    reviewed_ellipses: list[ReviewQueueEllipseEvidence]
+    reviewed_ellipse_count: int
+    complete_visible_bee_count: int
+    partial_visible_bee_count: int
+    crop_review_status: TrainingCropReviewStatus
+    visible_bee_status: VisibleBeeStatus
+    requested_at: datetime
+
+
+class ReviewQueueItemRecord(BaseModel):
+    review_queue_item_id: UUID
+    human_readable_id: str
+    workspace_id: UUID
+    subject_type: ReviewQueueSubjectType
+    subject_id: UUID
+    requested_by_user_id: UUID
+    original_crop_reviewer_user_id: UUID
+    status: ReviewQueueItemStatus
+    request_notes: str | None = None
+    requested_at: datetime
+    cancelled_at: datetime | None = None
+    cancelled_by_user_id: UUID | None = None
+    cancellation_notes: str | None = None
+    completed_at: datetime | None = None
+    completed_by_outcome_id: UUID | None = None
+    evidence_snapshot: ReviewQueueEvidenceSnapshot
+
+
+class ReviewQueueOutcomeRecord(BaseModel):
+    review_queue_outcome_id: UUID
+    review_queue_item_id: UUID
+    reviewer_id: UUID
+    review_outcome: ReviewQueueOutcomeValue
+    review_notes: str | None = None
+    created_at: datetime
+
+
+class ReviewQueueItemCreateRequest(BaseModel):
+    workspace_id: UUID
+    training_crop_id: UUID
+    request_notes: str | None = Field(default=None, max_length=500)
+
+
+class ReviewQueueItemCancelRequest(BaseModel):
+    cancellation_notes: str = Field(min_length=1, max_length=500)
+
+
+class ReviewQueueOutcomeCreateRequest(BaseModel):
+    review_outcome: ReviewQueueOutcomeValue
+    review_notes: str | None = Field(default=None, max_length=500)
+
+
+class ReviewQueueItemResponse(BaseModel):
+    review_queue_item_id: UUID
+    human_readable_id: str
+    subject_type: ReviewQueueSubjectType
+    subject_id: UUID
+    status: ReviewQueueItemStatus
+    request_notes: str | None = None
+    requested_at: datetime
+    cancelled_at: datetime | None = None
+    cancellation_notes: str | None = None
+    completed_at: datetime | None = None
+    completed_outcome: ReviewQueueOutcomeValue | None = None
+    completed_reviewer_display_identity: str | None = None
+    evidence_snapshot: ReviewQueueEvidenceSnapshot
+
+
+class ReviewQueueItemListResponse(BaseModel):
+    review_queue_items: list[ReviewQueueItemResponse]
 
 
 class ProcessAnalysisRunRequest(BaseModel):

@@ -30,6 +30,7 @@ from hive_sight_core_api.dependencies import (
     get_directed_ellipse_cleanup_workflow,
     get_hive_configuration_workflow,
     get_inspection_photo_access,
+    get_review_queue_workflow,
     get_settings,
     get_training_crop_dataset_item_workflow,
     get_training_crop_workflow,
@@ -39,6 +40,7 @@ from hive_sight_core_api.dev_users import DEV_USER_IDS
 from hive_sight_core_api.directed_ellipse_cleanup_workflow import DirectedEllipseCleanupWorkflow
 from hive_sight_core_api.hive_configuration_workflow import HiveConfigurationWorkflow
 from hive_sight_core_api.inspection_photo_access import InspectionPhotoAccess
+from hive_sight_core_api.review_queue_workflow import ReviewQueueWorkflow
 from hive_sight_core_api.models import (
     AnalysisEvidenceResponse,
     AnalysisRunDetailResponse,
@@ -95,6 +97,11 @@ from hive_sight_core_api.models import (
     ProcessAnalysisRunRequest,
     ReviewDecisionCreateRequest,
     ReviewDecisionResponse,
+    ReviewQueueItemCancelRequest,
+    ReviewQueueItemCreateRequest,
+    ReviewQueueItemListResponse,
+    ReviewQueueItemResponse,
+    ReviewQueueOutcomeCreateRequest,
     StartDatasetLabellingRequest,
     TrainingCropCreateRequest,
     TrainingCropDatasetItemCreateRequest,
@@ -169,6 +176,10 @@ TrainingCropWorkflowDep = Annotated[
 TrainingCropDatasetItemWorkflowDep = Annotated[
     TrainingCropDatasetItemWorkflow,
     Depends(get_training_crop_dataset_item_workflow),
+]
+ReviewQueueWorkflowDep = Annotated[
+    ReviewQueueWorkflow,
+    Depends(get_review_queue_workflow),
 ]
 BeeDetectorTrainingWorkflowDep = Annotated[
     BeeDetectorTrainingWorkflow,
@@ -601,6 +612,118 @@ def create_training_crop_dataset_item(
         training_crop_id=training_crop_id,
         request=request,
     )
+
+
+@app.post(
+    "/v1/review-queue/items",
+    response_model=ReviewQueueItemResponse,
+    status_code=201,
+)
+def request_training_crop_review(
+    request: ReviewQueueItemCreateRequest,
+    user: AuthenticatedUserDep,
+    workflow: ReviewQueueWorkflowDep,
+) -> ReviewQueueItemResponse:
+    return workflow.request_training_crop_review(user=user, request=request)
+
+
+@app.get(
+    "/v1/review-queue/work",
+    response_model=ReviewQueueItemListResponse,
+)
+def list_review_work(
+    user: AuthenticatedUserDep,
+    workflow: ReviewQueueWorkflowDep,
+) -> ReviewQueueItemListResponse:
+    return workflow.list_available_work(user=user)
+
+
+@app.get(
+    "/v1/review-queue/history",
+    response_model=ReviewQueueItemListResponse,
+)
+def list_review_history(
+    user: AuthenticatedUserDep,
+    workflow: ReviewQueueWorkflowDep,
+) -> ReviewQueueItemListResponse:
+    return workflow.list_review_history(user=user)
+
+
+@app.get(
+    "/v1/review-queue/requested",
+    response_model=ReviewQueueItemListResponse,
+)
+def list_requested_reviews(
+    workspace_id: UUID,
+    user: AuthenticatedUserDep,
+    workflow: ReviewQueueWorkflowDep,
+) -> ReviewQueueItemListResponse:
+    return workflow.list_requested_reviews(user=user, workspace_id=workspace_id)
+
+
+@app.get(
+    "/v1/review-queue/items/{review_queue_item_id}",
+    response_model=ReviewQueueItemResponse,
+)
+def get_review_work_item(
+    review_queue_item_id: UUID,
+    user: AuthenticatedUserDep,
+    workflow: ReviewQueueWorkflowDep,
+) -> ReviewQueueItemResponse:
+    return workflow.get_available_work_item(user=user, review_queue_item_id=review_queue_item_id)
+
+
+@app.post(
+    "/v1/review-queue/items/{review_queue_item_id}/outcomes",
+    response_model=ReviewQueueItemResponse,
+    status_code=201,
+)
+def complete_review_work_item(
+    review_queue_item_id: UUID,
+    request: ReviewQueueOutcomeCreateRequest,
+    user: AuthenticatedUserDep,
+    workflow: ReviewQueueWorkflowDep,
+) -> ReviewQueueItemResponse:
+    return workflow.complete_review(
+        user=user,
+        review_queue_item_id=review_queue_item_id,
+        request=request,
+    )
+
+
+@app.post(
+    "/v1/review-queue/items/{review_queue_item_id}/cancel",
+    response_model=ReviewQueueItemResponse,
+)
+def cancel_review_work_item(
+    review_queue_item_id: UUID,
+    request: ReviewQueueItemCancelRequest,
+    user: AuthenticatedUserDep,
+    workflow: ReviewQueueWorkflowDep,
+) -> ReviewQueueItemResponse:
+    return workflow.cancel_review(
+        user=user,
+        review_queue_item_id=review_queue_item_id,
+        request=request,
+    )
+
+
+@app.get("/v1/review-queue/items/{review_queue_item_id}/image")
+def get_review_work_item_image(
+    review_queue_item_id: UUID,
+    user: AuthenticatedUserDep,
+    workflow: ReviewQueueWorkflowDep,
+    state: DevStateDep,
+) -> Response:
+    photo = workflow.require_image_access(user=user, review_queue_item_id=review_queue_item_id)
+    body = state.object_storage.get_object(photo.original_object_key)
+    if body is None:
+        raise DomainError(
+            "photo_view_unavailable",
+            "The requested Review Queue image content is not available.",
+            404,
+        )
+    return Response(content=body, media_type=photo.content_type)
 
 
 @app.get(

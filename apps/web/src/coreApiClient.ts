@@ -525,6 +525,66 @@ export type TrainingCropEvidence = {
   caveat: string;
 };
 
+export type ReviewQueueItemStatus = "available" | "completed" | "cancelled";
+
+export type ReviewQueueOutcomeValue = "approved" | "changes_requested" | "not_determined";
+
+export type ReviewQueueEllipseEvidence = {
+  annotationId: string;
+  annotationType: BeeAnnotationType;
+  centerX: number;
+  centerY: number;
+  radiusX: number;
+  radiusY: number;
+  rotationDegrees: number;
+  coordinateSpace: "source_image_pixels";
+  sourceImageWidthPx: number;
+  sourceImageHeightPx: number;
+};
+
+export type ReviewQueueEvidenceSnapshot = {
+  safeSourceLabel: string;
+  trainingCropId: string;
+  trainingCropLabel: string;
+  inspectionPhotoId: string;
+  imageViewUrl: string;
+  cropX: number;
+  cropY: number;
+  cropWidth: number;
+  cropHeight: number;
+  sourceImageWidthPx: number;
+  sourceImageHeightPx: number;
+  cropImageWidthPx: number;
+  cropImageHeightPx: number;
+  reviewedEllipses: ReviewQueueEllipseEvidence[];
+  reviewedEllipseCount: number;
+  completeVisibleBeeCount: number;
+  partialVisibleBeeCount: number;
+  cropReviewStatus: TrainingCropReviewStatus;
+  visibleBeeStatus: VisibleBeeStatus;
+  requestedAt: string;
+};
+
+export type ReviewQueueItem = {
+  reviewQueueItemId: string;
+  humanReadableId: string;
+  subjectType: "training_crop";
+  subjectId: string;
+  status: ReviewQueueItemStatus;
+  requestNotes: string | null;
+  requestedAt: string;
+  cancelledAt: string | null;
+  cancellationNotes: string | null;
+  completedAt: string | null;
+  completedOutcome: ReviewQueueOutcomeValue | null;
+  completedReviewerDisplayIdentity: string | null;
+  evidenceSnapshot: ReviewQueueEvidenceSnapshot;
+};
+
+export type ReviewQueueItemList = {
+  reviewQueueItems: ReviewQueueItem[];
+};
+
 export type YoloObbLabelEntry = {
   datasetItemId: string;
   trainingCropId: string;
@@ -1776,6 +1836,141 @@ export async function fetchTrainingCropEvidence({
   return parseTrainingCropEvidence(await response.json());
 }
 
+export async function requestTrainingCropReview({
+  devUserId,
+  workspaceId,
+  trainingCropId,
+  requestNotes
+}: {
+  devUserId: string;
+  workspaceId: string;
+  trainingCropId: string;
+  requestNotes: string;
+}): Promise<ReviewQueueItem> {
+  const trimmedNotes = requestNotes.trim();
+  const response = await fetch(`${coreApiUrl}/v1/review-queue/items`, {
+    method: "POST",
+    headers: jsonHeaders(devUserId),
+    body: JSON.stringify({
+      workspace_id: workspaceId,
+      training_crop_id: trainingCropId,
+      request_notes: trimmedNotes.length > 0 ? trimmedNotes : null
+    })
+  });
+  await ensureOk(response);
+  return parseReviewQueueItem(await response.json());
+}
+
+export async function fetchReviewWork({
+  devUserId
+}: {
+  devUserId: string;
+}): Promise<ReviewQueueItemList> {
+  const response = await fetch(`${coreApiUrl}/v1/review-queue/work`, {
+    headers: devAuthHeaders(devUserId)
+  });
+  await ensureOk(response);
+  return parseReviewQueueItemList(await response.json());
+}
+
+export async function fetchReviewHistory({
+  devUserId
+}: {
+  devUserId: string;
+}): Promise<ReviewQueueItemList> {
+  const response = await fetch(`${coreApiUrl}/v1/review-queue/history`, {
+    headers: devAuthHeaders(devUserId)
+  });
+  await ensureOk(response);
+  return parseReviewQueueItemList(await response.json());
+}
+
+export async function fetchRequestedReviews({
+  devUserId,
+  workspaceId
+}: {
+  devUserId: string;
+  workspaceId: string;
+}): Promise<ReviewQueueItemList> {
+  const params = new URLSearchParams({ workspace_id: workspaceId });
+  const response = await fetch(`${coreApiUrl}/v1/review-queue/requested?${params}`, {
+    headers: devAuthHeaders(devUserId)
+  });
+  await ensureOk(response);
+  return parseReviewQueueItemList(await response.json());
+}
+
+export async function fetchReviewWorkItem({
+  devUserId,
+  reviewQueueItemId
+}: {
+  devUserId: string;
+  reviewQueueItemId: string;
+}): Promise<ReviewQueueItem> {
+  const response = await fetch(`${coreApiUrl}/v1/review-queue/items/${reviewQueueItemId}`, {
+    headers: devAuthHeaders(devUserId)
+  });
+  await ensureOk(response);
+  return parseReviewQueueItem(await response.json());
+}
+
+export async function completeReviewWorkItem({
+  devUserId,
+  reviewQueueItemId,
+  reviewOutcome,
+  reviewNotes
+}: {
+  devUserId: string;
+  reviewQueueItemId: string;
+  reviewOutcome: ReviewQueueOutcomeValue;
+  reviewNotes: string;
+}): Promise<ReviewQueueItem> {
+  const trimmedNotes = reviewNotes.trim();
+  const response = await fetch(`${coreApiUrl}/v1/review-queue/items/${reviewQueueItemId}/outcomes`, {
+    method: "POST",
+    headers: jsonHeaders(devUserId),
+    body: JSON.stringify({
+      review_outcome: reviewOutcome,
+      review_notes: trimmedNotes.length > 0 ? trimmedNotes : null
+    })
+  });
+  await ensureOk(response);
+  return parseReviewQueueItem(await response.json());
+}
+
+export async function cancelReviewWorkItem({
+  devUserId,
+  reviewQueueItemId,
+  cancellationNotes
+}: {
+  devUserId: string;
+  reviewQueueItemId: string;
+  cancellationNotes: string;
+}): Promise<ReviewQueueItem> {
+  const response = await fetch(`${coreApiUrl}/v1/review-queue/items/${reviewQueueItemId}/cancel`, {
+    method: "POST",
+    headers: jsonHeaders(devUserId),
+    body: JSON.stringify({ cancellation_notes: cancellationNotes.trim() })
+  });
+  await ensureOk(response);
+  return parseReviewQueueItem(await response.json());
+}
+
+export async function fetchReviewQueueImageObjectUrl({
+  devUserId,
+  imageViewUrl
+}: {
+  devUserId: string;
+  imageViewUrl: string;
+}): Promise<string> {
+  const response = await fetch(toCoreApiUrl(imageViewUrl), {
+    headers: devAuthHeaders(devUserId)
+  });
+  await ensureOk(response);
+  const blob = await response.blob();
+  return URL.createObjectURL(blob);
+}
+
 export async function createTrainingCropEllipse({
   devUserId,
   workspaceId,
@@ -2252,6 +2447,90 @@ function parseTrainingCropEvidence(value: unknown): TrainingCropEvidence {
     trainingCrop: parseTrainingCrop(record.training_crop),
     beeEllipses: requireArray(record.bee_ellipses, "bee_ellipses").map(parseOrientedBeeEllipse),
     caveat: requireString(record.caveat, "caveat")
+  };
+}
+
+function parseReviewQueueItemList(value: unknown): ReviewQueueItemList {
+  const record = requireRecord(value, "Review Queue Item list response");
+  return {
+    reviewQueueItems: requireArray(record.review_queue_items, "review_queue_items").map(
+      parseReviewQueueItem
+    )
+  };
+}
+
+function parseReviewQueueItem(value: unknown): ReviewQueueItem {
+  const record = requireRecord(value, "Review Queue Item response");
+  return {
+    reviewQueueItemId: requireString(record.review_queue_item_id, "review_queue_item_id"),
+    humanReadableId: requireString(record.human_readable_id, "human_readable_id"),
+    subjectType: requireReviewQueueSubjectType(record.subject_type),
+    subjectId: requireString(record.subject_id, "subject_id"),
+    status: requireReviewQueueItemStatus(record.status),
+    requestNotes: optionalString(record.request_notes, "request_notes"),
+    requestedAt: requireString(record.requested_at, "requested_at"),
+    cancelledAt: optionalString(record.cancelled_at, "cancelled_at"),
+    cancellationNotes: optionalString(record.cancellation_notes, "cancellation_notes"),
+    completedAt: optionalString(record.completed_at, "completed_at"),
+    completedOutcome:
+      record.completed_outcome === null
+        ? null
+        : requireReviewQueueOutcomeValue(record.completed_outcome),
+    completedReviewerDisplayIdentity: optionalString(
+      record.completed_reviewer_display_identity,
+      "completed_reviewer_display_identity"
+    ),
+    evidenceSnapshot: parseReviewQueueEvidenceSnapshot(record.evidence_snapshot)
+  };
+}
+
+function parseReviewQueueEvidenceSnapshot(value: unknown): ReviewQueueEvidenceSnapshot {
+  const record = requireRecord(value, "Review Queue evidence snapshot");
+  return {
+    safeSourceLabel: requireString(record.safe_source_label, "safe_source_label"),
+    trainingCropId: requireString(record.training_crop_id, "training_crop_id"),
+    trainingCropLabel: requireString(record.training_crop_label, "training_crop_label"),
+    inspectionPhotoId: requireString(record.inspection_photo_id, "inspection_photo_id"),
+    imageViewUrl: requireString(record.image_view_url, "image_view_url"),
+    cropX: requireNumber(record.crop_x, "crop_x"),
+    cropY: requireNumber(record.crop_y, "crop_y"),
+    cropWidth: requireNumber(record.crop_width, "crop_width"),
+    cropHeight: requireNumber(record.crop_height, "crop_height"),
+    sourceImageWidthPx: requireNumber(record.source_image_width_px, "source_image_width_px"),
+    sourceImageHeightPx: requireNumber(record.source_image_height_px, "source_image_height_px"),
+    cropImageWidthPx: requireNumber(record.crop_image_width_px, "crop_image_width_px"),
+    cropImageHeightPx: requireNumber(record.crop_image_height_px, "crop_image_height_px"),
+    reviewedEllipses: requireArray(record.reviewed_ellipses, "reviewed_ellipses").map(
+      parseReviewQueueEllipseEvidence
+    ),
+    reviewedEllipseCount: requireNumber(record.reviewed_ellipse_count, "reviewed_ellipse_count"),
+    completeVisibleBeeCount: requireNumber(
+      record.complete_visible_bee_count,
+      "complete_visible_bee_count"
+    ),
+    partialVisibleBeeCount: requireNumber(
+      record.partial_visible_bee_count,
+      "partial_visible_bee_count"
+    ),
+    cropReviewStatus: requireTrainingCropReviewStatus(record.crop_review_status),
+    visibleBeeStatus: requireVisibleBeeStatus(record.visible_bee_status),
+    requestedAt: requireString(record.requested_at, "requested_at")
+  };
+}
+
+function parseReviewQueueEllipseEvidence(value: unknown): ReviewQueueEllipseEvidence {
+  const record = requireRecord(value, "Review Queue ellipse evidence");
+  return {
+    annotationId: requireString(record.annotation_id, "annotation_id"),
+    annotationType: requireBeeAnnotationType(record.annotation_type),
+    centerX: requireNumber(record.center_x, "center_x"),
+    centerY: requireNumber(record.center_y, "center_y"),
+    radiusX: requireNumber(record.radius_x, "radius_x"),
+    radiusY: requireNumber(record.radius_y, "radius_y"),
+    rotationDegrees: requireNumber(record.rotation_degrees, "rotation_degrees"),
+    coordinateSpace: requireSourceImagePixelCoordinateSpace(record.coordinate_space),
+    sourceImageWidthPx: requireNumber(record.source_image_width_px, "source_image_width_px"),
+    sourceImageHeightPx: requireNumber(record.source_image_height_px, "source_image_height_px")
   };
 }
 
@@ -3542,6 +3821,27 @@ function requireReviewSubjectType(value: unknown): "annotation" {
     return value;
   }
   throw new Error("Core API response had an unexpected review subject type");
+}
+
+function requireReviewQueueSubjectType(value: unknown): "training_crop" {
+  if (value === "training_crop") {
+    return value;
+  }
+  throw new Error("Core API response had an unexpected Review Queue subject type");
+}
+
+function requireReviewQueueItemStatus(value: unknown): ReviewQueueItemStatus {
+  if (value === "available" || value === "completed" || value === "cancelled") {
+    return value;
+  }
+  throw new Error("Core API response had an unexpected Review Queue Item status");
+}
+
+function requireReviewQueueOutcomeValue(value: unknown): ReviewQueueOutcomeValue {
+  if (value === "approved" || value === "changes_requested" || value === "not_determined") {
+    return value;
+  }
+  throw new Error("Core API response had an unexpected Review Queue outcome");
 }
 
 function requireReviewDecisionValue(value: unknown): ReviewDecisionValue {

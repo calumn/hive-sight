@@ -30,6 +30,8 @@ from hive_sight_core_api.models import (
     ModelCandidateResponse,
     OrientedBeeEllipseResponse,
     ReviewDecisionResponse,
+    ReviewQueueItemRecord,
+    ReviewQueueOutcomeRecord,
     TrainingRunResponse,
     TrainingCropResponse,
 )
@@ -47,6 +49,8 @@ MODEL_RECORD_TYPES: dict[str, type] = {
     "dataset_labelling_session": DatasetLabellingSessionResponse,
     "training_crop": TrainingCropResponse,
     "training_crop_ellipse": OrientedBeeEllipseResponse,
+    "review_queue_item": ReviewQueueItemRecord,
+    "review_queue_outcome": ReviewQueueOutcomeRecord,
     "dataset_item": DatasetItemResponse,
     "dataset_version": DatasetVersionResponse,
     "training_run": TrainingRunResponse,
@@ -183,6 +187,20 @@ class PostgresProductDataStore(InMemoryProductDataStore):
         response = super().save_training_crop_ellipse(ellipse)
         self._persist_model("training_crop_ellipse", response.annotation_id, response)
         self._upsert_ellipse_projection(response)
+        return response
+
+    def save_review_queue_item(self, item: ReviewQueueItemRecord):
+        response = super().save_review_queue_item(item)
+        self._persist_model("review_queue_item", response.review_queue_item_id, response)
+        return response
+
+    def save_review_queue_outcome(self, outcome: ReviewQueueOutcomeRecord):
+        response = super().save_review_queue_outcome(outcome)
+        self._persist_model(
+            "review_queue_outcome",
+            response.review_queue_outcome_id,
+            response,
+        )
         return response
 
     def delete_training_crop_ellipse_record(self, annotation_id: UUID) -> None:
@@ -346,6 +364,10 @@ class PostgresProductDataStore(InMemoryProductDataStore):
             self.training_crops[model.training_crop_id] = model
         elif record_type == "training_crop_ellipse":
             self.training_crop_ellipses[model.annotation_id] = model
+        elif record_type == "review_queue_item":
+            self.review_queue_items[model.review_queue_item_id] = model
+        elif record_type == "review_queue_outcome":
+            self.review_queue_outcomes[model.review_queue_outcome_id] = model
         elif record_type == "dataset_item":
             self.dataset_items[model.dataset_item_id] = model
         elif record_type == "dataset_version":

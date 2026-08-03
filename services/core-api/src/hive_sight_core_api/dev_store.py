@@ -50,6 +50,9 @@ from hive_sight_core_api.models import (
     PrelabelerRunResponse,
     ReviewDecisionResponse,
     ReviewDecisionValue,
+    ReviewQueueItemRecord,
+    ReviewQueueItemResponse,
+    ReviewQueueOutcomeRecord,
     ReviewedEllipseSnapshot,
     ReviewSubjectType,
     TrainingCropCreateRequest,
@@ -196,6 +199,8 @@ class InMemoryProductDataStore:
     artifacts: dict[UUID, ArtifactResponse] = field(default_factory=dict)
     training_crops: dict[UUID, TrainingCropResponse] = field(default_factory=dict)
     training_crop_ellipses: dict[UUID, OrientedBeeEllipseResponse] = field(default_factory=dict)
+    review_queue_items: dict[UUID, ReviewQueueItemRecord] = field(default_factory=dict)
+    review_queue_outcomes: dict[UUID, ReviewQueueOutcomeRecord] = field(default_factory=dict)
     reviewer_user_ids: set[UUID] = field(
         default_factory=lambda: {DEFAULT_DEV_REVIEWER_USER_ID}
     )
@@ -258,6 +263,12 @@ class InMemoryProductDataStore:
 
     def list_development_users(self) -> list[DevUserResponse]:
         return [dev_user_response(seed) for seed in DEV_USERS]
+
+    def display_identity_for_user(self, user_id: UUID) -> str:
+        for seed in DEV_USERS:
+            if seed.user_id == user_id:
+                return seed.code
+        return str(user_id)
 
     def accept_data_use_agreement(
         self,
@@ -899,6 +910,18 @@ class InMemoryProductDataStore:
         self.training_crops[crop.training_crop_id] = crop
         return crop
 
+    def active_review_queue_item_for_training_crop(
+        self,
+        training_crop_id: UUID,
+    ) -> ReviewQueueItemRecord | None:
+        for item in self.review_queue_items.values():
+            if (
+                item.subject_id == training_crop_id
+                and item.status == "available"
+            ):
+                return item
+        return None
+
     def update_training_crop(
         self,
         user: UserContext,
@@ -1014,6 +1037,90 @@ class InMemoryProductDataStore:
         ]
         ellipses.sort(key=lambda ellipse: ellipse.created_at)
         return ellipses
+
+    def save_review_queue_item(
+        self,
+        item: ReviewQueueItemRecord,
+    ) -> ReviewQueueItemRecord:
+        self.review_queue_items[item.review_queue_item_id] = item
+        return item
+
+    def save_review_queue_outcome(
+        self,
+        outcome: ReviewQueueOutcomeRecord,
+    ) -> ReviewQueueOutcomeRecord:
+        self.review_queue_outcomes[outcome.review_queue_outcome_id] = outcome
+        return outcome
+
+    def get_review_queue_item(
+        self,
+        review_queue_item_id: UUID,
+    ) -> ReviewQueueItemRecord | None:
+        return self.review_queue_items.get(review_queue_item_id)
+
+    def get_review_queue_outcome(
+        self,
+        review_queue_outcome_id: UUID,
+    ) -> ReviewQueueOutcomeRecord | None:
+        return self.review_queue_outcomes.get(review_queue_outcome_id)
+
+    def list_review_queue_items(self) -> list[ReviewQueueItemRecord]:
+        return sorted(
+            self.review_queue_items.values(),
+            key=lambda item: (item.requested_at, item.human_readable_id),
+        )
+
+    def review_queue_outcome_for_item(
+        self,
+        review_queue_item_id: UUID,
+    ) -> ReviewQueueOutcomeRecord | None:
+        for outcome in self.review_queue_outcomes.values():
+            if outcome.review_queue_item_id == review_queue_item_id:
+                return outcome
+        return None
+
+    def review_queue_outcome_for_reviewer(
+        self,
+        review_queue_item_id: UUID,
+        reviewer_id: UUID,
+    ) -> ReviewQueueOutcomeRecord | None:
+        for outcome in self.review_queue_outcomes.values():
+            if (
+                outcome.review_queue_item_id == review_queue_item_id
+                and outcome.reviewer_id == reviewer_id
+            ):
+                return outcome
+        return None
+
+    def review_queue_item_response(
+        self,
+        item: ReviewQueueItemRecord,
+        include_reviewer_identity: bool = False,
+    ) -> ReviewQueueItemResponse:
+        outcome = (
+            self.get_review_queue_outcome(item.completed_by_outcome_id)
+            if item.completed_by_outcome_id is not None
+            else None
+        )
+        return ReviewQueueItemResponse(
+            review_queue_item_id=item.review_queue_item_id,
+            human_readable_id=item.human_readable_id,
+            subject_type=item.subject_type,
+            subject_id=item.subject_id,
+            status=item.status,
+            request_notes=item.request_notes,
+            requested_at=item.requested_at,
+            cancelled_at=item.cancelled_at,
+            cancellation_notes=item.cancellation_notes,
+            completed_at=item.completed_at,
+            completed_outcome=outcome.review_outcome if outcome is not None else None,
+            completed_reviewer_display_identity=(
+                self.display_identity_for_user(outcome.reviewer_id)
+                if include_reviewer_identity and outcome is not None
+                else None
+            ),
+            evidence_snapshot=item.evidence_snapshot,
+        )
 
     def existing_labelling_session_for_photo(
         self,

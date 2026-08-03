@@ -34,7 +34,9 @@ import {
   acceptWorkspaceDataUseAgreement,
   abandonTrainingRun,
   cancelBenchmarkEvaluation,
+  cancelReviewWorkItem,
   cancelTrainingRun,
+  completeReviewWorkItem,
   createTrainingCrop,
   createTrainingCropEllipse,
   createApiary,
@@ -66,10 +68,16 @@ import {
   fetchBenchmarkEvaluations,
   fetchModelCandidates,
   fetchModelTrainingReadiness,
+  fetchRequestedReviews,
+  fetchReviewHistory,
+  fetchReviewQueueImageObjectUrl,
+  fetchReviewWork,
+  fetchReviewWorkItem,
   fetchTrainingRuns,
   fetchTrainingCropEvidence,
   fetchTrainingCropsForPhoto,
   processAnalysisRun,
+  requestTrainingCropReview,
   startDatasetLabellingSession,
   startBenchmarkEvaluation,
   startModelTrainingRun,
@@ -112,6 +120,8 @@ import {
   type PhysicalYoloObbExport,
   type PhotoIntake,
   type ReviewDecisionValue,
+  type ReviewQueueItem,
+  type ReviewQueueOutcomeValue,
   type ModelTrainingReadiness,
   type ModelCandidate,
   type TrainingRun,
@@ -144,7 +154,7 @@ type CropDraft = {
   cropHeight: number;
 };
 
-type AppView = "inspection" | "repository";
+type AppView = "inspection" | "repository" | "review-work";
 
 export function App() {
   const trainingCropPanelRef = useRef<HTMLDivElement | null>(null);
@@ -270,6 +280,14 @@ export function App() {
   }, [evidenceImageUrl, labellingImageUrl]);
 
   const session = loadState.kind === "ready" ? loadState.session : null;
+  useEffect(() => {
+    if (appView === "repository" && session && !session.datasetCuratorCapability) {
+      setAppView("inspection");
+    }
+    if (appView === "review-work" && session && !session.reviewerCapability) {
+      setAppView("inspection");
+    }
+  }, [appView, session]);
   const termsAccepted = session?.workspaceDataUseAgreementStatus === "accepted";
   const selectedFrameStandard = frameStandards.find(
     (standard) => standard.frameStandardId === selectedFrameStandardId
@@ -878,7 +896,13 @@ export function App() {
       <header className="topbar" aria-label="Workspace status">
         <div>
           <p className="eyebrow">HiveSight</p>
-          <h1>{appView === "repository" ? "Bee Annotation Repository" : "Inspection photo intake"}</h1>
+          <h1>
+            {appView === "repository"
+              ? "Bee Annotation Repository"
+              : appView === "review-work"
+                ? "Review Work"
+                : "Inspection photo intake"}
+          </h1>
         </div>
         <StatusPill loadState={loadState} />
       </header>
@@ -914,6 +938,17 @@ export function App() {
                 >
                   <BookOpen size={18} />
                   Repository
+                </button>
+              ) : null}
+              {loadState.session.reviewerCapability ? (
+                <button
+                  type="button"
+                  className={appView === "review-work" ? "selected" : ""}
+                  onClick={() => setAppView("review-work")}
+                  data-testid="review-work-page-button"
+                >
+                  <ShieldCheck size={18} />
+                  Review Work
                 </button>
               ) : null}
             </nav>
@@ -959,7 +994,19 @@ export function App() {
           </aside>
 
           <section className="workflow-panel">
-            {appView === "repository" ? (
+            {appView === "review-work" ? (
+              <ReviewWorkPage
+                devUserId={devUserId}
+                workspaceId={loadState.session.workspaceId}
+                onError={(error) =>
+                  setActionState({
+                    kind: "blocked",
+                    code: error.code,
+                    message: error.message
+                  })
+                }
+              />
+            ) : appView === "repository" ? (
               <BeeAnnotationRepositoryPage
                 devUserId={devUserId}
                 workspaceId={loadState.session.workspaceId}
@@ -1927,6 +1974,30 @@ function proposalStyle(crop: TrainingCrop, proposal: BeeAnnotationProposal) {
   };
 }
 
+function reviewQueueImageStyle(item: ReviewQueueItem) {
+  const snapshot = item.evidenceSnapshot;
+  return {
+    left: `${(-snapshot.cropX / snapshot.cropWidth) * 100}%`,
+    top: `${(-snapshot.cropY / snapshot.cropHeight) * 100}%`,
+    width: `${(snapshot.sourceImageWidthPx / snapshot.cropWidth) * 100}%`,
+    height: `${(snapshot.sourceImageHeightPx / snapshot.cropHeight) * 100}%`
+  };
+}
+
+function reviewQueueEllipseStyle(
+  item: ReviewQueueItem,
+  ellipse: ReviewQueueItem["evidenceSnapshot"]["reviewedEllipses"][number]
+) {
+  const snapshot = item.evidenceSnapshot;
+  return {
+    left: `${((ellipse.centerX - snapshot.cropX - ellipse.radiusX) / snapshot.cropWidth) * 100}%`,
+    top: `${((ellipse.centerY - snapshot.cropY - ellipse.radiusY) / snapshot.cropHeight) * 100}%`,
+    width: `${((ellipse.radiusX * 2) / snapshot.cropWidth) * 100}%`,
+    height: `${((ellipse.radiusY * 2) / snapshot.cropHeight) * 100}%`,
+    transform: `rotate(${ellipse.rotationDegrees}deg)`
+  };
+}
+
 type EllipseGeometry = {
   annotationType: BeeAnnotationType;
   centerX: number;
@@ -2144,6 +2215,9 @@ function TrainingCropAnnotationPanel({
   const [datasetExclusionReason, setDatasetExclusionReason] =
     useState<DatasetExclusionReason>("unsuitable_crop");
   const [trainingCropDatasetItem, setTrainingCropDatasetItem] = useState<DatasetItem | null>(null);
+  const [requestedReviews, setRequestedReviews] = useState<ReviewQueueItem[]>([]);
+  const [reviewRequestNotes, setReviewRequestNotes] = useState("");
+  const [cancellationNotes, setCancellationNotes] = useState("");
   const [yoloObbExport, setYoloObbExport] = useState<YoloObbExport | null>(null);
   const [physicalYoloObbExport, setPhysicalYoloObbExport] =
     useState<PhysicalYoloObbExport | null>(null);
@@ -2195,6 +2269,11 @@ function TrainingCropAnnotationPanel({
 
   const selectedPhoto = photos.find((photo) => photo.inspectionPhotoId === selectedPhotoId) ?? null;
   const selectedCrop = evidence?.trainingCrop ?? crops.find((crop) => crop.trainingCropId === selectedCropId) ?? null;
+  const selectedCropReviewItems = requestedReviews.filter(
+    (item) => item.subjectId === selectedCrop?.trainingCropId
+  );
+  const selectedCropActiveReviewItem =
+    selectedCropReviewItems.find((item) => item.status === "available") ?? null;
   const selectedCropDatasetRole = trainingCropDatasetItem?.datasetRole ?? selectedCrop?.datasetRole ?? null;
   const selectedCropDatasetItemId =
     trainingCropDatasetItem?.datasetItemId ?? selectedCrop?.datasetItemId ?? null;
@@ -2311,7 +2390,8 @@ function TrainingCropAnnotationPanel({
     refreshTrainingRuns().catch((error) => onError(toApiError(error)));
     refreshModelCandidates().catch((error) => onError(toApiError(error)));
     refreshBenchmarkEvaluations().catch((error) => onError(toApiError(error)));
-  }, [workspaceId]);
+    refreshRequestedReviews().catch((error) => onError(toApiError(error)));
+  }, [devUserId, workspaceId]);
 
   useEffect(() => {
     if (!selectedModelCandidateId) {
@@ -2731,6 +2811,43 @@ function TrainingCropAnnotationPanel({
       return refreshedCurrent ?? listing.benchmarkEvaluations.at(0) ?? null;
     });
     return listing.benchmarkEvaluations;
+  }
+
+  async function refreshRequestedReviews() {
+    const listing = await fetchRequestedReviews({ devUserId, workspaceId });
+    setRequestedReviews(listing.reviewQueueItems);
+    return listing.reviewQueueItems;
+  }
+
+  async function requestSelectedCropReview() {
+    if (!selectedCrop) {
+      return;
+    }
+    await runCropAction("Requesting Training Crop review", async () => {
+      await requestTrainingCropReview({
+        devUserId,
+        workspaceId,
+        trainingCropId: selectedCrop.trainingCropId,
+        requestNotes: reviewRequestNotes
+      });
+      setReviewRequestNotes("");
+      await refreshRequestedReviews();
+    });
+  }
+
+  async function cancelSelectedCropReview() {
+    if (!selectedCropActiveReviewItem) {
+      return;
+    }
+    await runCropAction("Cancelling Training Crop review request", async () => {
+      await cancelReviewWorkItem({
+        devUserId,
+        reviewQueueItemId: selectedCropActiveReviewItem.reviewQueueItemId,
+        cancellationNotes
+      });
+      setCancellationNotes("");
+      await refreshRequestedReviews();
+    });
   }
 
   async function useTrainingRunCandidateForCropYolo(candidateId: string) {
@@ -3745,6 +3862,83 @@ function TrainingCropAnnotationPanel({
                       ? "Complete or exclude the Training Crop before assigning a Dataset Item."
                       : "Ready for Dataset Item assignment."}
                 </div>
+                <div className="review-request-panel" data-testid="training-crop-review-request-panel">
+                  <div>
+                    <strong>Requested Reviews</strong>
+                    <p>Make this completed Training Crop available to eligible Reviewers.</p>
+                    <p>
+                      Queue outcomes do not automatically change Dataset Items, Dataset Versions,
+                      Training Runs, Model Candidates, or Benchmark Evaluations.
+                    </p>
+                  </div>
+                  <label>
+                    <span>Neutral request notes</span>
+                    <input
+                      value={reviewRequestNotes}
+                      maxLength={500}
+                      onChange={(event) => setReviewRequestNotes(event.target.value)}
+                      disabled={
+                        Boolean(workingLabel) ||
+                        selectedCrop.reviewStatus !== "review_complete" ||
+                        Boolean(selectedCropActiveReviewItem)
+                      }
+                      data-testid="review-request-notes-input"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    disabled={
+                      Boolean(workingLabel) ||
+                      selectedCrop.reviewStatus !== "review_complete" ||
+                      selectedCrop.visibleBeeStatus !== "has_visible_bees" ||
+                      (evidence?.beeEllipses.length ?? 0) === 0 ||
+                      Boolean(selectedCropActiveReviewItem)
+                    }
+                    onClick={() => void requestSelectedCropReview()}
+                    data-testid="request-training-crop-review-button"
+                  >
+                    <ShieldCheck size={18} />
+                    Request review
+                  </button>
+                  {selectedCropActiveReviewItem ? (
+                    <>
+                      <label>
+                        <span>Cancellation notes</span>
+                        <input
+                          value={cancellationNotes}
+                          maxLength={500}
+                          onChange={(event) => setCancellationNotes(event.target.value)}
+                          disabled={Boolean(workingLabel)}
+                          data-testid="review-cancellation-notes-input"
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        disabled={Boolean(workingLabel) || cancellationNotes.trim().length === 0}
+                        onClick={() => void cancelSelectedCropReview()}
+                        data-testid="cancel-training-crop-review-button"
+                      >
+                        <CircleAlert size={18} />
+                        Cancel request
+                      </button>
+                    </>
+                  ) : null}
+                  <div className="export-summary" data-testid="requested-reviews-summary">
+                    {selectedCropReviewItems.length === 0 ? (
+                      <span>No requested reviews for this crop</span>
+                    ) : (
+                      selectedCropReviewItems.map((item) => (
+                        <span key={item.reviewQueueItemId}>
+                          {item.humanReadableId} / {item.status}
+                          {item.completedOutcome ? ` / ${item.completedOutcome}` : ""}
+                          {item.completedReviewerDisplayIdentity
+                            ? ` / ${item.completedReviewerDisplayIdentity}`
+                            : ""}
+                        </span>
+                      ))
+                    )}
+                  </div>
+                </div>
                 {yoloObbExport ? (
                   <div className="export-summary" data-testid="yolo-obb-export-summary">
                     <strong>{yoloObbExport.exportFormat} manifest</strong>
@@ -4225,6 +4419,274 @@ function TrainingCropAnnotationPanel({
           ) : null}
         </>
       )}
+    </section>
+  );
+}
+
+function ReviewWorkPage({
+  devUserId,
+  workspaceId,
+  onError
+}: {
+  devUserId: string;
+  workspaceId: string;
+  onError: (error: ApiError) => void;
+}) {
+  const [availableItems, setAvailableItems] = useState<ReviewQueueItem[]>([]);
+  const [historyItems, setHistoryItems] = useState<ReviewQueueItem[]>([]);
+  const [selectedItem, setSelectedItem] = useState<ReviewQueueItem | null>(null);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [outcome, setOutcome] = useState<ReviewQueueOutcomeValue>("approved");
+  const [notes, setNotes] = useState("");
+  const [workingLabel, setWorkingLabel] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    void refreshReviewQueues();
+  }, [devUserId]);
+
+  useEffect(() => {
+    if (!selectedItem) {
+      setImageUrl((current) => {
+        if (current) URL.revokeObjectURL(current);
+        return null;
+      });
+      return;
+    }
+    let cancelled = false;
+    fetchReviewQueueImageObjectUrl({
+      devUserId,
+      imageViewUrl: selectedItem.evidenceSnapshot.imageViewUrl
+    })
+      .then((nextImageUrl) => {
+        if (cancelled) {
+          URL.revokeObjectURL(nextImageUrl);
+          return;
+        }
+        setImageUrl((current) => {
+          if (current) URL.revokeObjectURL(current);
+          return nextImageUrl;
+        });
+      })
+      .catch((error) => onError(toApiError(error)));
+    return () => {
+      cancelled = true;
+    };
+  }, [devUserId, onError, selectedItem]);
+
+  async function runReviewAction(label: string, action: () => Promise<void>) {
+    setWorkingLabel(label);
+    setStatusMessage(null);
+    try {
+      await action();
+    } catch (error) {
+      onError(toApiError(error));
+    } finally {
+      setWorkingLabel(null);
+    }
+  }
+
+  async function refreshReviewQueues() {
+    await runReviewAction("Refreshing Review Work", async () => {
+      const [work, history] = await Promise.all([
+        fetchReviewWork({ devUserId }),
+        fetchReviewHistory({ devUserId })
+      ]);
+      setAvailableItems(work.reviewQueueItems);
+      setHistoryItems(history.reviewQueueItems);
+      setSelectedItem((current) =>
+        current && work.reviewQueueItems.some((item) => item.reviewQueueItemId === current.reviewQueueItemId)
+          ? current
+          : (work.reviewQueueItems[0] ?? null)
+      );
+    });
+  }
+
+  async function openReviewItem(reviewQueueItemId: string) {
+    await runReviewAction("Opening Review Queue Item", async () => {
+      const item = await fetchReviewWorkItem({ devUserId, reviewQueueItemId });
+      setSelectedItem(item);
+      setNotes("");
+      setOutcome("approved");
+    });
+  }
+
+  async function completeSelectedReview() {
+    if (!selectedItem) {
+      return;
+    }
+    await runReviewAction("Completing Review Queue Item", async () => {
+      const completed = await completeReviewWorkItem({
+        devUserId,
+        reviewQueueItemId: selectedItem.reviewQueueItemId,
+        reviewOutcome: outcome,
+        reviewNotes: notes
+      });
+      setStatusMessage(`${completed.humanReadableId} completed as ${completed.completedOutcome}.`);
+      setSelectedItem(null);
+      setNotes("");
+      const [work, history] = await Promise.all([
+        fetchReviewWork({ devUserId }),
+        fetchReviewHistory({ devUserId })
+      ]);
+      setAvailableItems(work.reviewQueueItems);
+      setHistoryItems(history.reviewQueueItems);
+    });
+  }
+
+  const notesRequired = outcome === "changes_requested" || outcome === "not_determined";
+
+  return (
+    <section className="analysis-panel review-work-panel" data-testid="review-work-page">
+      <div className="analysis-header">
+        <PanelHeading icon={<ShieldCheck size={20} />} title="Review Work" />
+        <span className="analysis-status status-queued">{availableItems.length} available</span>
+      </div>
+      <div className="button-row">
+        <button
+          type="button"
+          disabled={Boolean(workingLabel)}
+          onClick={() => void refreshReviewQueues()}
+          data-testid="refresh-review-work-button"
+        >
+          <RefreshCw size={18} />
+          Refresh
+        </button>
+      </div>
+
+      {availableItems.length === 0 ? (
+        <p className="analysis-caveat" data-testid="review-work-empty-state">
+          No review work is available for this Reviewer.
+        </p>
+      ) : (
+        <ul className="crop-list" data-testid="review-work-list">
+          {availableItems.map((item) => (
+            <li key={item.reviewQueueItemId}>
+              <button
+                type="button"
+                className={
+                  item.reviewQueueItemId === selectedItem?.reviewQueueItemId ? "selected-row" : ""
+                }
+                onClick={() => void openReviewItem(item.reviewQueueItemId)}
+                data-testid="review-work-list-item"
+              >
+                {item.humanReadableId} / {item.evidenceSnapshot.safeSourceLabel} /{" "}
+                {item.evidenceSnapshot.reviewedEllipseCount} ellipses
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {selectedItem && imageUrl ? (
+        <section className="crop-editor review-work-evidence" data-testid="review-work-evidence">
+          <div className="review-state" data-testid="review-work-safe-metadata">
+            {selectedItem.humanReadableId} / {selectedItem.evidenceSnapshot.safeSourceLabel} /{" "}
+            {selectedItem.evidenceSnapshot.cropWidth} x {selectedItem.evidenceSnapshot.cropHeight} /{" "}
+            {selectedItem.evidenceSnapshot.completeVisibleBeeCount} complete /{" "}
+            {selectedItem.evidenceSnapshot.partialVisibleBeeCount} partial
+          </div>
+          {selectedItem.requestNotes ? (
+            <p className="analysis-caveat" data-testid="review-work-request-notes">
+              {selectedItem.requestNotes}
+            </p>
+          ) : null}
+          <div
+            className="review-crop-surface"
+            style={{
+              aspectRatio: `${selectedItem.evidenceSnapshot.cropWidth} / ${selectedItem.evidenceSnapshot.cropHeight}`
+            }}
+            data-testid="review-work-crop-surface"
+          >
+            <img
+              src={imageUrl}
+              alt={selectedItem.evidenceSnapshot.safeSourceLabel}
+              style={reviewQueueImageStyle(selectedItem)}
+              draggable={false}
+            />
+            {selectedItem.evidenceSnapshot.reviewedEllipses.map((ellipse) => (
+              <span
+                key={ellipse.annotationId}
+                className={`bee-ellipse review-evidence ${
+                  ellipse.annotationType === "partial_visible_bee" ? "partial" : "complete"
+                }`}
+                style={reviewQueueEllipseStyle(selectedItem, ellipse)}
+                data-testid="review-work-ellipse"
+                aria-label={ellipse.annotationType}
+              >
+                <span className="ellipse-head-arrow" />
+              </span>
+            ))}
+          </div>
+          <form
+            className="review-panel"
+            data-testid="review-work-outcome-form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void completeSelectedReview();
+            }}
+          >
+            <label>
+              <span>Outcome</span>
+              <select
+                value={outcome}
+                onChange={(event) => setOutcome(event.target.value as ReviewQueueOutcomeValue)}
+                data-testid="review-work-outcome-select"
+              >
+                <option value="approved">Approved</option>
+                <option value="changes_requested">Changes requested</option>
+                <option value="not_determined">Not determined</option>
+              </select>
+            </label>
+            <label>
+              <span>{notesRequired ? "Notes required" : "Notes"}</span>
+              <textarea
+                value={notes}
+                maxLength={500}
+                onChange={(event) => setNotes(event.target.value)}
+                required={notesRequired}
+                data-testid="review-work-notes-input"
+              />
+            </label>
+            <button
+              type="submit"
+              disabled={Boolean(workingLabel) || (notesRequired && notes.trim().length === 0)}
+              data-testid="complete-review-work-button"
+            >
+              <Check size={18} />
+              Complete review
+            </button>
+          </form>
+        </section>
+      ) : null}
+
+      {statusMessage ? (
+        <p className="review-state success" role="status" data-testid="review-work-status-message">
+          {statusMessage}
+        </p>
+      ) : null}
+      {workingLabel ? (
+        <div className="outcome working" role="status">
+          <LoaderCircle className="spin" size={20} />
+          <span>{workingLabel}</span>
+        </div>
+      ) : null}
+
+      <section className="metadata-panel" data-testid="review-history-panel">
+        <div>
+          <strong>Review History</strong>
+          <p>Completed queue reviews for this Reviewer.</p>
+        </div>
+        {historyItems.length === 0 ? (
+          <span>No completed reviews</span>
+        ) : (
+          historyItems.map((item) => (
+            <span key={item.reviewQueueItemId} className="record-badge ready">
+              {item.humanReadableId} / {item.completedOutcome ?? item.status}
+            </span>
+          ))
+        )}
+      </section>
     </section>
   );
 }

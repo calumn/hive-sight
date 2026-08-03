@@ -104,7 +104,8 @@ These are the strongest near-term candidates based on the current project state.
 | Auth Boundary Decision | Business / Technical | Decide how external identity providers, HiveSight User records, Workspace Memberships, Contributor Access Scope, and internal capabilities fit together. |
 | First External Login Provider | Business / Technical | Add the first real OpenID Connect login path, likely Google first, with Apple parked as a later provider option. |
 | Workspace Collaboration And Membership Model | Business / Technical | Decide how multiple Users can share one Workspace, and whether one User can later belong to multiple Workspaces. |
-| Assigned Review And Contribution Task Inbox | Business / Technical | Let reviewers or contributors see assigned work from another User's Workspace without broad Workspace Membership. |
+| Reviewer Work Queue | Business / Technical | Let eligible Reviewer Users see shared review work from another User's Workspace without broad Workspace Membership or brittle named assignment. |
+| Reviewer Correction Workflow | Business / Governance | Let reviewers identify wrong individual annotations, propose corrected geometry/classification, and keep correction provenance separate from the original evidence. |
 | Task-Oriented User Guide Maintenance | Business / Technical | Keep `docs/user-guide.md` aligned with implemented workflows and add a closeout check when slices change user behaviour. |
 
 ## Data Governance, Consent, And Rights

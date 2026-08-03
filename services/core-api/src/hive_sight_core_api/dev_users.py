@@ -133,16 +133,16 @@ DEV_USERS: tuple[DevUserSeed, ...] = (
         hive_name="Contributor Hive",
     ),
     DevUserSeed(
-        code="NO-CAPABILITY",
+        code="BASIC-OWNER",
         user_id=UUID("00000000-0000-0000-0000-000000000109"),
-        display_name="No Capability User",
-        description="Valid User for restricted product-surface checks.",
+        display_name="Basic Workspace Owner",
+        description="Valid owner User with no elevated internal capability.",
         workspace_id=UUID("00000000-0000-0000-0000-000000000209"),
-        workspace_display_name="No Capability Workspace",
+        workspace_display_name="Basic Owner Workspace",
         apiary_id=UUID("00000000-0000-0000-0000-000000000309"),
-        apiary_name="No Capability Apiary",
+        apiary_name="Basic Owner Apiary",
         hive_id=UUID("00000000-0000-0000-0000-000000000409"),
-        hive_name="No Capability Hive",
+        hive_name="Basic Owner Hive",
     ),
 )
 

@@ -21,11 +21,22 @@ from hive_sight_core_api.dev_store import (
 from hive_sight_core_api.dev_users import DEV_USERS
 from hive_sight_core_api.main import app
 from hive_sight_core_api.models import (
+    AnnotationType,
     ArtifactResponse,
     BenchmarkEvaluationResponse,
+    CoordinateSpace,
     DatasetVersionResponse,
     ModelCandidateResponse,
+    ReviewQueueEllipseEvidence,
+    ReviewQueueEvidenceSnapshot,
+    ReviewQueueItemRecord,
+    ReviewQueueItemStatus,
+    ReviewQueueOutcomeRecord,
+    ReviewQueueOutcomeValue,
+    ReviewQueueSubjectType,
     TrainingRunResponse,
+    TrainingCropReviewStatus,
+    VisibleBeeStatus,
 )
 from hive_sight_core_api.postgres_store import PostgresProductDataStore
 
@@ -341,6 +352,96 @@ def test_postgres_store_seeds_development_users_with_separate_workspaces() -> No
     with pytest.raises(DomainError) as error:
         store.list_apiaries(UserContext(owner_b.user_id), owner_a.workspace_id)
     assert error.value.code == "workspace_access_denied"
+
+
+@pytest.mark.skipif(
+    importlib.util.find_spec("psycopg") is None or not os.getenv("HIVESIGHT_TEST_DATABASE_URL"),
+    reason="Set HIVESIGHT_TEST_DATABASE_URL and install psycopg to run Postgres persistence integration.",
+)
+def test_postgres_store_survives_restart_for_review_queue_records() -> None:
+    database_url = os.environ["HIVESIGHT_TEST_DATABASE_URL"]
+    reset_database(database_url)
+    store = _build_postgres_state(database_url).store
+    now = datetime(2026, 8, 3, 14, 0, tzinfo=UTC)
+    workspace_id = UUID("00000000-0000-0000-0000-000000019001")
+    review_queue_item_id = UUID("00000000-0000-0000-0000-000000019002")
+    review_queue_outcome_id = UUID("00000000-0000-0000-0000-000000019003")
+    training_crop_id = UUID("00000000-0000-0000-0000-000000019004")
+    inspection_photo_id = UUID("00000000-0000-0000-0000-000000019005")
+    annotation_id = UUID("00000000-0000-0000-0000-000000019006")
+    curator_id = UUID("00000000-0000-0000-0000-000000000104")
+    reviewer_id = UUID("00000000-0000-0000-0000-000000000105")
+
+    item = ReviewQueueItemRecord(
+        review_queue_item_id=review_queue_item_id,
+        human_readable_id="HS-RQ-000001",
+        workspace_id=workspace_id,
+        subject_type=ReviewQueueSubjectType.training_crop,
+        subject_id=training_crop_id,
+        requested_by_user_id=curator_id,
+        original_crop_reviewer_user_id=curator_id,
+        status=ReviewQueueItemStatus.completed,
+        request_notes="Please verify this crop.",
+        requested_at=now,
+        completed_at=now,
+        completed_by_outcome_id=review_queue_outcome_id,
+        evidence_snapshot=ReviewQueueEvidenceSnapshot(
+            safe_source_label="Training Crop abc12345",
+            training_crop_id=training_crop_id,
+            training_crop_label="Training Crop abc12345",
+            inspection_photo_id=inspection_photo_id,
+            image_view_url=f"/v1/review-queue/items/{review_queue_item_id}/image",
+            crop_x=10,
+            crop_y=20,
+            crop_width=100,
+            crop_height=80,
+            source_image_width_px=160,
+            source_image_height_px=120,
+            crop_image_width_px=100,
+            crop_image_height_px=80,
+            reviewed_ellipses=[
+                ReviewQueueEllipseEvidence(
+                    annotation_id=annotation_id,
+                    annotation_type=AnnotationType.complete_visible_bee,
+                    center_x=50,
+                    center_y=60,
+                    radius_x=14,
+                    radius_y=7,
+                    rotation_degrees=15,
+                    coordinate_space=CoordinateSpace.source_image_pixels,
+                    source_image_width_px=160,
+                    source_image_height_px=120,
+                )
+            ],
+            reviewed_ellipse_count=1,
+            complete_visible_bee_count=1,
+            partial_visible_bee_count=0,
+            crop_review_status=TrainingCropReviewStatus.review_complete,
+            visible_bee_status=VisibleBeeStatus.has_visible_bees,
+            requested_at=now,
+        ),
+    )
+    outcome = ReviewQueueOutcomeRecord(
+        review_queue_outcome_id=review_queue_outcome_id,
+        review_queue_item_id=review_queue_item_id,
+        reviewer_id=reviewer_id,
+        review_outcome=ReviewQueueOutcomeValue.approved,
+        review_notes="Looks correct.",
+        created_at=now,
+    )
+
+    store.save_review_queue_item(item)
+    store.save_review_queue_outcome(outcome)
+
+    restarted = _build_postgres_state(database_url).store
+    persisted_item = restarted.get_review_queue_item(review_queue_item_id)
+    persisted_outcome = restarted.get_review_queue_outcome(review_queue_outcome_id)
+
+    assert persisted_item is not None
+    assert persisted_outcome is not None
+    assert persisted_item.human_readable_id == "HS-RQ-000001"
+    assert persisted_item.evidence_snapshot.safe_source_label == "Training Crop abc12345"
+    assert persisted_outcome.review_outcome == ReviewQueueOutcomeValue.approved
 
 
 @pytest.mark.skipif(

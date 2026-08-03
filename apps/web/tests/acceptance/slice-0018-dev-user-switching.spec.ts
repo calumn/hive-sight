@@ -18,6 +18,7 @@ test("Development User switching reloads the selected User workspace and hides i
   await expect(page.getByTestId("apiary-select")).not.toContainText("Dev Owner Curator Apiary");
   await expect(page.getByTestId("hive-select")).toContainText("Owner A Hive");
   await expect(page.getByTestId("bee-annotation-repository-page-button")).toHaveCount(0);
+  await expect(page.getByTestId("review-work-page-button")).toHaveCount(0);
 
   await userSelect.selectOption("00000000-0000-0000-0000-000000000104");
   await expect(page.getByTestId("development-user-code")).toContainText("CURATOR-1");
@@ -26,9 +27,16 @@ test("Development User switching reloads the selected User workspace and hides i
   );
   await expect(page.getByTestId("apiary-select")).toContainText("Dataset Curator Apiary");
   await expect(page.getByTestId("bee-annotation-repository-page-button")).toBeVisible();
+  await expect(page.getByTestId("review-work-page-button")).toHaveCount(0);
+
+  await userSelect.selectOption("00000000-0000-0000-0000-000000000105");
+  await expect(page.getByTestId("development-user-code")).toContainText("REVIEWER-1");
+  await expect(page.getByTestId("development-user-capabilities")).toContainText("Reviewer");
+  await expect(page.getByTestId("bee-annotation-repository-page-button")).toHaveCount(0);
+  await expect(page.getByTestId("review-work-page-button")).toBeVisible();
 
   await page.reload();
   await expect(page.getByText("core-api online")).toBeVisible();
-  await expect(page.getByTestId("development-user-code")).toContainText("CURATOR-1");
-  await expect(userSelect).toHaveValue("00000000-0000-0000-0000-000000000104");
+  await expect(page.getByTestId("development-user-code")).toContainText("REVIEWER-1");
+  await expect(userSelect).toHaveValue("00000000-0000-0000-0000-000000000105");
 });

@@ -44,6 +44,7 @@ from hive_sight_core_api.dev_store import (
 from hive_sight_core_api.directed_ellipse_cleanup_workflow import DirectedEllipseCleanupWorkflow
 from hive_sight_core_api.hive_configuration_workflow import HiveConfigurationWorkflow
 from hive_sight_core_api.inspection_photo_access import InspectionPhotoAccess
+from hive_sight_core_api.review_queue_workflow import ReviewQueueWorkflow
 from hive_sight_core_api.settings import Settings, load_settings
 from hive_sight_core_api.training_crop_dataset_item_workflow import (
     TrainingCropDatasetItemWorkflow,
@@ -159,6 +160,10 @@ def get_training_crop_dataset_item_workflow(
     state: DevStateDep,
 ) -> TrainingCropDatasetItemWorkflow:
     return TrainingCropDatasetItemWorkflow(store=state.store)
+
+
+def get_review_queue_workflow(state: DevStateDep) -> ReviewQueueWorkflow:
+    return ReviewQueueWorkflow(store=state.store)
 
 
 def get_dataset_repository_workflow(state: DevStateDep) -> DatasetRepositoryWorkflow:

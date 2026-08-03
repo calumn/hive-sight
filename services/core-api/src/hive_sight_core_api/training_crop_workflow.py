@@ -7,7 +7,6 @@ from hive_sight_core_api.models import (
     AnnotationType,
     BeeEllipseAnnotationSource,
     BeeEllipseReviewMethod,
-    CandidateAnnotationReviewDecision,
     CoordinateSpace,
     InspectionIntent,
     InspectionPhotoEvidenceResponse,
@@ -106,6 +105,7 @@ class TrainingCropWorkflow:
             workspace_id=request.workspace_id,
             training_crop_id=training_crop_id,
         )
+        _require_no_available_review_queue_item(self.store, crop.training_crop_id)
         existing_ellipses = self.store.get_ellipses_for_training_crop(training_crop_id)
         bounds_updates = {
             key: value
@@ -186,6 +186,7 @@ class TrainingCropWorkflow:
             workspace_id=request.workspace_id,
             training_crop_id=training_crop_id,
         )
+        _require_no_available_review_queue_item(self.store, crop.training_crop_id)
         _require_crop_editable(crop)
         if crop.visible_bee_status == VisibleBeeStatus.no_visible_bees:
             raise DomainError(
@@ -262,6 +263,7 @@ class TrainingCropWorkflow:
             workspace_id=request.workspace_id,
             training_crop_id=ellipse.training_crop_id,
         )
+        _require_no_available_review_queue_item(self.store, crop.training_crop_id)
         _require_crop_editable(crop)
         annotation_type = request.annotation_type or ellipse.annotation_type
         _validate_bee_annotation_type(annotation_type)
@@ -300,6 +302,7 @@ class TrainingCropWorkflow:
             workspace_id=workspace_id,
             training_crop_id=ellipse.training_crop_id,
         )
+        _require_no_available_review_queue_item(self.store, crop.training_crop_id)
         _require_crop_editable(crop)
         self.store.delete_training_crop_ellipse_record(annotation_id)
 
@@ -584,6 +587,18 @@ def _require_crop_editable(crop: TrainingCropResponse) -> None:
         raise DomainError(
             "training_crop_locked",
             "Completed or excluded Training Crops must be reopened before editing.",
+            409,
+        )
+
+
+def _require_no_available_review_queue_item(
+    store: InMemoryProductDataStore,
+    training_crop_id: UUID,
+) -> None:
+    if store.active_review_queue_item_for_training_crop(training_crop_id) is not None:
+        raise DomainError(
+            "training_crop_review_request_active",
+            "Cancel the available Review Queue Item before editing this Training Crop.",
             409,
         )
 

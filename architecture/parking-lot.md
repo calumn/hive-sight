@@ -940,9 +940,32 @@ Review workflow, contributor workflow, authorization, and product UX.
 
 Promotion note:
 
-Partially promoted into `architecture/vertical-slice-0019-assigned-review-task-inbox.md` for the Reviewer task path only. Contributor task inboxes, Contribution Bundles, permission acceptance, and contributor withdrawal remain deferred.
+Partially promoted into `architecture/vertical-slice-0019-reviewer-work-queue.md` for the shared Reviewer Work Queue path only. The design deliberately favours a common eligible-review pool over named reviewer assignment. Contributor task inboxes, Contribution Bundles, permission acceptance, and contributor withdrawal remain deferred.
 
-## PARK-0040: Workspace Collaboration And Membership Model
+## PARK-0040: Reviewer Correction Workflow
+
+Status: parked
+Date parked: 2026-08-03
+Source: Slice 0019 grilling
+Area: review workflow, annotation correction, model governance
+
+Context:
+
+Slice 0019 deliberately keeps queue review completion at task level: `approved`, `changes_requested`, or `not_determined`, with notes. A deeper review workflow will need to let a Reviewer identify which individual annotation is wrong, propose corrected geometry or classification, and retain clear correction provenance without mutating the original annotation evidence.
+
+Why parked:
+
+Adding per-ellipse correction would widen Slice 0019 beyond proving shared review queue work and limited evidence access. It belongs with Blind Independent Review, reviewer correction, adjudication, or Varroa benchmark evidence rather than the first Reviewer Work Queue slice.
+
+Revisit trigger:
+
+Before Blind Independent Review, Third-Party Adjudication, benchmark Varroa review, reviewer-created replacement annotations, or any workflow where `changes_requested` notes are no longer sufficient.
+
+Suggested owner or area:
+
+Review workflow, annotation correction, dataset governance, and future Varroa benchmark governance.
+
+## PARK-0041: Workspace Collaboration And Membership Model
 
 Status: parked
 Date parked: 2026-08-03
@@ -965,7 +988,7 @@ Suggested owner or area:
 
 Product requirements, domain model, authorization, and Web UI.
 
-## PARK-0041: Real Authentication Provider And Session Architecture
+## PARK-0042: Real Authentication Provider And Session Architecture
 
 Status: parked
 Date parked: 2026-08-03
@@ -987,3 +1010,26 @@ Before external users, hosted deployment, Contribution Bundles, shared Workspace
 Suggested owner or area:
 
 Architecture, security, authentication, and product governance.
+
+## PARK-0043: Review Queue Claiming And Multi-Reviewer Rules
+
+Status: parked
+Date parked: 2026-08-03
+Source: Slice 0019 grilling
+Area: review workflow, queue operations, model governance
+
+Context:
+
+Slice 0019 uses a shared eligible-review pool. It deliberately does not assign items to named Reviewers, does not claim or lease review work, and closes a Review Queue Item after the first eligible Reviewer completion. This is enough to prove limited cross-Workspace review access and task-level outcomes.
+
+Why parked:
+
+Claiming, leases, stale work recovery, required reviewer counts, disagreement handling, and adjudication would widen the first review queue slice. They become important once reviews are no longer simple task-level checks or when several independent outcomes are required before benchmark or model-governance decisions.
+
+Revisit trigger:
+
+Before Blind Independent Review, Third-Party Adjudication, multi-review benchmark governance, reviewer disagreement metrics, or any queue where stale in-flight work can block progress.
+
+Suggested owner or area:
+
+Review workflow, queue operations, authorization, and model governance.
