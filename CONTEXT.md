@@ -18,6 +18,28 @@ _Avoid_: Account when the ownership container, not login identity, is the point.
 The relationship that gives a User access to a Workspace with a role. Version one supports a single `owner` membership created during registration.
 _Avoid_: User ownership when the relationship between identity and workspace is meant.
 
+**Contributor Contribution Permission**:
+A registered contributor's explicit permission for their identified image, annotation, or review contribution to support model-data curation. It is distinct from the Workspace Data Use Agreement and can be withdrawn by that contributor through their own HiveSight identity.
+_Avoid_: Workspace agreement when the permission belongs to a helper rather than the Workspace owner.
+
+**Contribution Bundle**:
+A named, immutable collection of one contributor's identified images, annotations, or reviews covered by one Contributor Contribution Permission. Every included Dataset Item retains the bundle reference.
+_Avoid_: Dataset Version when referring to the contributor's consent boundary rather than a frozen training selection.
+
+In the first release, withdrawal applies to the whole Contribution Bundle. A contributor who wants distinct withdrawal boundaries creates distinct bundles before accepting permission.
+
+**Contributor Access Scope**:
+The narrowly assigned annotation tasks and Contribution Bundles a contributor may view or work on. It never grants general access to a Workspace, its inspections, or another contributor's evidence.
+_Avoid_: Workspace Membership when the access exists only for an assigned contribution.
+
+**Contributor Pseudonym**:
+The contributor-selected display identity used in contribution provenance and curator-facing views. It does not require disclosure of the contributor's real name to a Workspace owner or other contributors.
+_Avoid_: Legal name when the system needs only an accountable HiveSight identity.
+
+**Contribution Usage Record**:
+A contributor-visible, read-only account of a Contribution Bundle's accepted terms, permission/deletion status, and derived Dataset Versions, Training Runs, and model artifacts. It does not reveal other contributors' evidence or the wider Workspace.
+_Avoid_: Dataset lineage when the view is specifically the contributor's transparent account of use.
+
 **Beekeeper**:
 A beekeeping actor or persona who records inspections or reviews analysis results. In version one, the registered User with the owner Workspace Membership acts as the primary Beekeeper.
 _Avoid_: User when the point is beekeeping work rather than login identity.
@@ -62,6 +84,18 @@ _Avoid_: Frame record, frame inventory.
 The underlying original image evidence record used by inspection, dataset, and model-governance workflows. In Slice 0014, every Source Image is an Inspection Photo source image. Later, imported, public, or bootstrap Source Images may exist outside the inspection workflow.
 _Avoid_: Inspection Photo when referring to image file evidence that may later come from non-inspection sources.
 
+**Source Rights Record**:
+The recorded provenance and licence or other lawful-use basis for a Source Image, such as a public/open dataset licence, a Workspace Data Use Agreement, or a Contributor Contribution Permission. It is separate from annotation provenance.
+_Avoid_: Contributor permission when use is instead authorised by a public/open licence.
+
+Required attribution travels with the relevant Dataset Version, export, evaluation report, and released model documentation.
+
+Public/open source does not imply permission for user-facing deployment, sharing/publication, or commercial use. Those uses require explicit Permitted Use Scopes on an approved Source Rights Record.
+
+**Permitted Use Scope**:
+An explicitly authorised purpose for evidence, such as model development, evaluation, user-facing deployment, sharing/publication, or commercial use. An unlisted use is not permitted.
+_Avoid_: General model use when the permitted purpose is the important boundary.
+
 **Inspection Photo**:
 The beekeeper/product-facing role a Source Image plays when it is attached to an Inspection.
 _Avoid_: Source Image when the product workflow context of an inspection upload is meant.
@@ -92,9 +126,67 @@ _Avoid_: Maybe bee.
 A model or reviewed marker for a visible Varroa mite on or near a bee.
 _Avoid_: Confirmed mite, infection.
 
+**Not Assessed For Varroa**:
+An explicit outcome for a localised bee that the first Varroa pipeline did not evaluate because required orientation was unreliable. It is not evidence that no mite is visible.
+_Avoid_: No Varroa, negative result.
+
+**Varroa Review Outcome**:
+A human judgement about one bee-relative crop: `visible_varroa_present`, `no_visible_varroa`, or `not_determined`. `no_visible_varroa` is an active negative judgement; `not_determined` is not a negative result.
+_Avoid_: No annotation when the absence of a marker has not been reviewed.
+
+**Blind Independent Review**:
+A second review performed without showing the first reviewer's outcome or Varroa marker positions. Disagreement is resolved through a documented adjudication outcome.
+_Avoid_: A second click after seeing the first review.
+
+**Third-Party Adjudication**:
+Resolution of a disagreement between two Blind Independent Reviews by a third reviewer who did not perform either original review. The adjudicator records a fresh blind judgement before seeing anonymised prior reviews and recording the final outcome. If the disagreement remains unresolved, the canonical outcome is `not_determined`.
+_Avoid_: One original reviewer deciding their own disagreement.
+
+**Review Agreement Metrics**:
+Reported evidence of how consistently Varroa reviewers agree on outcomes and marker locations, including the count of items without independent second review. Marker-location agreement uses one-to-one matched markers in bee-relative coordinates; unmatched markers are reported separately. Audit results are separated by Annotation Source, including human-from-scratch and AI-assisted-reviewed evidence.
+_Avoid_: Treating a model score as meaningful without showing the reliability of its benchmark labels.
+
+**Audit Disposition**:
+A Dataset Curator's recorded decision about a quality-audit concern and its effect on a Dataset Version. A Model Approver must acknowledge it when promoting a candidate that relies on the affected version.
+_Avoid_: An unrecorded acknowledgement of a warning.
+
 **Visible Varroa Rate**:
-The photo-visible estimate of likely Varroa detections associated with complete visible bees per 100 estimated complete visible bees.
+The photo-visible estimate of likely Varroa detections associated with complete visible bees per 100 estimated complete visible bees. A user-facing result warns when any complete visible bee was not assessed for Varroa.
 _Avoid_: Infestation rate, diagnosis, colony-level rate.
+
+**Human-Reviewed Inspection Result**:
+A separately provenanced inspection result calculated after a human recovery review. The reviewer may resolve previously unassessed bees and correct any model-produced bee, orientation, or Varroa decision. The latest completed revision is the inspection's current result by default. It carries its own assessment coverage and is suppressed when that coverage remains inadequate. It is shown alongside, not instead of, the immutable original model-only result.
+_Avoid_: Overwriting the model-only result.
+
+**Review Completion**:
+The proportion of in-scope bees for which a reviewer has recorded an explicit outcome, including `not_determined`.
+_Avoid_: Determinate Varroa Coverage.
+
+**Determinate Varroa Coverage**:
+The proportion of in-scope bees with a positive or active negative Varroa outcome. `not_determined` does not contribute to it and cannot support a Visible Varroa Rate.
+_Avoid_: Review Completion.
+
+**Result Evidence Breakdown**:
+The counts behind an inspection result: positive, active negative, `not_determined`, and unassessed complete visible bees, shown with Review Completion and Determinate Varroa Coverage.
+_Avoid_: A bare percentage with no explanation of its evidence.
+
+**Inspection Recovery Review**:
+A distinct, named, saveable, and resumable human review session for recovering or correcting a fixed snapshot of a model-only inspection result and its photo evidence. Its evidence is always reported as AI-assisted-reviewed because the model output was visible. It remains available for an owner’s retained inspection after data-use withdrawal but cannot contribute to model improvement without an active agreement and independent curation. In the first release, only the Workspace owner may create, resume, or complete it. The owner may complete it at any coverage level after explicit confirmation. Once completed it is immutable; a later correction starts a new linked review and result revision.
+_Avoid_: An unstructured collection of edits with no review provenance.
+
+Recovery evidence created while the Workspace Data Use Agreement is withdrawn remains product-only. A later agreement is prospective; model use requires a separate explicit dataset-contribution decision and independent curation.
+
+**Dataset Contribution Decision**:
+An explicit Workspace owner decision allowing one named completed recovery-result revision to be considered for model-data curation. It is not a workspace-wide opt-in and does not itself assign a Dataset Role.
+_Avoid_: Treating agreement acceptance as permission to use all retained evidence.
+
+**Contribution Withdrawal**:
+A contributor's withdrawal of permission for their training contribution to support future model use. It withdraws affected Dataset Items, quarantines affected Dataset Versions and model artifacts, and requires a replacement trained without the contribution before future use resumes.
+_Avoid_: Treating withdrawal as merely a future-upload preference.
+
+**Historical Reanalysis**:
+An explicit request to analyse an existing Inspection Photo with a newer model. It creates a new model-only result and never rewrites earlier model-only or human-reviewed results.
+_Avoid_: Automatic reanalysis after model promotion.
 
 **Tagged Photo**:
 A rendered view of an inspection photo with annotation overlays.
@@ -109,6 +201,10 @@ _Avoid_: Label when the distinction from review status matters.
 **Oriented Bee Ellipse**:
 The canonical reviewed geometry for a visible bee, represented by center point, two radii, and directed body-axis rotation. The rotation points from the ellipse center toward the bee's head along the major axis; the opposite end is the tail.
 _Avoid_: Bounding box when the human-reviewed bee shape and orientation are meant.
+
+**Orientation Reliability**:
+The reviewed assessment of whether a Bee Annotation's directed head/tail orientation is trustworthy: `reliable` or `unreliable`.
+_Avoid_: Confidence when the value is about head/tail direction rather than whether a bee is present.
 
 **Candidate Annotation**:
 A proposed Annotation awaiting human review. It may come from a model candidate, imported public dataset, previous draft, or future helper.
@@ -143,7 +239,7 @@ A workspace-level acceptance of the service's data-use terms, required in versio
 _Avoid_: Consent record when referring to the service-level agreement.
 
 **Data Deletion Request**:
-A request to delete or purge workspace-held data.
+A tracked request to delete or purge workspace-held data or a contributor's own Contribution Bundle.
 _Avoid_: Consent withdrawal when the user is asking for deletion rather than stopping future use.
 
 **Model Version**:
@@ -151,7 +247,7 @@ A named version of the model or model pipeline that produced analysis output.
 _Avoid_: Model when traceability to output matters.
 
 **Model Purpose**:
-The logical role a model serves, such as Bee Detector or future Varroa Detector.
+The logical role a model serves: Bee Localisation, Bee Orientation, or Varroa Detection. A Model Purpose is independent of the particular model family used to implement it.
 _Avoid_: Model type when the point is product/domain role rather than implementation family.
 
 **Dataset Version**:
@@ -161,6 +257,18 @@ _Avoid_: Dataset when traceability to an evaluation matters.
 **Dataset Item**:
 A reviewed image-and-annotation unit assigned to a Dataset Role and eligible for inclusion in a Dataset Version.
 _Avoid_: Photo when the dataset eligibility decision is meant.
+
+**Dataset Selection Method**:
+The provenance of how an item was chosen for a dataset. `human_selected` means the curator selected it before seeing upstream model suggestions; `upstream_model_selected` means any upstream model output influenced selection. It is distinct from Annotation Source and Review Method.
+_Avoid_: Annotation source when the point is why the crop was chosen rather than who proposed its labels.
+
+**Sampling Purpose**:
+The statistical purpose of a set of Varroa reviews: `model_curation` builds representative training or benchmark evidence, while `inspection_rate_estimation` supports a future rate estimate with a stated sampling plan.
+_Avoid_: Dataset role when the point is the statistical goal rather than eligibility for a particular model split.
+
+**Sampling Method**:
+How a Varroa review was selected within its Sampling Purpose. The first model-curation methods are `stratified_random` and `curator_targeted` for deliberately added difficult examples.
+_Avoid_: Dataset Selection Method when the question is random/stratified versus targeted selection within an already-defined population.
 
 **Bee Annotation Repository**:
 The growing set of reviewed bee annotation evidence, including Source Images, crop provenance, canonical oriented bee ellipses, and dataset roles.
@@ -195,15 +303,23 @@ A model or model pipeline version under evaluation before approval for user-faci
 _Avoid_: Model Version when release approval status matters.
 
 **HiveSight Bee Detector**:
-The project-owned model used to propose bee Candidate Annotations. Its output must be human reviewed before entering the Bee Annotation Repository as trusted evidence.
+The project-owned model used to propose bee Candidate Annotations. The first version implements the Bee Localisation Model; its output must be human reviewed before entering the Bee Annotation Repository as trusted evidence.
 _Avoid_: Grounding DINO when referring to the intended trainable HiveSight model.
 
+**Bee Localisation Model**:
+The model purpose that finds visible bees and estimates their body geometry in a frame or crop. It does not by itself establish which end of the body is the head.
+_Avoid_: Bee orientation model, Varroa detector.
+
+**Bee Orientation Model**:
+The model purpose that determines the head/tail direction of a localised bee. It converts a body-axis estimate into a directed centre-to-head orientation.
+_Avoid_: Oriented bounding-box rotation when biological head direction is meant.
+
 **Varroa Detector**:
-The future second-stage model purpose for detecting visible Varroa mites on or near bees.
+The future model purpose for detecting likely visible Varroa mites on or near a bee, preferably from a bee-relative crop normalized to head direction.
 _Avoid_: Mite Detector when the intended product scope is specifically Varroa.
 
 **YOLO OBB**:
-The first selected model-family baseline for the HiveSight Bee Detector, using oriented bounding boxes exported from canonical oriented bee ellipses.
+The first selected model-family baseline for the HiveSight Bee Detector's Bee Localisation Model, using oriented bounding boxes exported from canonical oriented bee ellipses. Its geometric rotation does not carry biological head/tail direction.
 _Avoid_: Canonical annotation geometry when referring to the model-specific training label format.
 
 **Pre-Labelling Model Version**:
@@ -211,5 +327,9 @@ The model version that generated Candidate Annotations for human review during d
 _Avoid_: Model Version without specifying that it is used for pre-labelling rather than user-facing analysis.
 
 **Benchmark Evaluation**:
-A documented evaluation of one model version against one protected benchmark dataset version.
+A documented evaluation of one Model Candidate, for one Model Purpose, against one protected benchmark dataset version or selection snapshot.
 _Avoid_: Test run, accuracy check.
+
+**End-to-End Pipeline Evaluation**:
+A protected evaluation of the composed Bee Localisation, Bee Orientation, and Varroa Detection pipeline against a separate full-frame selection snapshot, frozen before candidate selection or tuning, with complete human-reviewed bee, orientation-reliability, and relevant Varroa evidence.
+_Avoid_: A single-model benchmark when the question is real workflow performance.

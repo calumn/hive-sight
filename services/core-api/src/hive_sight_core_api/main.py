@@ -10,6 +10,9 @@ from hive_sight_core_api.analysis_request_workflow import AnalysisRequestWorkflo
 from hive_sight_core_api.bee_detector_candidate_annotation_workflow import (
     BeeDetectorCandidateAnnotationWorkflow,
 )
+from hive_sight_core_api.bee_detector_benchmark_evaluation_workflow import (
+    BeeDetectorBenchmarkEvaluationWorkflow,
+)
 from hive_sight_core_api.bee_detector_training_workflow import BeeDetectorTrainingWorkflow
 from hive_sight_core_api.dataset_labelling_workflow import DatasetLabellingWorkflow
 from hive_sight_core_api.dataset_repository_workflow import DatasetRepositoryWorkflow
@@ -18,11 +21,13 @@ from hive_sight_core_api.dependencies import (
     DevStateDep,
     get_analysis_processing_workflow,
     get_analysis_request_workflow,
+    get_bee_detector_benchmark_evaluation_workflow,
     get_bee_detector_candidate_annotation_workflow,
     get_bee_detector_training_workflow,
     get_dataset_labelling_workflow,
     get_dataset_repository_workflow,
     get_dataset_role_assignment_workflow,
+    get_directed_ellipse_cleanup_workflow,
     get_hive_configuration_workflow,
     get_inspection_photo_access,
     get_settings,
@@ -30,6 +35,7 @@ from hive_sight_core_api.dependencies import (
     get_training_crop_workflow,
 )
 from hive_sight_core_api.dev_store import DomainError, UserContext
+from hive_sight_core_api.directed_ellipse_cleanup_workflow import DirectedEllipseCleanupWorkflow
 from hive_sight_core_api.hive_configuration_workflow import HiveConfigurationWorkflow
 from hive_sight_core_api.inspection_photo_access import InspectionPhotoAccess
 from hive_sight_core_api.models import (
@@ -42,6 +48,11 @@ from hive_sight_core_api.models import (
     ApiaryResponse,
     BeeAnnotationProposalListResponse,
     BeeAnnotationProposalRequest,
+    BenchmarkEvaluationCancelRequest,
+    BenchmarkEvaluationListResponse,
+    BenchmarkEvaluationReadinessResponse,
+    BenchmarkEvaluationResponse,
+    BenchmarkEvaluationStartRequest,
     DatasetItemCreateRequest,
     DatasetItemResponse,
     DatasetRepositoryItemDetail,
@@ -54,6 +65,8 @@ from hive_sight_core_api.models import (
     DatasetLabellingEvidenceResponse,
     DatasetLabellingSessionResponse,
     DevSessionResponse,
+    DirectedEllipseLocalCleanupRequest,
+    DirectedEllipseLocalCleanupResponse,
     ErrorResponse,
     FrameStandardResponse,
     HealthResponse,
@@ -159,9 +172,17 @@ BeeDetectorTrainingWorkflowDep = Annotated[
     BeeDetectorTrainingWorkflow,
     Depends(get_bee_detector_training_workflow),
 ]
+BeeDetectorBenchmarkEvaluationWorkflowDep = Annotated[
+    BeeDetectorBenchmarkEvaluationWorkflow,
+    Depends(get_bee_detector_benchmark_evaluation_workflow),
+]
 BeeDetectorCandidateAnnotationWorkflowDep = Annotated[
     BeeDetectorCandidateAnnotationWorkflow,
     Depends(get_bee_detector_candidate_annotation_workflow),
+]
+DirectedEllipseCleanupWorkflowDep = Annotated[
+    DirectedEllipseCleanupWorkflow,
+    Depends(get_directed_ellipse_cleanup_workflow),
 ]
 DevUserIdHeader = Annotated[str | None, Header(alias="x-hivesight-dev-user-id")]
 
@@ -807,6 +828,18 @@ def list_model_candidates(
     )
 
 
+@app.post(
+    "/v1/dev/directed-ellipse-orientation-cleanup",
+    response_model=DirectedEllipseLocalCleanupResponse,
+)
+def reset_directed_ellipse_local_evidence(
+    request: DirectedEllipseLocalCleanupRequest,
+    user: AuthenticatedUserDep,
+    workflow: DirectedEllipseCleanupWorkflowDep,
+) -> DirectedEllipseLocalCleanupResponse:
+    return workflow.reset_dataset_and_model_evidence(user=user, request=request)
+
+
 @app.get(
     "/v1/model-training/model-candidates/{model_candidate_id}",
     response_model=ModelCandidateResponse,
@@ -821,6 +854,87 @@ def get_model_candidate(
         user=user,
         workspace_id=workspace_id,
         model_candidate_id=model_candidate_id,
+    )
+
+
+@app.get(
+    "/v1/model-training/model-candidates/{model_candidate_id}/benchmark-readiness",
+    response_model=BenchmarkEvaluationReadinessResponse,
+)
+def get_model_candidate_benchmark_readiness(
+    model_candidate_id: UUID,
+    workspace_id: UUID,
+    user: AuthenticatedUserDep,
+    workflow: BeeDetectorBenchmarkEvaluationWorkflowDep,
+) -> BenchmarkEvaluationReadinessResponse:
+    return workflow.readiness(
+        user=user,
+        workspace_id=workspace_id,
+        model_candidate_id=model_candidate_id,
+    )
+
+
+@app.post(
+    "/v1/model-training/benchmark-evaluations",
+    response_model=BenchmarkEvaluationResponse,
+    status_code=202,
+)
+def start_model_candidate_benchmark_evaluation(
+    request: BenchmarkEvaluationStartRequest,
+    user: AuthenticatedUserDep,
+    workflow: BeeDetectorBenchmarkEvaluationWorkflowDep,
+) -> BenchmarkEvaluationResponse:
+    return workflow.start_evaluation(user=user, request=request)
+
+
+@app.get(
+    "/v1/model-training/benchmark-evaluations",
+    response_model=BenchmarkEvaluationListResponse,
+)
+def list_model_candidate_benchmark_evaluations(
+    workspace_id: UUID,
+    user: AuthenticatedUserDep,
+    workflow: BeeDetectorBenchmarkEvaluationWorkflowDep,
+) -> BenchmarkEvaluationListResponse:
+    return BenchmarkEvaluationListResponse(
+        benchmark_evaluations=workflow.list_evaluations(
+            user=user,
+            workspace_id=workspace_id,
+        )
+    )
+
+
+@app.get(
+    "/v1/model-training/benchmark-evaluations/{benchmark_evaluation_id}",
+    response_model=BenchmarkEvaluationResponse,
+)
+def get_model_candidate_benchmark_evaluation(
+    benchmark_evaluation_id: UUID,
+    workspace_id: UUID,
+    user: AuthenticatedUserDep,
+    workflow: BeeDetectorBenchmarkEvaluationWorkflowDep,
+) -> BenchmarkEvaluationResponse:
+    return workflow.get_evaluation(
+        user=user,
+        workspace_id=workspace_id,
+        benchmark_evaluation_id=benchmark_evaluation_id,
+    )
+
+
+@app.post(
+    "/v1/model-training/benchmark-evaluations/{benchmark_evaluation_id}/cancel",
+    response_model=BenchmarkEvaluationResponse,
+)
+def cancel_model_candidate_benchmark_evaluation(
+    benchmark_evaluation_id: UUID,
+    request: BenchmarkEvaluationCancelRequest,
+    user: AuthenticatedUserDep,
+    workflow: BeeDetectorBenchmarkEvaluationWorkflowDep,
+) -> BenchmarkEvaluationResponse:
+    return workflow.cancel_evaluation(
+        user=user,
+        benchmark_evaluation_id=benchmark_evaluation_id,
+        request=request,
     )
 
 

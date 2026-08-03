@@ -54,6 +54,7 @@ test("Dataset Curator creates a crop, adds an oriented bee ellipse, and complete
 
   await page.getByTestId("training-crop-surface").click({ position: { x: 180, y: 120 } });
   await expect(page.getByTestId("training-crop-ellipse")).toHaveCount(1);
+  await expect.poll(() => headShadingIsObvious(page)).toBe(true);
 
   await page.getByTestId("training-ellipse-type-select").selectOption("partial_visible_bee");
   await expect(page.getByTestId("selected-training-ellipse-label")).toContainText(
@@ -115,9 +116,17 @@ test("Dataset Curator creates a crop, adds an oriented bee ellipse, and complete
 
   await page.getByTestId("rotate-training-ellipse-button").click();
   await expectGeometryValue(page, "training-ellipse-rotation", initialRotation + 5);
-  await expect(page.getByTestId("training-crop-review-controls")).toContainText("5 degrees");
+  await expect(page.getByTestId("training-crop-review-controls")).toContainText(
+    "5 degree head direction"
+  );
   await page.getByTestId("rotate-training-ellipse-anticlockwise-button").click();
   await expectGeometryValue(page, "training-ellipse-rotation", initialRotation);
+  await page.getByTestId("flip-training-ellipse-head-tail-button").click();
+  await expectGeometryValue(page, "training-ellipse-rotation", initialRotation + 180);
+  await expect(page.getByTestId("training-crop-ellipse")).toHaveAttribute(
+    "aria-label",
+    /head direction 180 degrees/
+  );
 
   await expect(page.getByTestId("training-crop-visible-status-select")).toHaveValue(
     "has_visible_bees"
@@ -164,6 +173,19 @@ async function sourcePhotoPreviewShowsWholeImage(page: Page): Promise<boolean> {
     const previewBox = preview.getBoundingClientRect();
     const imageBox = image.getBoundingClientRect();
     return previewBox.height + 1 >= imageBox.height;
+  });
+}
+
+async function headShadingIsObvious(page: Page): Promise<boolean> {
+  return page.getByTestId("training-crop-ellipse").evaluate((ellipse) => {
+    const marker = ellipse.querySelector(".ellipse-head-arrow");
+    const style = window.getComputedStyle(ellipse);
+    const markerStyle = marker ? window.getComputedStyle(marker) : null;
+    return (
+      style.backgroundImage.includes("255, 215, 64") &&
+      style.backgroundImage.includes("linear-gradient") &&
+      markerStyle?.display === "none"
+    );
   });
 }
 

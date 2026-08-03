@@ -18,6 +18,7 @@ from hive_sight_core_api.models import (
     AnnotationResponse,
     ApiaryResponse,
     ArtifactResponse,
+    BenchmarkEvaluationResponse,
     DatasetVersionResponse,
     DatasetItemResponse,
     DatasetLabellingSessionResponse,
@@ -48,6 +49,7 @@ MODEL_RECORD_TYPES: dict[str, type] = {
     "dataset_item": DatasetItemResponse,
     "dataset_version": DatasetVersionResponse,
     "training_run": TrainingRunResponse,
+    "benchmark_evaluation": BenchmarkEvaluationResponse,
     "model_candidate": ModelCandidateResponse,
     "artifact": ArtifactResponse,
 }
@@ -180,9 +182,73 @@ class PostgresProductDataStore(InMemoryProductDataStore):
         self._persist_model("training_run", response.training_run_id, response)
         return response
 
+    def save_benchmark_evaluation(self, evaluation: BenchmarkEvaluationResponse):
+        response = super().save_benchmark_evaluation(evaluation)
+        self._persist_model(
+            "benchmark_evaluation",
+            response.benchmark_evaluation_id,
+            response,
+        )
+        return response
+
     def delete_training_run(self, training_run_id: UUID) -> None:
         super().delete_training_run(training_run_id)
         self._delete_record("training_run", training_run_id)
+
+    def remove_dataset_and_model_evidence_for_workspace(
+        self,
+        workspace_id: UUID,
+    ) -> dict[str, int]:
+        dataset_item_ids = [
+            dataset_item_id
+            for dataset_item_id, dataset_item in self.dataset_items.items()
+            if dataset_item.workspace_id == workspace_id
+        ]
+        dataset_version_ids = [
+            dataset_version_id
+            for dataset_version_id, dataset_version in self.dataset_versions.items()
+            if dataset_version.workspace_id == workspace_id
+        ]
+        training_run_ids = [
+            training_run_id
+            for training_run_id, training_run in self.training_runs.items()
+            if training_run.workspace_id == workspace_id
+        ]
+        model_candidate_ids = [
+            model_candidate_id
+            for model_candidate_id, model_candidate in self.model_candidates.items()
+            if model_candidate.workspace_id == workspace_id
+        ]
+        benchmark_evaluation_ids = [
+            benchmark_evaluation_id
+            for benchmark_evaluation_id, benchmark_evaluation in self.benchmark_evaluations.items()
+            if benchmark_evaluation.workspace_id == workspace_id
+        ]
+        artifact_owner_ids = set(dataset_version_ids) | set(training_run_ids) | set(
+            benchmark_evaluation_ids
+        )
+        artifact_ids = [
+            artifact_id
+            for artifact_id, artifact in self.artifacts.items()
+            if artifact.owner_id in artifact_owner_ids
+        ]
+        counts = super().remove_dataset_and_model_evidence_for_workspace(workspace_id)
+        with self._connect() as connection, connection.cursor() as cursor:
+            cursor.execute("DELETE FROM dataset_items WHERE workspace_id = %s", (workspace_id,))
+            for record_type, record_ids in (
+                ("dataset_item", dataset_item_ids),
+                ("dataset_version", dataset_version_ids),
+                ("training_run", training_run_ids),
+                ("benchmark_evaluation", benchmark_evaluation_ids),
+                ("model_candidate", model_candidate_ids),
+                ("artifact", artifact_ids),
+            ):
+                for record_id in record_ids:
+                    cursor.execute(
+                        "DELETE FROM repository_records WHERE record_type = %s AND record_id = %s",
+                        (record_type, str(record_id)),
+                    )
+        return counts
 
     def save_model_candidate(self, model_candidate: ModelCandidateResponse):
         response = super().save_model_candidate(model_candidate)
@@ -261,6 +327,8 @@ class PostgresProductDataStore(InMemoryProductDataStore):
             self.dataset_versions[model.dataset_version_id] = model
         elif record_type == "training_run":
             self.training_runs[model.training_run_id] = model
+        elif record_type == "benchmark_evaluation":
+            self.benchmark_evaluations[model.benchmark_evaluation_id] = model
         elif record_type == "model_candidate":
             self.model_candidates[model.model_candidate_id] = model
         elif record_type == "artifact":

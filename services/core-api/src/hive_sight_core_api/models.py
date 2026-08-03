@@ -949,6 +949,117 @@ class ModelCandidateListResponse(BaseModel):
     model_candidates: list[ModelCandidateResponse]
 
 
+class BenchmarkEvaluationStartRequest(BaseModel):
+    workspace_id: UUID
+    model_candidate_id: UUID
+    confidence_threshold: float = Field(default=0.10, ge=0, le=1)
+    acknowledge_high_severity_warnings: bool = False
+
+
+class BenchmarkEvaluationCancelRequest(BaseModel):
+    workspace_id: UUID
+    reason: str | None = Field(default=None, max_length=500)
+
+
+class BenchmarkEvaluationWarningResponse(BaseModel):
+    code: str
+    severity: ModelTrainingWarningSeverity
+    message: str
+
+
+class BenchmarkEvaluationReadinessResponse(BaseModel):
+    workspace_id: UUID
+    model_candidate_id: UUID
+    model_candidate_human_readable_id: str
+    adapter_type: str
+    training_adapter_type: str
+    evaluation_adapter_type: str
+    database_purpose: str
+    benchmark_item_count: int
+    eligible_to_start_evaluation: bool
+    active_model_job_id: UUID | None = None
+    active_model_job_type: str | None = None
+    warnings: list[BenchmarkEvaluationWarningResponse]
+
+
+class BenchmarkEvaluationItemResultResponse(BaseModel):
+    dataset_item_id: UUID
+    human_readable_id: str
+    source_group_key: str | None = None
+    hive_configuration_frame_standard_id: str | None = None
+    curriculum_stage: str | None = None
+    ground_truth_count: int
+    prediction_count: int
+    matched_count: int
+    false_positive_count: int
+    false_negative_count: int
+
+
+class BenchmarkEvaluationResponse(BaseModel):
+    benchmark_evaluation_id: UUID
+    workspace_id: UUID
+    human_readable_id: str
+    model_candidate_id: UUID
+    model_candidate_human_readable_id: str
+    training_run_id: UUID
+    dataset_version_id: UUID
+    status: str
+    phase: str
+    adapter_type: str
+    training_adapter_type: str
+    evaluation_adapter_type: str
+    database_purpose: str
+    confidence_threshold: float
+    match_strategy: str
+    benchmark_scope: str
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    last_heartbeat_at: datetime | None = None
+    last_activity_message: str | None = None
+    progress_percent: float | None = None
+    latest_log_excerpt: str | None = None
+    cancel_requested_at: datetime | None = None
+    cancel_requested_by_user_id: UUID | None = None
+    cancel_reason: str | None = None
+    failure_code: str | None = None
+    failure_message: str | None = None
+    is_stale: bool = False
+    stale_after_seconds: int | None = None
+    warning_acknowledgement: dict[str, object] | None = None
+    warnings: list[BenchmarkEvaluationWarningResponse]
+    metrics_summary: dict[str, object]
+    item_results: list[BenchmarkEvaluationItemResultResponse]
+    raw_prediction_artifact_id: UUID | None = None
+    report_artifact_id: UUID | None = None
+    artifact_ids: list[UUID]
+    created_by_user_id: UUID
+    created_at: datetime
+
+
+class BenchmarkEvaluationListResponse(BaseModel):
+    benchmark_evaluations: list[BenchmarkEvaluationResponse]
+
+
+class DirectedEllipseLocalCleanupRequest(BaseModel):
+    workspace_id: UUID
+    reason: str | None = Field(default=None, max_length=500)
+    confirm_remove_dataset_and_model_evidence: bool = False
+
+
+class DirectedEllipseLocalCleanupResponse(BaseModel):
+    workspace_id: UUID
+    dataset_items_removed: int
+    dataset_versions_removed: int
+    training_runs_removed: int
+    model_candidates_removed: int
+    artifacts_removed: int
+    artifact_paths_removed: int
+    training_crops_reopened: int
+    training_crop_ellipses_preserved: int
+    inspection_photos_preserved: int
+    caveat: str
+
+
 class TrainingCropCreateRequest(BaseModel):
     workspace_id: UUID
     inspection_photo_id: UUID

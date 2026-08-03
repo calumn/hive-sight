@@ -258,11 +258,11 @@ Area: privacy, model governance
 
 Context:
 
-Slice 0014 snapshots Workspace Data Use Agreement eligibility at Dataset Item assignment time, but does not automatically propagate later consent withdrawal or deletion requests into exports, Training Runs, benchmark records, or already-trained artifacts.
+The accepted Contribution Withdrawal policy immediately excludes affected Dataset Items from future exports, Dataset Versions, Training Runs, Benchmark Evaluations, and promotion; preserves historical audit lineage; quarantines affected Dataset Versions and model artifacts; and requires a replacement trained without the contribution before future use resumes.
 
 Why parked:
 
-Withdrawal and deletion enforcement require product, policy, legal, and technical decisions. A simple database rule would be misleading.
+The policy is now decided, but durable propagation, artifact quarantine, replacement training, deletion/erasure handling, and operational reporting still need implementation. Formal privacy/policy review must define the exact contents and retention period of the minimal audit record preserved after contributor deletion, including any legal-retention exception, and how a contributor-terms change is classified as material.
 
 Revisit trigger:
 
@@ -304,15 +304,19 @@ Area: model training, model evaluation, dataset governance
 
 Context:
 
-Bee detection and Varroa detection are separate logical model stages. That split helps measure each stage independently, but it does not automatically prevent the mite-training dataset from inheriting Bee Detector blind spots. If mite-training crops are selected only from bees found by the Bee Detector, the Varroa detector may never learn from missed bee populations such as shadowed, occluded, dense, or unusual-angle bees.
+Bee Localisation, Bee Orientation, and Varroa Detection are separate logical model purposes. The accepted policy requires Varroa training and benchmark datasets to include human-selected bee crops independent of upstream model output. Otherwise the Varroa Detector may never learn from missed populations such as shadowed, occluded, dense, or unusual-angle bees.
+
+Each Varroa Dataset Item will record Dataset Selection Method as `human_selected` or `upstream_model_selected`. `human_selected` requires blind selection before upstream model suggestions are seen; any model-influenced selection is `upstream_model_selected`. Benchmark reports will show the mix. No numeric quota has yet been set.
+
+Model curation defaults to `stratified_random` sampling across available Hive, frame, bee-density, lighting, and image-quality strata, with deliberately difficult examples added as `curator_targeted`. Reports will retain both method and stratum distributions.
 
 Why parked:
 
-Slice 0015 trains only the HiveSight Bee Detector. Varroa mite annotation, mite crops, mite detector training, and bee-to-mite association are out of scope for the first YOLO OBB bee baseline.
+Slice 0015 trains only the HiveSight Bee Detector. Varroa mite annotation, independent human crop selection, mite detector training, and bee-to-mite association are out of scope for the first YOLO OBB Bee Localisation baseline.
 
 Revisit trigger:
 
-Before the first Varroa detector training slice, before creating a mite benchmark Dataset Version, or before using Bee Detector output as the sole source of mite-training crops.
+Before the first Varroa detector training slice, before creating a mite benchmark Dataset Version, or before implementing the human-selected crop collection workflow required by the accepted policy.
 
 Suggested owner or area:
 
@@ -655,7 +659,9 @@ Area: model capability, Varroa pipeline, inspection automation
 
 Context:
 
-Slice 0015.35 makes reviewed Oriented Bee Ellipses direction-aware by defining `rotation_degrees` as center-to-head orientation. The first implementation keeps head/tail direction under human review. YOLO OBB can propose bee geometry and body-axis alignment, but it should not be assumed to predict biologically meaningful head direction reliably.
+Slice 0015.35 makes reviewed Oriented Bee Ellipses direction-aware by defining `rotation_degrees` as center-to-head orientation. The first implementation keeps head/tail direction under human review. YOLO OBB can propose Bee Localisation geometry and body-axis alignment, but it should not be assumed to predict biologically meaningful head direction reliably.
+
+ADR 0007 defines Bee Orientation as a distinct logical Model Purpose between Bee Localisation and Varroa Detection. The first implementation will be a binary head/tail classifier on body-axis-normalized bee crops; a keypoint/pose or multi-head model remains an alternative if benchmark evidence shows the classifier is inadequate.
 
 For future real hive inspections, HiveSight needs a model pipeline that can identify every visible bee and its correct head/tail orientation without human intervention. This matters because the future Varroa Detector is expected to work on bee-relative crops: each bee image may be extracted, rotated into a consistent head/tail orientation, and then passed into Varroa mite detection. If head direction is wrong, Varroa-location evidence and mite detection quality may degrade.
 
@@ -670,3 +676,237 @@ Before the first user-facing Varroa Assessment pipeline, before automated bee cr
 Suggested owner or area:
 
 Bee Detector model design, Varroa Detector planning, dataset curation, and model evaluation.
+
+## PARK-0029: Orientation Reliability Review And Dataset Gate
+
+Status: parked
+Date parked: 2026-08-02
+Source: Three-stage model pipeline grilling
+Area: annotation workflow, dataset governance, persistence
+
+Context:
+
+ADR 0007 requires reviewed Bee Annotations to carry Orientation Reliability: `reliable` or `unreliable`, independently of bee-presence confidence and review status. Existing directed ellipses do not yet have this field, so their head direction must not be assumed reliable merely because a rotation was recorded.
+
+Why parked:
+
+The current implementation provides directed ellipse review but does not yet persist Orientation Reliability or provide a dedicated review queue. The current early corpus is small enough for a one-time human review when the field is introduced.
+
+Revisit trigger:
+
+Before creating the first Bee Orientation Dataset Version, the first head-normalized Varroa Dataset Version, or any model evaluation that claims head-direction evidence.
+
+Suggested owner or area:
+
+Annotation workflow, dataset governance, and persistence design.
+
+## PARK-0030: Inspection-Rate Sampling Policy
+
+Status: parked
+Date parked: 2026-08-02
+Source: Three-stage model pipeline grilling
+Area: Varroa assessment, statistics, product safety
+
+Context:
+
+HiveSight distinguishes `model_curation` sampling, which builds representative training and benchmark evidence, from `inspection_rate_estimation` sampling, which would support a future beekeeper-facing Visible Varroa Rate with a stated confidence interval and margin of error. Both may use the same CAPTCHA-like Varroa review UI, but their selection rules and evidence claims differ.
+
+Why parked:
+
+The current work establishes model data and does not yet provide a user-facing Varroa assessment. A rate-estimation policy must account for the intended confidence level and margin, finite population size, within-frame clustering, sampling frame, and upstream model uncertainty before any statistically stated product claim is made.
+
+Revisit trigger:
+
+Before the first user-facing Varroa Assessment slice, before displaying a confidence interval, or before presenting a sampled visible Varroa rate as more than uncalibrated evidence.
+
+Suggested owner or area:
+
+Product requirements, statistical design, model evaluation, and beekeeper-facing UX.
+
+## PARK-0031: User-Facing Varroa Coverage Threshold
+
+Status: parked
+Date parked: 2026-08-02
+Source: Three-stage model pipeline grilling
+Area: model evaluation, product safety, beekeeper-facing UX
+
+Context:
+
+HiveSight will always show a coverage warning when one or more complete visible bees are not assessed for Varroa. Once real end-to-end evidence supports a coverage threshold, a headline Visible Varroa Rate below that threshold will be suppressed rather than displayed with a warning alone.
+
+Why parked:
+
+The project does not yet have a representative End-to-End Pipeline Evaluation corpus or evidence to choose a defensible threshold. Selecting one now would be arbitrary.
+
+Revisit trigger:
+
+Before promoting the first user-facing Varroa pipeline, when representative end-to-end coverage data is available, or when defining model promotion thresholds.
+
+Suggested owner or area:
+
+Model evaluation, product requirements, statistical design, and beekeeper-facing UX.
+
+## PARK-0032: Inadequate-Coverage Review Recovery
+
+Status: parked
+Date parked: 2026-08-02
+Source: Three-stage model pipeline grilling
+Area: Varroa assessment UX, review workflow, model governance
+
+Context:
+
+When a user-facing Visible Varroa Rate is suppressed for inadequate coverage, the Workspace owner should be able to open an Inspection Recovery Review: a distinct, named, saveable, and resumable session linked to a fixed snapshot of the original model-only result and its photo evidence. It remains available for retained inspection history after Workspace Data Use Agreement withdrawal, but recovery evidence is ineligible for model improvement without an active agreement and independent curation. Newer models are not run or substituted during recovery. Every annotation and Varroa decision made in recovery retains its recovery-review provenance and is reported as AI-assisted-reviewed, never human-from-scratch, because the original model output was visible. Model promotion never automatically reanalyses historical Inspection Photos; a future explicit Historical Reanalysis creates a new model-only result without changing prior model-only or human-reviewed results. In the first release this route is available only for suppressed model-only results, not every completed inspection, and only the Workspace owner may create, resume, or complete it. The owner may complete it at any coverage level after explicit confirmation, including when the headline rate remains suppressed. A completed review and result are immutable; a later correction creates a new linked review and human-reviewed result revision. The latest completed human-reviewed result becomes the inspection's current result by default, while the original model-only result and earlier human-reviewed revisions remain available as labelled comparison history. The reviewer may resolve previously unassessed complete visible bees and correct any model-produced bee, orientation, or Varroa decision. The original model-only result must remain immutable while the recovery workflow calculates and shows a separately provenanced human-reviewed inspection result alongside it. Both results must show a Result Evidence Breakdown: positive, active negative, `not_determined`, and unassessed complete visible-bee counts, plus Review Completion and Determinate Varroa Coverage. `not_determined` counts only toward Review Completion. The human-reviewed result must remain suppressed when an evidence-based determinate-coverage threshold is still not met. This is product feedback only until a Dataset Curator independently reviews it and assigns a Dataset Role; it is not automatic training-data intake.
+
+Why parked:
+
+User-facing Varroa Assessment, the coverage threshold, and the complete review UX do not yet exist. The current product evidence flow already distinguishes User Corrections and reviewed dataset evidence, but needs a purpose-built recovery journey.
+
+Revisit trigger:
+
+Before the first user-facing Varroa Assessment slice, when implementing coverage suppression, or when adding complete-bee review/correction for model output.
+
+Suggested owner or area:
+
+Varroa assessment UX, review workflow, dataset governance, and acceptance testing.
+
+Recovery evidence created while the Workspace Data Use Agreement is withdrawn remains product-only after later agreement acceptance. Model use requires a separate explicit Workspace owner dataset-contribution decision, followed by independent Dataset Curator review and Dataset Role assignment.
+
+Each Dataset Contribution Decision applies to exactly one named completed Human-Reviewed Inspection Result revision; it is not a workspace-wide opt-in or Dataset Role assignment.
+
+## PARK-0033: General Inspection Review And Correction
+
+Status: parked
+Date parked: 2026-08-02
+Source: Three-stage model pipeline grilling
+Area: inspection UX, review workflow, model governance
+
+Context:
+
+The first Inspection Recovery Review is intentionally available only when a model-only user-facing Varroa result is suppressed for inadequate coverage. A future general review workflow could allow a beekeeper to correct any completed inspection, including results whose coverage was adequate.
+
+Why parked:
+
+The initial recovery workflow solves the safety-critical inadequate-coverage case. A general inspection editor is a larger product and governance decision that should be designed deliberately rather than becoming an accidental extension.
+
+Revisit trigger:
+
+After the first user-facing Varroa Assessment recovery workflow has been demonstrated, or when ordinary completed inspections need user correction.
+
+Suggested owner or area:
+
+Inspection UX, model governance, and acceptance testing.
+
+## PARK-0034: Historical Inspection Reanalysis
+
+Status: parked
+Date parked: 2026-08-02
+Source: Three-stage model pipeline grilling
+Area: inspection history, model lifecycle, provenance
+
+Context:
+
+Model promotion must never automatically reanalyse historical Inspection Photos. A future Workspace owner-initiated Historical Reanalysis should run a selected newer model against an existing photo and create a new model-only result, preserving all prior model-only and human-reviewed results for comparison.
+
+Why parked:
+
+The first user-facing Varroa Assessment and recovery workflow need stable provenance first. Reanalysis needs a deliberate model-selection, queueing, cost, and comparison experience.
+
+Revisit trigger:
+
+After the first promoted user-facing model is available, or when a Workspace owner asks to compare a historic inspection against a newer model.
+
+Suggested owner or area:
+
+Inspection UX, model lifecycle, background jobs, and acceptance testing.
+
+## PARK-0035: Public Source Licence Compatibility Review
+
+Status: parked
+Date parked: 2026-08-02
+Source: Contributor permission and source-rights grilling
+Area: source rights, legal/policy, model governance
+
+Context:
+
+HiveSight records Source Rights Records, curator approval, permitted-use scopes, attribution, and Source Rights Invalidation for public/open evidence. The current approved boundary is local research and model development only unless a rights record explicitly permits broader use.
+
+Why parked:
+
+Detailed compatibility assessment for non-commercial, share-alike, redistribution, attribution, and model-output obligations needs formal legal/policy review. HiveSight must not infer that a public/open image licence permits sharing, publication, commercial use, or user-facing deployment.
+
+Revisit trigger:
+
+Before any public-source evidence supports a shared or published dataset, model release, commercial activity, or user-facing deployment; or before importing a source with non-standard or restrictive terms.
+
+Suggested owner or area:
+
+Legal/policy review, Dataset Curator governance, and model release management.
+
+## PARK-0036: Benchmark Dataset Version Lifecycle
+
+Status: parked
+Date parked: 2026-08-03
+Source: Slice 0015.4 planning
+Area: model evaluation, dataset governance, curator UX
+
+Context:
+
+Slice 0015.4 uses protected benchmark Dataset Items already frozen inside the evaluated Model Candidate's Training Run Dataset Version as the first benchmark selection snapshot. That is enough to produce the first Bee Localisation Benchmark Evaluation report.
+
+Why parked:
+
+A separate benchmark-only Dataset Version lifecycle introduces curation UI, locking rules, source-group governance, report comparison rules, and permission/scope impact handling beyond the first evaluation proof point.
+
+Revisit trigger:
+
+Before comparing multiple Model Candidates against the same named benchmark, before publishing model-quality numbers, before promotion workflow, or when benchmark curation needs its own named lifecycle.
+
+Suggested owner or area:
+
+Dataset governance, model evaluation, and curator UX.
+
+## PARK-0037: Precise Rotated Geometry Evaluation
+
+Status: parked
+Date parked: 2026-08-03
+Source: Slice 0015.4 planning
+Area: model evaluation, geometry, bee localisation metrics
+
+Context:
+
+Slice 0015.4 starts with `ellipse_match_v1`, a simple replaceable matching rule based on center distance plus radius/area overlap approximation. It reports complete and partial visible bee precision/recall separately without claiming precise rotated IoU scoring.
+
+Why parked:
+
+Precise rotated-box or ellipse IoU adds geometry complexity that is not needed for the first benchmark-reporting path. The first slice needs an honest, deterministic comparison rule more than it needs a perfect metric.
+
+Revisit trigger:
+
+Before publishing Bee Localisation quality claims, before model promotion, when two candidate models appear close enough that the approximate matcher may change the decision, or when rotated geometry utilities already exist with focused tests.
+
+Suggested owner or area:
+
+Model evaluation and geometry utilities.
+
+## PARK-0038: Full-Frame Bee Localisation Evaluation
+
+Status: parked
+Date parked: 2026-08-03
+Source: Slice 0015.4 grilling
+Area: model evaluation, bee localisation, full-frame benchmark evidence
+
+Context:
+
+Slice 0015.4 evaluates Bee Localisation Model Candidates against Training Crop benchmark Dataset Items. That proves the benchmark workflow and measures crop-level localisation, but it does not answer whether the model can find bees across realistic whole-frame inspection photos.
+
+Why parked:
+
+Full-frame evaluation needs different benchmark evidence, image-scale handling, source-group governance, UI/report caveats, and likely different matching/performance expectations. Adding it now would widen the first benchmark-reporting slice.
+
+Revisit trigger:
+
+After crop-level Benchmark Evaluation is implemented and at least one trained candidate has been measured, before making whole-frame Bee Localisation claims, or before starting the user-facing Varroa Assessment pipeline.
+
+Suggested owner or area:
+
+Model evaluation, dataset governance, and future Varroa Assessment pipeline planning.

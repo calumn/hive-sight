@@ -19,6 +19,7 @@ from hive_sight_core_api.dev_store import (
 from hive_sight_core_api.main import app
 from hive_sight_core_api.models import (
     ArtifactResponse,
+    BenchmarkEvaluationResponse,
     DatasetVersionResponse,
     ModelCandidateResponse,
     TrainingRunResponse,
@@ -243,6 +244,68 @@ def test_postgres_store_survives_restart_for_training_crop_dataset_item_path() -
         assert repository_body["summary"]["latest_dataset_version"]["human_readable_id"] == "HS-DV-PERSIST"
         assert repository_body["items"][0]["dataset_item_id"] == dataset_item_id
         assert repository_body["items"][0]["latest_dataset_version_membership"]["membership"] == "training"
+
+        cleanup = restarted_client.post(
+            "/v1/dev/directed-ellipse-orientation-cleanup",
+            json={
+                "workspace_id": workspace_id,
+                "reason": "Postgres directed ellipse cleanup test.",
+                "confirm_remove_dataset_and_model_evidence": True,
+            },
+            headers=_headers(),
+        )
+        assert cleanup.status_code == 200
+        assert cleanup.json()["dataset_items_removed"] == 1
+        assert cleanup.json()["dataset_versions_removed"] == 1
+        assert cleanup.json()["training_crops_reopened"] == 1
+        assert cleanup.json()["training_crop_ellipses_preserved"] == 1
+    finally:
+        app.dependency_overrides.clear()
+
+    cleaned_state = _build_postgres_state(
+        database_url,
+        object_storage_root=object_storage_root,
+    )
+    app.dependency_overrides[get_dev_state] = lambda: cleaned_state
+    cleaned_client = TestClient(app)
+    try:
+        cleaned_evidence = cleaned_client.get(
+            f"/v1/training-crops/{crop['training_crop_id']}/evidence",
+            params={"workspace_id": workspace_id},
+            headers=_headers(),
+        )
+        cleaned_repository = cleaned_client.get(
+            "/v1/dataset-repository/items",
+            params={"workspace_id": workspace_id},
+            headers=_headers(),
+        )
+        assert cleaned_evidence.status_code == 200
+        assert cleaned_evidence.json()["training_crop"]["review_status"] == "review_pending"
+        assert cleaned_evidence.json()["bee_ellipses"][0]["rotation_degrees"] == 15
+        assert cleaned_repository.status_code == 200
+        assert cleaned_repository.json()["summary"]["dataset_item_count"] == 0
+
+        recompleted = cleaned_client.patch(
+            f"/v1/training-crops/{crop['training_crop_id']}",
+            json={
+                "workspace_id": workspace_id,
+                "visible_bee_status": "has_visible_bees",
+                "review_status": "review_complete",
+            },
+            headers=_headers(),
+        )
+        reassignment = cleaned_client.post(
+            f"/v1/training-crops/{crop['training_crop_id']}/dataset-item",
+            json={
+                "workspace_id": workspace_id,
+                "dataset_role": "validation",
+                "source_group_key": "post-cleanup-frame",
+            },
+            headers=_headers(),
+        )
+        assert recompleted.status_code == 200
+        assert reassignment.status_code == 201
+        assert reassignment.json()["reviewed_ellipse_snapshots"][0]["rotation_degrees"] == 15
     finally:
         app.dependency_overrides.clear()
 
@@ -261,6 +324,7 @@ def test_postgres_store_survives_restart_for_model_training_records() -> None:
     training_run_id = UUID("00000000-0000-0000-0000-000000014002")
     model_candidate_id = UUID("00000000-0000-0000-0000-000000014003")
     weights_artifact_id = UUID("00000000-0000-0000-0000-000000014004")
+    benchmark_evaluation_id = UUID("00000000-0000-0000-0000-000000014005")
 
     artifact = ArtifactResponse(
         artifact_id=weights_artifact_id,
@@ -354,11 +418,44 @@ def test_postgres_store_survives_restart_for_model_training_records() -> None:
         not_user_facing_reason="baseline_training_only",
         created_at=now,
     )
+    benchmark_evaluation = BenchmarkEvaluationResponse(
+        benchmark_evaluation_id=benchmark_evaluation_id,
+        workspace_id=workspace_id,
+        human_readable_id="HS-BE-000001",
+        model_candidate_id=model_candidate_id,
+        model_candidate_human_readable_id="HS-MC-000001",
+        training_run_id=training_run_id,
+        dataset_version_id=dataset_version_id,
+        status="completed",
+        phase="completed",
+        adapter_type="fake",
+        training_adapter_type="fake",
+        evaluation_adapter_type="fake",
+        database_purpose="test",
+        confidence_threshold=0.1,
+        match_strategy="ellipse_match_v1",
+        benchmark_scope="training_crop_benchmark_only",
+        started_at=now,
+        completed_at=now,
+        last_heartbeat_at=now,
+        last_activity_message="Benchmark Evaluation completed.",
+        progress_percent=100,
+        latest_log_excerpt="Benchmark Evaluation completed.",
+        warnings=[],
+        metrics_summary={"precision": 0.5, "recall": 1.0},
+        item_results=[],
+        raw_prediction_artifact_id=None,
+        report_artifact_id=None,
+        artifact_ids=[],
+        created_by_user_id=USER_ID,
+        created_at=now,
+    )
 
     store.save_artifact(artifact)
     store.save_dataset_version(dataset_version)
     store.save_training_run(training_run)
     store.save_model_candidate(model_candidate)
+    store.save_benchmark_evaluation(benchmark_evaluation)
 
     restarted = _build_postgres_state(database_url).store
     assert (
@@ -369,6 +466,10 @@ def test_postgres_store_survives_restart_for_model_training_records() -> None:
     assert (
         restarted.get_model_candidate(workspace_id, model_candidate_id).human_readable_id
         == "HS-MC-000001"
+    )
+    assert (
+        restarted.get_benchmark_evaluation(workspace_id, benchmark_evaluation_id).human_readable_id
+        == "HS-BE-000001"
     )
     assert restarted.get_artifact(weights_artifact_id).relative_path.endswith("weights/best.pt")
 

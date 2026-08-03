@@ -452,6 +452,12 @@ class BeeDetectorTrainingWorkflow:
                 "Another Bee Detector Training Run is already queued or running.",
                 409,
             )
+        if self.store.active_benchmark_evaluation(request.workspace_id) is not None:
+            raise DomainError(
+                "model_job_already_active",
+                "Another model job is already active in this local environment.",
+                409,
+            )
         dataset_version = self.get_dataset_version(
             user=user,
             workspace_id=request.workspace_id,
@@ -1265,6 +1271,9 @@ class BeeDetectorTrainingWorkflow:
             return owner.workspace_id if owner else None
         if artifact.owner_type == "training_run":
             owner = self.store.training_runs.get(artifact.owner_id)
+            return owner.workspace_id if owner else None
+        if artifact.owner_type == "benchmark_evaluation":
+            owner = self.store.benchmark_evaluations.get(artifact.owner_id)
             return owner.workspace_id if owner else None
         return None
 

@@ -33,6 +33,7 @@ import {
 import {
   acceptWorkspaceDataUseAgreement,
   abandonTrainingRun,
+  cancelBenchmarkEvaluation,
   cancelTrainingRun,
   createTrainingCrop,
   createTrainingCropEllipse,
@@ -60,6 +61,8 @@ import {
   fetchHiveInspections,
   fetchInspectionPhotos,
   fetchInspectionPhotoObjectUrl,
+  fetchBenchmarkEvaluationReadiness,
+  fetchBenchmarkEvaluations,
   fetchModelCandidates,
   fetchModelTrainingReadiness,
   fetchTrainingRuns,
@@ -67,6 +70,7 @@ import {
   fetchTrainingCropsForPhoto,
   processAnalysisRun,
   startDatasetLabellingSession,
+  startBenchmarkEvaluation,
   startModelTrainingRun,
   suggestTrainingCropBeeAnnotations,
   toCoreApiContentUrl,
@@ -82,6 +86,8 @@ import {
   type ApiError,
   type BeeAnnotationType,
   type BeeAnnotationProposal,
+  type BenchmarkEvaluation,
+  type BenchmarkEvaluationReadiness,
   type DevSession,
   type HealthResponse,
   type Hive,
@@ -1581,7 +1587,9 @@ function RepositoryCropPreview({ detail }: { detail: DatasetRepositoryItemDetail
           className={`repository-ellipse ${ellipse.annotationType}`}
           style={repositoryEllipseStyle(detail, ellipse)}
           data-testid="repository-crop-ellipse"
-        />
+        >
+          <span className="ellipse-head-arrow" data-testid="repository-crop-ellipse-head-arrow" />
+        </span>
       ))}
     </div>
   );
@@ -1658,6 +1666,14 @@ function formatElapsedTime(startedAt: string | null, completedAt: string | null,
 
 function isActiveTrainingRun(run: TrainingRun) {
   return run.status === "queued" || run.status === "running" || run.status === "cancelling";
+}
+
+function isActiveBenchmarkEvaluation(evaluation: BenchmarkEvaluation) {
+  return (
+    evaluation.status === "queued" ||
+    evaluation.status === "running" ||
+    evaluation.status === "cancelling"
+  );
 }
 
 function trainingRunCanBeDeleted(run: TrainingRun) {
@@ -1982,6 +1998,16 @@ function TrainingCropAnnotationPanel({
   const [trainingRunClockTick, setTrainingRunClockTick] = useState(0);
   const [modelCandidates, setModelCandidates] = useState<ModelCandidate[]>([]);
   const [selectedModelCandidateId, setSelectedModelCandidateId] = useState<string | null>(null);
+  const [benchmarkReadiness, setBenchmarkReadiness] =
+    useState<BenchmarkEvaluationReadiness | null>(null);
+  const [benchmarkEvaluation, setBenchmarkEvaluation] = useState<BenchmarkEvaluation | null>(null);
+  const [benchmarkEvaluations, setBenchmarkEvaluations] = useState<BenchmarkEvaluation[]>([]);
+  const [benchmarkEvaluationsLastCheckedAt, setBenchmarkEvaluationsLastCheckedAt] = useState<
+    string | null
+  >(null);
+  const [benchmarkEvaluationPollError, setBenchmarkEvaluationPollError] = useState<string | null>(
+    null
+  );
   const [candidateThreshold, setCandidateThreshold] = useState(0.1);
   const [candidateProposals, setCandidateProposals] = useState<BeeAnnotationProposal[]>([]);
   const [selectedProposalId, setSelectedProposalId] = useState<string | null>(null);
@@ -1994,11 +2020,18 @@ function TrainingCropAnnotationPanel({
   const [workingLabel, setWorkingLabel] = useState<string | null>(null);
   const [cropZoom, setCropZoom] = useState(1);
   const hasActiveTrainingRun = trainingRuns.some(isActiveTrainingRun);
+  const hasActiveBenchmarkEvaluation = benchmarkEvaluations.some(isActiveBenchmarkEvaluation);
   const shouldPollTrainingRuns =
     hasActiveTrainingRun || workingLabel === "Starting Bee Detector training";
+  const shouldPollBenchmarkEvaluations =
+    hasActiveBenchmarkEvaluation || workingLabel === "Starting Benchmark Evaluation";
   const canStartModelTraining =
     Boolean(datasetVersion) &&
     (modelTrainingReadiness?.eligibleToStartTraining ?? true) &&
+    !Boolean(workingLabel);
+  const canStartBenchmarkEvaluation =
+    Boolean(selectedModelCandidateId) &&
+    (benchmarkReadiness?.eligibleToStartEvaluation ?? true) &&
     !Boolean(workingLabel);
 
   const selectedPhoto = photos.find((photo) => photo.inspectionPhotoId === selectedPhotoId) ?? null;
@@ -2031,6 +2064,9 @@ function TrainingCropAnnotationPanel({
   });
   const canRotateAntiClockwise = canAdjustEllipse(selectedCrop, selectedEllipse, {
     rotationDegrees: (selectedEllipse?.rotationDegrees ?? 0) - 5
+  });
+  const canFlipHeadTail = canAdjustEllipse(selectedCrop, selectedEllipse, {
+    rotationDegrees: (selectedEllipse?.rotationDegrees ?? 0) + 180
   });
   const canShrinkRadiusX = canAdjustEllipse(selectedCrop, selectedEllipse, {
     radiusX: (selectedEllipse?.radiusX ?? 0) - 5
@@ -2115,7 +2151,18 @@ function TrainingCropAnnotationPanel({
   useEffect(() => {
     refreshTrainingRuns().catch((error) => onError(toApiError(error)));
     refreshModelCandidates().catch((error) => onError(toApiError(error)));
+    refreshBenchmarkEvaluations().catch((error) => onError(toApiError(error)));
   }, [workspaceId]);
+
+  useEffect(() => {
+    if (!selectedModelCandidateId) {
+      setBenchmarkReadiness(null);
+      return;
+    }
+    refreshBenchmarkReadiness(selectedModelCandidateId).catch((error) =>
+      setBenchmarkEvaluationPollError(toApiError(error).message)
+    );
+  }, [selectedModelCandidateId, workspaceId]);
 
   useEffect(() => {
     if (!shouldPollTrainingRuns) {
@@ -2129,6 +2176,19 @@ function TrainingCropAnnotationPanel({
     }, 3000);
     return () => window.clearInterval(interval);
   }, [shouldPollTrainingRuns, workspaceId]);
+
+  useEffect(() => {
+    if (!shouldPollBenchmarkEvaluations) {
+      return;
+    }
+    const interval = window.setInterval(() => {
+      setTrainingRunClockTick((current) => current + 1);
+      refreshBenchmarkEvaluations().catch((error) => {
+        setBenchmarkEvaluationPollError(toApiError(error).message);
+      });
+    }, 3000);
+    return () => window.clearInterval(interval);
+  }, [shouldPollBenchmarkEvaluations, workspaceId]);
 
   async function runCropAction(label: string, action: () => Promise<void>) {
     setWorkingLabel(label);
@@ -2487,6 +2547,33 @@ function TrainingCropAnnotationPanel({
     return listing.modelCandidates;
   }
 
+  async function refreshBenchmarkReadiness(modelCandidateId: string) {
+    const readiness = await fetchBenchmarkEvaluationReadiness({
+      devUserId,
+      workspaceId,
+      modelCandidateId
+    });
+    setBenchmarkReadiness(readiness);
+    setBenchmarkEvaluationPollError(null);
+    return readiness;
+  }
+
+  async function refreshBenchmarkEvaluations() {
+    const listing = await fetchBenchmarkEvaluations({ devUserId, workspaceId });
+    setBenchmarkEvaluations(listing.benchmarkEvaluations);
+    setBenchmarkEvaluationsLastCheckedAt(new Date().toISOString());
+    setBenchmarkEvaluationPollError(null);
+    setBenchmarkEvaluation((current) => {
+      const refreshedCurrent = current
+        ? listing.benchmarkEvaluations.find(
+            (evaluation) => evaluation.benchmarkEvaluationId === current.benchmarkEvaluationId
+          )
+        : null;
+      return refreshedCurrent ?? listing.benchmarkEvaluations.at(0) ?? null;
+    });
+    return listing.benchmarkEvaluations;
+  }
+
   async function useTrainingRunCandidateForCropYolo(candidateId: string) {
     const candidates = await refreshModelCandidates();
     setSelectedModelCandidateId(candidateId);
@@ -2496,6 +2583,7 @@ function TrainingCropAnnotationPanel({
     const message = `Now using ${candidateLabel} for crop YOLO.`;
     setModelCandidateSelectionMessage(message);
     setCandidateProposalMessage(message);
+    await refreshBenchmarkReadiness(candidateId);
   }
 
   async function createModelDatasetVersion() {
@@ -2525,6 +2613,42 @@ function TrainingCropAnnotationPanel({
       const readiness = await fetchModelTrainingReadiness({ devUserId, workspaceId });
       setModelTrainingReadiness(readiness);
       await refreshTrainingRuns();
+    });
+  }
+
+  async function startSelectedBenchmarkEvaluation() {
+    if (!selectedModelCandidateId) {
+      return;
+    }
+    await runCropAction("Starting Benchmark Evaluation", async () => {
+      const nextEvaluation = await startBenchmarkEvaluation({
+        devUserId,
+        workspaceId,
+        modelCandidateId: selectedModelCandidateId,
+        acknowledgeHighSeverityWarnings: acknowledgeModelWarnings
+      });
+      setBenchmarkEvaluation(nextEvaluation);
+      await refreshBenchmarkReadiness(selectedModelCandidateId);
+      await refreshBenchmarkEvaluations();
+    });
+  }
+
+  async function cancelSelectedBenchmarkEvaluation() {
+    if (!benchmarkEvaluation) {
+      return;
+    }
+    await runCropAction("Cancelling Benchmark Evaluation", async () => {
+      const cancelled = await cancelBenchmarkEvaluation({
+        devUserId,
+        workspaceId,
+        benchmarkEvaluationId: benchmarkEvaluation.benchmarkEvaluationId,
+        reason: "Cancelled from local benchmark evaluation UI."
+      });
+      setBenchmarkEvaluation(cancelled);
+      if (selectedModelCandidateId) {
+        await refreshBenchmarkReadiness(selectedModelCandidateId);
+      }
+      await refreshBenchmarkEvaluations();
     });
   }
 
@@ -2819,8 +2943,12 @@ function TrainingCropAnnotationPanel({
                             setSelectedEllipseId(ellipse.annotationId);
                           }}
                           data-testid="training-crop-ellipse"
-                          aria-label={ellipse.annotationType}
-                        />
+                          aria-label={`${ellipse.annotationType} head direction ${formatGeometryValue(
+                            normalizeRotation(ellipse.rotationDegrees)
+                          )} degrees`}
+                        >
+                          <span className="ellipse-head-arrow" data-testid="training-crop-ellipse-head-arrow" />
+                        </button>
                       ))}
                       {candidateProposals.map((proposal) => (
                         <button
@@ -2837,7 +2965,9 @@ function TrainingCropAnnotationPanel({
                           }}
                           data-testid="candidate-bee-proposal"
                           aria-label={`Suggested bee ${Math.round(proposal.confidence * 100)}% confidence`}
-                        />
+                        >
+                          <span className="ellipse-head-arrow" data-testid="candidate-bee-proposal-head-arrow" />
+                        </button>
                       ))}
                     </div>
                   </div>
@@ -2854,7 +2984,7 @@ function TrainingCropAnnotationPanel({
                       {selectedEllipse
                         ? `${selectedEllipse.annotationType} / ${formatGeometryValue(
                             normalizeRotation(selectedEllipse.rotationDegrees)
-                          )} degrees`
+                          )} degree head direction`
                         : "Click inside the crop to add a default bee ellipse."}
                     </p>
                   </div>
@@ -2993,6 +3123,21 @@ function TrainingCropAnnotationPanel({
                     >
                       <RotateCw size={18} />
                       Rotate +
+                    </button>
+                    <button
+                      type="button"
+                      disabled={controlLocked || !canFlipHeadTail}
+                      onClick={() =>
+                        selectedEllipse &&
+                        void updateSelectedEllipse({
+                          rotationDegrees: selectedEllipse.rotationDegrees + 180
+                        })
+                      }
+                      data-testid="flip-training-ellipse-head-tail-button"
+                      title="Flip head/tail"
+                    >
+                      <RotateCw size={18} />
+                      Flip head/tail
                     </button>
                   </div>
                   <div className="control-cluster" aria-label="Resize selected ellipse">
@@ -3664,6 +3809,170 @@ function TrainingCropAnnotationPanel({
                       <p>Baseline only; not user-facing.</p>
                     </div>
                   ) : null}
+                  <div
+                    className="export-summary"
+                    data-testid="benchmark-evaluation-panel"
+                  >
+                    <strong>Bee Detector benchmark evaluation</strong>
+                    <span>Training Crop benchmark only</span>
+                    {benchmarkReadiness ? (
+                      <>
+                        <span>Candidate {benchmarkReadiness.modelCandidateHumanReadableId}</span>
+                        <span>Benchmark {benchmarkReadiness.benchmarkItemCount}</span>
+                        <span>{benchmarkReadiness.evaluationAdapterType}</span>
+                        <span>{benchmarkReadiness.databasePurpose}</span>
+                        {benchmarkReadiness.activeModelJobId ? (
+                          <span>
+                            Active {benchmarkReadiness.activeModelJobType}{" "}
+                            {benchmarkReadiness.activeModelJobId.slice(0, 8)}
+                          </span>
+                        ) : null}
+                        {benchmarkReadiness.warnings.map((warning) => (
+                          <span key={warning.code}>
+                            {warning.severity}: {warning.code}
+                          </span>
+                        ))}
+                        {!benchmarkReadiness.eligibleToStartEvaluation ? (
+                          <p data-testid="benchmark-evaluation-blocker">
+                            Evaluation cannot start until readiness blockers are resolved.
+                          </p>
+                        ) : null}
+                      </>
+                    ) : (
+                      <span>Select a Model Candidate to check benchmark readiness.</span>
+                    )}
+                    <div className="button-row">
+                      <button
+                        type="button"
+                        disabled={!selectedModelCandidateId || Boolean(workingLabel)}
+                        onClick={() =>
+                          selectedModelCandidateId
+                            ? void refreshBenchmarkReadiness(selectedModelCandidateId)
+                            : undefined
+                        }
+                        data-testid="benchmark-evaluation-readiness-button"
+                      >
+                        <RefreshCw size={18} />
+                        Check benchmark
+                      </button>
+                      <button
+                        type="button"
+                        disabled={!canStartBenchmarkEvaluation}
+                        onClick={() => void startSelectedBenchmarkEvaluation()}
+                        data-testid="start-benchmark-evaluation-button"
+                      >
+                        <Play size={18} />
+                        Run benchmark
+                      </button>
+                      <button
+                        type="button"
+                        disabled={
+                          !benchmarkEvaluation ||
+                          !isActiveBenchmarkEvaluation(benchmarkEvaluation) ||
+                          Boolean(workingLabel)
+                        }
+                        onClick={() => void cancelSelectedBenchmarkEvaluation()}
+                        data-testid="cancel-benchmark-evaluation-button"
+                      >
+                        <CircleAlert size={18} />
+                        Cancel benchmark
+                      </button>
+                    </div>
+                    {benchmarkEvaluation ? (
+                      <div
+                        className="training-run-row"
+                        data-testid="benchmark-evaluation-summary"
+                      >
+                        <span>{benchmarkEvaluation.humanReadableId}</span>
+                        <span>{benchmarkEvaluation.status}</span>
+                        <span>Phase {benchmarkEvaluation.phase}</span>
+                        <span>
+                          Progress {formatProgressPercent(benchmarkEvaluation.progressPercent)}
+                        </span>
+                        <span>
+                          Precision {formatMetric(benchmarkEvaluation.metricsSummary.precision)}
+                        </span>
+                        <span>
+                          Recall {formatMetric(benchmarkEvaluation.metricsSummary.recall)}
+                        </span>
+                        <span>
+                          Last heartbeat {formatDateTime(benchmarkEvaluation.lastHeartbeatAt)}
+                        </span>
+                        <span>
+                          Elapsed{" "}
+                          {formatElapsedTime(
+                            benchmarkEvaluation.startedAt,
+                            benchmarkEvaluation.completedAt,
+                            trainingRunClockTick
+                          )}
+                        </span>
+                        {benchmarkEvaluation.lastActivityMessage ? (
+                          <p data-testid="benchmark-evaluation-activity">
+                            Activity: {benchmarkEvaluation.lastActivityMessage}
+                          </p>
+                        ) : null}
+                        {isActiveBenchmarkEvaluation(benchmarkEvaluation) ? (
+                          <p data-testid="benchmark-evaluation-active-status">
+                            Evaluation is active. Polling the Core API every 3 seconds for updates.
+                          </p>
+                        ) : null}
+                        {benchmarkEvaluation.failureCode || benchmarkEvaluation.failureMessage ? (
+                          <p
+                            className="analysis-caveat failed"
+                            data-testid="benchmark-evaluation-failure"
+                          >
+                            {benchmarkEvaluation.failureCode ?? "benchmark_evaluation_failed"}:{" "}
+                            {benchmarkEvaluation.failureMessage ??
+                              "Benchmark Evaluation failed before a report was created."}
+                          </p>
+                        ) : null}
+                        {benchmarkEvaluation.latestLogExcerpt ? (
+                          <pre
+                            className="training-log-excerpt"
+                            data-testid="benchmark-evaluation-log-excerpt"
+                          >
+                            {benchmarkEvaluation.latestLogExcerpt}
+                          </pre>
+                        ) : null}
+                        <div className="button-row">
+                          {benchmarkEvaluation.reportArtifactId ? (
+                            <a
+                              className="text-link"
+                              href={toCoreApiContentUrl(
+                                `/v1/model-training/artifacts/${benchmarkEvaluation.reportArtifactId}?workspace_id=${workspaceId}`
+                              )}
+                              target="_blank"
+                              rel="noreferrer"
+                              data-testid="benchmark-evaluation-report-link"
+                            >
+                              Report
+                            </a>
+                          ) : null}
+                          {benchmarkEvaluation.rawPredictionArtifactId ? (
+                            <a
+                              className="text-link"
+                              href={toCoreApiContentUrl(
+                                `/v1/model-training/artifacts/${benchmarkEvaluation.rawPredictionArtifactId}?workspace_id=${workspaceId}`
+                              )}
+                              target="_blank"
+                              rel="noreferrer"
+                              data-testid="benchmark-evaluation-raw-predictions-link"
+                            >
+                              Raw predictions
+                            </a>
+                          ) : null}
+                        </div>
+                      </div>
+                    ) : null}
+                    {benchmarkEvaluationPollError ? (
+                      <p
+                        className="analysis-caveat failed"
+                        data-testid="benchmark-evaluation-poll-error"
+                      >
+                        Could not refresh Benchmark Evaluations: {benchmarkEvaluationPollError}
+                      </p>
+                    ) : null}
+                  </div>
                   {trainingRuns.length > 0 ? (
                     <div className="export-summary" data-testid="model-training-run-list">
                       <strong>Training runs</strong>
@@ -3706,6 +4015,39 @@ function TrainingCropAnnotationPanel({
                               {run.failureCode ?? "training_failed"}:{" "}
                               {run.failureMessage ?? "No failure message recorded."}
                             </span>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                  {benchmarkEvaluations.length > 0 ? (
+                    <div className="export-summary" data-testid="benchmark-evaluation-list">
+                      <strong>Benchmark evaluations</strong>
+                      {benchmarkEvaluationsLastCheckedAt ? (
+                        <span data-testid="benchmark-evaluations-last-checked">
+                          Last checked {formatDateTime(benchmarkEvaluationsLastCheckedAt)}
+                        </span>
+                      ) : null}
+                      {hasActiveBenchmarkEvaluation ? (
+                        <span data-testid="benchmark-evaluations-polling">Auto-refreshing</span>
+                      ) : null}
+                      {benchmarkEvaluations.map((evaluation) => (
+                        <div
+                          className="training-run-row"
+                          data-testid="benchmark-evaluation-list-item"
+                          key={evaluation.benchmarkEvaluationId}
+                        >
+                          <span>{evaluation.humanReadableId}</span>
+                          <span>{evaluation.status}</span>
+                          <span>Phase {evaluation.phase}</span>
+                          <span>Candidate {evaluation.modelCandidateHumanReadableId}</span>
+                          <span>
+                            Benchmark {String(evaluation.metricsSummary.benchmark_item_count ?? "n/a")}
+                          </span>
+                          <span>Precision {formatMetric(evaluation.metricsSummary.precision)}</span>
+                          <span>Recall {formatMetric(evaluation.metricsSummary.recall)}</span>
+                          {evaluation.lastActivityMessage ? (
+                            <span>{evaluation.lastActivityMessage}</span>
                           ) : null}
                         </div>
                       ))}

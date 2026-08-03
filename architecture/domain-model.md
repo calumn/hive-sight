@@ -360,6 +360,47 @@ Rules:
 - Frame labels are lightweight grouping hints, not frame inventory records.
 - A frame label does not prove that photos are non-overlapping or safe to aggregate without caution.
 
+### Source Rights Record
+
+The recorded lawful-use basis for one or more Source Images. It is distinct from Annotation Source and records the rights to use the underlying image evidence.
+
+Essential fields:
+
+- id
+- rights basis
+- source organisation or repository
+- source reference
+- licence or terms version
+- allowed-use summary
+- permitted use scopes
+- attribution requirement
+- attribution text
+- restriction review
+- status
+- reviewed by user id
+- reviewed at
+- recorded by user id
+- recorded at
+
+Statuses:
+
+- `pending_review`
+- `approved`
+- `rejected`
+- `superseded`
+- `invalidated`
+
+Rules:
+
+- Recognised rights bases include `workspace_data_use_agreement`, `contributor_contribution_permission`, `public_or_open_licence`, and `other_approved_basis`.
+- A public/open rights record must identify a source reference and licence or terms version and be explicitly approved by a Dataset Curator before its Source Images become Dataset Items.
+- Public/open evidence is local research and model development evidence only unless the approved Source Rights Record explicitly permits a broader use scope.
+- Imported annotation provenance does not establish rights to the underlying image and is stored separately.
+- A Source Rights Record remains immutable once a Dataset Version includes a referenced Source Image; later corrections create a superseding rights record.
+- If a rights basis is later found invalid, revoked, or incompatible with HiveSight's use, the record becomes `invalidated` and triggers the quarantine and replacement path defined by ADR 0009.
+- Required attribution is carried into every relevant Dataset Version, derived export, Benchmark Evaluation report, and released Model Version documentation.
+- An unlisted use scope is not permitted.
+
 ### Source Image
 
 The underlying original image evidence record used by inspection, dataset, and model-governance workflows.
@@ -381,9 +422,11 @@ Essential fields:
 - source group key
 - provenance summary
 - permission status
+- source rights record id
 - metadata status
 - metadata checked at
 - status
+- rights-impact reason
 - created at
 
 Source types:
@@ -410,6 +453,8 @@ Rules:
 - `workspace_id` is required for `inspection_photo` Source Images; future public/imported source ownership may differ.
 - Accepted Source Images require dimensions, `content_hash`, and `content_hash_algorithm`.
 - Source Image has its own provenance and permission status, separate from Dataset Item permission snapshots.
+- Every Source Image used for model data has a Source Rights Record. The rights basis may be a Workspace Data Use Agreement, Contributor Contribution Permission, public/open licence, or another explicitly approved basis.
+- Public/open Source Images record their source organisation or repository, source reference, licence or terms version, allowed-use basis, attribution requirement, and restriction review. Imported annotation provenance remains distinct from source-image rights.
 - Source Image may exist without dataset eligibility, but Dataset Item creation requires eligible permission.
 - Raw EXIF or image metadata should not be stored in Postgres by default because image metadata may contain personally identifiable information, location, device, or private apiary signals.
 - `metadata_status` records minimisation/check status only.
@@ -563,6 +608,7 @@ Essential fields:
 - source
 - geometry
 - visibility class
+- orientation reliability
 - confidence
 - review status
 
@@ -591,6 +637,8 @@ Rules:
 
 - The canonical reviewed geometry for bee annotations is an oriented bee ellipse.
 - Oriented Bee Ellipse rotation is directed: `rotation_degrees` points from the ellipse center toward the bee's head along the major axis; the opposite end is the tail.
+- Reviewed Bee Annotations record Orientation Reliability as `reliable` or `unreliable`, independently of their visibility class, bee-presence confidence, and review status.
+- Existing Bee Annotations without Orientation Reliability must be returned for one-time human review before entering Bee Orientation or head-normalized Varroa Dataset Versions.
 - Candidate Annotations are not ground truth until human reviewed.
 - Reviewed Annotations still require Dataset Role assignment before dataset use.
 - Model-specific exports may project oriented ellipses into other shapes such as YOLO OBB labels.
@@ -631,6 +679,46 @@ Rules:
 - Imported public dataset annotations may enter as Candidate Annotations only; they become reviewed evidence only after HiveSight review.
 - Candidate Annotation is independent of any one model run or model family.
 
+### Varroa Review
+
+A human review of visible Varroa evidence on one bee-relative crop.
+
+Essential fields:
+
+- id
+- bee annotation id
+- sampling purpose
+- sampling method
+- sampling stratum summary
+- review outcome
+- source
+- review method
+- reviewer id
+- reviewed at
+- optional independent second reviewer id
+- optional adjudicator id, distinct from both original reviewer ids
+- optional adjudication reference
+- optional adjudication rationale
+
+Review outcomes:
+
+- `visible_varroa_present`
+- `no_visible_varroa`
+- `not_determined`
+
+Rules:
+
+- `visible_varroa_present` requires one or more reviewed Varroa Annotations.
+- `no_visible_varroa` is an active human negative judgement, not merely the absence of a Varroa Annotation.
+- `not_determined` must not be exported as a negative Varroa training or benchmark example.
+- `model_curation` and `inspection_rate_estimation` are distinct Sampling Purposes even when they share the same review UI; only the former is eligible for a model Dataset Item by default.
+- Default model-curation reviews use `stratified_random` selection across available Hive, frame, bee-density, lighting, and image-quality strata. Deliberately added difficult examples use `curator_targeted`; Dataset Versions and benchmark reports preserve their distributions.
+- An early baseline benchmark may use one active curator review only when its report states that limitation. A Model Candidate cannot be considered for user-facing Varroa Assessment until benchmark Varroa Review Outcomes have Blind Independent Review: the second reviewer cannot see the first outcome or Varroa marker positions. Disagreements require Third-Party Adjudication by a reviewer distinct from both originals, who first records a fresh blind review and only then sees anonymised prior reviews to document the final outcome.
+- A disagreement that remains unresolved, including a three-way conflict, has the canonical outcome `not_determined` and is excluded from Varroa training and benchmark evidence.
+- Training and validation Varroa evidence may use one active reviewed outcome when its review provenance remains available; the stronger Blind Independent Review and Third-Party Adjudication path is the user-facing benchmark promotion gate.
+- A non-blocking quality audit periodically selects a stratified-random sample of training and validation Varroa Reviews for Blind Independent Review. Its selection and review provenance, agreement, disagreement, and unresolved outcomes remain distinct from protected benchmark evidence and are reported by Annotation Source, including human-from-scratch and AI-assisted-reviewed evidence.
+- A concerning quality-audit result requires a documented Dataset Curator Audit Disposition and a warning on every affected Dataset Version. It does not automatically block dataset use while numerical escalation thresholds remain deferred.
+
 ### Varroa Annotation
 
 Structured marker data identifying a likely visible Varroa mite.
@@ -659,6 +747,7 @@ Rules:
 - Partial or unassociated Varroa detections are additional evidence.
 - Candidate Annotations are not ground truth until human reviewed.
 - Reviewed Annotations still require Dataset Role assignment before dataset use.
+- A Varroa Annotation is evidence of a positive marker; a Varroa Review carries the explicit positive, negative, or not-determined judgement for the bee-relative crop.
 
 ### User Correction
 
@@ -692,6 +781,150 @@ Rules:
 
 - A user correction is review evidence, not ground truth.
 - A user correction is not training, validation, or benchmark data until the Workspace Data Use Agreement and review decisions allow it.
+
+### Inspection Recovery Review
+
+A distinct, named, saveable, and resumable human review session that recovers or corrects a model-only inspection result.
+
+Essential fields:
+
+- id
+- inspection id
+- original model-only result id
+- original photo-evidence snapshot reference
+- original model candidate/version references
+- recovery-review provenance on every resulting annotation and Varroa decision
+- optional superseded recovery review id
+- optional superseded human-reviewed result id
+- created by user id
+- status
+- started at
+- last saved at
+- completed at
+- optional notes
+- review completion
+- determinate Varroa coverage
+- result evidence breakdown: positive, active negative, not-determined, and unassessed complete visible-bee counts
+
+Statuses:
+
+- `in_progress`
+- `completed`
+- `abandoned`
+
+Rules:
+
+- The review is linked to, and does not change, the original model-only result.
+- The review uses a fixed snapshot of the original model-only result and its photo evidence. Newer models are not run or substituted during recovery.
+- Every annotation and Varroa decision produced or amended in the review retains its recovery-review provenance and is reported as AI-assisted-reviewed, never human-from-scratch, because the original model output was visible.
+- If the Workspace Data Use Agreement is withdrawn but the inspection remains retained, the Workspace owner may still complete the review for inspection support. Its evidence is ineligible for model improvement until an active agreement exists and a Dataset Curator independently reviews it and assigns a Dataset Role.
+- Recovery evidence created during withdrawal remains product-only after later agreement acceptance. The Workspace owner must make a separate explicit dataset-contribution decision before independent Dataset Curator review and Dataset Role assignment may make it eligible for model improvement.
+- Model promotion does not automatically reanalyse historical Inspection Photos. A future explicit Historical Reanalysis creates a new model-only result and never alters earlier model-only or human-reviewed results.
+- In the first release, a review may be opened only for a model-only result whose user-facing Varroa estimate is suppressed for inadequate coverage.
+- In the first release, only the Workspace owner may create, resume, or complete a review.
+- The Workspace owner may complete a review at any coverage level after explicit confirmation, including when the resulting headline rate remains suppressed.
+- A completed review and its Human-Reviewed Inspection Result are immutable. A later correction starts a new linked recovery review and result revision, which records what it supersedes.
+- The latest completed Human-Reviewed Inspection Result is the inspection's current result by default. The original model-only result and earlier human-reviewed revisions remain available as labelled comparison history.
+- The reviewer may resolve previously unassessed complete visible bees and correct any model-produced bee, orientation, or Varroa decision.
+- A completed review produces a separately provenanced Human-Reviewed Inspection Result with its own Review Completion and Determinate Varroa Coverage calculations.
+- The original model-only result and every Human-Reviewed Inspection Result expose a Result Evidence Breakdown with positive, active negative, `not_determined`, and unassessed complete visible-bee counts.
+- `not_determined` counts toward Review Completion but not Determinate Varroa Coverage and cannot support a headline Visible Varroa Rate.
+- Review evidence is product feedback only until a Dataset Curator independently reviews it and assigns a Dataset Role.
+
+### Dataset Contribution Decision
+
+An explicit Workspace owner decision allowing one completed Human-Reviewed Inspection Result revision to be considered for model-data curation.
+
+Essential fields:
+
+- id
+- workspace id
+- human-reviewed inspection result revision id
+- current Workspace Data Use Agreement id and terms version
+- decided by user id
+- decided at
+- status
+
+Statuses:
+
+- `contributed`
+- `withdrawn`
+
+Rules:
+
+- A decision applies to exactly one named result revision and is never a workspace-wide opt-in.
+- It does not itself assign a Dataset Role or make evidence training-ready; independent Dataset Curator review and Dataset Role assignment remain required.
+- It can be created only while a Workspace Data Use Agreement is active.
+
+### Contribution Bundle
+
+A named, immutable collection of one contributor's identified images, annotations, or reviews that share one intended model-data permission boundary.
+
+Essential fields:
+
+- id
+- human-readable id
+- workspace id
+- contributor user id
+- contributor pseudonym snapshot
+- name
+- contribution subject references
+- created at
+
+Rules:
+
+- A bundle belongs to exactly one contributor in one workspace.
+- A Dataset Curator creates the bundle and assigns its annotation tasks. The Workspace owner may offer their own evidence but does not obtain dataset-governance authority through ownership alone.
+- A contributor is a registered User and can view their own bundles through their own identity.
+- A contributor may use a pseudonym. HiveSight retains only the minimum contact/authentication data needed to manage contributor access and requests; provenance and curator-facing views use the internal contributor id and pseudonym rather than a required real name.
+- Contributor registration does not grant Workspace Membership, Workspace ownership, or dataset/model-governance capability.
+- Contributor access is limited to explicitly assigned annotation tasks and Contribution Bundles; it does not expose the wider Workspace, unassigned inspections, or other contributors' evidence.
+- The contributor can view a read-only Contribution Usage Record for each bundle: accepted terms, permission and deletion status, and linked Dataset Versions, Training Runs, and model-artifact outcomes. It does not reveal other contributors' evidence or the wider Workspace.
+- A contributor may create more than one bundle.
+- Once a Contributor Contribution Permission is accepted, the bundle's subject list is immutable. Additional work requires a new bundle.
+- In the first release, withdrawal applies to the complete bundle. Finer withdrawal boundaries require separate bundles before permission acceptance.
+- Every Dataset Item derived from a bundled contribution retains the bundle reference.
+
+### Contributor Contribution Permission
+
+A registered contributor's explicit permission for one named, immutable Contribution Bundle of their identified image, annotation, or review work to support model-data curation. It is separate from Workspace ownership, Workspace Membership, Dataset Curator capability, and the Workspace Data Use Agreement.
+
+Essential fields:
+
+- id
+- contributor user id
+- workspace id
+- contribution bundle id
+- terms version
+- permitted use scopes
+- terms reacceptance required at
+- status
+- offered at
+- accepted at
+- withdrawn at
+
+Statuses:
+
+- `not_accepted`
+- `offered`
+- `accepted`
+- `withdrawn`
+
+Rules:
+
+- A permission covers exactly one named, immutable Contribution Bundle; it is not a grant over the whole workspace.
+- Permitted Use Scopes are an explicit, closed list. An unlisted use is not permitted.
+- The first contributor terms offer `model_development` and `evaluation` only. `user_facing_deployment`, `sharing_or_publication`, and `commercial_use` require separate explicit opt-in.
+- Before acceptance, the contributor sees only a non-sensitive bundle summary and the applicable terms. Assigned images and annotation tasks become visible only after explicit acceptance of that named bundle and terms version.
+- A material terms change requires fresh acceptance before the bundle can appear in a new Dataset Version, Training Run, Benchmark Evaluation, or promotion. Historical lineage remains available for audit.
+- Re-acceptance after withdrawal creates a new permission record for future use only. It never automatically unquarantines prior Dataset Versions or model artifacts.
+- Every Dataset Item derived from the bundle retains the permission and bundle references.
+- A contributor may withdraw their own permission without becoming a Workspace owner or Dataset Curator.
+- The contributor can withdraw permission through their own registered HiveSight identity.
+- Withdrawal applies to the complete Contribution Bundle in the first release.
+- Withdrawal or a contributor deletion request immediately revokes access to every unfinished task in the bundle. HiveSight retains only the minimal audit record needed to explain the request and affected lineage.
+- A Dataset Item is eligible for future model use only while the Workspace Data Use Agreement and every applicable Contributor Contribution Permission are active.
+- Withdrawal follows ADR 0008 for every Dataset Item and derived artifact that depends on the permission.
 
 ### Review Decision
 
@@ -748,18 +981,19 @@ Rules:
 - Version one requires the workspace owner to accept the agreement before upload and analysis features can be used.
 - If the agreement is withdrawn or not accepted, new upload and analysis are disabled.
 - Existing inspection history may remain viewable unless a deletion process applies.
-- Withdrawal stops future model-improvement use from the point of withdrawal, subject to the data-use terms.
-- The treatment of previously uploaded photos, existing dataset versions, and already-trained model artifacts is an explicit policy/legal gap.
+- Contribution Withdrawal stops future reliance on affected training evidence, including its use through affected Dataset Versions, Model Candidates, and Model Versions. Historical lineage is retained for audit; source-image and annotation erasure follows the applicable deletion process.
 
 ### Data Deletion Request
 
-A request to delete or purge workspace-held data.
+A tracked request to delete or purge workspace-held data or a contributor's own Contribution Bundle. A contributor's request automatically triggers Contribution Withdrawal, which immediately stops future model use.
 
 Essential fields:
 
 - id
 - workspace id
 - requester id
+- request scope
+- optional contribution bundle id
 - status
 - requested at
 - completed at
@@ -776,8 +1010,12 @@ Statuses:
 Rules:
 
 - The operational workflow is deferred.
+- A contributor may request deletion only for their own Contribution Bundle through their registered HiveSight identity.
+- Starting a contributor deletion request automatically withdraws the bundle's Contributor Contribution Permission before erasure processing begins.
+- A contributor's deletion request does not grant permission to delete another contributor's data or the wider workspace.
+- A request records source-image, annotation, derived-artifact, and retention-handling outcomes separately from Contribution Withdrawal.
 - Uploaded photos and metadata should be treated as potentially personally identifiable or sensitive.
-- The project must decide how deletion interacts with existing dataset versions and already-trained model artifacts before production use.
+- The exact contents and retention period of the minimal audit record, deletion/purge timing, legal-retention exceptions, and material-terms-change classification remain to be decided before production use; PARK-0011 tracks this policy work.
 
 ### Dataset Item
 
@@ -795,7 +1033,12 @@ Essential fields:
 - dataset role
 - optional curriculum stage
 - provenance
+- dataset selection method
 - permission status
+- contributor contribution permission and bundle references
+- source rights record snapshot
+- permitted use scope snapshot
+- eligibility-impact reason
 - source group key
 - hive configuration snapshot
 - hive configuration resolution
@@ -817,14 +1060,18 @@ Rules:
 - A Dataset Item requires reviewed annotation evidence.
 - Dataset Items are immutable after assignment.
 - Later corrections use supersession or withdrawal rather than in-place mutation.
-- Initial statuses are `active`, `superseded`, and `withdrawn`.
+- Initial statuses are `active`, `superseded`, `withdrawn`, and `rights_invalidated`.
 - Benchmark Dataset Items must not be used for training or routine tuning.
+- Benchmark Dataset Items are selected from a predeclared sampling plan and frozen before an evaluated Model Candidate is run. They must not be added because of that candidate's results.
 - Benchmark Dataset Items require a `source_group_key`.
 - Dataset Role assignment must hard-block benchmark leakage conflicts for the same Source Image or same `source_group_key` across benchmark versus training/validation.
 - Training and validation may share a `source_group_key` in Slice 0014, but exports or reports must flag that as a leakage warning.
 - Duplicate or near-duplicate frame photos must be handled before serious benchmark claims.
-- Dataset Items snapshot Workspace Data Use Agreement eligibility at assignment time.
-- Consent withdrawal does not automatically remove Dataset Items from future training/export in Slice 0014; withdrawal and deletion enforcement remain explicit policy gaps.
+- Dataset Items snapshot the approved Source Rights Record, Workspace Data Use Agreement eligibility where applicable, and every applicable Contributor Contribution Permission at assignment time.
+- A Dataset Item may be used only for a scope allowed by its Source Rights Record and every applicable Contributor Contribution Permission.
+- Varroa Dataset Items record Dataset Selection Method as `human_selected` or `upstream_model_selected`. `human_selected` requires selection before upstream model suggestions are seen; any model-influenced selection is `upstream_model_selected`. Benchmark Evaluations report the distribution.
+- Contribution Withdrawal transitions affected Dataset Items to `withdrawn` and excludes them from all future exports, Dataset Versions, Training Runs, Benchmark Evaluations, and promotion.
+- Source Rights Invalidation transitions affected Dataset Items to `rights_invalidated` and applies the same exclusion to future exports, Dataset Versions, Training Runs, Benchmark Evaluations, and promotion.
 - Model-specific training files are derived artifacts, not the canonical Dataset Item evidence.
 
 ### Dataset Version
@@ -852,6 +1099,10 @@ Essential fields:
 - annotation source counts
 - review method counts
 - warning summary
+- rights-impact summary
+- required attribution summary
+- permitted use scope summary
+- audit dispositions
 - created by user id
 - created at
 
@@ -859,16 +1110,20 @@ Statuses:
 
 - `active`
 - `obsolete`
+- `quarantined`
 
 Rules:
 
 - A Dataset Version is explicit and durable.
 - A Dataset Version freezes the evidence and explanatory metadata used at creation time.
+- A benchmark Dataset Version or selection snapshot freezes the predeclared sampling plan, selection methods, strata, and included items before the evaluated Model Candidate is run.
 - Only active, reviewed Dataset Items may be included.
 - Candidate Annotations that have not been reviewed are excluded from Dataset Versions.
 - Dataset Versions used by Training Runs are immutable. Changed evidence or changed selection criteria require a new Dataset Version.
 - Benchmark Dataset Items may be recorded as protected metadata, but must not be exported into trainer-facing training or validation data.
 - A Dataset Version may be marked obsolete as metadata, but its frozen manifest must not be changed.
+- A Dataset Version reports the intersection of its included Dataset Items' Permitted Use Scopes and identifies incompatible or excluded evidence.
+- A Contribution Withdrawal or Source Rights Invalidation affecting any included Dataset Item transitions the Dataset Version to `quarantined`; its immutable manifest remains available only for audit and it cannot support a new Training Run, Benchmark Evaluation, or promotion.
 - Model-specific export packages are physical artifacts derived from a Dataset Version, not the Dataset Version itself.
 
 ### Training Run
@@ -900,17 +1155,21 @@ Essential fields:
 - failure message
 - outcome summary
 - optional retry-of training run id
+- rights-impact summary
+- required attribution summary
 
 Rules:
 
 - Training Runs must not use benchmark Dataset Items.
 - Training Runs should be repeatable enough to compare candidates.
-- The first bee detector baseline is expected to use YOLO OBB as a model-specific export from reviewed oriented bee ellipses.
+- The first Bee Localisation baseline is expected to use YOLO OBB as a model-specific export from reviewed oriented bee ellipses.
+- YOLO OBB body-axis geometry is not Bee Orientation evidence; a future Bee Orientation Model must establish directed centre-to-head orientation independently.
 - Slice 0015 Training Runs create non-user-facing Model Candidates only.
 - Failed Training Runs do not create Model Candidates.
 - Training Runs are immutable once terminal except for derived artifact availability.
 - One queued/running local Training Run may exist at a time in Slice 0015.
 - Real YOLO training should not run against the disposable test database by default.
+- A terminal Training Run remains immutable after Contribution Withdrawal or Source Rights Invalidation, but its rights-impact summary identifies the affected evidence and its resulting model artifact cannot be used for new analysis or promotion.
 
 ### Model Candidate
 
@@ -929,6 +1188,7 @@ Essential fields:
 - artifact reference
 - status
 - promotion status
+- scope-compatibility report
 - not user-facing reason
 - created at
 
@@ -937,6 +1197,7 @@ Statuses:
 - `created`
 - `failed`
 - `withdrawn`
+- `quarantined`
 
 Promotion statuses:
 
@@ -947,10 +1208,14 @@ Promotion statuses:
 
 Rules:
 
-- A Model Candidate becomes user-facing only after Benchmark Evaluation and human approval.
-- The Slice 0015 Bee Detector baseline creates Model Candidates with `promotion_status=not_evaluated`.
+- A Model Candidate has one Model Purpose: Bee Localisation, Bee Orientation, or Varroa Detection. The existing Slice 0015 persisted/API value `bee_detector` means Bee Localisation and remains in place until a deliberate contract-evolution slice changes it.
+- A Model Candidate becomes user-facing only after a Benchmark Evaluation for that Model Purpose and human approval of the relevant pipeline.
+- User-facing deployment, sharing/publication, and commercial release each hard-block unless every Dataset Item used to train the candidate permits the relevant scope. The scope-compatibility report identifies the supporting Dataset Versions and any excluded or incompatible evidence.
+- The Slice 0015 HiveSight Bee Detector baseline creates Bee Localisation Model Candidates with `promotion_status=not_evaluated`.
 - A Model Candidate is not a Model Version.
 - Fake-adapter Model Candidates must remain visibly fake/test-only and ineligible for real promotion.
+- A Model Candidate affected by Contribution Withdrawal must be marked `withdrawn` and cannot be promoted or used for new analysis. A replacement requires a new Training Run using a Dataset Version that excludes the withdrawn contribution.
+- A Model Candidate affected by Source Rights Invalidation must be marked `quarantined` and cannot be promoted or used for new analysis. A replacement requires a new Training Run using a Dataset Version that excludes the invalidated evidence.
 
 ### Model Version
 
@@ -963,6 +1228,7 @@ Essential fields:
 - version label
 - pipeline description
 - release status
+- scope-compatibility report reference
 - created at
 - approved at
 - retired at
@@ -972,6 +1238,7 @@ Release statuses:
 - `draft`
 - `benchmark_pending`
 - `approved_for_user_facing_analysis`
+- `quarantined`
 - `retired`
 - `rejected`
 
@@ -980,25 +1247,65 @@ Relationships:
 - produces many analysis results
 - has many benchmark evaluations
 
+Rules:
+
+- A Model Version affected by Contribution Withdrawal or Source Rights Invalidation transitions to `quarantined` and cannot be selected for new analysis. It may be replaced only by a Model Candidate trained and evaluated without the affected evidence.
+- A Model Version retains the approved scope-compatibility report for every deployment, sharing/publication, or commercial release action.
+
 ### Benchmark Evaluation
 
-A documented evaluation of one model version against one protected benchmark dataset version.
+A documented evaluation of one Model Candidate, for one Model Purpose, against one protected benchmark dataset version or selection snapshot.
 
 Essential fields:
 
 - id
-- model version id
+- model candidate id
+- model purpose
 - dataset version id
 - status
-- bee detection metrics summary
-- Varroa detection metrics summary
+- model-purpose metrics summary
 - quality-bucket metrics summary
+- review agreement metrics summary
 - reviewer decision id
 - evaluated at
 
 Rules:
 
-- A user-facing model version requires documented benchmark evaluation and human approval.
+- A user-facing pipeline requires documented benchmark evaluation for each constituent Model Purpose and human approval.
+- A user-facing Varroa Assessment pipeline additionally requires its benchmark Varroa Review Outcomes to satisfy Blind Independent Review and Third-Party Adjudication of disagreements.
+- A Varroa Benchmark Evaluation reports outcome agreement, one-to-one matched marker-location agreement in bee-relative coordinates, unmatched-marker counts, adjudication and unresolved-disagreement counts, and the number of benchmark items without independent second review.
+- When a candidate relies on a Dataset Version with a quality-audit warning, its promotion record includes the Model Approver's explicit acknowledgement of the associated Audit Disposition.
+- Fixed numeric promotion thresholds are deferred until baseline data exists.
+
+### End-to-End Pipeline Evaluation
+
+A documented evaluation of the composed Bee Localisation, Bee Orientation, and Varroa Detection pipeline against a separate protected full-frame selection snapshot with complete human-reviewed bee, Orientation Reliability, and relevant Varroa evidence.
+
+Essential fields:
+
+- id
+- selected Model Candidate ids by Model Purpose
+- protected full-frame benchmark dataset version or selection snapshot
+- protected full-frame source group keys
+- status
+- end-to-end metrics summary
+- stage coverage and failure summary
+- reviewer decision id
+- evaluated at
+
+Rules:
+
+- It complements rather than replaces constituent Model Purpose Benchmark Evaluations.
+- A user-facing Varroa Assessment pipeline requires a documented End-to-End Pipeline Evaluation and human approval.
+- Its predeclared full-frame selection plan and source groups are frozen before candidate selection or tuning.
+- Its full-frame `source_group_key` values are disjoint from training, validation, and constituent Model Purpose benchmark evidence.
+- Its full-frame evidence includes all visible Bee Annotations, their Orientation Reliability, and the relevant Varroa Review Outcomes, rather than only bees which reached the model's final stage.
+- It reports localised-bee to Varroa-Assessment coverage, the count and proportion recorded as `not_assessed_orientation_unreliable`, and counts and proportions lost at each stage.
+- It reports those measures separately for complete and partial visible bees; the initial user-facing Varroa estimate continues to use complete visible bees only.
+- A user-facing Varroa estimate displays a coverage warning whenever any complete visible bee was not assessed for Varroa.
+- Once an evidence-based coverage threshold is established, coverage below it suppresses the user-facing headline estimate.
+- An inadequate-coverage result provides a route to review or correct the inspection. The reviewer may resolve previously unassessed complete visible bees and correct any model-produced bee, orientation, or Varroa decision. The original model-only result remains immutable; the recovery workflow calculates and shows a separate human-reviewed inspection result alongside it with explicit provenance. The human-reviewed result carries its own coverage and remains suppressed when an evidence-based coverage threshold is still not met. Resulting evidence is product feedback only until a Dataset Curator independently reviews it and assigns a Dataset Role. It is never automatic training evidence.
+- It breaks coverage and errors down by Hive Configuration, bee-density, lighting, and image-quality strata, with sparse-group warnings.
 - Fixed numeric promotion thresholds are deferred until baseline data exists.
 
 ## Relationship Summary
@@ -1023,6 +1330,8 @@ Rules:
 - Varroa annotation may reference one bee annotation.
 - User correction belongs to one inspection photo and may reference one annotation.
 - Workspace data-use agreement belongs to one workspace and is accepted by an owner user in version one.
+- Source Rights Record is referenced by one or more Source Images.
+- Contributor Contribution Permission belongs to one contributor user and one named immutable Contribution Bundle in one workspace.
 - Data deletion request belongs to one workspace.
 - Review decision applies to one review subject.
 - Dataset item references reviewed image and annotation evidence.
@@ -1079,6 +1388,13 @@ Rules:
 - `accepted`
 - `withdrawn`
 
+### Contributor Contribution Permission
+
+- `not_accepted`
+- `offered`
+- `accepted`
+- `withdrawn`
+
 ### Workspace Membership
 
 - `active`
@@ -1123,7 +1439,7 @@ Rules:
 - Every user correction belongs to exactly one inspection photo.
 - Every user correction records the user who created it once authentication exists.
 - A user correction is never ground truth without review.
-- A user correction is never training, validation, or benchmark data without an active workspace data-use agreement and review.
+- A user correction is never training, validation, or benchmark data without an active Workspace Data Use Agreement, any applicable Contributor Contribution Permission, and review.
 - A Candidate Annotation is never ground truth without human review.
 - A Reviewed Annotation is never training, validation, or benchmark data without Dataset Role assignment.
 - A reviewed bee annotation uses an oriented bee ellipse as its canonical geometry.
@@ -1134,8 +1450,15 @@ Rules:
 - A Dataset Version freezes the metadata needed to explain a Training Run.
 - A Dataset Version referenced by a Training Run is immutable.
 - A Training Run creates a Model Candidate, not an approved Model Version.
-- Bee Detector and Varroa Detector are separate model purposes.
-- The Bee Detector does not assess Varroa infestation.
+- Bee Localisation, Bee Orientation, and Varroa Detection are separate Model Purposes.
+- Bee Localisation does not establish biological head direction or assess Varroa evidence.
+- Bee Orientation does not localise all bees or assess Varroa evidence.
+- Varroa Detection consumes traceable bee-localisation and orientation evidence, with an explicit uncertainty/fallback outcome when orientation is not reliable.
+- A positive Varroa Detection includes explicit mite location; bee-level presence/absence alone is insufficient for the first Varroa capability.
+- In the first live Varroa pipeline, a localised bee with unreliable orientation is recorded as `not_assessed_orientation_unreliable`; it is not a negative Varroa result and the detector does not run on a guessed rotation.
+- The first head-normalized Varroa training and benchmark corpora exclude bees with unreliable orientation; those bees remain eligible for Bee Localisation evidence and supplementary Varroa evidence.
+- The first Varroa training and benchmark datasets include human-selected bee crops independent of upstream model output; they must not be assembled solely from localised/oriented model proposals.
+- The first Bee Orientation training and benchmark corpora include only reliably oriented complete visible bees; reliably oriented partial bees are retained for later separately reported evaluation.
 - Workspace ownership does not grant internal dataset/model governance capability.
 - A user must be registered, logged in, and authorized through an active workspace membership before uploading inspection photos.
 - A workspace without an accepted workspace data-use agreement must not upload new photos or receive new analysis.
@@ -1192,7 +1515,7 @@ Deferred privacy decisions:
 - exact wording and versioning of workspace data-use terms
 - whether withdrawal affects only future model-improvement use or also previously uploaded photos
 - whether and how users can purge workspace-held data
-- whether already-trained model artifacts can or must be affected by later withdrawal or deletion requests
+- exact deletion/purge timing and any legal-retention exception for withdrawn source assets and model artifacts
 - what regulatory obligations apply to inspection photos and metadata
 
 ## Traceability
@@ -1206,19 +1529,19 @@ Deferred privacy decisions:
 - `Training Crop` supports the bee annotation repository and curriculum training baseline.
 - `Frame Label` supports FR-005.
 - `Bee Annotation` and `Analysis Result` support FR-006 and MR-001.
-- Oriented bee ellipse geometry supports MR-008, MR-008A, and ADR-0002.
+- Oriented bee ellipse geometry supports MR-008, MR-008A, MR-001A, ADR-0002, and ADR-0006.
 - `Varroa Annotation` and `Analysis Result` support FR-007 and MR-002.
 - `Inspection Summary` supports FR-008.
 - `Tagged Photo` rendering supports FR-009, FR-010, and FR-011.
 - `User Correction` and `Review Decision` support FR-012 and MR-013 to MR-014.
-- `Workspace Data Use Agreement` supports FR-016, FR-019, and MR-019 to MR-023 as revised by the domain decision.
+- `Workspace Data Use Agreement` and `Contributor Contribution Permission` support FR-016, FR-019, MR-017H, and MR-019 to MR-023 as revised by the domain decision.
 - `Data Deletion Request` captures the deferred deletion/privacy gap.
 - Upload status supports FR-018 and NFR-006.
 - `Model Version` supports MR-028.
 - `Dataset Item` supports MR-017, MR-017A, and the AI-assisted annotation baseline.
 - `Candidate Annotation` supports AI-assisted annotation while preserving human review as the trust boundary.
 - `Dataset Version` supports MR-017, MR-017F, MR-029, and Slice 0015 Training Run governance.
-- `Training Run` and `Model Candidate` support MR-029A, MR-029B, and the AI-assisted annotation baseline.
+- `Training Run` and `Model Candidate` support MR-029A, MR-029B, the three Model Purposes, and the AI-assisted annotation baseline.
 - `Benchmark Evaluation` supports MR-030 and MR-031.
 
 ## Open Architecture Questions
@@ -1230,7 +1553,7 @@ Deferred privacy decisions:
 - Where should original inspection photos be stored?
 - What initial image formats and upload size limits should be configured?
 - What should the workspace data-use agreement say, and how should accepted terms versions be tracked?
-- How should workspace data-use withdrawal affect previously uploaded photos, existing dataset versions, and already-trained model artifacts?
+- What exact deletion/purge timing and legal-retention exceptions apply to withdrawn source assets and model artifacts?
 - What data deletion or purge workflow is required before production use?
 - Are uploaded photos and inspection metadata legally or operationally personally identifiable or sensitive in the target markets?
 - Should frame labels affect v1 aggregation, or only provide warning context?

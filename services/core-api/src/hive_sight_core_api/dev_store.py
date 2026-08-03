@@ -40,6 +40,7 @@ from hive_sight_core_api.models import (
     InspectionPhotoResponse,
     InspectionResponse,
     ArtifactResponse,
+    BenchmarkEvaluationResponse,
     ModelCandidateResponse,
     OrientedBeeEllipseCreateRequest,
     OrientedBeeEllipseResponse,
@@ -182,6 +183,7 @@ class InMemoryProductDataStore:
     dataset_items: dict[UUID, DatasetItemResponse] = field(default_factory=dict)
     dataset_versions: dict[UUID, DatasetVersionResponse] = field(default_factory=dict)
     training_runs: dict[UUID, TrainingRunResponse] = field(default_factory=dict)
+    benchmark_evaluations: dict[UUID, BenchmarkEvaluationResponse] = field(default_factory=dict)
     model_candidates: dict[UUID, ModelCandidateResponse] = field(default_factory=dict)
     artifacts: dict[UUID, ArtifactResponse] = field(default_factory=dict)
     training_crops: dict[UUID, TrainingCropResponse] = field(default_factory=dict)
@@ -1222,8 +1224,109 @@ class InMemoryProductDataStore:
                 return run
         return None
 
+    def save_benchmark_evaluation(
+        self,
+        evaluation: BenchmarkEvaluationResponse,
+    ) -> BenchmarkEvaluationResponse:
+        self.benchmark_evaluations[evaluation.benchmark_evaluation_id] = evaluation
+        return evaluation
+
+    def get_benchmark_evaluation(
+        self,
+        workspace_id: UUID,
+        benchmark_evaluation_id: UUID,
+    ) -> BenchmarkEvaluationResponse | None:
+        evaluation = self.benchmark_evaluations.get(benchmark_evaluation_id)
+        if evaluation is None or evaluation.workspace_id != workspace_id:
+            return None
+        return evaluation
+
+    def list_benchmark_evaluations(
+        self,
+        workspace_id: UUID,
+    ) -> list[BenchmarkEvaluationResponse]:
+        evaluations = [
+            evaluation
+            for evaluation in self.benchmark_evaluations.values()
+            if evaluation.workspace_id == workspace_id
+        ]
+        evaluations.sort(key=lambda evaluation: evaluation.created_at, reverse=True)
+        return evaluations
+
+    def active_benchmark_evaluation(
+        self,
+        workspace_id: UUID,
+    ) -> BenchmarkEvaluationResponse | None:
+        for evaluation in self.benchmark_evaluations.values():
+            if (
+                evaluation.workspace_id == workspace_id
+                and evaluation.status in {"queued", "running", "cancelling"}
+            ):
+                return evaluation
+        return None
+
     def delete_training_run(self, training_run_id: UUID) -> None:
         self.training_runs.pop(training_run_id, None)
+
+    def remove_dataset_and_model_evidence_for_workspace(
+        self,
+        workspace_id: UUID,
+    ) -> dict[str, int]:
+        dataset_item_ids = [
+            dataset_item_id
+            for dataset_item_id, dataset_item in self.dataset_items.items()
+            if dataset_item.workspace_id == workspace_id
+        ]
+        dataset_version_ids = [
+            dataset_version_id
+            for dataset_version_id, dataset_version in self.dataset_versions.items()
+            if dataset_version.workspace_id == workspace_id
+        ]
+        training_run_ids = [
+            training_run_id
+            for training_run_id, training_run in self.training_runs.items()
+            if training_run.workspace_id == workspace_id
+        ]
+        model_candidate_ids = [
+            model_candidate_id
+            for model_candidate_id, model_candidate in self.model_candidates.items()
+            if model_candidate.workspace_id == workspace_id
+        ]
+        benchmark_evaluation_ids = [
+            benchmark_evaluation_id
+            for benchmark_evaluation_id, benchmark_evaluation in self.benchmark_evaluations.items()
+            if benchmark_evaluation.workspace_id == workspace_id
+        ]
+        artifact_owner_ids = set(dataset_version_ids) | set(training_run_ids) | set(
+            benchmark_evaluation_ids
+        )
+        artifact_ids = [
+            artifact_id
+            for artifact_id, artifact in self.artifacts.items()
+            if artifact.owner_id in artifact_owner_ids
+        ]
+
+        for dataset_item_id in dataset_item_ids:
+            self.dataset_items.pop(dataset_item_id, None)
+        for dataset_version_id in dataset_version_ids:
+            self.dataset_versions.pop(dataset_version_id, None)
+        for training_run_id in training_run_ids:
+            self.training_runs.pop(training_run_id, None)
+        for model_candidate_id in model_candidate_ids:
+            self.model_candidates.pop(model_candidate_id, None)
+        for benchmark_evaluation_id in benchmark_evaluation_ids:
+            self.benchmark_evaluations.pop(benchmark_evaluation_id, None)
+        for artifact_id in artifact_ids:
+            self.artifacts.pop(artifact_id, None)
+
+        return {
+            "dataset_items_removed": len(dataset_item_ids),
+            "dataset_versions_removed": len(dataset_version_ids),
+            "training_runs_removed": len(training_run_ids),
+            "model_candidates_removed": len(model_candidate_ids),
+            "benchmark_evaluations_removed": len(benchmark_evaluation_ids),
+            "artifacts_removed": len(artifact_ids),
+        }
 
     def save_model_candidate(
         self,

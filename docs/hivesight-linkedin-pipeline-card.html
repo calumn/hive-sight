@@ -1,0 +1,618 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Hive-Sight model pipeline overview</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #172033;
+        --muted: #506078;
+        --line: #cbd7e6;
+        --blue: #1d5fa7;
+        --blue-soft: #e9f2ff;
+        --green: #267a55;
+        --green-soft: #e8f7ef;
+        --amber: #bf6b11;
+        --amber-soft: #fff2df;
+        --purple: #7650b8;
+        --purple-soft: #f2ecff;
+        --red: #b42318;
+        --red-soft: #fff0ef;
+        --paper: #fbfcff;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: #dfe7f0;
+        color: var(--ink);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", sans-serif;
+        letter-spacing: 0;
+      }
+
+      .frame {
+        width: 1200px;
+        height: 675px;
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(247, 250, 255, 0.94)),
+          radial-gradient(circle at 12% 0%, rgba(255, 199, 87, 0.18), transparent 34%),
+          radial-gradient(circle at 88% 12%, rgba(29, 95, 167, 0.12), transparent 35%);
+        padding: 28px 32px;
+        overflow: hidden;
+      }
+
+      .header {
+        display: grid;
+        grid-template-columns: 1fr 360px;
+        gap: 28px;
+        align-items: start;
+        margin-bottom: 20px;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+      }
+
+      .mark {
+        width: 62px;
+        height: 62px;
+        border: 3px solid #102a43;
+        border-radius: 18px;
+        display: grid;
+        place-items: center;
+        background: #fff;
+        position: relative;
+        box-shadow: 0 10px 24px rgba(23, 32, 51, 0.08);
+      }
+
+      .bee {
+        width: 25px;
+        height: 40px;
+        border-radius: 999px;
+        border: 3px solid #172033;
+        background:
+          linear-gradient(#ffce4a 0 18%, #172033 18% 29%, #ffce4a 29% 47%, #172033 47% 58%, #ffce4a 58% 100%);
+        position: relative;
+      }
+
+      .bee::before,
+      .bee::after {
+        content: "";
+        width: 22px;
+        height: 14px;
+        border: 2px solid rgba(23, 32, 51, 0.72);
+        border-radius: 50%;
+        position: absolute;
+        top: 7px;
+        background: rgba(255, 255, 255, 0.72);
+      }
+
+      .bee::before {
+        left: -19px;
+        transform: rotate(-24deg);
+      }
+
+      .bee::after {
+        right: -19px;
+        transform: rotate(24deg);
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 42px;
+        line-height: 1;
+        font-weight: 820;
+      }
+
+      .subtitle {
+        margin: 7px 0 0;
+        font-size: 18px;
+        color: var(--muted);
+        font-weight: 650;
+      }
+
+      .thesis {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 14px 16px;
+        background: rgba(255, 255, 255, 0.78);
+        box-shadow: 0 10px 28px rgba(23, 32, 51, 0.07);
+      }
+
+      .thesis h2 {
+        margin: 0 0 6px;
+        font-size: 18px;
+        line-height: 1.1;
+      }
+
+      .thesis p {
+        margin: 0;
+        font-size: 13px;
+        line-height: 1.35;
+        color: var(--muted);
+      }
+
+      .pipeline {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+
+      .stage {
+        min-height: 235px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.84);
+        padding: 14px 13px;
+        position: relative;
+        box-shadow: 0 8px 20px rgba(23, 32, 51, 0.06);
+      }
+
+      .stage::after {
+        content: "";
+        position: absolute;
+        right: -15px;
+        top: 105px;
+        border-top: 10px solid transparent;
+        border-bottom: 10px solid transparent;
+        border-left: 12px solid #8798af;
+      }
+
+      .stage:last-child::after {
+        display: none;
+      }
+
+      .stage.input {
+        border-color: #a8c8ef;
+        background: var(--blue-soft);
+      }
+
+      .stage.curate {
+        border-color: #a7d8bf;
+        background: var(--green-soft);
+      }
+
+      .stage.model {
+        border-color: #f0c58d;
+        background: var(--amber-soft);
+      }
+
+      .stage.future {
+        border-color: #c8b7ef;
+        background: var(--purple-soft);
+      }
+
+      .stage.infer {
+        border-color: #d8c586;
+        background: #fff9e6;
+      }
+
+      .stage-label {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        margin-bottom: 12px;
+      }
+
+      .number {
+        width: 29px;
+        height: 29px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        background: #172033;
+        color: white;
+        font-weight: 800;
+        font-size: 15px;
+      }
+
+      .stage h3 {
+        margin: 0;
+        font-size: 15px;
+        line-height: 1.12;
+        font-weight: 800;
+      }
+
+      .stage .role {
+        margin: 0;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--muted);
+        font-weight: 800;
+      }
+
+      .visual {
+        height: 88px;
+        border-radius: 9px;
+        background: rgba(255, 255, 255, 0.86);
+        border: 1px solid rgba(82, 96, 109, 0.18);
+        margin: 12px 0;
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+      }
+
+      .comb {
+        width: 150px;
+        height: 64px;
+        background:
+          linear-gradient(30deg, transparent 24%, rgba(121, 73, 20, 0.45) 25% 27%, transparent 28%),
+          linear-gradient(150deg, transparent 24%, rgba(121, 73, 20, 0.45) 25% 27%, transparent 28%),
+          linear-gradient(90deg, rgba(246, 172, 47, 0.45), rgba(111, 65, 18, 0.35));
+        background-size: 18px 18px, 18px 18px, auto;
+        border: 3px solid #51351a;
+        border-radius: 6px;
+        position: relative;
+      }
+
+      .comb span {
+        position: absolute;
+        width: 18px;
+        height: 10px;
+        border: 2px solid #1d5fa7;
+        border-radius: 999px;
+        transform: rotate(var(--r));
+        left: var(--x);
+        top: var(--y);
+        background: rgba(255, 255, 255, 0.4);
+      }
+
+      .mini-steps {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 7px;
+        width: 152px;
+      }
+
+      .mini {
+        height: 60px;
+        border-radius: 8px;
+        border: 1px solid rgba(23, 32, 51, 0.14);
+        background: white;
+        display: grid;
+        place-items: center;
+        position: relative;
+      }
+
+      .ellipse {
+        width: 31px;
+        height: 17px;
+        border: 2px solid #1d5fa7;
+        border-radius: 999px;
+        transform: rotate(var(--r));
+        background: linear-gradient(90deg, rgba(255, 204, 64, 0.76) 0 38%, transparent 38%);
+      }
+
+      .crop-grid {
+        width: 138px;
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 5px;
+      }
+
+      .crop-cell {
+        height: 32px;
+        border-radius: 5px;
+        background:
+          radial-gradient(circle at 60% 45%, #2b1d10 0 8%, transparent 9%),
+          linear-gradient(120deg, #f4b549, #6f471c);
+        border: 1px solid rgba(23, 32, 51, 0.16);
+        position: relative;
+      }
+
+      .mite {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #8b1e16;
+        position: absolute;
+        right: 7px;
+        top: 7px;
+        box-shadow: 0 0 0 2px rgba(139, 30, 22, 0.2);
+      }
+
+      .bars {
+        width: 140px;
+        display: grid;
+        gap: 8px;
+      }
+
+      .bar {
+        height: 16px;
+        border-radius: 999px;
+        background: #ecf0f5;
+        overflow: hidden;
+      }
+
+      .bar span {
+        display: block;
+        height: 100%;
+        border-radius: 999px;
+        background: linear-gradient(90deg, #bf6b11, #ffc14d);
+        width: var(--w);
+      }
+
+      .stage ul {
+        margin: 0;
+        padding-left: 17px;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.32;
+      }
+
+      .lower {
+        display: grid;
+        grid-template-columns: 2fr 1.05fr;
+        gap: 14px;
+      }
+
+      .panel {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.84);
+        padding: 14px 16px;
+        box-shadow: 0 8px 20px rgba(23, 32, 51, 0.05);
+      }
+
+      .panel h3 {
+        margin: 0 0 10px;
+        font-size: 15px;
+      }
+
+      .capabilities {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+      }
+
+      .cap {
+        border-radius: 9px;
+        background: #f8fafc;
+        border: 1px solid #d8e1ec;
+        padding: 10px;
+        min-height: 84px;
+      }
+
+      .cap b {
+        display: block;
+        font-size: 12px;
+        margin-bottom: 5px;
+      }
+
+      .cap p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.28;
+      }
+
+      .right-list {
+        display: grid;
+        gap: 8px;
+      }
+
+      .takeaway {
+        display: grid;
+        grid-template-columns: 28px 1fr;
+        gap: 8px;
+        align-items: start;
+        font-size: 12px;
+        line-height: 1.28;
+        color: var(--muted);
+      }
+
+      .tick {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        background: #e8f7ef;
+        border: 1px solid #9ad1b4;
+        color: var(--green);
+        display: grid;
+        place-items: center;
+        font-weight: 900;
+      }
+
+      .footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 12px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .url {
+        color: #1d5fa7;
+        font-weight: 750;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="frame" aria-label="Hive-Sight model pipeline overview">
+      <section class="header">
+        <div class="brand">
+          <div class="mark" aria-hidden="true"><div class="bee"></div></div>
+          <div>
+            <h1>Hive-Sight</h1>
+            <p class="subtitle">The interesting part of an AI system often is not just the AI.</p>
+          </div>
+        </div>
+        <aside class="thesis">
+          <h2>From photo evidence to useful judgement</h2>
+          <p>
+            Varroa estimation needs detection, uncertainty, evidence governance,
+            and statistical inference. A photograph is a sample, not a census.
+          </p>
+        </aside>
+      </section>
+
+      <section class="pipeline" aria-label="Pipeline stages">
+        <article class="stage input">
+          <div class="stage-label">
+            <div class="number">1</div>
+            <div>
+              <p class="role">Evidence</p>
+              <h3>Frame photos</h3>
+            </div>
+          </div>
+          <div class="visual">
+            <div class="comb">
+              <span style="--x: 20px; --y: 19px; --r: 18deg"></span>
+              <span style="--x: 70px; --y: 10px; --r: -34deg"></span>
+              <span style="--x: 103px; --y: 38px; --r: 42deg"></span>
+              <span style="--x: 45px; --y: 42px; --r: -6deg"></span>
+            </div>
+          </div>
+          <ul>
+            <li>Hive and frame context</li>
+            <li>Source rights and consent</li>
+            <li>Image quality signals</li>
+          </ul>
+        </article>
+
+        <article class="stage curate">
+          <div class="stage-label">
+            <div class="number">2</div>
+            <div>
+              <p class="role">Ground truth</p>
+              <h3>Human-reviewed data</h3>
+            </div>
+          </div>
+          <div class="visual">
+            <div class="mini-steps">
+              <div class="mini"><div class="ellipse" style="--r: 25deg"></div></div>
+              <div class="mini"><div class="ellipse" style="--r: -42deg"></div></div>
+              <div class="mini"><div class="ellipse" style="--r: 84deg"></div></div>
+            </div>
+          </div>
+          <ul>
+            <li>Directed bee ellipses</li>
+            <li>Complete and partial bees</li>
+            <li>Dataset roles and versions</li>
+          </ul>
+        </article>
+
+        <article class="stage model">
+          <div class="stage-label">
+            <div class="number">3</div>
+            <div>
+              <p class="role">Vision models</p>
+              <h3>Detect, orient, detect</h3>
+            </div>
+          </div>
+          <div class="visual">
+            <div class="crop-grid">
+              <div class="crop-cell"></div>
+              <div class="crop-cell"><span class="mite"></span></div>
+              <div class="crop-cell"></div>
+              <div class="crop-cell"></div>
+              <div class="crop-cell"></div>
+              <div class="crop-cell"></div>
+              <div class="crop-cell"><span class="mite"></span></div>
+              <div class="crop-cell"></div>
+            </div>
+          </div>
+          <ul>
+            <li>Bee localisation</li>
+            <li>Head orientation</li>
+            <li>Varroa detection</li>
+          </ul>
+        </article>
+
+        <article class="stage future">
+          <div class="stage-label">
+            <div class="number">4</div>
+            <div>
+              <p class="role">Evaluation</p>
+              <h3>Benchmarks and uncertainty</h3>
+            </div>
+          </div>
+          <div class="visual">
+            <div class="bars">
+              <div class="bar"><span style="--w: 72%"></span></div>
+              <div class="bar"><span style="--w: 48%"></span></div>
+              <div class="bar"><span style="--w: 61%"></span></div>
+            </div>
+          </div>
+          <ul>
+            <li>Precision and recall</li>
+            <li>Coverage warnings</li>
+            <li>End-to-end evaluation</li>
+          </ul>
+        </article>
+
+        <article class="stage infer">
+          <div class="stage-label">
+            <div class="number">5</div>
+            <div>
+              <p class="role">Inference</p>
+              <h3>Actionable result</h3>
+            </div>
+          </div>
+          <div class="visual">
+            <svg width="145" height="74" viewBox="0 0 145 74" role="img" aria-label="uncertainty distribution">
+              <line x1="10" y1="63" x2="135" y2="63" stroke="#8a98a8" stroke-width="1.5" />
+              <path d="M16 63 C34 62 37 28 55 25 C76 21 80 62 96 62 C110 62 112 49 130 47" fill="none" stroke="#bf6b11" stroke-width="4" stroke-linecap="round" />
+              <path d="M41 63 C45 41 50 25 58 25 C67 25 72 43 76 63 Z" fill="rgba(255,193,77,0.46)" />
+              <line x1="58" y1="16" x2="58" y2="66" stroke="#b42318" stroke-width="2" stroke-dasharray="4 4" />
+            </svg>
+          </div>
+          <ul>
+            <li>Sample, not census</li>
+            <li>Confidence intervals</li>
+            <li>Beekeeper decision support</li>
+          </ul>
+        </article>
+      </section>
+
+      <section class="lower">
+        <div class="panel">
+          <h3>What makes it trustworthy</h3>
+          <div class="capabilities">
+            <div class="cap">
+              <b>Data governance</b>
+              <p>Source rights, attribution, contribution permission, withdrawal, and quarantine.</p>
+            </div>
+            <div class="cap">
+              <b>Human review</b>
+              <p>Model suggestions become evidence only after reviewed annotation decisions.</p>
+            </div>
+            <div class="cap">
+              <b>Benchmarking</b>
+              <p>Protected benchmark sets measure each model purpose separately and end to end.</p>
+            </div>
+            <div class="cap">
+              <b>Statistical layer</b>
+              <p>Detection output is evidence for an estimate, not the estimate itself.</p>
+            </div>
+          </div>
+        </div>
+        <div class="panel">
+          <h3>Design stance</h3>
+          <div class="right-list">
+            <div class="takeaway"><span class="tick">✓</span><span>Separate bee localisation, orientation, and mite detection.</span></div>
+            <div class="takeaway"><span class="tick">✓</span><span>Report uncertainty and coverage, not just a tidy number.</span></div>
+            <div class="takeaway"><span class="tick">✓</span><span>Keep consent, provenance, and evaluation visible.</span></div>
+          </div>
+        </div>
+      </section>
+
+      <div class="footer">
+        <span>Open-source project: Hive-Sight</span>
+        <span class="url">github.com/calumn/hive-sight</span>
+      </div>
+    </main>
+  </body>
+</html>

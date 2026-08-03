@@ -139,20 +139,20 @@ These should be derived for rendering rather than persisted unless a later slice
 
 ## Acceptance Criteria
 
-- [ ] `CONTEXT.md`, model requirements, domain model, and ADRs define Oriented Bee Ellipse rotation as directed center-to-head orientation.
-- [ ] Training Crop editor visually distinguishes ellipse head and tail ends.
-- [ ] Dataset Curator can flip a selected ellipse's head/tail direction without changing its center, radii, annotation type, or provenance.
-- [ ] Flipped ellipse rotation is persisted and survives reload.
-- [ ] One-time dev-only cleanup removes stale Dataset Items, Dataset Versions, Training Runs, Model Candidates, and derived local artifacts while keeping photos, Training Crops, and ellipses.
-- [ ] Preserved crops can be re-reviewed, completed, and assigned to fresh Dataset Items after cleanup.
-- [ ] New Dataset Item snapshots include the directed `rotation_degrees` value.
-- [ ] Bee Annotation Repository detail previews render reviewed ellipse snapshots with visible head/tail direction.
-- [ ] Existing model-assisted Candidate Annotation acceptance still produces reviewed ellipses with human-review provenance and directed orientation.
-- [ ] Existing YOLO OBB export and training remain geometrically compatible.
-- [ ] User guide explains how to orient the ellipse head end toward the bee's head.
-- [ ] Browser acceptance covers creating or selecting an ellipse, flipping head/tail, reloading, and seeing the same direction.
-- [ ] `pnpm verify:slice` passes.
-- [ ] Live Postgres verification proves cleanup and preserved crop/ellipse review evidence behave correctly.
+- [x] `CONTEXT.md`, model requirements, domain model, and ADRs define Oriented Bee Ellipse rotation as directed center-to-head orientation.
+- [x] Training Crop editor visually distinguishes ellipse head and tail ends.
+- [x] Dataset Curator can flip a selected ellipse's head/tail direction without changing its center, radii, annotation type, or provenance.
+- [x] Flipped ellipse rotation is persisted and survives reload.
+- [x] One-time dev-only cleanup removes stale Dataset Items, Dataset Versions, Training Runs, Model Candidates, and derived local artifacts while keeping photos, Training Crops, and ellipses.
+- [x] Preserved crops can be re-reviewed, completed, and assigned to fresh Dataset Items after cleanup.
+- [x] New Dataset Item snapshots include the directed `rotation_degrees` value.
+- [x] Bee Annotation Repository detail previews render reviewed ellipse snapshots with visible head/tail direction.
+- [x] Existing model-assisted Candidate Annotation acceptance still produces reviewed ellipses with human-review provenance and directed orientation.
+- [x] Existing YOLO OBB export and training remain geometrically compatible.
+- [x] User guide explains how to orient the ellipse head end toward the bee's head.
+- [x] Browser acceptance covers creating or selecting an ellipse and flipping head/tail; API and live Postgres tests cover persisted/reloaded direction.
+- [x] `pnpm verify:slice` passes.
+- [x] Live Postgres verification proves cleanup and preserved crop/ellipse review evidence behave correctly.
 
 ## Open Questions
 

@@ -732,6 +732,81 @@ export type ModelCandidateList = {
   modelCandidates: ModelCandidate[];
 };
 
+export type BenchmarkEvaluationWarning = ModelTrainingWarning;
+
+export type BenchmarkEvaluationReadiness = {
+  workspaceId: string;
+  modelCandidateId: string;
+  modelCandidateHumanReadableId: string;
+  adapterType: "fake" | "ultralytics_yolo_obb";
+  trainingAdapterType: "fake" | "ultralytics_yolo_obb";
+  evaluationAdapterType: "fake" | "ultralytics_yolo_obb";
+  databasePurpose: string;
+  benchmarkItemCount: number;
+  eligibleToStartEvaluation: boolean;
+  activeModelJobId: string | null;
+  activeModelJobType: string | null;
+  warnings: BenchmarkEvaluationWarning[];
+};
+
+export type BenchmarkEvaluationItemResult = {
+  datasetItemId: string;
+  humanReadableId: string;
+  sourceGroupKey: string | null;
+  hiveConfigurationFrameStandardId: string | null;
+  curriculumStage: string | null;
+  groundTruthCount: number;
+  predictionCount: number;
+  matchedCount: number;
+  falsePositiveCount: number;
+  falseNegativeCount: number;
+};
+
+export type BenchmarkEvaluation = {
+  benchmarkEvaluationId: string;
+  workspaceId: string;
+  humanReadableId: string;
+  modelCandidateId: string;
+  modelCandidateHumanReadableId: string;
+  trainingRunId: string;
+  datasetVersionId: string;
+  status: "queued" | "running" | "cancelling" | "completed" | "failed" | "cancelled";
+  phase: string;
+  adapterType: "fake" | "ultralytics_yolo_obb";
+  trainingAdapterType: "fake" | "ultralytics_yolo_obb";
+  evaluationAdapterType: "fake" | "ultralytics_yolo_obb";
+  databasePurpose: string;
+  confidenceThreshold: number;
+  matchStrategy: string;
+  benchmarkScope: string;
+  startedAt: string | null;
+  completedAt: string | null;
+  lastHeartbeatAt: string | null;
+  lastActivityMessage: string | null;
+  progressPercent: number | null;
+  latestLogExcerpt: string | null;
+  cancelRequestedAt: string | null;
+  cancelRequestedByUserId: string | null;
+  cancelReason: string | null;
+  failureCode: string | null;
+  failureMessage: string | null;
+  isStale: boolean;
+  staleAfterSeconds: number | null;
+  warningAcknowledgement: Record<string, unknown> | null;
+  warnings: BenchmarkEvaluationWarning[];
+  metricsSummary: Record<string, unknown>;
+  itemResults: BenchmarkEvaluationItemResult[];
+  rawPredictionArtifactId: string | null;
+  reportArtifactId: string | null;
+  artifactIds: string[];
+  createdByUserId: string;
+  createdAt: string;
+};
+
+export type BenchmarkEvaluationList = {
+  benchmarkEvaluations: BenchmarkEvaluation[];
+};
+
 export type AnalysisRunDetail = {
   analysisRunId: string;
   workspaceId: string;
@@ -1395,6 +1470,89 @@ export async function fetchModelCandidates({
   });
   await ensureOk(response);
   return parseModelCandidateList(await response.json());
+}
+
+export async function fetchBenchmarkEvaluationReadiness({
+  devUserId,
+  workspaceId,
+  modelCandidateId
+}: {
+  devUserId: string;
+  workspaceId: string;
+  modelCandidateId: string;
+}): Promise<BenchmarkEvaluationReadiness> {
+  const params = new URLSearchParams({ workspace_id: workspaceId });
+  const response = await fetch(
+    `${coreApiUrl}/v1/model-training/model-candidates/${modelCandidateId}/benchmark-readiness?${params}`,
+    {
+      headers: devAuthHeaders(devUserId)
+    }
+  );
+  await ensureOk(response);
+  return parseBenchmarkEvaluationReadiness(await response.json());
+}
+
+export async function startBenchmarkEvaluation({
+  devUserId,
+  workspaceId,
+  modelCandidateId,
+  acknowledgeHighSeverityWarnings
+}: {
+  devUserId: string;
+  workspaceId: string;
+  modelCandidateId: string;
+  acknowledgeHighSeverityWarnings: boolean;
+}): Promise<BenchmarkEvaluation> {
+  const response = await fetch(`${coreApiUrl}/v1/model-training/benchmark-evaluations`, {
+    method: "POST",
+    headers: jsonHeaders(devUserId),
+    body: JSON.stringify({
+      workspace_id: workspaceId,
+      model_candidate_id: modelCandidateId,
+      confidence_threshold: 0.1,
+      acknowledge_high_severity_warnings: acknowledgeHighSeverityWarnings
+    })
+  });
+  await ensureOk(response);
+  return parseBenchmarkEvaluation(await response.json());
+}
+
+export async function fetchBenchmarkEvaluations({
+  devUserId,
+  workspaceId
+}: {
+  devUserId: string;
+  workspaceId: string;
+}): Promise<BenchmarkEvaluationList> {
+  const params = new URLSearchParams({ workspace_id: workspaceId });
+  const response = await fetch(`${coreApiUrl}/v1/model-training/benchmark-evaluations?${params}`, {
+    headers: devAuthHeaders(devUserId)
+  });
+  await ensureOk(response);
+  return parseBenchmarkEvaluationList(await response.json());
+}
+
+export async function cancelBenchmarkEvaluation({
+  devUserId,
+  workspaceId,
+  benchmarkEvaluationId,
+  reason
+}: {
+  devUserId: string;
+  workspaceId: string;
+  benchmarkEvaluationId: string;
+  reason: string;
+}): Promise<BenchmarkEvaluation> {
+  const response = await fetch(
+    `${coreApiUrl}/v1/model-training/benchmark-evaluations/${benchmarkEvaluationId}/cancel`,
+    {
+      method: "POST",
+      headers: jsonHeaders(devUserId),
+      body: JSON.stringify({ workspace_id: workspaceId, reason })
+    }
+  );
+  await ensureOk(response);
+  return parseBenchmarkEvaluation(await response.json());
 }
 
 export async function cancelTrainingRun({
@@ -2670,6 +2828,119 @@ function parseModelCandidateList(value: unknown): ModelCandidateList {
   };
 }
 
+function parseBenchmarkEvaluationReadiness(value: unknown): BenchmarkEvaluationReadiness {
+  const record = requireRecord(value, "Benchmark Evaluation readiness response");
+  return {
+    workspaceId: requireString(record.workspace_id, "workspace_id"),
+    modelCandidateId: requireString(record.model_candidate_id, "model_candidate_id"),
+    modelCandidateHumanReadableId: requireString(
+      record.model_candidate_human_readable_id,
+      "model_candidate_human_readable_id"
+    ),
+    adapterType: requireTrainingAdapterType(record.adapter_type),
+    trainingAdapterType: requireTrainingAdapterType(record.training_adapter_type),
+    evaluationAdapterType: requireTrainingAdapterType(record.evaluation_adapter_type),
+    databasePurpose: requireString(record.database_purpose, "database_purpose"),
+    benchmarkItemCount: requireNumber(record.benchmark_item_count, "benchmark_item_count"),
+    eligibleToStartEvaluation: requireBoolean(
+      record.eligible_to_start_evaluation,
+      "eligible_to_start_evaluation"
+    ),
+    activeModelJobId: optionalString(record.active_model_job_id, "active_model_job_id"),
+    activeModelJobType: optionalString(record.active_model_job_type, "active_model_job_type"),
+    warnings: requireArray(record.warnings, "warnings").map(parseModelTrainingWarning)
+  };
+}
+
+function parseBenchmarkEvaluationItemResult(value: unknown): BenchmarkEvaluationItemResult {
+  const record = requireRecord(value, "Benchmark Evaluation item result");
+  return {
+    datasetItemId: requireString(record.dataset_item_id, "dataset_item_id"),
+    humanReadableId: requireString(record.human_readable_id, "human_readable_id"),
+    sourceGroupKey: optionalString(record.source_group_key, "source_group_key"),
+    hiveConfigurationFrameStandardId: optionalString(
+      record.hive_configuration_frame_standard_id,
+      "hive_configuration_frame_standard_id"
+    ),
+    curriculumStage: optionalString(record.curriculum_stage, "curriculum_stage"),
+    groundTruthCount: requireNumber(record.ground_truth_count, "ground_truth_count"),
+    predictionCount: requireNumber(record.prediction_count, "prediction_count"),
+    matchedCount: requireNumber(record.matched_count, "matched_count"),
+    falsePositiveCount: requireNumber(record.false_positive_count, "false_positive_count"),
+    falseNegativeCount: requireNumber(record.false_negative_count, "false_negative_count")
+  };
+}
+
+function parseBenchmarkEvaluation(value: unknown): BenchmarkEvaluation {
+  const record = requireRecord(value, "Benchmark Evaluation response");
+  return {
+    benchmarkEvaluationId: requireString(record.benchmark_evaluation_id, "benchmark_evaluation_id"),
+    workspaceId: requireString(record.workspace_id, "workspace_id"),
+    humanReadableId: requireString(record.human_readable_id, "human_readable_id"),
+    modelCandidateId: requireString(record.model_candidate_id, "model_candidate_id"),
+    modelCandidateHumanReadableId: requireString(
+      record.model_candidate_human_readable_id,
+      "model_candidate_human_readable_id"
+    ),
+    trainingRunId: requireString(record.training_run_id, "training_run_id"),
+    datasetVersionId: requireString(record.dataset_version_id, "dataset_version_id"),
+    status: requireBenchmarkEvaluationStatus(record.status),
+    phase: requireString(record.phase, "phase"),
+    adapterType: requireTrainingAdapterType(record.adapter_type),
+    trainingAdapterType: requireTrainingAdapterType(record.training_adapter_type),
+    evaluationAdapterType: requireTrainingAdapterType(record.evaluation_adapter_type),
+    databasePurpose: requireString(record.database_purpose, "database_purpose"),
+    confidenceThreshold: requireNumber(record.confidence_threshold, "confidence_threshold"),
+    matchStrategy: requireString(record.match_strategy, "match_strategy"),
+    benchmarkScope: requireString(record.benchmark_scope, "benchmark_scope"),
+    startedAt: optionalString(record.started_at, "started_at"),
+    completedAt: optionalString(record.completed_at, "completed_at"),
+    lastHeartbeatAt: optionalString(record.last_heartbeat_at, "last_heartbeat_at"),
+    lastActivityMessage: optionalString(record.last_activity_message, "last_activity_message"),
+    progressPercent: optionalNumber(record.progress_percent, "progress_percent"),
+    latestLogExcerpt: optionalString(record.latest_log_excerpt, "latest_log_excerpt"),
+    cancelRequestedAt: optionalString(record.cancel_requested_at, "cancel_requested_at"),
+    cancelRequestedByUserId: optionalString(
+      record.cancel_requested_by_user_id,
+      "cancel_requested_by_user_id"
+    ),
+    cancelReason: optionalString(record.cancel_reason, "cancel_reason"),
+    failureCode: optionalString(record.failure_code, "failure_code"),
+    failureMessage: optionalString(record.failure_message, "failure_message"),
+    isStale: requireBoolean(record.is_stale, "is_stale"),
+    staleAfterSeconds: optionalNumber(record.stale_after_seconds, "stale_after_seconds"),
+    warningAcknowledgement:
+      record.warning_acknowledgement === null
+        ? null
+        : requireRecord(record.warning_acknowledgement, "warning_acknowledgement"),
+    warnings: requireArray(record.warnings, "warnings").map(parseModelTrainingWarning),
+    metricsSummary: requireRecord(record.metrics_summary, "metrics_summary"),
+    itemResults: requireArray(record.item_results, "item_results").map(
+      parseBenchmarkEvaluationItemResult
+    ),
+    rawPredictionArtifactId: optionalString(
+      record.raw_prediction_artifact_id,
+      "raw_prediction_artifact_id"
+    ),
+    reportArtifactId: optionalString(record.report_artifact_id, "report_artifact_id"),
+    artifactIds: requireArray(record.artifact_ids, "artifact_ids").map((id) =>
+      requireString(id, "artifact_ids[]")
+    ),
+    createdByUserId: requireString(record.created_by_user_id, "created_by_user_id"),
+    createdAt: requireString(record.created_at, "created_at")
+  };
+}
+
+function parseBenchmarkEvaluationList(value: unknown): BenchmarkEvaluationList {
+  const record = requireRecord(value, "Benchmark Evaluation list response");
+  return {
+    benchmarkEvaluations: requireArray(
+      record.benchmark_evaluations,
+      "benchmark_evaluations"
+    ).map(parseBenchmarkEvaluation)
+  };
+}
+
 function parseModelTrainingWarning(value: unknown): ModelTrainingWarning {
   const record = requireRecord(value, "Model training warning response");
   return {
@@ -3113,6 +3384,20 @@ function requireTrainingRunStatus(value: unknown): TrainingRun["status"] {
     return value;
   }
   throw new Error("Core API response had an unexpected Training Run status");
+}
+
+function requireBenchmarkEvaluationStatus(value: unknown): BenchmarkEvaluation["status"] {
+  if (
+    value === "queued" ||
+    value === "running" ||
+    value === "cancelling" ||
+    value === "completed" ||
+    value === "failed" ||
+    value === "cancelled"
+  ) {
+    return value;
+  }
+  throw new Error("Core API response had an unexpected Benchmark Evaluation status");
 }
 
 function requireGeneratedDatasetExportFileKind(

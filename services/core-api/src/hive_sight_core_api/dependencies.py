@@ -17,6 +17,9 @@ from hive_sight_core_api.bee_detector_candidate_annotation_workflow import (
     FakeBeeDetectorInferenceAdapter,
     UltralyticsYoloObbInferenceAdapter,
 )
+from hive_sight_core_api.bee_detector_benchmark_evaluation_workflow import (
+    BeeDetectorBenchmarkEvaluationWorkflow,
+)
 from hive_sight_core_api.bee_detector_training_workflow import (
     BeeDetectorTrainingWorkflow,
     FakeBeeDetectorTrainingAdapter,
@@ -38,6 +41,7 @@ from hive_sight_core_api.dev_store import (
     UploadPolicy,
     deterministic_id_factory,
 )
+from hive_sight_core_api.directed_ellipse_cleanup_workflow import DirectedEllipseCleanupWorkflow
 from hive_sight_core_api.hive_configuration_workflow import HiveConfigurationWorkflow
 from hive_sight_core_api.inspection_photo_access import InspectionPhotoAccess
 from hive_sight_core_api.settings import Settings, load_settings
@@ -159,6 +163,17 @@ def get_dataset_repository_workflow(state: DevStateDep) -> DatasetRepositoryWork
     )
 
 
+def get_directed_ellipse_cleanup_workflow(
+    state: DevStateDep,
+) -> DirectedEllipseCleanupWorkflow:
+    settings = get_settings()
+    return DirectedEllipseCleanupWorkflow(
+        store=state.store,
+        artifact_root=state.model_artifact_root,
+        database_purpose=settings.database_purpose,
+    )
+
+
 def get_inspection_photo_access(state: DevStateDep) -> InspectionPhotoAccess:
     settings = get_settings()
     analysis_workflow = AnalysisRequestWorkflow(
@@ -188,6 +203,28 @@ def get_bee_detector_training_workflow(state: DevStateDep) -> BeeDetectorTrainin
         else FakeBeeDetectorTrainingAdapter()
     )
     return BeeDetectorTrainingWorkflow(
+        store=state.store,
+        image_loader=state.object_storage.get_object,
+        artifact_root=state.model_artifact_root,
+        adapter=adapter,
+        persistence_backend=settings.persistence_backend,
+        database_purpose=settings.database_purpose,
+        clock=state.store.clock,
+        stale_after_seconds=settings.training_run_stale_after_seconds,
+        heartbeat_interval_seconds=settings.training_run_heartbeat_interval_seconds,
+    )
+
+
+def get_bee_detector_benchmark_evaluation_workflow(
+    state: DevStateDep,
+) -> BeeDetectorBenchmarkEvaluationWorkflow:
+    settings = get_settings()
+    adapter = (
+        UltralyticsYoloObbInferenceAdapter(device=settings.yolo_device)
+        if settings.bee_detector_training_adapter == "ultralytics_yolo_obb"
+        else FakeBeeDetectorInferenceAdapter()
+    )
+    return BeeDetectorBenchmarkEvaluationWorkflow(
         store=state.store,
         image_loader=state.object_storage.get_object,
         artifact_root=state.model_artifact_root,

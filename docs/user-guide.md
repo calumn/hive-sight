@@ -45,7 +45,7 @@ pnpm model:setup:yolo
 Then start the stack with Postgres-backed metadata and the real YOLO adapter:
 
 ```sh
-pnpm dev:all:yolo-training
+pnpm dev:all:yolo
 ```
 
 Open:
@@ -89,12 +89,16 @@ Use this when you want to manually create the training evidence for the Bee Dete
 2. Use zoom and pan to inspect the crop.
 3. Click inside the crop to add a default bee ellipse.
 4. Use the ellipse controls to nudge, rotate, and resize the ellipse.
-5. Set the bee type to `Complete visible bee` or `Partial visible bee`.
-6. Repeat until the visible bees in the crop are annotated.
-7. Set visible bee status.
-8. Click `Complete crop`.
+5. Make sure the arrow on the ellipse points toward the bee's head.
+6. If the ellipse shape is correct but points tail-first, click `Flip head/tail`.
+7. Set the bee type to `Complete visible bee` or `Partial visible bee`.
+8. Repeat until the visible bees in the crop are annotated.
+9. Set visible bee status.
+10. Click `Complete crop`.
 
 Complete bees should normally be fully contained by the crop. Partial bees may overlap the crop edge when the bee is only partly visible.
+
+The stored ellipse rotation is the bee head direction. This matters for future Varroa work, where HiveSight may rotate each bee crop consistently before looking for mites.
 
 ## Reopen And Continue A Training Crop
 
@@ -154,7 +158,7 @@ Use this when you want to train a local YOLO OBB Model Candidate from the curren
 1. Start HiveSight with:
 
 ```sh
-pnpm dev:all:yolo-training
+pnpm dev:all:yolo
 ```
 
 2. Create or select a Dataset Version.
@@ -172,6 +176,26 @@ You can also start a run from the command line:
 pnpm model:train:bee:yolo
 ```
 
+## Evaluate A Bee Localisation Model Candidate
+
+Use this when you want internal model-governance evidence for a completed Bee Detector Model Candidate. This is a Dataset Curator task, not normal beekeeper inspection work.
+
+1. Make sure your Dataset Version has protected Benchmark items from source images that were not used for Training or Validation.
+2. Train a Bee Detector baseline and select the completed Model Candidate.
+3. In `Bee Detector benchmark evaluation`, click `Check benchmark`.
+4. Review warnings such as `SMALL_BENCHMARK_SET`.
+5. Click `Run benchmark`.
+6. Watch status, phase, heartbeat, progress, precision, recall, activity, and log excerpt.
+7. Open the `Report` and `Raw predictions` links when the run completes.
+
+The report is Training Crop benchmark only. It does not evaluate full-frame bee localisation, bee head-end prediction, or Varroa detection.
+
+For a command-line real-adapter proof-of-life check against the latest completed real Model Candidate:
+
+```sh
+pnpm model:qa:bee:evaluate
+```
+
 ## Use A Model Candidate To Suggest Bees In A Crop
 
 Use this when you want the trained Bee Detector to propose candidate ellipses for a crop, while keeping human review in control.
@@ -179,7 +203,7 @@ Use this when you want the trained Bee Detector to propose candidate ellipses fo
 1. Start HiveSight with:
 
 ```sh
-pnpm dev:all:yolo-training
+pnpm dev:all:yolo
 ```
 
 2. Make sure at least one completed Model Candidate exists.
@@ -201,6 +225,18 @@ For a command-line proof-of-life check against the latest Model Candidate and fi
 ```sh
 pnpm model:qa:bee:prelabel
 ```
+
+## Reset Early Dataset Evidence For Directed Head Review
+
+Use this only for the early local dataset created before ellipse direction meant bee head direction.
+
+Start the Postgres-backed stack, then run:
+
+```sh
+pnpm model:reset:directed-ellipse-review
+```
+
+This removes local Dataset Items, Dataset Versions, Training Runs, Model Candidates, and derived model artifacts. It keeps uploaded photos, Training Crops, and existing ellipses, and reopens completed crops so you can review head direction and assign fresh Dataset Items.
 
 ## Run Slice Verification
 

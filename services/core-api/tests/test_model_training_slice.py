@@ -137,6 +137,102 @@ def test_dataset_curator_creates_dataset_version_and_fake_training_run(
         app.dependency_overrides.clear()
 
 
+def test_directed_ellipse_cleanup_removes_local_dataset_model_evidence_and_reopens_crops(
+    tmp_path: Path,
+) -> None:
+    state = _build_state(tmp_path)
+    app.dependency_overrides[get_dev_state] = lambda: state
+    client = TestClient(app)
+    try:
+        workspace_id = _workspace(client)
+        training_crop_id = _create_reviewed_crop_item(client, workspace_id, "training", 10, 10)
+        _create_reviewed_crop_item(client, workspace_id, "validation", 260, 10)
+        dataset_version_response = client.post(
+            "/v1/model-training/dataset-versions",
+            json={"workspace_id": workspace_id},
+            headers=_headers(),
+        )
+        assert dataset_version_response.status_code == 201
+        dataset_version = dataset_version_response.json()
+        package_dir = (
+            state.model_artifact_root
+            / "dataset-versions"
+            / f"dataset-version-{dataset_version['dataset_version_id']}"
+        )
+        assert package_dir.exists()
+        training_response = client.post(
+            "/v1/model-training/training-runs",
+            json={
+                "workspace_id": workspace_id,
+                "dataset_version_id": dataset_version["dataset_version_id"],
+                "acknowledge_high_severity_warnings": True,
+            },
+            headers=_headers(),
+        )
+        assert training_response.status_code == 202
+        training_run = _wait_for_training_run_status(
+            client,
+            workspace_id,
+            training_response.json()["training_run_id"],
+            "completed",
+        )
+        run_dir = (
+            state.model_artifact_root
+            / "training-runs"
+            / f"training-run-{training_run['training_run_id']}"
+        )
+        assert run_dir.exists()
+
+        missing_confirmation = client.post(
+            "/v1/dev/directed-ellipse-orientation-cleanup",
+            json={"workspace_id": workspace_id},
+            headers=_headers(),
+        )
+        assert missing_confirmation.status_code == 422
+        assert (
+            missing_confirmation.json()["detail"]["code"]
+            == "directed_ellipse_cleanup_confirmation_required"
+        )
+
+        cleanup = client.post(
+            "/v1/dev/directed-ellipse-orientation-cleanup",
+            json={
+                "workspace_id": workspace_id,
+                "reason": "Slice test reset.",
+                "confirm_remove_dataset_and_model_evidence": True,
+            },
+            headers=_headers(),
+        )
+
+        assert cleanup.status_code == 200
+        body = cleanup.json()
+        assert body["dataset_items_removed"] == 2
+        assert body["dataset_versions_removed"] == 1
+        assert body["training_runs_removed"] == 1
+        assert body["model_candidates_removed"] == 1
+        assert body["artifacts_removed"] > 0
+        assert body["training_crops_reopened"] == 2
+        assert body["training_crop_ellipses_preserved"] == 2
+        assert body["inspection_photos_preserved"] == 2
+        assert state.store.dataset_items == {}
+        assert state.store.dataset_versions == {}
+        assert state.store.training_runs == {}
+        assert state.store.model_candidates == {}
+        assert state.store.artifacts == {}
+        assert not package_dir.exists()
+        assert not run_dir.exists()
+        assert state.store.training_crops[UUID(training_crop_id)].review_status == "review_pending"
+        assert len(state.store.training_crop_ellipses) == 2
+        evidence = client.get(
+            f"/v1/training-crops/{training_crop_id}/evidence?workspace_id={workspace_id}",
+            headers=_headers(),
+        )
+        assert evidence.status_code == 200
+        assert evidence.json()["training_crop"]["review_status"] == "review_pending"
+    finally:
+        app.dependency_overrides.clear()
+
+
 def test_model_training_requires_dataset_curator_capability(tmp_path: Path) -> None:
     state = _build_state(tmp_path)
     app.dependency_overrides[get_dev_state] = lambda: state
@@ -222,6 +318,124 @@ def test_artifact_serving_uses_known_artifact_ids(tmp_path: Path) -> None:
         )
         assert response.status_code == 404
         assert response.json()["detail"]["code"] == "artifact_not_found"
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_dataset_curator_evaluates_model_candidate_against_protected_benchmark(
+    tmp_path: Path,
+) -> None:
+    state = _build_state(tmp_path)
+    app.dependency_overrides[get_dev_state] = lambda: state
+    client = TestClient(app)
+    try:
+        workspace_id = _workspace(client)
+        _create_reviewed_crop_item(client, workspace_id, "training", 10, 10)
+        _create_reviewed_crop_item(client, workspace_id, "validation", 260, 10)
+        _create_reviewed_crop_item(client, workspace_id, "benchmark", 10, 260)
+        dataset_version = client.post(
+            "/v1/model-training/dataset-versions",
+            json={"workspace_id": workspace_id},
+            headers=_headers(),
+        ).json()
+        training_response = client.post(
+            "/v1/model-training/training-runs",
+            json={
+                "workspace_id": workspace_id,
+                "dataset_version_id": dataset_version["dataset_version_id"],
+                "acknowledge_high_severity_warnings": True,
+            },
+            headers=_headers(),
+        )
+        training_run = _wait_for_training_run_status(
+            client,
+            workspace_id,
+            training_response.json()["training_run_id"],
+            "completed",
+        )
+
+        readiness = client.get(
+            "/v1/model-training/model-candidates/"
+            f"{training_run['model_candidate_id']}/benchmark-readiness?workspace_id={workspace_id}",
+            headers=_headers(),
+        )
+        start_response = client.post(
+            "/v1/model-training/benchmark-evaluations",
+            json={
+                "workspace_id": workspace_id,
+                "model_candidate_id": training_run["model_candidate_id"],
+            },
+            headers=_headers(),
+        )
+        evaluation = _wait_for_benchmark_evaluation_status(
+            client,
+            workspace_id,
+            start_response.json()["benchmark_evaluation_id"],
+            "completed",
+        )
+
+        assert readiness.status_code == 200
+        assert readiness.json()["benchmark_item_count"] == 1
+        assert readiness.json()["eligible_to_start_evaluation"] is True
+        assert any(
+            warning["code"] == "SMALL_BENCHMARK_SET"
+            for warning in readiness.json()["warnings"]
+        )
+        assert start_response.status_code == 202
+        assert evaluation["human_readable_id"] == "HS-BE-000001"
+        assert evaluation["status"] == "completed"
+        assert evaluation["benchmark_scope"] == "training_crop_benchmark_only"
+        assert evaluation["metrics_summary"]["benchmark_item_count"] == 1
+        assert evaluation["metrics_summary"]["recall"] == 1
+        assert evaluation["metrics_summary"]["precision"] == 0.5
+        assert len(evaluation["item_results"]) == 1
+        assert evaluation["raw_prediction_artifact_id"] is not None
+        assert evaluation["report_artifact_id"] is not None
+
+        report = client.get(
+            f"/v1/model-training/artifacts/{evaluation['report_artifact_id']}?workspace_id={workspace_id}",
+            headers=_headers(),
+        )
+        raw_predictions = client.get(
+            "/v1/model-training/artifacts/"
+            f"{evaluation['raw_prediction_artifact_id']}?workspace_id={workspace_id}",
+            headers=_headers(),
+        )
+        assert report.status_code == 200
+        assert "Training Crop benchmark only" in report.text
+        assert "not beekeeper-facing inspection output" in report.text
+        assert raw_predictions.status_code == 200
+        assert raw_predictions.json()["predictions"][0]["predictions"]
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_benchmark_evaluation_requires_dataset_curator_capability(tmp_path: Path) -> None:
+    state = _build_state(tmp_path)
+    state.store.dataset_curator_user_ids.clear()
+    app.dependency_overrides[get_dev_state] = lambda: state
+    client = TestClient(app)
+    try:
+        workspace_id = client.get(
+            "/v1/dev/session",
+            headers={"x-hivesight-dev-user-id": str(ORDINARY_USER_ID)},
+        ).json()["workspace_id"]
+        client.post(
+            "/v1/workspace-data-use-agreements/acceptances",
+            json={"workspace_id": workspace_id, "terms_version": "2026-07-31"},
+            headers={"x-hivesight-dev-user-id": str(ORDINARY_USER_ID)},
+        )
+        response = client.post(
+            "/v1/model-training/benchmark-evaluations",
+            json={
+                "workspace_id": workspace_id,
+                "model_candidate_id": "00000000-0000-0000-0000-000000009999",
+            },
+            headers={"x-hivesight-dev-user-id": str(ORDINARY_USER_ID)},
+        )
+
+        assert response.status_code == 403
+        assert response.json()["detail"]["code"] == "dataset_curator_access_required"
     finally:
         app.dependency_overrides.clear()
 
@@ -536,7 +750,7 @@ def _create_reviewed_crop_item(
     dataset_role: str,
     crop_x: int,
     crop_y: int,
-) -> None:
+) -> str:
     apiary_id = client.post(
         "/v1/apiaries",
         json={"workspace_id": workspace_id, "name": f"Apiary {dataset_role}"},
@@ -615,6 +829,7 @@ def _create_reviewed_crop_item(
         headers=_headers(),
     )
     assert assignment.status_code == 201
+    return crop["training_crop_id"]
 
 
 def _headers() -> dict[str, str]:
@@ -638,6 +853,26 @@ def _wait_for_training_run_status(
             return body
         time.sleep(0.02)
     raise AssertionError(f"Training Run did not reach {expected_status}.")
+
+
+def _wait_for_benchmark_evaluation_status(
+    client: TestClient,
+    workspace_id: str,
+    benchmark_evaluation_id: str,
+    expected_status: str,
+) -> dict:
+    for _ in range(50):
+        response = client.get(
+            "/v1/model-training/benchmark-evaluations/"
+            f"{benchmark_evaluation_id}?workspace_id={workspace_id}",
+            headers=_headers(),
+        )
+        assert response.status_code == 200
+        body = response.json()
+        if body["status"] == expected_status:
+            return body
+        time.sleep(0.02)
+    raise AssertionError(f"Benchmark Evaluation did not reach {expected_status}.")
 
 
 def _source_png() -> bytes:
