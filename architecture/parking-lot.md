@@ -153,7 +153,7 @@ Suggested owner or area:
 
 Model governance and architecture.
 
-## PARK-0007: Dev Persona Switcher
+## PARK-0007: Dev User Switcher
 
 Status: promoted
 Date parked: 2026-07-30
@@ -162,7 +162,7 @@ Area: developer experience, UI acceptance, authorization simulation
 
 Context:
 
-HiveSight currently uses dev authentication through `x-hivesight-dev-user-id`. Before real authentication is selected, the UI should make it easy to exercise behaviours as different seeded Users and Internal Capabilities, such as Beekeeper Owner, Dataset Curator, Reviewer, and a User with no internal capability.
+HiveSight currently uses dev authentication through `x-hivesight-dev-user-id`. Before real authentication is selected, the UI should make it easy to exercise behaviours as different seeded development Users, each with stable identity, its own Workspace, Workspace Membership, and Internal Capabilities.
 
 Why parked:
 
@@ -914,3 +914,72 @@ After crop-level Benchmark Evaluation is implemented and at least one trained ca
 Suggested owner or area:
 
 Model evaluation, dataset governance, and future Varroa Assessment pipeline planning.
+
+## PARK-0039: Assigned Review And Contribution Task Inbox
+
+Status: parked
+Date parked: 2026-08-03
+Source: Slice 0018 grilling
+Area: review workflow, contributor workflow, authorization
+
+Context:
+
+Reviewers and contributors will need to see work assigned to them from another User's Workspace without gaining broad Workspace Membership or visibility into that Workspace. This may become a task or inbox concept rather than a message-queue technology decision.
+
+Why parked:
+
+Slice 0018 establishes development User switching and Workspace separation only. Cross-user work assignment, task visibility, blind-review access, contributor bundles, and adjudication workflow would make the slice too large.
+
+Revisit trigger:
+
+Before Blind Independent Review, Third-Party Adjudication, external contributor annotation, Contribution Bundle tasks, or any workflow where one User needs to work on evidence owned by another User's Workspace.
+
+Suggested owner or area:
+
+Review workflow, contributor workflow, authorization, and product UX.
+
+## PARK-0040: Workspace Collaboration And Membership Model
+
+Status: parked
+Date parked: 2026-08-03
+Source: Slice 0018 grilling
+Area: workspace membership, collaboration, authorization
+
+Context:
+
+The stronger expected use case is multiple Users sharing one Workspace, such as a family, bee club, association, or small business managing the same apiaries and hives. A User belonging to multiple Workspaces is not ruled out, but it is not the main near-term assumption.
+
+Why parked:
+
+Slice 0018 gives each seeded development User one default Workspace and avoids Workspace switching. Collaboration affects invitations, access lists, audit trails, default Workspace choice, and the semantics of "who am I acting for?"
+
+Revisit trigger:
+
+Before invitations, shared apiary/hive management, family/business accounts, beekeeper associations, or any workflow where multiple Users act inside one Workspace. Decide then whether one User can belong to multiple Workspaces and how Workspace switching/default Workspace works.
+
+Suggested owner or area:
+
+Product requirements, domain model, authorization, and Web UI.
+
+## PARK-0041: Real Authentication Provider And Session Architecture
+
+Status: parked
+Date parked: 2026-08-03
+Source: Slice 0018 grilling
+Area: authentication, authorization, security
+
+Context:
+
+HiveSight should not roll its own password, account recovery, or social-login implementation. Real authentication should be delegated to an external OpenID Connect identity provider, probably Google first, with Apple or other providers considered later. HiveSight still owns Workspace Membership, Internal Capabilities, Contributor Access Scope, and authorization decisions.
+
+Why parked:
+
+Slice 0018 is a development identity-switching slice, not production authentication. The real authentication choice is long-lived and should produce an ADR before implementation.
+
+Revisit trigger:
+
+Before external users, hosted deployment, Contribution Bundles, shared Workspaces, non-local use, or implementing any real login provider.
+
+Suggested owner or area:
+
+Architecture, security, authentication, and product governance.

@@ -10,6 +10,10 @@ HiveSight is a Varroa-focused inspection support system for hobbyist and small-s
 A registered login identity that can authenticate and be authorized to act in one or more workspaces.
 _Avoid_: Beekeeper when the point is login, registration, authentication, or identity.
 
+**Development User**:
+A seeded local testing User used by HiveSight's development stack to simulate logging in as a distinct identity. Development Users have stable User ids, display codes, Workspaces, Workspace Memberships, and capabilities. Switching Development User is a local QA tool and is not real authentication, not a product role, and not a security boundary.
+_Avoid_: Role switcher when the point is selecting a different User identity.
+
 **Workspace**:
 The ownership boundary for apiaries, hives, inspections, photos, corrections, and model-use terms.
 _Avoid_: Account when the ownership container, not login identity, is the point.

@@ -43,7 +43,7 @@ These are the strongest near-term candidates based on the current project state.
 | Orientation Reliability Review | Business / Technical | Add explicit `reliable` / `unreliable` orientation review for directed bee ellipses. | Bee head direction is now meaningful, but reliability is not yet captured. |
 | Bee Orientation Model Baseline | Technical | Train the first model that predicts head/tail direction for localised bees. | Varroa crops need consistent head-normalised orientation. |
 | Varroa Review Outcome Labelling | Business | Add the CAPTCHA-like workflow for `visible_varroa_present`, `no_visible_varroa`, and `not_determined`. | Varroa training needs active positives and active negatives, not silent absence. |
-| Dev User And Role Switching | Technical / UX | Let local development and acceptance testing switch between seeded Users and role/capability profiles. | Review, curation, contributor, and owner flows are now central enough that one hard-coded dev user hides behaviour. |
+| Dev User And Role Switching | Technical / UX | Let local development and acceptance testing switch between seeded development Users with their own Workspaces and capabilities. | Review, curation, contributor, and owner flows are now central enough that one hard-coded dev user hides behaviour. |
 | Public Dataset Candidate Import | Technical / Governance | Import public USDA-ARS image/XML evidence as Candidate Annotations requiring human review. | This could accelerate dataset growth, but only if provenance and source rights are handled correctly. |
 
 ## Bee Localisation And Dataset Quality
@@ -100,9 +100,11 @@ These are the strongest near-term candidates based on the current project state.
 | Inspection Completion Semantics | Business | Define when a Training Data Collection inspection is complete and how incomplete work is reported. |
 | Inspection History And Resume | Business | List inspections for a selected hive, resume recent work, and separate training-data collection from Varroa assessment history. |
 | Hive Setup Edit And Rename | Business / Technical | Edit Apiary, Hive, and Hive Configuration safely while preserving historical provenance snapshots. |
-| Dev Persona Switcher | Technical / UX | Let local testing switch between owner, Dataset Curator, reviewer, and no-capability users before real auth exists. |
+| Dev User Switcher | Technical / UX | Let local testing switch between seeded Users, each with stable identity, default Workspace, and capabilities, before real auth exists. |
 | Auth Boundary Decision | Business / Technical | Decide how external identity providers, HiveSight User records, Workspace Memberships, Contributor Access Scope, and internal capabilities fit together. |
 | First External Login Provider | Business / Technical | Add the first real OpenID Connect login path, likely Google first, with Apple parked as a later provider option. |
+| Workspace Collaboration And Membership Model | Business / Technical | Decide how multiple Users can share one Workspace, and whether one User can later belong to multiple Workspaces. |
+| Assigned Review And Contribution Task Inbox | Business / Technical | Let reviewers or contributors see assigned work from another User's Workspace without broad Workspace Membership. |
 | Task-Oriented User Guide Maintenance | Business / Technical | Keep `docs/user-guide.md` aligned with implemented workflows and add a closeout check when slices change user behaviour. |
 
 ## Data Governance, Consent, And Rights
@@ -126,7 +128,7 @@ These are the strongest near-term candidates based on the current project state.
 | Object Storage For Images And Artifacts | Technical | Move image bytes and model artifacts to a deliberate storage abstraction rather than local file paths. |
 | Persistence Schema Hardening | Technical | Refine indexes, constraints, repositories, migration discipline, and local/QA database separation. |
 | API Contract Governance | Technical | Version and review Core API, Analysis Service, and model job contracts as boundaries mature. |
-| Real Authentication And Authorization | Business / Technical | Replace local dev session headers with a real auth boundary and role/capability management. |
+| Real Authentication Provider And Session Architecture | Business / Technical | Replace local dev session headers with delegated authentication, production sessions, and HiveSight-owned authorization decisions. |
 | Social Login Provider Expansion | Business / Technical | Add Apple or other identity providers after the first external-login path proves the User and permission model. |
 | Release And Operations Readiness | Technical / Governance | Add deployment target, runbooks, backups, rollback, health checks, and incident handling before external use. |
 

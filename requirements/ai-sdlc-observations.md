@@ -469,6 +469,7 @@ AI contribution:
 
 - Proposed `Slice 0018: Dev User And Role Switching` as a bridge from the existing `x-hivesight-dev-user-id` seam toward real authentication.
 - Parked real external login behind a follow-on Auth Boundary Decision and First External Login Provider slice.
+- Refined Slice 0018 after grilling: switch seeded development Users rather than roles; give each seeded User its own Workspace; keep cross-user task access out of scope; use User switching as a logout/login proxy that clears user-scoped UI state; hide impossible product capabilities while showing diagnostic capability status in the Development session panel.
 
 Human judgment still required:
 
