@@ -82,7 +82,7 @@ API and contract governance.
 
 ## PARK-0004: Release And Operations Readiness Skill
 
-Status: parked
+Status: promoted
 Date parked: 2026-07-30
 Source: skills remediation grilling
 Area: operations
@@ -937,6 +937,10 @@ Before Blind Independent Review, Third-Party Adjudication, external contributor 
 Suggested owner or area:
 
 Review workflow, contributor workflow, authorization, and product UX.
+
+Promotion note:
+
+Partially promoted into `architecture/vertical-slice-0019-assigned-review-task-inbox.md` for the Reviewer task path only. Contributor task inboxes, Contribution Bundles, permission acceptance, and contributor withdrawal remain deferred.
 
 ## PARK-0040: Workspace Collaboration And Membership Model
 

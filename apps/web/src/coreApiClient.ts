@@ -16,6 +16,24 @@ export type DevSession = {
   workspaceDataUseAgreementTermsVersion: string | null;
 };
 
+export type DevUser = {
+  userId: string;
+  displayName: string;
+  devUserCode: string;
+  description: string;
+  workspaceId: string;
+  workspaceDisplayName: string;
+  workspaceMembershipRole: string;
+  reviewerCapability: boolean;
+  datasetCuratorCapability: boolean;
+  contributorAccessScope: string;
+  isDefault: boolean;
+};
+
+export type DevUserList = {
+  devUsers: DevUser[];
+};
+
 export type Apiary = {
   apiaryId: string;
   workspaceId: string;
@@ -844,6 +862,12 @@ export async function fetchDevSession(devUserId: string): Promise<DevSession> {
   });
   await ensureOk(response);
   return parseDevSession(await response.json());
+}
+
+export async function fetchDevUsers(): Promise<DevUserList> {
+  const response = await fetch(`${coreApiUrl}/v1/dev/users`);
+  await ensureOk(response);
+  return parseDevUserList(await response.json());
 }
 
 export async function acceptWorkspaceDataUseAgreement({
@@ -1967,6 +1991,39 @@ function parseDevSession(value: unknown): DevSession {
       record.workspace_data_use_agreement_terms_version,
       "workspace_data_use_agreement_terms_version"
     )
+  };
+}
+
+function parseDevUser(value: unknown): DevUser {
+  const record = requireRecord(value, "Development User response");
+  return {
+    userId: requireString(record.user_id, "user_id"),
+    displayName: requireString(record.display_name, "display_name"),
+    devUserCode: requireString(record.dev_user_code, "dev_user_code"),
+    description: requireString(record.description, "description"),
+    workspaceId: requireString(record.workspace_id, "workspace_id"),
+    workspaceDisplayName: requireString(record.workspace_display_name, "workspace_display_name"),
+    workspaceMembershipRole: requireString(
+      record.workspace_membership_role,
+      "workspace_membership_role"
+    ),
+    reviewerCapability: requireBoolean(record.reviewer_capability, "reviewer_capability"),
+    datasetCuratorCapability: requireBoolean(
+      record.dataset_curator_capability,
+      "dataset_curator_capability"
+    ),
+    contributorAccessScope: requireString(
+      record.contributor_access_scope,
+      "contributor_access_scope"
+    ),
+    isDefault: requireBoolean(record.is_default, "is_default")
+  };
+}
+
+function parseDevUserList(value: unknown): DevUserList {
+  const record = requireRecord(value, "Development User list response");
+  return {
+    devUsers: requireArray(record.dev_users, "dev_users").map(parseDevUser)
   };
 }
 

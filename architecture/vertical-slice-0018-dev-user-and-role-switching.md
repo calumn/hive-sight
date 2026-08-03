@@ -188,29 +188,43 @@ Each Workspace should have one recognisable seeded Apiary/Hive pair and an accep
 
 ## Acceptance Criteria
 
-- [ ] The Web UI lets a developer choose among seeded development Users without typing a UUID.
-- [ ] The default selected development User preserves the current convenient owner/curator/reviewer local workflow.
-- [ ] The selected development User is persisted locally across browser refresh and revalidated against Core API on startup.
-- [ ] Switching development User clears all user-scoped UI state and reloads the selected User's own default Workspace.
-- [ ] The Development session panel clearly shows selected User, Workspace, Workspace Membership role, and diagnostic capability status.
-- [ ] Product workflow UI hides curator/reviewer capabilities the selected User cannot activate.
-- [ ] Core API exposes a local-only dev User list with stable seeded User data when dev personas are enabled.
-- [ ] Core API dev User list is unavailable when dev personas are disabled, and the Web UI hides the switcher or shows a clear local-development configuration error.
-- [ ] Core API rejects unknown dev User ids with `401 not_authenticated`.
-- [ ] Core API still rejects requests without a valid dev User identity.
-- [ ] Dataset Curator-only API behaviour is allowed for the Dataset Curator User and blocked for the No Capability User.
-- [ ] Reviewer-only API behaviour is allowed for Reviewer Users and blocked for the No Capability User.
-- [ ] Workspace access remains enforced when switching Users.
-- [ ] Reviewer and Contributor Users do not gain broad access to another User's Workspace.
-- [ ] Every seeded development User has a deterministic User id, display code, default Workspace, accepted Workspace Data Use Agreement, and recognisable Apiary/Hive context in both in-memory and Postgres dev modes.
-- [ ] Existing local workflows continue to work for the default development User.
-- [ ] Records created after switching User record the selected User id wherever the domain already has an actor/creator/reviewer/assigned-by field.
-- [ ] API and Playwright acceptance tests cover User switching, state clearing, role-gated visibility, and dev-only endpoint availability.
-- [ ] `CONTEXT.md` defines Development User / Development Persona as local testing language, not a product role.
-- [ ] `docs/user-guide.md` explains the development User switcher and includes a short manual QA scenario.
+- [x] The Web UI lets a developer choose among seeded development Users without typing a UUID.
+- [x] The default selected development User preserves the current convenient owner/curator/reviewer local workflow.
+- [x] The selected development User is persisted locally across browser refresh and revalidated against Core API on startup.
+- [x] Switching development User clears all user-scoped UI state and reloads the selected User's own default Workspace.
+- [x] The Development session panel clearly shows selected User, Workspace, Workspace Membership role, and diagnostic capability status.
+- [x] Product workflow UI hides curator/reviewer capabilities the selected User cannot activate.
+- [x] Core API exposes a local-only dev User list with stable seeded User data when dev personas are enabled.
+- [x] Core API dev User list is unavailable when dev personas are disabled, and the Web UI hides the switcher or shows a clear local-development configuration error.
+- [x] Core API rejects unknown dev User ids with `401 not_authenticated`.
+- [x] Core API still rejects requests without a valid dev User identity.
+- [x] Dataset Curator-only API behaviour is allowed for the Dataset Curator User and blocked for the No Capability User.
+- [x] Reviewer-only API behaviour is allowed for Reviewer Users and blocked for the No Capability User.
+- [x] Workspace access remains enforced when switching Users.
+- [x] Reviewer and Contributor Users do not gain broad access to another User's Workspace.
+- [x] Every seeded development User has a deterministic User id, display code, default Workspace, accepted Workspace Data Use Agreement, and recognisable Apiary/Hive context in both in-memory and Postgres dev modes.
+- [x] Existing local workflows continue to work for the default development User.
+- [x] Records created after switching User record the selected User id wherever the domain already has an actor/creator/reviewer/assigned-by field.
+- [x] API and Playwright acceptance tests cover User switching, state clearing, role-gated visibility, and dev-only endpoint availability.
+- [x] `CONTEXT.md` defines Development User / Development Persona as local testing language, not a product role.
+- [x] `docs/user-guide.md` explains the development User switcher and includes a short manual QA scenario.
 
 ## Open Questions
 
-- Should the dev User list endpoint return `404` or `403` when disabled? Recommended default: `404`.
-- What exact deterministic UUIDs should be assigned to the seeded development Users, Workspaces, Apiaries, and Hives?
-- Should the compact switcher sit in the sidebar permanently while dev personas are enabled, or in a collapsible development panel within the app shell?
+- Closed: the dev User list endpoint returns `404 dev_users_disabled` when disabled.
+- Closed: deterministic ids use the `000...010x`, `000...020x`, `000...030x`, and `000...040x` ranges for Users, Workspaces, Apiaries, and Hives respectively.
+- Closed: the compact switcher sits in the sidebar Development session panel while dev personas are enabled.
+
+## Implementation Notes
+
+- The local stack enables dev User switching by setting `HIVESIGHT_DEV_USERS_ENABLED=true` for the Core API.
+- The Web UI hides the switcher if `/v1/dev/users` is unavailable.
+- The selected development User id is stored in browser local storage under `hivesight.developmentUserId`.
+- Postgres seed/reset uses the same deterministic dev User catalogue as the in-memory store.
+
+## Verification
+
+- `services/core-api/.venv/bin/python -m pytest services/core-api/tests/test_dev_user_switching_slice.py -q`: 4 passed.
+- `HIVESIGHT_TEST_DATABASE_URL=postgresql://hive_sight:hive_sight@localhost:5432/hive_sight_core_test services/core-api/.venv/bin/python -m pytest services/core-api/tests/test_postgres_persistence_slice.py::test_postgres_store_seeds_development_users_with_separate_workspaces -q`: 1 passed.
+- `pnpm --filter @hive-sight/web exec playwright test tests/acceptance/slice-0018-dev-user-switching.spec.ts`: 1 passed.
+- `pnpm verify:slice`: passed; report written to `reports/slice-verification/latest.md`.

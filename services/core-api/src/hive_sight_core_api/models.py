@@ -190,6 +190,24 @@ class DevSessionResponse(BaseModel):
     workspace_data_use_agreement_terms_version: str | None
 
 
+class DevUserResponse(BaseModel):
+    user_id: UUID
+    display_name: str
+    dev_user_code: str
+    description: str
+    workspace_id: UUID
+    workspace_display_name: str
+    workspace_membership_role: str
+    reviewer_capability: bool
+    dataset_curator_capability: bool
+    contributor_access_scope: str
+    is_default: bool
+
+
+class DevUserListResponse(BaseModel):
+    dev_users: list[DevUserResponse]
+
+
 class WorkspaceDataUseAgreementAcceptanceRequest(BaseModel):
     workspace_id: UUID
     terms_version: str = Field(min_length=1)

@@ -55,6 +55,7 @@ import {
   fetchDatasetRepositoryItemDetail,
   fetchDatasetRepositoryItems,
   fetchDevSession,
+  fetchDevUsers,
   fetchFrameStandards,
   fetchHiveConfiguration,
   fetchHives,
@@ -101,6 +102,7 @@ import {
   type DatasetVersion,
   type DatasetVersionMembership,
   type DatasetRole,
+  type DevUser,
   type ImageQualityStatus,
   type Inspection,
   type InspectionIntent,
@@ -120,7 +122,8 @@ import {
   type YoloObbExport
 } from "./coreApiClient";
 
-const devUserId = "00000000-0000-0000-0000-000000000101";
+const defaultDevUserId = "00000000-0000-0000-0000-000000000101";
+const devUserStorageKey = "hivesight.developmentUserId";
 const currentTermsVersion = "2026-07-29";
 
 type LoadState =
@@ -146,6 +149,11 @@ type AppView = "inspection" | "repository";
 export function App() {
   const trainingCropPanelRef = useRef<HTMLDivElement | null>(null);
   const [loadState, setLoadState] = useState<LoadState>({ kind: "loading" });
+  const [selectedDevUserId, setSelectedDevUserId] = useState(() => {
+    return window.localStorage.getItem(devUserStorageKey) ?? defaultDevUserId;
+  });
+  const [devUsers, setDevUsers] = useState<DevUser[]>([]);
+  const [devUserSwitchingAvailable, setDevUserSwitchingAvailable] = useState(false);
   const [appView, setAppView] = useState<AppView>("inspection");
   const [actionState, setActionState] = useState<ActionState>({ kind: "idle" });
   const [apiaries, setApiaries] = useState<Apiary[]>([]);
@@ -179,19 +187,76 @@ export function App() {
   const [inspectionIntent, setInspectionIntent] =
     useState<InspectionIntent>("training_data_collection");
   const [file, setFile] = useState<File | null>(null);
+  const devUserId = selectedDevUserId;
 
   useEffect(() => {
-    Promise.all([fetchCoreHealth(), fetchDevSession(devUserId), fetchFrameStandards({ devUserId })])
-      .then(async ([health, session, standards]) => {
+    let cancelled = false;
+
+    async function loadWorkspaceForDevelopmentUser() {
+      setLoadState({ kind: "loading" });
+      clearUserScopedState();
+      try {
+        const health = await fetchCoreHealth();
+        let activeDevUserId = selectedDevUserId;
+        try {
+          const devUserListing = await fetchDevUsers();
+          if (cancelled) {
+            return;
+          }
+          setDevUsers(devUserListing.devUsers);
+          setDevUserSwitchingAvailable(true);
+          const selectedDevUserIsAvailable = devUserListing.devUsers.some(
+            (devUser) => devUser.userId === activeDevUserId
+          );
+          if (!selectedDevUserIsAvailable) {
+            const fallbackDevUserId =
+              devUserListing.devUsers.find((devUser) => devUser.isDefault)?.userId ??
+              defaultDevUserId;
+            window.localStorage.setItem(devUserStorageKey, fallbackDevUserId);
+            if (fallbackDevUserId !== selectedDevUserId) {
+              setSelectedDevUserId(fallbackDevUserId);
+              return;
+            }
+            activeDevUserId = fallbackDevUserId;
+          }
+        } catch (error) {
+          if (cancelled) {
+            return;
+          }
+          setDevUsers([]);
+          setDevUserSwitchingAvailable(false);
+          activeDevUserId = defaultDevUserId;
+        }
+
+        const [session, standards] = await Promise.all([
+          fetchDevSession(activeDevUserId),
+          fetchFrameStandards({ devUserId: activeDevUserId })
+        ]);
+        if (cancelled) {
+          return;
+        }
         setFrameStandards(standards);
         if (!standards.some((standard) => standard.frameStandardId === "british_national_deep_brood")) {
           setSelectedFrameStandardId(standards[0]?.frameStandardId ?? "");
         }
-        await refreshWorkspaceContext(session.workspaceId);
+        await refreshWorkspaceContext(session.workspaceId, undefined, undefined, activeDevUserId);
+        if (cancelled) {
+          return;
+        }
         setLoadState({ kind: "ready", health, session });
-      })
-      .catch((error: Error) => setLoadState({ kind: "error", message: error.message }));
-  }, []);
+      } catch (error) {
+        if (!cancelled) {
+          setLoadState({ kind: "error", message: error instanceof Error ? error.message : "Loading failed" });
+        }
+      }
+    }
+
+    void loadWorkspaceForDevelopmentUser();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedDevUserId]);
 
   useEffect(() => {
     return () => {
@@ -240,9 +305,10 @@ export function App() {
   async function refreshWorkspaceContext(
     workspaceId: string,
     preferredApiaryId?: string,
-    preferredHiveId?: string
+    preferredHiveId?: string,
+    activeDevUserId = devUserId
   ) {
-    const listing = await fetchApiaries({ devUserId, workspaceId });
+    const listing = await fetchApiaries({ devUserId: activeDevUserId, workspaceId });
     setApiaries(listing.apiaries);
     const nextApiary =
       listing.apiaries.find((candidate) => candidate.apiaryId === preferredApiaryId) ??
@@ -257,16 +323,17 @@ export function App() {
       clearInspectionWorkflow();
       return;
     }
-    await refreshHivesForApiary(workspaceId, nextApiary, preferredHiveId);
+    await refreshHivesForApiary(workspaceId, nextApiary, preferredHiveId, activeDevUserId);
   }
 
   async function refreshHivesForApiary(
     workspaceId: string,
     selectedApiary: Apiary,
-    preferredHiveId?: string
+    preferredHiveId?: string,
+    activeDevUserId = devUserId
   ) {
     const listing = await fetchHives({
-      devUserId,
+      devUserId: activeDevUserId,
       workspaceId,
       apiaryId: selectedApiary.apiaryId
     });
@@ -282,14 +349,18 @@ export function App() {
       setHiveConfiguration(null);
       return;
     }
-    await loadHiveConfigurationForSelection(workspaceId, nextHive);
-    await refreshTrainingInspections(workspaceId, nextHive);
+    await loadHiveConfigurationForSelection(workspaceId, nextHive, activeDevUserId);
+    await refreshTrainingInspections(workspaceId, nextHive, undefined, activeDevUserId);
   }
 
-  async function loadHiveConfigurationForSelection(workspaceId: string, selectedHive: Hive) {
+  async function loadHiveConfigurationForSelection(
+    workspaceId: string,
+    selectedHive: Hive,
+    activeDevUserId = devUserId
+  ) {
     try {
       const configuration = await fetchHiveConfiguration({
-        devUserId,
+        devUserId: activeDevUserId,
         workspaceId,
         hiveId: selectedHive.hiveId
       });
@@ -340,10 +411,11 @@ export function App() {
   async function refreshTrainingInspections(
     workspaceId: string,
     selectedHive: Hive,
-    preferredInspectionId?: string
+    preferredInspectionId?: string,
+    activeDevUserId = devUserId
   ) {
     const listing = await fetchHiveInspections({
-      devUserId,
+      devUserId: activeDevUserId,
       workspaceId,
       hiveId: selectedHive.hiveId,
       intent: "training_data_collection"
@@ -359,13 +431,14 @@ export function App() {
       clearInspectionWorkflow();
       return;
     }
-    await selectInspection(workspaceId, nextInspection, true);
+    await selectInspection(workspaceId, nextInspection, true, activeDevUserId);
   }
 
   async function selectInspection(
     workspaceId: string,
     selectedInspection: Inspection,
-    scrollToCrops: boolean
+    scrollToCrops: boolean,
+    activeDevUserId = devUserId
   ) {
     setInspection(selectedInspection);
     setFile(null);
@@ -376,7 +449,7 @@ export function App() {
     clearLabellingImage();
     setActionState({ kind: "idle" });
     const listing = await fetchInspectionPhotos({
-      devUserId,
+      devUserId: activeDevUserId,
       workspaceId,
       inspectionId: selectedInspection.inspectionId
     });
@@ -765,6 +838,25 @@ export function App() {
     clearLabellingImage();
   }
 
+  function clearUserScopedState() {
+    setAppView("inspection");
+    setActionState({ kind: "idle" });
+    setApiaries([]);
+    setApiary(null);
+    setHives([]);
+    setHive(null);
+    setHiveConfiguration(null);
+    setTrainingInspections([]);
+    setInspection(null);
+    setInspectionPhotos([]);
+    setAnalysisDetail(null);
+    setFile(null);
+    setReviewState(null);
+    setLabellingState(null);
+    clearEvidenceImage();
+    clearLabellingImage();
+  }
+
   async function runAction(label: string, action: () => Promise<void>) {
     setActionState({ kind: "working", label });
     try {
@@ -774,6 +866,11 @@ export function App() {
       const apiError = toApiError(error);
       setActionState({ kind: "blocked", code: apiError.code, message: apiError.message });
     }
+  }
+
+  function onSelectDevelopmentUser(nextDevUserId: string) {
+    window.localStorage.setItem(devUserStorageKey, nextDevUserId);
+    setSelectedDevUserId(nextDevUserId);
   }
 
   return (
@@ -789,7 +886,15 @@ export function App() {
       {loadState.kind === "ready" ? (
         <section className="intake-layout" aria-label="Inspection photo intake workflow">
           <aside className="workspace-panel">
-            <PanelHeading icon={<ShieldCheck size={20} />} title="Workspace gate" />
+            <PanelHeading icon={<ShieldCheck size={20} />} title="Development session" />
+            {devUserSwitchingAvailable ? (
+              <DevelopmentUserSelector
+                devUsers={devUsers}
+                selectedDevUserId={devUserId}
+                disabled={actionState.kind === "working"}
+                onSelectDevelopmentUser={onSelectDevelopmentUser}
+              />
+            ) : null}
             <nav className="view-switcher" aria-label="HiveSight local pages">
               <button
                 type="button"
@@ -800,18 +905,28 @@ export function App() {
                 <FileImage size={18} />
                 Inspection
               </button>
-              <button
-                type="button"
-                className={appView === "repository" ? "selected" : ""}
-                onClick={() => setAppView("repository")}
-                disabled={!loadState.session.datasetCuratorCapability}
-                data-testid="bee-annotation-repository-page-button"
-              >
-                <BookOpen size={18} />
-                Repository
-              </button>
+              {loadState.session.datasetCuratorCapability ? (
+                <button
+                  type="button"
+                  className={appView === "repository" ? "selected" : ""}
+                  onClick={() => setAppView("repository")}
+                  data-testid="bee-annotation-repository-page-button"
+                >
+                  <BookOpen size={18} />
+                  Repository
+                </button>
+              ) : null}
             </nav>
             <dl className="facts">
+              {devUserSwitchingAvailable ? (
+                <div>
+                  <dt>Dev User</dt>
+                  <dd data-testid="development-user-code">
+                    {devUsers.find((devUser) => devUser.userId === devUserId)?.devUserCode ??
+                      "unknown"}
+                  </dd>
+                </div>
+              ) : null}
               <div>
                 <dt>User</dt>
                 <dd>{loadState.session.userId.slice(0, 8)}</dd>
@@ -823,6 +938,12 @@ export function App() {
               <div>
                 <dt>Role</dt>
                 <dd>{loadState.session.role}</dd>
+              </div>
+              <div>
+                <dt>Capabilities</dt>
+                <dd data-testid="development-user-capabilities">
+                  {formatCapabilities(loadState.session)}
+                </dd>
               </div>
             </dl>
             <button
@@ -1144,6 +1265,36 @@ function StatusPill({ loadState }: { loadState: LoadState }) {
   return <span className="status-pill status-ready">{loadState.health.service} online</span>;
 }
 
+function DevelopmentUserSelector({
+  devUsers,
+  selectedDevUserId,
+  disabled,
+  onSelectDevelopmentUser
+}: {
+  devUsers: DevUser[];
+  selectedDevUserId: string;
+  disabled: boolean;
+  onSelectDevelopmentUser: (devUserId: string) => void;
+}) {
+  return (
+    <label className="development-user-select">
+      <span>Acting as</span>
+      <select
+        value={selectedDevUserId}
+        onChange={(event) => onSelectDevelopmentUser(event.target.value)}
+        disabled={disabled}
+        data-testid="development-user-select"
+      >
+        {devUsers.map((devUser) => (
+          <option key={devUser.userId} value={devUser.userId}>
+            {devUser.devUserCode} / {devUser.displayName}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 function PanelHeading({ icon, title }: { icon: ReactNode; title: string }) {
   return (
     <div className="panel-heading">
@@ -1151,6 +1302,14 @@ function PanelHeading({ icon, title }: { icon: ReactNode; title: string }) {
       <h2>{title}</h2>
     </div>
   );
+}
+
+function formatCapabilities(session: DevSession) {
+  const capabilities = [
+    session.datasetCuratorCapability ? "Dataset Curator" : null,
+    session.reviewerCapability ? "Reviewer" : null
+  ].filter((capability): capability is string => capability !== null);
+  return capabilities.length > 0 ? capabilities.join(" / ") : "None";
 }
 
 function RecordBadge({ value }: { value: string | undefined }) {

@@ -27,6 +27,7 @@ from hive_sight_core_api.models import (
     DatasetRole,
     DataUseAgreementStatus,
     DevSessionResponse,
+    DevUserResponse,
     FrameStandardResponse,
     FrameStandardStatus,
     GeneratedDatasetExportFileEntry,
@@ -64,6 +65,13 @@ from hive_sight_core_api.models import (
     YoloObbExportResponse,
     YoloObbImageEntry,
     YoloObbLabelEntry,
+)
+from hive_sight_core_api.dev_users import (
+    DEV_USERS,
+    accepted_at,
+    dev_user_response,
+    seeded_apiary,
+    seeded_hive,
 )
 
 try:
@@ -214,6 +222,42 @@ class InMemoryProductDataStore:
             workspace_data_use_agreement_status=workspace.data_use_agreement_status,
             workspace_data_use_agreement_terms_version=workspace.data_use_agreement_terms_version,
         )
+
+    def seed_development_users(self) -> None:
+        for seed in DEV_USERS:
+            self.users.add(seed.user_id)
+            self.workspaces[seed.workspace_id] = WorkspaceRecord(
+                workspace_id=seed.workspace_id,
+                data_use_agreement_status=DataUseAgreementStatus.accepted,
+                data_use_agreement_terms_version="dev-seed",
+                data_use_agreement_accepted_at=accepted_at(),
+            )
+            if not any(
+                membership.user_id == seed.user_id
+                and membership.workspace_id == seed.workspace_id
+                and membership.role == seed.workspace_membership_role
+                for membership in self.memberships
+            ):
+                self.memberships.append(
+                    WorkspaceMembershipRecord(
+                        user_id=seed.user_id,
+                        workspace_id=seed.workspace_id,
+                        role=seed.workspace_membership_role,
+                    )
+                )
+            if seed.reviewer_capability:
+                self.reviewer_user_ids.add(seed.user_id)
+            else:
+                self.reviewer_user_ids.discard(seed.user_id)
+            if seed.dataset_curator_capability:
+                self.dataset_curator_user_ids.add(seed.user_id)
+            else:
+                self.dataset_curator_user_ids.discard(seed.user_id)
+            self.apiaries[seed.apiary_id] = seeded_apiary(seed)
+            self.hives[seed.hive_id] = seeded_hive(seed)
+
+    def list_development_users(self) -> list[DevUserResponse]:
+        return [dev_user_response(seed) for seed in DEV_USERS]
 
     def accept_data_use_agreement(
         self,
@@ -1754,6 +1798,7 @@ class DevState:
     upload_policy: UploadPolicy
     dataset_export_root: Path = Path("var/exports/datasets")
     model_artifact_root: Path = Path("var/model-runs")
+    dev_users_enabled: bool = False
 
 
 class DomainError(Exception):

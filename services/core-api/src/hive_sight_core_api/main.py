@@ -35,6 +35,7 @@ from hive_sight_core_api.dependencies import (
     get_training_crop_workflow,
 )
 from hive_sight_core_api.dev_store import DomainError, UserContext
+from hive_sight_core_api.dev_users import DEV_USER_IDS
 from hive_sight_core_api.directed_ellipse_cleanup_workflow import DirectedEllipseCleanupWorkflow
 from hive_sight_core_api.hive_configuration_workflow import HiveConfigurationWorkflow
 from hive_sight_core_api.inspection_photo_access import InspectionPhotoAccess
@@ -65,6 +66,7 @@ from hive_sight_core_api.models import (
     DatasetLabellingEvidenceResponse,
     DatasetLabellingSessionResponse,
     DevSessionResponse,
+    DevUserListResponse,
     DirectedEllipseLocalCleanupRequest,
     DirectedEllipseLocalCleanupResponse,
     ErrorResponse,
@@ -187,7 +189,10 @@ DirectedEllipseCleanupWorkflowDep = Annotated[
 DevUserIdHeader = Annotated[str | None, Header(alias="x-hivesight-dev-user-id")]
 
 
-def get_dev_user_context(x_hivesight_dev_user_id: DevUserIdHeader = None) -> UserContext:
+def get_dev_user_context(
+    state: DevStateDep,
+    x_hivesight_dev_user_id: DevUserIdHeader = None,
+) -> UserContext:
     if x_hivesight_dev_user_id is None:
         raise DomainError(
             "not_authenticated",
@@ -195,13 +200,20 @@ def get_dev_user_context(x_hivesight_dev_user_id: DevUserIdHeader = None) -> Use
             401,
         )
     try:
-        return UserContext(user_id=UUID(x_hivesight_dev_user_id))
+        user_id = UUID(x_hivesight_dev_user_id)
     except ValueError as exc:
         raise DomainError(
             "not_authenticated",
             "The dev authentication header was not a valid User id.",
             401,
         ) from exc
+    if state.dev_users_enabled and user_id not in DEV_USER_IDS:
+        raise DomainError(
+            "not_authenticated",
+            "The selected development User is not available in this environment.",
+            401,
+        )
+    return UserContext(user_id=user_id)
 
 
 AuthenticatedUserDep = Annotated[UserContext, Depends(get_dev_user_context)]
@@ -229,6 +241,18 @@ def healthz() -> HealthResponse:
 @app.get("/v1/dev/session", response_model=DevSessionResponse)
 def get_dev_session(user: AuthenticatedUserDep, state: DevStateDep) -> DevSessionResponse:
     return state.store.ensure_dev_session(user.user_id)
+
+
+@app.get("/v1/dev/users", response_model=DevUserListResponse)
+def list_dev_users(state: DevStateDep) -> DevUserListResponse:
+    if not state.dev_users_enabled:
+        raise DomainError(
+            "dev_users_disabled",
+            "Development User switching is not enabled in this environment.",
+            404,
+        )
+    state.store.seed_development_users()
+    return DevUserListResponse(dev_users=state.store.list_development_users())
 
 
 @app.post(

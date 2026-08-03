@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import argparse
 import json
+from uuid import NAMESPACE_URL, uuid5
 from urllib.parse import urlparse, urlunparse
 from pathlib import Path
 
 from hive_sight_core_api.dev_store import FRAME_STANDARDS
+from hive_sight_core_api.dev_users import DEV_USERS, accepted_at
 from hive_sight_core_api.settings import load_settings
 
 MIGRATIONS_DIR = Path(__file__).with_name("migrations")
@@ -83,95 +85,175 @@ def reset_database(database_url: str) -> None:
 
 def seed_dev_data(database_url: str) -> None:
     apply_migrations(database_url)
-    user_id = "00000000-0000-0000-0000-000000000101"
-    workspace_id = "00000000-0000-0000-0000-000000000201"
     with _connect(database_url) as connection, connection.cursor() as cursor:
-        cursor.execute(
-            """
-                INSERT INTO users (id, display_name, contact_identifier)
-                VALUES (%s, %s, %s)
-                ON CONFLICT (id) DO NOTHING
-                """,
-            (user_id, "HiveSight Dev Curator", "dev-curator"),
-        )
-        cursor.execute(
-            """
-                INSERT INTO repository_records (record_type, record_id, payload)
-                VALUES ('user', %s, %s::jsonb)
-                ON CONFLICT (record_type, record_id) DO UPDATE SET payload = EXCLUDED.payload
-                """,
-            (user_id, json.dumps({"user_id": user_id})),
-        )
-        cursor.execute(
-            """
-                INSERT INTO workspaces (
-                    id,
-                    display_name,
-                    data_use_agreement_status,
-                    data_use_agreement_terms_version,
-                    data_use_agreement_accepted_at
-                )
-                VALUES (%s, %s, 'accepted', 'dev-seed', now())
-                ON CONFLICT (id) DO UPDATE SET
-                    data_use_agreement_status = EXCLUDED.data_use_agreement_status,
-                    data_use_agreement_terms_version = EXCLUDED.data_use_agreement_terms_version,
-                    data_use_agreement_accepted_at = EXCLUDED.data_use_agreement_accepted_at
-                """,
-            (workspace_id, "HiveSight Dev Workspace"),
-        )
-        cursor.execute(
-            """
-                INSERT INTO repository_records (record_type, record_id, payload)
-                VALUES ('workspace', %s, %s::jsonb)
-                ON CONFLICT (record_type, record_id) DO UPDATE SET payload = EXCLUDED.payload
-                """,
-            (
-                workspace_id,
-                json.dumps(
-                    {
-                        "workspace_id": workspace_id,
-                        "data_use_agreement_status": "accepted",
-                        "data_use_agreement_terms_version": "dev-seed",
-                        "data_use_agreement_accepted_at": None,
-                    }
-                ),
-            ),
-        )
-        cursor.execute(
-            """
-                INSERT INTO workspace_memberships (id, user_id, workspace_id, role, status)
-                VALUES (%s, %s, %s, 'owner', 'active')
-                ON CONFLICT (user_id, workspace_id, role) DO NOTHING
-                """,
-            ("00000000-0000-0000-0000-000000000301", user_id, workspace_id),
-        )
-        cursor.execute(
-            """
-                INSERT INTO repository_records (record_type, record_id, payload)
-                VALUES ('workspace_membership', %s, %s::jsonb)
-                ON CONFLICT (record_type, record_id) DO UPDATE SET payload = EXCLUDED.payload
-                """,
-            (
-                f"{user_id}:{workspace_id}:owner",
-                json.dumps(
-                    {
-                        "user_id": user_id,
-                        "workspace_id": workspace_id,
-                        "role": "owner",
-                        "status": "active",
-                    }
-                ),
-            ),
-        )
-        for offset, capability in enumerate(("reviewer", "dataset_curator"), start=1):
+        seed_time = accepted_at()
+        for seed in DEV_USERS:
+            user_id = str(seed.user_id)
+            workspace_id = str(seed.workspace_id)
             cursor.execute(
                 """
-                    INSERT INTO internal_capabilities (id, user_id, capability)
+                    INSERT INTO users (id, display_name, contact_identifier)
                     VALUES (%s, %s, %s)
-                    ON CONFLICT (user_id, capability) DO UPDATE SET status = 'active'
+                    ON CONFLICT (id) DO UPDATE SET
+                        display_name = EXCLUDED.display_name,
+                        contact_identifier = EXCLUDED.contact_identifier
                     """,
-                (f"00000000-0000-0000-0000-00000000040{offset}", user_id, capability),
+                (user_id, seed.display_name, seed.code),
             )
+            cursor.execute(
+                """
+                    INSERT INTO repository_records (record_type, record_id, payload)
+                    VALUES ('user', %s, %s::jsonb)
+                    ON CONFLICT (record_type, record_id) DO UPDATE SET payload = EXCLUDED.payload
+                    """,
+                (user_id, json.dumps({"user_id": user_id})),
+            )
+            cursor.execute(
+                """
+                    INSERT INTO workspaces (
+                        id,
+                        display_name,
+                        data_use_agreement_status,
+                        data_use_agreement_terms_version,
+                        data_use_agreement_accepted_at
+                    )
+                    VALUES (%s, %s, 'accepted', 'dev-seed', %s)
+                    ON CONFLICT (id) DO UPDATE SET
+                        display_name = EXCLUDED.display_name,
+                        data_use_agreement_status = EXCLUDED.data_use_agreement_status,
+                        data_use_agreement_terms_version = EXCLUDED.data_use_agreement_terms_version,
+                        data_use_agreement_accepted_at = EXCLUDED.data_use_agreement_accepted_at
+                    """,
+                (workspace_id, seed.workspace_display_name, seed_time),
+            )
+            cursor.execute(
+                """
+                    INSERT INTO repository_records (record_type, record_id, payload)
+                    VALUES ('workspace', %s, %s::jsonb)
+                    ON CONFLICT (record_type, record_id) DO UPDATE SET payload = EXCLUDED.payload
+                    """,
+                (
+                    workspace_id,
+                    json.dumps(
+                        {
+                            "workspace_id": workspace_id,
+                            "data_use_agreement_status": "accepted",
+                            "data_use_agreement_terms_version": "dev-seed",
+                            "data_use_agreement_accepted_at": seed_time.isoformat(),
+                        }
+                    ),
+                ),
+            )
+            cursor.execute(
+                """
+                    INSERT INTO workspace_memberships (id, user_id, workspace_id, role, status)
+                    VALUES (%s, %s, %s, %s, 'active')
+                    ON CONFLICT (user_id, workspace_id, role) DO UPDATE SET status = 'active'
+                    """,
+                (
+                    str(
+                        uuid5(
+                            NAMESPACE_URL,
+                            f"hivesight:membership:{user_id}:{workspace_id}:{seed.workspace_membership_role}",
+                        )
+                    ),
+                    user_id,
+                    workspace_id,
+                    seed.workspace_membership_role,
+                ),
+            )
+            cursor.execute(
+                """
+                    INSERT INTO repository_records (record_type, record_id, payload)
+                    VALUES ('workspace_membership', %s, %s::jsonb)
+                    ON CONFLICT (record_type, record_id) DO UPDATE SET payload = EXCLUDED.payload
+                    """,
+                (
+                    f"{user_id}:{workspace_id}:{seed.workspace_membership_role}",
+                    json.dumps(
+                        {
+                            "user_id": user_id,
+                            "workspace_id": workspace_id,
+                            "role": seed.workspace_membership_role,
+                            "status": "active",
+                        }
+                    ),
+                ),
+            )
+            cursor.execute(
+                """
+                    INSERT INTO apiaries (id, workspace_id, name)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name
+                    """,
+                (str(seed.apiary_id), workspace_id, seed.apiary_name),
+            )
+            cursor.execute(
+                """
+                    INSERT INTO repository_records (record_type, record_id, payload)
+                    VALUES ('apiary', %s, %s::jsonb)
+                    ON CONFLICT (record_type, record_id) DO UPDATE SET payload = EXCLUDED.payload
+                    """,
+                (
+                    str(seed.apiary_id),
+                    json.dumps(
+                        {
+                            "apiary_id": str(seed.apiary_id),
+                            "workspace_id": workspace_id,
+                            "name": seed.apiary_name,
+                        }
+                    ),
+                ),
+            )
+            cursor.execute(
+                """
+                    INSERT INTO hives (id, workspace_id, apiary_id, name)
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name
+                    """,
+                (str(seed.hive_id), workspace_id, str(seed.apiary_id), seed.hive_name),
+            )
+            cursor.execute(
+                """
+                    INSERT INTO repository_records (record_type, record_id, payload)
+                    VALUES ('hive', %s, %s::jsonb)
+                    ON CONFLICT (record_type, record_id) DO UPDATE SET payload = EXCLUDED.payload
+                    """,
+                (
+                    str(seed.hive_id),
+                    json.dumps(
+                        {
+                            "hive_id": str(seed.hive_id),
+                            "apiary_id": str(seed.apiary_id),
+                            "workspace_id": workspace_id,
+                            "name": seed.hive_name,
+                        }
+                    ),
+                ),
+            )
+            cursor.execute("DELETE FROM internal_capabilities WHERE user_id = %s", (user_id,))
+            for capability, enabled in (
+                ("reviewer", seed.reviewer_capability),
+                ("dataset_curator", seed.dataset_curator_capability),
+            ):
+                if enabled:
+                    cursor.execute(
+                        """
+                            INSERT INTO internal_capabilities (id, user_id, capability, status)
+                            VALUES (%s, %s, %s, 'active')
+                            ON CONFLICT (user_id, capability) DO UPDATE SET status = 'active'
+                            """,
+                        (
+                            str(
+                                uuid5(
+                                    NAMESPACE_URL,
+                                    f"hivesight:capability:{user_id}:{capability}",
+                                )
+                            ),
+                            user_id,
+                            capability,
+                        ),
+                    )
         for frame_standard in FRAME_STANDARDS:
             cursor.execute(
                 """

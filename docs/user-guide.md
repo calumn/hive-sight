@@ -31,6 +31,19 @@ Check whether the servers are running:
 pnpm dev:status
 ```
 
+## Switch Development User
+
+Use this when you want to exercise the local UI as another seeded User without real authentication.
+
+1. Start HiveSight locally.
+2. In `Development session`, choose a User from `Acting as`.
+3. Wait for the selected User's Workspace, Apiary, and Hive to load.
+4. Check `Capabilities` to see whether that User is a Dataset Curator, Reviewer, both, or neither.
+
+Switching User behaves like logging out and logging in as someone else: the current page, selected Inspection, selected photos, crops, repository state, and transient images are cleared before the new User's Workspace is loaded.
+
+Product actions that the selected User can never perform are hidden. For example, a User without Dataset Curator capability will not see the Repository page button.
+
 ## Start HiveSight With Real YOLO Training
 
 Use this when you want to train or test a local YOLO OBB Bee Detector Model Candidate.

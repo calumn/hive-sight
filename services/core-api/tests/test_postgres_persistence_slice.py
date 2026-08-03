@@ -11,11 +11,14 @@ from hive_configuration_test_support import configure_hive
 from hive_sight_core_api.db import MIGRATIONS_DIR, reset_database
 from hive_sight_core_api.dependencies import get_dev_state
 from hive_sight_core_api.dev_store import (
+    DomainError,
     FileSystemObjectStorage,
     InMemoryEventRecorder,
     InMemoryObjectStorage,
     UploadPolicy,
+    UserContext,
 )
+from hive_sight_core_api.dev_users import DEV_USERS
 from hive_sight_core_api.main import app
 from hive_sight_core_api.models import (
     ArtifactResponse,
@@ -308,6 +311,36 @@ def test_postgres_store_survives_restart_for_training_crop_dataset_item_path() -
         assert reassignment.json()["reviewed_ellipse_snapshots"][0]["rotation_degrees"] == 15
     finally:
         app.dependency_overrides.clear()
+
+
+@pytest.mark.skipif(
+    importlib.util.find_spec("psycopg") is None or not os.getenv("HIVESIGHT_TEST_DATABASE_URL"),
+    reason="Set HIVESIGHT_TEST_DATABASE_URL and install psycopg to run Postgres persistence integration.",
+)
+def test_postgres_store_seeds_development_users_with_separate_workspaces() -> None:
+    database_url = os.environ["HIVESIGHT_TEST_DATABASE_URL"]
+    reset_database(database_url)
+
+    store = _build_postgres_state(database_url).store
+    store.seed_development_users()
+
+    owner_a = DEV_USERS[1]
+    owner_b = DEV_USERS[2]
+    curator = DEV_USERS[3]
+    no_capability = DEV_USERS[-1]
+
+    assert store.ensure_dev_session(owner_a.user_id).workspace_id == owner_a.workspace_id
+    assert store.ensure_dev_session(owner_b.user_id).workspace_id == owner_b.workspace_id
+    assert store.ensure_dev_session(curator.user_id).dataset_curator_capability is True
+    assert store.ensure_dev_session(no_capability.user_id).dataset_curator_capability is False
+    assert store.ensure_dev_session(no_capability.user_id).reviewer_capability is False
+    assert [
+        apiary.name
+        for apiary in store.list_apiaries(UserContext(owner_a.user_id), owner_a.workspace_id)
+    ] == ["Owner A Apiary"]
+    with pytest.raises(DomainError) as error:
+        store.list_apiaries(UserContext(owner_b.user_id), owner_a.workspace_id)
+    assert error.value.code == "workspace_access_denied"
 
 
 @pytest.mark.skipif(

@@ -22,6 +22,7 @@ export default defineConfig({
       command:
         "cd ../../services/core-api && ./.venv/bin/python -m uvicorn hive_sight_core_api.main:app --host 127.0.0.1 --port 8000",
       env: {
+        HIVESIGHT_DEV_USERS_ENABLED: "true",
         HIVESIGHT_PRELABELER: "deterministic"
       },
       reuseExistingServer: false,

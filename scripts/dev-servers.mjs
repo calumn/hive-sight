@@ -27,6 +27,7 @@ const services = [
     ],
     cwd: "services/core-api",
     env: {
+      HIVESIGHT_DEV_USERS_ENABLED: "true",
       CORE_API_ALLOWED_ORIGINS: [
         "http://localhost:5173",
         "http://127.0.0.1:5173",

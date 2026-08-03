@@ -12,6 +12,7 @@ from hive_sight_core_api.dev_store import (
     WorkspaceMembershipRecord,
     WorkspaceRecord,
 )
+from hive_sight_core_api.dev_users import DEV_USERS, DevUserSeed
 from hive_sight_core_api.models import (
     AnalysisResultResponse,
     AnalysisRunResponse,
@@ -68,6 +69,30 @@ class PostgresProductDataStore(InMemoryProductDataStore):
         session = super().ensure_dev_session(user_id)
         self._persist_core_identity(user_id=user_id, workspace_id=session.workspace_id)
         return session
+
+    def seed_development_users(self) -> None:
+        super().seed_development_users()
+        for seed in DEV_USERS:
+            self._persist_payload("user", seed.user_id, {"user_id": str(seed.user_id)})
+            self._persist_workspace(seed.workspace_id)
+            self._persist_model("apiary", seed.apiary_id, self.apiaries[seed.apiary_id])
+            self._persist_model("hive", seed.hive_id, self.hives[seed.hive_id])
+            self._upsert_apiary_projection(self.apiaries[seed.apiary_id])
+            self._upsert_hive_projection(self.hives[seed.hive_id])
+            membership = next(
+                membership
+                for membership in self.memberships
+                if membership.user_id == seed.user_id
+                and membership.workspace_id == seed.workspace_id
+                and membership.role == seed.workspace_membership_role
+            )
+            self._persist_payload(
+                "workspace_membership",
+                f"{membership.user_id}:{membership.workspace_id}:{membership.role}",
+                _jsonable(asdict(membership)),
+            )
+            self._upsert_seeded_user_projection(seed)
+            self._upsert_workspace_projection(seed.workspace_id)
 
     def accept_data_use_agreement(self, *args: Any, **kwargs: Any):
         response = super().accept_data_use_agreement(*args, **kwargs)
@@ -382,19 +407,55 @@ class PostgresProductDataStore(InMemoryProductDataStore):
                     workspace_id,
                 ),
             )
-            for capability in ("reviewer", "dataset_curator"):
-                cursor.execute(
-                    """
-                    INSERT INTO internal_capabilities (id, user_id, capability)
-                    VALUES (%s, %s, %s)
-                    ON CONFLICT (user_id, capability) DO UPDATE SET status = 'active'
-                    """,
-                    (
-                        uuid5(NAMESPACE_URL, f"hivesight:capability:{user_id}:{capability}"),
-                        user_id,
-                        capability,
+    def _upsert_seeded_user_projection(self, seed: DevUserSeed) -> None:
+        with self._connect() as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO users (id, display_name, contact_identifier)
+                VALUES (%s, %s, %s)
+                ON CONFLICT (id) DO UPDATE SET
+                    display_name = EXCLUDED.display_name,
+                    contact_identifier = EXCLUDED.contact_identifier
+                """,
+                (seed.user_id, seed.display_name, seed.code),
+            )
+            cursor.execute(
+                """
+                INSERT INTO workspace_memberships (id, user_id, workspace_id, role, status)
+                VALUES (%s, %s, %s, %s, 'active')
+                ON CONFLICT (user_id, workspace_id, role) DO UPDATE SET status = 'active'
+                """,
+                (
+                    uuid5(
+                        NAMESPACE_URL,
+                        f"hivesight:membership:{seed.user_id}:{seed.workspace_id}:{seed.workspace_membership_role}",
                     ),
-                )
+                    seed.user_id,
+                    seed.workspace_id,
+                    seed.workspace_membership_role,
+                ),
+            )
+            cursor.execute("DELETE FROM internal_capabilities WHERE user_id = %s", (seed.user_id,))
+            for capability, enabled in (
+                ("reviewer", seed.reviewer_capability),
+                ("dataset_curator", seed.dataset_curator_capability),
+            ):
+                if enabled:
+                    cursor.execute(
+                        """
+                        INSERT INTO internal_capabilities (id, user_id, capability, status)
+                        VALUES (%s, %s, %s, 'active')
+                        ON CONFLICT (user_id, capability) DO UPDATE SET status = 'active'
+                        """,
+                        (
+                            uuid5(
+                                NAMESPACE_URL,
+                                f"hivesight:capability:{seed.user_id}:{capability}",
+                            ),
+                            seed.user_id,
+                            capability,
+                        ),
+                    )
 
     def _persist_workspace(self, workspace_id: UUID) -> None:
         workspace = self.workspaces[workspace_id]

@@ -70,6 +70,7 @@ def build_dev_state(
     max_upload_size_bytes: int = 15 * 1024 * 1024,
     dataset_export_root: Path = DEFAULT_DATASET_EXPORT_ROOT,
     model_artifact_root: Path | None = None,
+    dev_users_enabled: bool | None = None,
 ) -> DevState:
     id_factory = deterministic_id_factory(id_values) if id_values is not None else None
     settings = get_settings()
@@ -87,14 +88,21 @@ def build_dev_state(
             id_factory=resolved_id_factory,
             clock=clock,
         )
-    return DevState(
+    should_seed_dev_users = (
+        dev_users_enabled if dev_users_enabled is not None else settings.dev_users_enabled
+    )
+    state = DevState(
         store=store,
         object_storage=_object_storage(settings),
         event_recorder=InMemoryEventRecorder(),
         upload_policy=UploadPolicy(max_size_bytes=max_upload_size_bytes),
         dataset_export_root=dataset_export_root,
         model_artifact_root=model_artifact_root or _model_artifact_root(settings),
+        dev_users_enabled=should_seed_dev_users,
     )
+    if should_seed_dev_users:
+        state.store.seed_development_users()
+    return state
 
 
 DevStateDep = Annotated[DevState, Depends(get_dev_state)]

@@ -19,6 +19,7 @@ class Settings:
     training_run_heartbeat_interval_seconds: int
     object_storage_root: str = "var/object-storage"
     persistence_backend: str = "in_memory"
+    dev_users_enabled: bool = False
 
 
 def load_settings() -> Settings:
@@ -51,9 +52,17 @@ def load_settings() -> Settings:
         training_run_heartbeat_interval_seconds=int(
             os.getenv("HIVESIGHT_TRAINING_RUN_HEARTBEAT_INTERVAL_SECONDS", "5")
         ),
+        dev_users_enabled=_bool_env("HIVESIGHT_DEV_USERS_ENABLED", False),
     )
 
 
 def _csv_env(name: str, default: str) -> list[str]:
     raw_value = os.getenv(name, default)
     return [item.strip() for item in raw_value.split(",") if item.strip()]
+
+
+def _bool_env(name: str, default: bool) -> bool:
+    raw_value = os.getenv(name)
+    if raw_value is None:
+        return default
+    return raw_value.strip().lower() in {"1", "true", "yes", "on"}

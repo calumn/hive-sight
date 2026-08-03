@@ -238,6 +238,19 @@ h1 {
   margin-bottom: 18px;
 }
 
+.development-user-select {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 18px;
+}
+
+.development-user-select span {
+  color: #626a5f;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
 .view-switcher button {
   justify-content: flex-start;
   width: 100%;
