@@ -172,6 +172,10 @@ Revisit trigger:
 
 Slice 0013 closeout decision: keep this after Slice 0014 unless role-specific UI acceptance becomes the immediate next workflow. Revisit before the next role-specific UI acceptance flow.
 
+Promotion note:
+
+Promoted into `architecture/vertical-slice-0018-dev-user-and-role-switching.md` after role-specific dataset-governance, reviewer, contributor, and future authentication discussions made the single hard-coded dev User too limiting for planning, acceptance testing, and manual QA.
+
 Suggested owner or area:
 
 Web UI, Core API dev session, and test automation.

@@ -441,3 +441,35 @@ AI contribution:
 Human judgment still required:
 
 - Define the benchmark or operational failure that would justify replacing the first binary head/tail classifier.
+
+### 2026-08-03 Roadmap Capture
+
+Human-confirmed direction:
+
+- Add a lightweight roadmap document under `requirements` so potential future slices are visible outside individual slice docs and the parking lot.
+- Group future work by business, technical, governance, and quality concerns rather than treating slice numbers as a fixed plan.
+
+AI contribution:
+
+- Consolidated parked and emerging work into `requirements/roadmap.md`, including Bee Localisation, Bee Orientation, Varroa Detection, statistical inference, product workflow, data governance, platform, and testing candidates.
+
+Human judgment still required:
+
+- Choose the next active slice from the roadmap before implementation.
+
+### 2026-08-03 Dev User And Auth Boundary Direction
+
+Human-confirmed direction:
+
+- Tackle role-sensitive local workflows before real registration and external login.
+- Avoid rolling HiveSight-owned passwords or account recovery.
+- Treat Google or Apple login as future delegated authentication options, while HiveSight keeps ownership of Workspace Membership, internal capabilities, Contributor Access Scope, and authorization decisions.
+
+AI contribution:
+
+- Proposed `Slice 0018: Dev User And Role Switching` as a bridge from the existing `x-hivesight-dev-user-id` seam toward real authentication.
+- Parked real external login behind a follow-on Auth Boundary Decision and First External Login Provider slice.
+
+Human judgment still required:
+
+- Decide whether Google is the first real provider and whether Apple is needed for the first external-user release.
