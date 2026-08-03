@@ -56,6 +56,8 @@ These are the strongest near-term candidates based on the current project state.
 | Full-Frame And Tiled YOLO Export | Technical | Export larger regions or full-frame sides for model training once crop training is not enough. |
 | Full-Frame Bee Localisation Evaluation | Technical | Benchmark model performance on dense, realistic frame photos and report losses by density, lighting, image quality, and Hive Configuration. |
 | Dataset Quality Dashboard | Business / Technical | Show dataset coverage by role, source group, hive context, curriculum stage, bee density, image quality, annotation source, and warning state. |
+| Bulk Dataset Role Assignment | Business / UX | Safely assign many completed crops into dataset roles with source-leakage, review-strength, and benchmark-protection guardrails. |
+| Negative Or Background Bee Localisation Dataset Role | Technical / Governance | Decide whether completed no-bee crops should become explicit background evidence for Bee Localisation training and export. |
 | Dataset Item Supersession Workflow | Technical / Governance | Correct wrong Dataset Item assignments without mutating history consumed by Dataset Versions or Training Runs. |
 | Public Dataset Candidate Import | Technical / Governance | Import external/public annotations as untrusted candidates with source rights, attribution, and source-group provenance. |
 
@@ -96,9 +98,12 @@ These are the strongest near-term candidates based on the current project state.
 | Candidate Slice | Type | Outcome |
 | --- | --- | --- |
 | Modern Candidate Annotation Review Workflow | Business | Replace legacy dataset labelling with a current candidate-review workflow aligned to Model Candidate pre-labelling and public imports. |
+| Training Inspection Workflow Separation | Business / UX | Split Training Data Collection into setup, crop selection, bee annotation, and crop governance stages so long annotation sessions are easier to run and resume. |
 | Annotation Productivity Improvements | Business | Add keyboard shortcuts, bulk accept/reject, better selection, zoom presets, last-saved status, and safer navigation for long annotation sessions. |
+| Crop Bounds Editing After Save | Business / UX | Let a Dataset Curator safely resize or reposition saved Training Crops with clear invalidation rules for annotations, reviews, and Dataset Items. |
 | Inspection Completion Semantics | Business | Define when a Training Data Collection inspection is complete and how incomplete work is reported. |
 | Inspection History And Resume | Business | List inspections for a selected hive, resume recent work, and separate training-data collection from Varroa assessment history. |
+| Resume Exact Training Workflow Position | Business / UX | Resume the exact stage, photo, crop, and editor context from a long-running annotation session once workflow state is stable. |
 | Hive Setup Edit And Rename | Business / Technical | Edit Apiary, Hive, and Hive Configuration safely while preserving historical provenance snapshots. |
 | Dev User Switcher | Technical / UX | Let local testing switch between seeded Users, each with stable identity, default Workspace, and capabilities, before real auth exists. |
 | Auth Boundary Decision | Business / Technical | Decide how external identity providers, HiveSight User records, Workspace Memberships, Contributor Access Scope, and internal capabilities fit together. |
@@ -126,6 +131,7 @@ These are the strongest near-term candidates based on the current project state.
 | --- | --- | --- |
 | Background Job Runner Separation | Technical | Move training/evaluation execution out of web request handling and into a clearer local worker boundary. |
 | Model Job Operations Dashboard | Technical / UX | Show active jobs, logs, heartbeats, cancellation, failure reason, artifact paths, and recovery actions in one place. |
+| Dedicated Model Governance Page | Technical / UX | Move Dataset Versions, Training Runs, Model Candidates, Benchmark Evaluations, and future promotion controls into a focused model-governance surface. |
 | Object Storage For Images And Artifacts | Technical | Move image bytes and model artifacts to a deliberate storage abstraction rather than local file paths. |
 | Persistence Schema Hardening | Technical | Refine indexes, constraints, repositories, migration discipline, and local/QA database separation. |
 | API Contract Governance | Technical | Version and review Core API, Analysis Service, and model job contracts as boundaries mature. |
@@ -138,6 +144,7 @@ These are the strongest near-term candidates based on the current project state.
 | Candidate Slice | Type | Outcome |
 | --- | --- | --- |
 | UI-Level Gherkin Harness | Technical / Quality | Add BDD-style UI acceptance where it improves behaviour readability beyond Playwright specs. |
+| Cross-Inspection Submitted Review Dashboard | Business / Quality | Let Dataset Curators see crops they submitted for review across inspections so waiting work can be chased or cancelled deliberately. |
 | Real Model QA Test Environment | Technical / Quality | Keep real YOLO training/evaluation smoke tests outside normal CI but runnable on demand against a QA database. |
 | Test Coverage Report Expansion | Technical / Quality | Extend slice verification reports to show unit, API, BDD, UI, real-adapter QA, and known skipped tests in one place. |
 | Defect Regression Guard Cleanup | Technical / Quality | Review recent defects and ensure each important fix has the right regression test level. |

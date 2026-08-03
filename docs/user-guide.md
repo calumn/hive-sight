@@ -77,8 +77,8 @@ Use this when you want to upload frame photos and create Training Crops for bee 
 4. Select an existing Hive, or create one.
 5. Make sure the Hive has a Hive Configuration and Frame Standard.
 6. Create an Inspection with intent `Training data collection`.
-7. Upload one or more frame photos.
-8. If an earlier Training Inspection exists, choose it from `Resume Training Inspection`.
+7. If an earlier Training Inspection exists, choose it from `Resume Training Inspection`.
+8. Use the workflow stage buttons to move between `Inspection Setup`, `Crop Selection`, `Bee Annotation`, and `Crop Governance`.
 
 Training-data collection inspections show the Training Crop workflow. Varroa assessment inspections do not.
 
@@ -86,11 +86,14 @@ Training-data collection inspections show the Training Crop workflow. Varroa ass
 
 Use this when you want to cut a large frame photo into smaller annotation areas.
 
-1. Select a source photo in `Training crops`.
-2. Click the source photo to place a crop.
-3. Adjust the crop coordinates or size if needed.
-4. Click `Save crop`.
-5. Select the saved crop from the crop list.
+1. Open the `Crop Selection` workflow stage.
+2. Upload one or more frame photos.
+3. Select a source photo.
+4. Click the source photo to place a crop.
+5. Adjust the crop coordinates or size if needed.
+6. Click `Save crop`.
+7. Select the saved crop from the crop list.
+8. Click `Annotate selected crop` when you are ready to mark bees.
 
 Saved crops and their reviewed ellipses persist when using the Postgres-backed local stack.
 If a saved crop was created by mistake, select it and click `Delete crop`. Deletion is available only before the crop has an active review request or has been assigned into the dataset.
@@ -99,16 +102,18 @@ If a saved crop was created by mistake, select it and click `Delete crop`. Delet
 
 Use this when you want to manually create the training evidence for the Bee Detector.
 
-1. Select an editable Training Crop.
-2. Use zoom and pan to inspect the crop.
-3. Click inside the crop to add a default bee ellipse.
-4. Use the ellipse controls to nudge, rotate, and resize the ellipse.
-5. Make sure the arrow on the ellipse points toward the bee's head.
-6. If the ellipse shape is correct but points tail-first, click `Flip head/tail`.
-7. Set the bee type to `Complete visible bee` or `Partial visible bee`.
-8. Repeat until the visible bees in the crop are annotated.
-9. Set visible bee status.
-10. Click `Complete crop`.
+1. Open the `Bee Annotation` workflow stage.
+2. Select an editable Training Crop from the crop queue.
+3. Use zoom and pan to inspect the crop.
+4. Click inside the crop to add a default bee ellipse.
+5. Use the ellipse controls to nudge, rotate, and resize the ellipse.
+6. Make sure the arrow on the ellipse points toward the bee's head.
+7. If the ellipse shape is correct but points tail-first, click `Flip head/tail`.
+8. Set the bee type to `Complete visible bee` or `Partial visible bee`.
+9. Repeat until the visible bees in the crop are annotated.
+10. Use `Previous crop`, `Next crop`, or `Next incomplete` to move through the crop queue.
+11. Set visible bee status.
+12. Click `Complete crop`.
 
 Complete bees should normally be fully contained by the crop. Partial bees may overlap the crop edge when the bee is only partly visible.
 
@@ -120,23 +125,25 @@ Use this when you need to come back later or correct completed work.
 
 1. Start HiveSight with the Postgres-backed stack.
 2. Resume the relevant Training Inspection.
-3. Select the crop from the crop list.
-4. If it is complete or excluded, click `Reopen crop`.
-5. Add, edit, or delete ellipses.
-6. Complete or exclude the crop again when finished.
+3. Open `Bee Annotation` or `Crop Governance`.
+4. Select the crop from the crop list.
+5. If it is complete or excluded, click `Reopen crop`.
+6. Add, edit, or delete ellipses.
+7. Complete or exclude the crop again when finished.
 
 ## Assign Completed Crops To Dataset Roles
 
 Use this when completed crop evidence is ready to become model training data.
 
-1. Select a completed crop.
-2. In `Bee Annotation Repository`, choose a Dataset role:
+1. Open the `Crop Governance` workflow stage.
+2. Select a completed crop.
+3. In `Bee Annotation Repository`, choose a Dataset role:
    - `Training`
    - `Validation`
    - `Benchmark`
    - `Excluded`
-3. Add a source group key when assigning benchmark evidence.
-4. Click `Assign item`.
+4. Add a source group key when assigning benchmark evidence.
+5. Click `Assign item`.
 
 The assignment snapshots the reviewed ellipses at that point. Later edits to the crop do not change an already-created Dataset Item.
 
@@ -160,10 +167,11 @@ Use this when a Dataset Curator wants another Reviewer to check completed bee an
 
 1. Switch to a User with Dataset Curator capability.
 2. Resume or create a Training Data Collection inspection.
-3. Select a completed Training Crop that has visible bees and reviewed ellipses.
-4. In `Independent crop review`, add request notes if useful.
-5. Click `Request review`.
-6. Check the requested review summary for the `HS-RQ-...` item and its current status.
+3. Open the `Crop Governance` workflow stage.
+4. Select a completed Training Crop that has visible bees and reviewed ellipses.
+5. In `Independent crop review`, add request notes if useful.
+6. Click `Request review`.
+7. Check the requested review summary for the `HS-RQ-...` item and its current status.
 
 While a review request is available, the crop is locked from editing so the Reviewer sees the exact evidence that was submitted.
 
@@ -228,7 +236,7 @@ Use this when you want internal model-governance evidence for a completed Bee De
 
 1. Make sure your Dataset Version has protected Benchmark items from source images that were not used for Training or Validation.
 2. Train a Bee Detector baseline and select the completed Model Candidate.
-3. In `Bee Detector benchmark evaluation`, click `Check benchmark`.
+3. In the model-governance panel, click `Check benchmark`.
 4. Review warnings such as `SMALL_BENCHMARK_SET`.
 5. Click `Run benchmark`.
 6. Watch status, phase, heartbeat, progress, precision, recall, activity, and log excerpt.
@@ -253,7 +261,7 @@ pnpm dev:all:yolo
 ```
 
 2. Make sure at least one completed Model Candidate exists.
-3. Select an editable Training Crop that was not included in that Model Candidate's frozen Dataset Version.
+3. Open `Bee Annotation` and select an editable Training Crop that was not included in that Model Candidate's frozen Dataset Version.
 4. Either click `Use candidate for crop YOLO` on the completed Training Run, or choose the Model Candidate in `YOLO crop pre-labels`.
 5. Check that the panel says which Model Candidate is being used for crop YOLO.
 6. Set the confidence threshold. The current default is 10%.

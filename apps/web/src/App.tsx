@@ -159,6 +159,7 @@ type CropDraft = {
 };
 
 type AppView = "inspection" | "repository" | "review-work";
+type TrainingWorkflowStage = "setup" | "crop_selection" | "bee_annotation" | "crop_governance";
 
 export function App() {
   const trainingCropPanelRef = useRef<HTMLDivElement | null>(null);
@@ -1347,6 +1348,32 @@ function DevelopmentUserSelector({
   );
 }
 
+function TrainingWorkflowStageButton({
+  label,
+  summary,
+  selected,
+  testId,
+  onClick
+}: {
+  label: string;
+  summary: string;
+  selected: boolean;
+  testId: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={selected ? "selected" : ""}
+      onClick={onClick}
+      data-testid={testId}
+    >
+      <span>{label}</span>
+      <strong>{summary}</strong>
+    </button>
+  );
+}
+
 function PanelHeading({ icon, title }: { icon: ReactNode; title: string }) {
   return (
     <div className="panel-heading">
@@ -1858,6 +1885,10 @@ function formatDatasetRoleLabel(role: DatasetRole | null) {
   return "Unassigned";
 }
 
+function countBeeEllipses(evidence: TrainingCropEvidence | null, annotationType: BeeAnnotationType) {
+  return evidence?.beeEllipses.filter((ellipse) => ellipse.annotationType === annotationType).length ?? 0;
+}
+
 function formatDateTime(value: string | null) {
   return value ? new Date(value).toLocaleString() : "n/a";
 }
@@ -2266,6 +2297,8 @@ function TrainingCropAnnotationPanel({
   const [acknowledgeModelWarnings, setAcknowledgeModelWarnings] = useState(false);
   const [workingLabel, setWorkingLabel] = useState<string | null>(null);
   const [cropZoom, setCropZoom] = useState(1);
+  const [activeWorkflowStage, setActiveWorkflowStage] =
+    useState<TrainingWorkflowStage>("setup");
   const selectedCropRef = useRef<TrainingCrop | null>(null);
   const selectedEllipseRef = useRef<OrientedBeeEllipse | null>(null);
   const ellipseAdjustmentInFlightRef = useRef(false);
@@ -2286,6 +2319,19 @@ function TrainingCropAnnotationPanel({
     Boolean(selectedModelCandidateId) &&
     (benchmarkReadiness?.eligibleToStartEvaluation ?? true) &&
     !Boolean(workingLabel);
+  const cropProgress = useMemo(() => {
+    const pending = crops.filter((crop) => crop.reviewStatus === "review_pending").length;
+    const completed = crops.filter((crop) => crop.reviewStatus === "review_complete").length;
+    const excluded = crops.filter((crop) => crop.reviewStatus === "excluded").length;
+    const assigned = crops.filter((crop) => crop.datasetItemId).length;
+    return {
+      assigned,
+      completed,
+      excluded,
+      pending,
+      total: crops.length
+    };
+  }, [crops]);
 
   const selectedPhoto = photos.find((photo) => photo.inspectionPhotoId === selectedPhotoId) ?? null;
   const selectedCropEvidence =
@@ -2303,6 +2349,21 @@ function TrainingCropAnnotationPanel({
   const selectedCropDatasetItemId =
     trainingCropDatasetItem?.datasetItemId ?? selectedCrop?.datasetItemId ?? null;
   const selectedCropIsAssigned = Boolean(selectedCropDatasetItemId);
+  const selectedCropEllipseCount = selectedCropEvidence?.beeEllipses.length ?? 0;
+  const selectedCropDatasetAssignmentBlockedReason =
+    !selectedCrop
+      ? "Select a Training Crop before assigning a Dataset Item."
+      : selectedCropIsAssigned
+        ? "This crop already has a current Dataset Item assignment."
+        : selectedCrop.reviewStatus === "review_pending"
+          ? "Complete or exclude the Training Crop before assigning a Dataset Item."
+          : datasetRole !== "excluded" && selectedCrop.visibleBeeStatus !== "has_visible_bees"
+            ? "Only completed crops with visible bees can enter the positive Bee Detector dataset."
+            : datasetRole !== "excluded" && selectedCropEllipseCount === 0
+              ? "Add at least one reviewed bee ellipse before assigning this crop."
+              : datasetRole === "benchmark" && datasetSourceGroupKey.trim().length === 0
+                ? "Add a source group key before assigning benchmark evidence."
+                : null;
   const selectedEllipse =
     selectedCropEvidence?.beeEllipses.find((ellipse) => ellipse.annotationId === selectedEllipseId) ??
     null;
@@ -2357,6 +2418,7 @@ function TrainingCropAnnotationPanel({
   useEffect(() => {
     if (photos.length === 0) {
       setSelectedPhotoId("");
+      setActiveWorkflowStage("setup");
       return;
     }
     setSelectedPhotoId((current) =>
@@ -2364,6 +2426,7 @@ function TrainingCropAnnotationPanel({
         ? current
         : photos[0].inspectionPhotoId
     );
+    setActiveWorkflowStage((current) => (current === "setup" ? "crop_selection" : current));
   }, [photos]);
 
   useEffect(() => {
@@ -2540,6 +2603,7 @@ function TrainingCropAnnotationPanel({
       setDraftCrop(null);
       await refreshCropsForPhoto(selectedPhoto.inspectionPhotoId);
       setSelectedCropId(crop.trainingCropId);
+      setActiveWorkflowStage("bee_annotation");
     });
   }
 
@@ -3137,10 +3201,75 @@ function TrainingCropAnnotationPanel({
         <span className="analysis-status status-queued">{crops.length} crops</span>
       </div>
 
-      {photos.length === 0 ? (
-        <p className="analysis-caveat">Upload a training data photo before creating crops.</p>
+      <div
+        className="training-workflow-stage-nav"
+        data-testid="training-workflow-stage-nav"
+        aria-label="Training Inspection workflow stages"
+      >
+        <TrainingWorkflowStageButton
+          label="Inspection Setup"
+          summary={photos.length === 0 ? "needs photo" : `${photos.length} photo${photos.length === 1 ? "" : "s"}`}
+          selected={activeWorkflowStage === "setup"}
+          testId="workflow-stage-setup-button"
+          onClick={() => setActiveWorkflowStage("setup")}
+        />
+        <TrainingWorkflowStageButton
+          label="Crop Selection"
+          summary={`${cropProgress.total} crop${cropProgress.total === 1 ? "" : "s"}`}
+          selected={activeWorkflowStage === "crop_selection"}
+          testId="workflow-stage-crop-selection-button"
+          onClick={() => setActiveWorkflowStage("crop_selection")}
+        />
+        <TrainingWorkflowStageButton
+          label="Bee Annotation"
+          summary={`${cropProgress.pending} pending`}
+          selected={activeWorkflowStage === "bee_annotation"}
+          testId="workflow-stage-bee-annotation-button"
+          onClick={() => setActiveWorkflowStage("bee_annotation")}
+        />
+        <TrainingWorkflowStageButton
+          label="Crop Governance"
+          summary={`${cropProgress.assigned} assigned`}
+          selected={activeWorkflowStage === "crop_governance"}
+          testId="workflow-stage-crop-governance-button"
+          onClick={() => setActiveWorkflowStage("crop_governance")}
+        />
+      </div>
+
+      {activeWorkflowStage === "setup" ? (
+        <section
+          className="workflow-stage-panel"
+          data-testid="training-workflow-stage-setup"
+          aria-label="Inspection Setup"
+        >
+          <strong>Inspection Setup</strong>
+          <p>
+            Select or create the Apiary, Hive, Hive Configuration, and Training Data Collection
+            Inspection above. Then move to Crop Selection to upload photos and define Training
+            Crops.
+          </p>
+        </section>
+      ) : photos.length === 0 ? (
+        <section
+          className="workflow-stage-panel"
+          data-testid={
+            activeWorkflowStage === "crop_selection"
+              ? "training-workflow-stage-crop-selection"
+              : activeWorkflowStage === "bee_annotation"
+                ? "training-workflow-stage-bee-annotation"
+                : "training-workflow-stage-crop-governance"
+          }
+        >
+          <p className="analysis-caveat">Upload a training data photo before creating crops.</p>
+        </section>
       ) : (
         <>
+          {activeWorkflowStage === "crop_selection" ? (
+            <section
+              className="workflow-stage-panel"
+              data-testid="training-workflow-stage-crop-selection"
+              aria-label="Crop Selection"
+            >
           <div className="metadata-panel crop-photo-controls">
             <label>
               <span>Source photo</span>
@@ -3242,7 +3371,55 @@ function TrainingCropAnnotationPanel({
             </ul>
           ) : null}
 
-          {selectedCrop && sourceImageUrl ? (
+          {selectedCrop ? (
+            <div className="metadata-panel crop-completion-controls">
+              <button
+                type="button"
+                disabled={
+                  selectedCropIsAssigned ||
+                  Boolean(selectedCropActiveReviewItem) ||
+                  Boolean(workingLabel)
+                }
+                onClick={() => void deleteSelectedCrop()}
+                data-testid="delete-training-crop-button"
+              >
+                <Trash2 size={18} />
+                Delete crop
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveWorkflowStage("bee_annotation")}
+                data-testid="annotate-selected-crop-button"
+              >
+                <Image size={18} />
+                Annotate crop
+              </button>
+            </div>
+          ) : null}
+            </section>
+          ) : null}
+
+          {activeWorkflowStage === "bee_annotation" && selectedCrop && sourceImageUrl ? (
+            <section
+              className="workflow-stage-panel"
+              data-testid="training-workflow-stage-bee-annotation"
+              aria-label="Bee Annotation"
+            >
+            <ul className="crop-list" data-testid="training-crop-list">
+              {crops.map((crop, index) => (
+                <li key={crop.trainingCropId}>
+                  <button
+                    type="button"
+                    className={crop.trainingCropId === selectedCropId ? "selected-row" : ""}
+                    onClick={() => setSelectedCropId(crop.trainingCropId)}
+                    data-testid="training-crop-list-item"
+                  >
+                    Crop {index + 1} / {crop.reviewStatus} / {crop.visibleBeeStatus} /{" "}
+                    {formatDatasetRoleLabel(crop.datasetRole)}
+                  </button>
+                </li>
+              ))}
+            </ul>
             <section className="crop-editor" aria-label="Selected Training Crop editor">
               <div className="crop-editing-tool" data-testid="training-crop-editing-tool">
                 <div className="crop-workspace">
@@ -3894,11 +4071,56 @@ function TrainingCropAnnotationPanel({
                 <Metric label="Review" value={selectedCrop.reviewStatus} />
                 <Metric label="Visible bees" value={selectedCrop.visibleBeeStatus} />
                 <Metric label="Dataset role" value={formatDatasetRoleLabel(selectedCropDatasetRole)} />
-                <Metric label="Ellipses" value={selectedCropEvidence?.beeEllipses.length ?? 0} />
+                <Metric label="Ellipses" value={selectedCropEllipseCount} />
                 <Metric label="Coordinates" value="source px" />
               </div>
 
               <div className="metadata-panel crop-completion-controls">
+                <button
+                  type="button"
+                  disabled={crops.findIndex((crop) => crop.trainingCropId === selectedCrop.trainingCropId) <= 0}
+                  onClick={() => {
+                    const currentIndex = crops.findIndex(
+                      (crop) => crop.trainingCropId === selectedCrop.trainingCropId
+                    );
+                    const previousCrop = crops[currentIndex - 1];
+                    if (previousCrop) setSelectedCropId(previousCrop.trainingCropId);
+                  }}
+                  data-testid="previous-training-crop-button"
+                >
+                  <ArrowLeft size={18} />
+                  Previous crop
+                </button>
+                <button
+                  type="button"
+                  disabled={
+                    crops.findIndex((crop) => crop.trainingCropId === selectedCrop.trainingCropId) >=
+                    crops.length - 1
+                  }
+                  onClick={() => {
+                    const currentIndex = crops.findIndex(
+                      (crop) => crop.trainingCropId === selectedCrop.trainingCropId
+                    );
+                    const nextCrop = crops[currentIndex + 1];
+                    if (nextCrop) setSelectedCropId(nextCrop.trainingCropId);
+                  }}
+                  data-testid="next-training-crop-button"
+                >
+                  <ArrowRight size={18} />
+                  Next crop
+                </button>
+                <button
+                  type="button"
+                  disabled={!crops.some((crop) => crop.reviewStatus === "review_pending")}
+                  onClick={() => {
+                    const nextIncomplete = crops.find((crop) => crop.reviewStatus === "review_pending");
+                    if (nextIncomplete) setSelectedCropId(nextIncomplete.trainingCropId);
+                  }}
+                  data-testid="next-incomplete-training-crop-button"
+                >
+                  <ArrowRight size={18} />
+                  Next incomplete
+                </button>
                 <label>
                   <span>Visible bee status</span>
                   <select
@@ -3973,7 +4195,48 @@ function TrainingCropAnnotationPanel({
                   Delete crop
                 </button>
               </div>
+            </section>
+            </section>
+          ) : activeWorkflowStage === "bee_annotation" ? (
+            <section
+              className="workflow-stage-panel"
+              data-testid="training-workflow-stage-bee-annotation"
+              aria-label="Bee Annotation"
+            >
+              <p className="analysis-caveat">Create a Training Crop before annotating bees.</p>
+            </section>
+          ) : null}
 
+          {activeWorkflowStage === "crop_governance" && selectedCrop ? (
+            <section
+              className="workflow-stage-panel"
+              data-testid="training-workflow-stage-crop-governance"
+              aria-label="Crop Governance"
+            >
+              <div className="crop-governance-layout">
+                <div className="crop-governance-list" data-testid="crop-governance-list">
+                  {crops.map((crop, index) => (
+                    <button
+                      key={crop.trainingCropId}
+                      type="button"
+                      className={crop.trainingCropId === selectedCropId ? "selected-row" : ""}
+                      onClick={() => setSelectedCropId(crop.trainingCropId)}
+                      data-testid="training-crop-list-item"
+                    >
+                      Crop {index + 1} / {crop.reviewStatus} / {crop.visibleBeeStatus} /{" "}
+                      {formatDatasetRoleLabel(crop.datasetRole)}
+                    </button>
+                  ))}
+                </div>
+                <div className="crop-governance-detail" data-testid="crop-governance-detail">
+                  <div className="export-summary">
+                    <strong>Crop {Math.max(1, crops.findIndex((crop) => crop.trainingCropId === selectedCrop.trainingCropId) + 1)}</strong>
+                    <span>{selectedCrop.reviewStatus}</span>
+                    <span>{selectedCrop.visibleBeeStatus}</span>
+                    <span>{formatDatasetRoleLabel(selectedCropDatasetRole)}</span>
+                    <span>Complete visible bees {countBeeEllipses(selectedCropEvidence, "complete_visible_bee")}</span>
+                    <span>Partial visible bees {countBeeEllipses(selectedCropEvidence, "partial_visible_bee")}</span>
+                  </div>
               <div className="metadata-panel crop-dataset-controls">
                 <div>
                   <strong>Bee Annotation Repository</strong>
@@ -4043,13 +4306,7 @@ function TrainingCropAnnotationPanel({
                 ) : null}
                 <button
                   type="button"
-                  disabled={
-                    !selectedCrop ||
-                    selectedCropIsAssigned ||
-                    Boolean(workingLabel) ||
-                    selectedCrop.reviewStatus === "review_pending" ||
-                    (datasetRole === "benchmark" && datasetSourceGroupKey.trim().length === 0)
-                  }
+                  disabled={Boolean(selectedCropDatasetAssignmentBlockedReason) || Boolean(workingLabel)}
                   onClick={() => void assignSelectedCropToDataset()}
                   data-testid="assign-training-crop-dataset-role-button"
                 >
@@ -4081,8 +4338,8 @@ function TrainingCropAnnotationPanel({
                           ? ` / ${trainingCropDatasetItem.reviewedEllipseSnapshots.length} ellipse snapshots`
                           : ""
                       }`
-                    : selectedCrop.reviewStatus === "review_pending"
-                      ? "Complete or exclude the Training Crop before assigning a Dataset Item."
+                    : selectedCropDatasetAssignmentBlockedReason
+                      ? selectedCropDatasetAssignmentBlockedReason
                       : "Ready for Dataset Item assignment."}
                 </div>
                 <div className="review-request-panel" data-testid="training-crop-review-request-panel">
@@ -4114,7 +4371,7 @@ function TrainingCropAnnotationPanel({
                       Boolean(workingLabel) ||
                       selectedCrop.reviewStatus !== "review_complete" ||
                       selectedCrop.visibleBeeStatus !== "has_visible_bees" ||
-                      (selectedCropEvidence?.beeEllipses.length ?? 0) === 0 ||
+                      selectedCropEllipseCount === 0 ||
                       Boolean(selectedCropActiveReviewItem)
                     }
                     onClick={() => void requestSelectedCropReview()}
@@ -4630,6 +4887,8 @@ function TrainingCropAnnotationPanel({
                     </div>
                   ) : null}
                 </div>
+                </div>
+              </div>
               </div>
             </section>
           ) : null}

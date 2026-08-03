@@ -691,6 +691,48 @@ label span {
   border-color: #cbd7dd;
 }
 
+.training-workflow-stage-nav {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.training-workflow-stage-nav button {
+  align-items: flex-start;
+  display: grid;
+  gap: 4px;
+  justify-content: stretch;
+  min-height: 68px;
+  text-align: left;
+}
+
+.training-workflow-stage-nav button.selected {
+  background: #31572c;
+  border-color: #31572c;
+  color: #ffffff;
+}
+
+.training-workflow-stage-nav button span,
+.training-workflow-stage-nav button strong {
+  overflow-wrap: anywhere;
+}
+
+.training-workflow-stage-nav button strong {
+  color: inherit;
+  font-size: 0.82rem;
+}
+
+.workflow-stage-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.workflow-stage-panel > p {
+  color: #515b4c;
+  line-height: 1.4;
+  margin-bottom: 0;
+}
+
 .crop-photo-controls,
 .crop-draft-controls,
 .crop-completion-controls {
@@ -1082,6 +1124,35 @@ label span {
   color: #ffffff;
 }
 
+.crop-governance-layout {
+  align-items: start;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(260px, 0.55fr) minmax(0, 1.45fr);
+}
+
+.crop-governance-list {
+  display: grid;
+  gap: 8px;
+}
+
+.crop-governance-list button {
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.crop-governance-list button.selected-row {
+  background: #31572c;
+  border-color: #31572c;
+  color: #ffffff;
+}
+
+.crop-governance-detail {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
 .crop-editor {
   display: grid;
   gap: 12px;
@@ -1349,6 +1420,8 @@ label span {
   .repository-summary,
   .repository-filters,
   .repository-browser,
+  .training-workflow-stage-nav,
+  .crop-governance-layout,
   .control-cluster {
     grid-template-columns: 1fr;
   }

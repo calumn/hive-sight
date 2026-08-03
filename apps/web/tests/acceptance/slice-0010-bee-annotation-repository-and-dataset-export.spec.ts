@@ -41,6 +41,7 @@ test("Dataset Curator assigns a completed Training Crop and sees a YOLO OBB expo
   await page.getByTestId("complete-training-crop-button").click();
   await expect(page.getByTestId("training-crop-list-item")).toContainText("review_complete");
 
+  await page.getByTestId("workflow-stage-crop-governance-button").click();
   await page.getByTestId("training-crop-dataset-role-select").selectOption("training");
   await page
     .getByTestId("training-crop-dataset-assignment-note-input")
@@ -63,8 +64,10 @@ test("Dataset Curator assigns a completed Training Crop and sees a YOLO OBB expo
   await page.getByTestId("inspection-page-button").click();
   await expect(page.getByTestId("training-crop-list-item")).toContainText("review_complete");
   await expect(page.getByTestId("training-crop-list-item")).toContainText("Training");
+  await page.getByTestId("workflow-stage-bee-annotation-button").click();
   await expect(page.getByTestId("training-crop-ellipse")).toHaveCount(1);
 
+  await page.getByTestId("workflow-stage-crop-governance-button").click();
   await page.getByTestId("create-yolo-obb-export-button").click();
   await expect(page.getByTestId("yolo-obb-export-summary")).toContainText("Training 1");
   await expect(page.getByTestId("yolo-obb-export-summary")).toContainText("Labels 1");

@@ -1056,3 +1056,141 @@ Before using Training Crop evidence for user-facing bee counts, infestation-rate
 Suggested owner or area:
 
 Dataset governance, Bee Localisation evaluation, Varroa sampling design, and future full-frame annotation/reconciliation workflow.
+
+## PARK-0045: Crop Bounds Editing After Save
+
+Status: parked
+Date parked: 2026-08-03
+Source: Slice 0020 grilling
+Area: crop selection, annotation UI, dataset governance
+
+Context:
+
+Slice 0020 keeps Training Crop creation simple: the Dataset Curator can create and delete eligible crops, but does not get a first-class edit/resize/reposition workflow for crop bounds after save.
+
+Why parked:
+
+Changing crop bounds after ellipses, review requests, or Dataset Items exist is not just a UI edit. It raises questions about whether existing bee ellipses remain valid, whether review evidence has been changed, whether Dataset Item snapshots must be invalidated, and whether downstream Dataset Versions or Training Runs have consumed the old crop evidence.
+
+Revisit trigger:
+
+When crop-placement mistakes become common enough that delete-and-recreate is not acceptable, before supporting non-developer curators at scale, or before implementing richer crop drafting with resize handles.
+
+Suggested owner or area:
+
+Training Crop workflow, annotation UI, and dataset governance.
+
+## PARK-0046: Bulk Dataset Role Assignment
+
+Status: parked
+Date parked: 2026-08-03
+Source: Slice 0020 grilling
+Area: dataset governance, curator productivity
+
+Context:
+
+Slice 0020 keeps Dataset Role assignment as an explicit selected-crop governance action. It does not introduce bulk assignment of many completed crops into `training`, `validation`, `benchmark`, or `excluded`.
+
+Why parked:
+
+Bulk assignment is useful, but it can amplify mistakes. It needs clearer guardrails around review strength, source-image leakage, source groups, benchmark protection, and whether all selected crops have comparable annotation quality.
+
+Revisit trigger:
+
+When individual assignment becomes the bottleneck for a real corpus, after Crop Governance has made per-crop status and warnings clear enough to support safe bulk decisions.
+
+Suggested owner or area:
+
+Dataset governance, Repository UX, and acceptance testing.
+
+## PARK-0047: Resume Exact Training Workflow Position
+
+Status: parked
+Date parked: 2026-08-03
+Source: Slice 0020 grilling
+Area: inspection resume, annotation UX
+
+Context:
+
+Slice 0020 derives the initial stage from saved Inspection state, but does not persist the exact stage, selected Source Image, selected Training Crop, zoom, pan, or editor position the Dataset Curator last used.
+
+Why parked:
+
+Persisting exact UI position can become stale and create a second source of truth if it is introduced too early. The current slice focuses on making saved domain records easy to find and safe to work with.
+
+Revisit trigger:
+
+When long annotation sessions routinely span several days or several inspections, and resuming the exact crop/stage becomes more valuable than deriving a sensible starting point.
+
+Suggested owner or area:
+
+Web UI, inspection resume, and annotation productivity.
+
+## PARK-0048: Dedicated Model Governance Page
+
+Status: parked
+Date parked: 2026-08-03
+Source: Slice 0020 grilling
+Area: model governance, Repository UX
+
+Context:
+
+Slice 0020 keeps Dataset Version creation, Bee Detector Training Runs, Model Candidate selection, and Benchmark Evaluation controls in the Repository page. Crop Governance is limited to decisions about the selected Inspection's crops.
+
+Why parked:
+
+The model-governance controls are now substantial enough that they may deserve a separate page, but moving them while also separating the Training Inspection workflow would widen Slice 0020 unnecessarily.
+
+Revisit trigger:
+
+When comparing multiple Model Candidates, managing reusable benchmark sets, promoting candidates, or operating model jobs becomes too crowded for the Repository page.
+
+Suggested owner or area:
+
+Model governance, Repository UX, and operations.
+
+## PARK-0049: Negative Or Background Bee Localisation Dataset Role
+
+Status: parked
+Date parked: 2026-08-03
+Source: Slice 0020 grilling
+Area: dataset governance, bee localisation training
+
+Context:
+
+Slice 0020 treats a completed Training Crop with `no_visible_bees` as ineligible for the positive bee-detector training dataset. Such crops may still be useful as explicit negative or background examples later.
+
+Why parked:
+
+Adding a negative/background role changes dataset export semantics, training configuration, evaluation expectations, and curator guidance. It should be designed deliberately rather than hidden inside workflow separation.
+
+Revisit trigger:
+
+Before training Bee Localisation models with explicit background examples, before false-positive reduction becomes the limiting model-quality problem, or before full-frame/tiled training export.
+
+Suggested owner or area:
+
+Bee Localisation model training, dataset export, and dataset governance.
+
+## PARK-0050: Cross-Inspection Submitted Review Dashboard
+
+Status: parked
+Date parked: 2026-08-03
+Source: Slice 0020 grilling
+Area: review workflow, curator UX
+
+Context:
+
+Slice 0020 may show a selected-Inspection `Waiting for review` filter or section, but it does not add a broader dashboard where a Dataset Curator can see all their submitted crops waiting for review across hives and inspections.
+
+Why parked:
+
+The selected-Inspection governance view is enough for the workflow separation slice. Cross-inspection chasing, reminders, stale-review handling, and reviewer capacity belong with the wider review operations design.
+
+Revisit trigger:
+
+When review wait states span multiple inspections or users need to chase, cancel, or re-route review work across the whole Workspace.
+
+Suggested owner or area:
+
+Review workflow, curator UX, and queue operations.

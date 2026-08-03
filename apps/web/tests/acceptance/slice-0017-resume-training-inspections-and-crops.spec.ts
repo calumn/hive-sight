@@ -52,6 +52,7 @@ test("Dataset Curator resumes saved Training Inspection crops and ellipses after
   await expect(page.getByTestId("inspection-photo-list")).toContainText("bee-frame-test.png");
   await expect(page.getByTestId("training-crop-panel")).toBeVisible();
   await expect(page.getByTestId("training-crop-list-item")).toContainText("review_pending");
+  await page.getByTestId("workflow-stage-bee-annotation-button").click();
   await expect(page.getByTestId("training-crop-ellipse")).toHaveCount(1);
   await page.getByTestId("training-crop-ellipse").click();
   await expectGeometryValue(page, "training-ellipse-center-x", savedCenterX);

@@ -40,10 +40,12 @@ test("Dataset Curator previews Model Candidate bee suggestions before accepting 
   await expect(page.getByTestId("model-candidate-selection-confirmation")).toContainText(
     "Now using HS-MC-"
   );
+  await page.getByTestId("workflow-stage-bee-annotation-button").click();
   await expect(page.getByTestId("selected-crop-yolo-candidate-state")).toContainText(
     "Using HS-MC-"
   );
 
+  await page.getByTestId("workflow-stage-crop-selection-button").click();
   await page.getByTestId("training-source-photo-preview").click({ position: { x: 720, y: 300 } });
   const latestCropIndex = await page.getByTestId("training-crop-list-item").count();
   await page.getByTestId("save-training-crop-button").click();
@@ -71,6 +73,7 @@ async function createCompletedDatasetCrop(
   position: { x: number; y: number },
   datasetRole: "training" | "validation"
 ) {
+  await page.getByTestId("workflow-stage-crop-selection-button").click();
   await page.getByTestId("training-source-photo-preview").click({ position });
   const latestCropIndex = await page.getByTestId("training-crop-list-item").count();
   await page.getByTestId("save-training-crop-button").click();
@@ -78,6 +81,7 @@ async function createCompletedDatasetCrop(
   await page.getByTestId("training-crop-surface").click({ position: { x: 180, y: 120 } });
   await expect(page.getByTestId("training-crop-ellipse")).toHaveCount(1);
   await page.getByTestId("complete-training-crop-button").click();
+  await page.getByTestId("workflow-stage-crop-governance-button").click();
   await page.getByTestId("training-crop-dataset-role-select").selectOption(datasetRole);
   await page
     .getByTestId("training-crop-dataset-assignment-note-input")

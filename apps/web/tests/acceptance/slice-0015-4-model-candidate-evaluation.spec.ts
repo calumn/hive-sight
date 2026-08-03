@@ -32,6 +32,7 @@ test("Dataset Curator runs a fake Model Candidate benchmark evaluation", async (
   await page.getByTestId("inspection-photo-input").setInputFiles(fixtureImagePath);
   await page.getByTestId("upload-photo-button").click();
   await expect(page.getByTestId("inspection-photo-list-item")).toHaveCount(2);
+  await page.getByTestId("workflow-stage-crop-selection-button").click();
   await page.getByTestId("training-crop-photo-select").selectOption({ index: 1 });
   await createCompletedDatasetCrop(page, { x: 420, y: 220 }, "benchmark");
 
@@ -67,6 +68,7 @@ async function createCompletedDatasetCrop(
   position: { x: number; y: number },
   datasetRole: "training" | "validation" | "benchmark"
 ) {
+  await page.getByTestId("workflow-stage-crop-selection-button").click();
   await page.getByTestId("training-source-photo-preview").click({ position });
   const latestCropIndex = await page.getByTestId("training-crop-list-item").count();
   await page.getByTestId("save-training-crop-button").click();
@@ -77,6 +79,7 @@ async function createCompletedDatasetCrop(
   await expect(page.getByTestId("training-crop-list-item").nth(latestCropIndex)).toContainText(
     "review_complete"
   );
+  await page.getByTestId("workflow-stage-crop-governance-button").click();
   await page.getByTestId("training-crop-dataset-role-select").selectOption(datasetRole);
   if (datasetRole === "benchmark") {
     await page

@@ -40,6 +40,7 @@ test("Dataset Curator creates a physical YOLO OBB package from a completed Train
   await page.getByTestId("complete-training-crop-button").click();
   await expect(page.getByTestId("training-crop-list-item")).toContainText("review_complete");
 
+  await page.getByTestId("workflow-stage-crop-governance-button").click();
   await page.getByTestId("training-crop-dataset-role-select").selectOption("training");
   await page
     .getByTestId("training-crop-dataset-assignment-note-input")
