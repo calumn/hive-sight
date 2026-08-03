@@ -26,6 +26,17 @@ test("Reviewer completes shared Review Queue work without seeing private source 
     setup.privateFilename
   );
   await expect(page.getByTestId("review-work-ellipse")).toHaveCount(2);
+  const reviewSurface = page.getByTestId("review-work-crop-surface");
+  const reviewSurfaceBox = await reviewSurface.boundingBox();
+  expect(reviewSurfaceBox).not.toBeNull();
+  expect(reviewSurfaceBox?.width).toBeLessThanOrEqual(setup.cropImageWidthPx + 2);
+  expect(reviewSurfaceBox?.height).toBeLessThanOrEqual(setup.cropImageHeightPx + 2);
+  expect(reviewSurfaceBox?.width ?? 0).toBeGreaterThan(0);
+  expect(reviewSurfaceBox?.height ?? 0).toBeGreaterThan(0);
+  expect((reviewSurfaceBox?.width ?? 0) / (reviewSurfaceBox?.height ?? 1)).toBeCloseTo(
+    setup.cropWidth / setup.cropHeight,
+    1
+  );
 
   await page.getByTestId("review-work-outcome-select").selectOption("approved");
   await page.getByTestId("complete-review-work-button").click();
@@ -65,6 +76,10 @@ async function setupReviewQueueItem(request: APIRequestContext) {
   const reviewQueueItem = await reviewRequest.json();
   return {
     privateFilename,
+    cropHeight: crop.cropHeight,
+    cropImageHeightPx: crop.cropImageHeightPx,
+    cropImageWidthPx: crop.cropImageWidthPx,
+    cropWidth: crop.cropWidth,
     reviewQueueHumanReadableId: reviewQueueItem.human_readable_id as string
   };
 }
@@ -128,7 +143,8 @@ async function createCompletedTrainingCrop(
     headers: jsonHeaders(curatorUserId)
   });
   expect(crop.status()).toBe(201);
-  const trainingCropId = (await crop.json()).training_crop_id as string;
+  const cropBody = await crop.json();
+  const trainingCropId = cropBody.training_crop_id as string;
   for (const [annotationType, centerX] of [
     ["complete_visible_bee", 45],
     ["partial_visible_bee", 20]
@@ -159,7 +175,13 @@ async function createCompletedTrainingCrop(
     headers: jsonHeaders(curatorUserId)
   });
   expect(completed.status()).toBe(200);
-  return { trainingCropId };
+  return {
+    cropHeight: cropBody.crop_height as number,
+    cropImageHeightPx: cropBody.crop_image_height_px as number,
+    cropImageWidthPx: cropBody.crop_image_width_px as number,
+    cropWidth: cropBody.crop_width as number,
+    trainingCropId
+  };
 }
 
 function devHeaders(devUserId: string) {

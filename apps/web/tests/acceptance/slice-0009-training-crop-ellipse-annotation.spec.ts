@@ -98,6 +98,19 @@ test("Dataset Curator creates a crop, adds an oriented bee ellipse, and complete
   await expectGeometryValue(page, "training-ellipse-center-x", initialX - 5);
   await page.getByTestId("nudge-training-ellipse-right-button").click();
   await expectGeometryValue(page, "training-ellipse-center-x", initialX);
+  const repeatStartX = await readGeometryValue(page, "training-ellipse-center-x");
+  const rightNudgeBox = await page.getByTestId("nudge-training-ellipse-right-button").boundingBox();
+  expect(rightNudgeBox).not.toBeNull();
+  await page.mouse.move(
+    rightNudgeBox!.x + rightNudgeBox!.width / 2,
+    rightNudgeBox!.y + rightNudgeBox!.height / 2
+  );
+  await page.mouse.down();
+  await page.waitForTimeout(750);
+  await page.mouse.up();
+  await expect
+    .poll(() => readGeometryValue(page, "training-ellipse-center-x"))
+    .toBeGreaterThan(repeatStartX + 5);
 
   await page.getByTestId("nudge-training-ellipse-up-button").click();
   await expectGeometryValue(page, "training-ellipse-center-y", initialY - 5);

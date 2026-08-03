@@ -56,6 +56,15 @@ test("Dataset Curator assigns a completed Training Crop and sees a YOLO OBB expo
   );
   await expect(page.getByTestId("assign-training-crop-dataset-role-button")).toBeDisabled();
 
+  await page.getByTestId("bee-annotation-repository-page-button").click();
+  await expect(page.getByTestId("bee-annotation-repository-page")).toBeVisible();
+  await expect(page.getByTestId("repository-item-list")).toContainText("HS-DI");
+
+  await page.getByTestId("inspection-page-button").click();
+  await expect(page.getByTestId("training-crop-list-item")).toContainText("review_complete");
+  await expect(page.getByTestId("training-crop-list-item")).toContainText("Training");
+  await expect(page.getByTestId("training-crop-ellipse")).toHaveCount(1);
+
   await page.getByTestId("create-yolo-obb-export-button").click();
   await expect(page.getByTestId("yolo-obb-export-summary")).toContainText("Training 1");
   await expect(page.getByTestId("yolo-obb-export-summary")).toContainText("Labels 1");

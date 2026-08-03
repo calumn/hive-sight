@@ -24,6 +24,7 @@ import {
 import {
   type FormEvent,
   type MouseEvent,
+  type PointerEvent,
   type ReactNode,
   useEffect,
   useMemo,
@@ -136,6 +137,8 @@ import {
 const defaultDevUserId = "00000000-0000-0000-0000-000000000101";
 const devUserStorageKey = "hivesight.developmentUserId";
 const currentTermsVersion = "2026-07-29";
+const ellipseAdjustmentRepeatDelayMs = 350;
+const ellipseAdjustmentRepeatIntervalMs = 220;
 
 type LoadState =
   | { kind: "loading" }
@@ -1274,6 +1277,7 @@ export function App() {
             {showTrainingCropPanel ? (
               <div ref={trainingCropPanelRef}>
                 <TrainingCropAnnotationPanel
+                  key={`${devUserId}:${loadState.session.workspaceId}:${inspection?.inspectionId ?? "no-inspection"}`}
                   devUserId={devUserId}
                   workspaceId={loadState.session.workspaceId}
                   photos={inspectionPhotos}
@@ -1999,6 +2003,15 @@ function reviewQueueEllipseStyle(
   };
 }
 
+function reviewQueueSurfaceStyle(item: ReviewQueueItem) {
+  const snapshot = item.evidenceSnapshot;
+  const displayWidth = snapshot.cropImageWidthPx || snapshot.cropWidth;
+  return {
+    aspectRatio: `${snapshot.cropWidth} / ${snapshot.cropHeight}`,
+    maxWidth: `${displayWidth}px`
+  };
+}
+
 type EllipseGeometry = {
   annotationType: BeeAnnotationType;
   centerX: number;
@@ -2253,6 +2266,12 @@ function TrainingCropAnnotationPanel({
   const [acknowledgeModelWarnings, setAcknowledgeModelWarnings] = useState(false);
   const [workingLabel, setWorkingLabel] = useState<string | null>(null);
   const [cropZoom, setCropZoom] = useState(1);
+  const selectedCropRef = useRef<TrainingCrop | null>(null);
+  const selectedEllipseRef = useRef<OrientedBeeEllipse | null>(null);
+  const ellipseAdjustmentInFlightRef = useRef(false);
+  const ellipseAdjustmentRepeatTimeoutRef = useRef<number | null>(null);
+  const ellipseAdjustmentRepeatIntervalRef = useRef<number | null>(null);
+  const ellipseAdjustmentPointerConsumedRef = useRef(false);
   const hasActiveTrainingRun = trainingRuns.some(isActiveTrainingRun);
   const hasActiveBenchmarkEvaluation = benchmarkEvaluations.some(isActiveBenchmarkEvaluation);
   const shouldPollTrainingRuns =
@@ -2269,7 +2288,12 @@ function TrainingCropAnnotationPanel({
     !Boolean(workingLabel);
 
   const selectedPhoto = photos.find((photo) => photo.inspectionPhotoId === selectedPhotoId) ?? null;
-  const selectedCrop = evidence?.trainingCrop ?? crops.find((crop) => crop.trainingCropId === selectedCropId) ?? null;
+  const selectedCropEvidence =
+    evidence?.trainingCrop.trainingCropId === selectedCropId ? evidence : null;
+  const selectedCrop =
+    selectedCropEvidence?.trainingCrop ??
+    crops.find((crop) => crop.trainingCropId === selectedCropId) ??
+    null;
   const selectedCropReviewItems = requestedReviews.filter(
     (item) => item.subjectId === selectedCrop?.trainingCropId
   );
@@ -2280,7 +2304,8 @@ function TrainingCropAnnotationPanel({
     trainingCropDatasetItem?.datasetItemId ?? selectedCrop?.datasetItemId ?? null;
   const selectedCropIsAssigned = Boolean(selectedCropDatasetItemId);
   const selectedEllipse =
-    evidence?.beeEllipses.find((ellipse) => ellipse.annotationId === selectedEllipseId) ?? null;
+    selectedCropEvidence?.beeEllipses.find((ellipse) => ellipse.annotationId === selectedEllipseId) ??
+    null;
   const selectedProposal =
     candidateProposals.find((proposal) => proposal.proposalId === selectedProposalId) ?? null;
   const cropLocked =
@@ -2321,6 +2346,15 @@ function TrainingCropAnnotationPanel({
   });
 
   useEffect(() => {
+    selectedCropRef.current = selectedCrop;
+    selectedEllipseRef.current = selectedEllipse;
+  }, [selectedCrop, selectedEllipse]);
+
+  useEffect(() => {
+    return () => stopEllipseAdjustmentRepeat();
+  }, []);
+
+  useEffect(() => {
     if (photos.length === 0) {
       setSelectedPhotoId("");
       return;
@@ -2347,6 +2381,11 @@ function TrainingCropAnnotationPanel({
     }
 
     let cancelled = false;
+    setCrops([]);
+    setEvidence(null);
+    setSelectedCropId(null);
+    setSelectedEllipseId(null);
+    setTrainingCropDatasetItem(null);
     void refreshCropsForPhoto(selectedPhoto.inspectionPhotoId);
     fetchInspectionPhotoObjectUrl({
       devUserId,
@@ -2555,6 +2594,86 @@ function TrainingCropAnnotationPanel({
       });
       await refreshEvidence(selectedCrop.trainingCropId);
     });
+  }
+
+  async function repeatSelectedEllipseAdjustment(
+    nextValues: (ellipse: OrientedBeeEllipse) => Partial<EllipseGeometry>
+  ) {
+    const crop = selectedCropRef.current;
+    const ellipse = selectedEllipseRef.current;
+    if (
+      !crop ||
+      !ellipse ||
+      crop.reviewStatus === "review_complete" ||
+      crop.reviewStatus === "excluded" ||
+      ellipseAdjustmentInFlightRef.current
+    ) {
+      return;
+    }
+    const values = nextValues(ellipse);
+    if (!canAdjustEllipse(crop, ellipse, values)) {
+      stopEllipseAdjustmentRepeat();
+      return;
+    }
+    ellipseAdjustmentInFlightRef.current = true;
+    try {
+      await updateTrainingCropEllipse({
+        devUserId,
+        workspaceId,
+        annotationId: ellipse.annotationId,
+        annotationType: values.annotationType,
+        centerX: values.centerX,
+        centerY: values.centerY,
+        radiusX: values.radiusX,
+        radiusY: values.radiusY,
+        rotationDegrees: values.rotationDegrees
+      });
+      await refreshEvidence(crop.trainingCropId);
+    } catch (error) {
+      stopEllipseAdjustmentRepeat();
+      onError(toApiError(error));
+    } finally {
+      ellipseAdjustmentInFlightRef.current = false;
+    }
+  }
+
+  function startEllipseAdjustmentRepeat(
+    event: PointerEvent<HTMLButtonElement>,
+    nextValues: (ellipse: OrientedBeeEllipse) => Partial<EllipseGeometry>
+  ) {
+    if (event.button !== 0 || event.currentTarget.disabled) {
+      return;
+    }
+    stopEllipseAdjustmentRepeat();
+    ellipseAdjustmentPointerConsumedRef.current = true;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    void repeatSelectedEllipseAdjustment(nextValues);
+    ellipseAdjustmentRepeatTimeoutRef.current = window.setTimeout(() => {
+      ellipseAdjustmentRepeatIntervalRef.current = window.setInterval(() => {
+        void repeatSelectedEllipseAdjustment(nextValues);
+      }, ellipseAdjustmentRepeatIntervalMs);
+    }, ellipseAdjustmentRepeatDelayMs);
+  }
+
+  function stopEllipseAdjustmentRepeat() {
+    if (ellipseAdjustmentRepeatTimeoutRef.current !== null) {
+      window.clearTimeout(ellipseAdjustmentRepeatTimeoutRef.current);
+      ellipseAdjustmentRepeatTimeoutRef.current = null;
+    }
+    if (ellipseAdjustmentRepeatIntervalRef.current !== null) {
+      window.clearInterval(ellipseAdjustmentRepeatIntervalRef.current);
+      ellipseAdjustmentRepeatIntervalRef.current = null;
+    }
+  }
+
+  function clickEllipseAdjustment(
+    nextValues: (ellipse: OrientedBeeEllipse) => Partial<EllipseGeometry>
+  ) {
+    if (ellipseAdjustmentPointerConsumedRef.current) {
+      ellipseAdjustmentPointerConsumedRef.current = false;
+      return;
+    }
+    void repeatSelectedEllipseAdjustment(nextValues);
   }
 
   async function deleteSelectedEllipse() {
@@ -3227,7 +3346,7 @@ function TrainingCropAnnotationPanel({
                         style={cropImageStyle(selectedCrop)}
                         draggable={false}
                       />
-                      {evidence?.beeEllipses.map((ellipse) => (
+                      {selectedCropEvidence?.beeEllipses.map((ellipse) => (
                         <button
                           key={ellipse.annotationId}
                           type="button"
@@ -3340,9 +3459,16 @@ function TrainingCropAnnotationPanel({
                     <button
                       type="button"
                       disabled={controlLocked || !canNudgeUp}
+                      onPointerDown={(event) =>
+                        startEllipseAdjustmentRepeat(event, (ellipse) => ({
+                          centerY: ellipse.centerY - 5
+                        }))
+                      }
+                      onPointerUp={stopEllipseAdjustmentRepeat}
+                      onPointerCancel={stopEllipseAdjustmentRepeat}
+                      onPointerLeave={stopEllipseAdjustmentRepeat}
                       onClick={() =>
-                        selectedEllipse &&
-                        void updateSelectedEllipse({ centerY: selectedEllipse.centerY - 5 })
+                        clickEllipseAdjustment((ellipse) => ({ centerY: ellipse.centerY - 5 }))
                       }
                       data-testid="nudge-training-ellipse-up-button"
                       title="Nudge up"
@@ -3353,9 +3479,16 @@ function TrainingCropAnnotationPanel({
                     <button
                       type="button"
                       disabled={controlLocked || !canNudgeLeft}
+                      onPointerDown={(event) =>
+                        startEllipseAdjustmentRepeat(event, (ellipse) => ({
+                          centerX: ellipse.centerX - 5
+                        }))
+                      }
+                      onPointerUp={stopEllipseAdjustmentRepeat}
+                      onPointerCancel={stopEllipseAdjustmentRepeat}
+                      onPointerLeave={stopEllipseAdjustmentRepeat}
                       onClick={() =>
-                        selectedEllipse &&
-                        void updateSelectedEllipse({ centerX: selectedEllipse.centerX - 5 })
+                        clickEllipseAdjustment((ellipse) => ({ centerX: ellipse.centerX - 5 }))
                       }
                       data-testid="nudge-training-ellipse-left-button"
                       title="Nudge left"
@@ -3366,9 +3499,16 @@ function TrainingCropAnnotationPanel({
                     <button
                       type="button"
                       disabled={controlLocked || !canNudgeRight}
+                      onPointerDown={(event) =>
+                        startEllipseAdjustmentRepeat(event, (ellipse) => ({
+                          centerX: ellipse.centerX + 5
+                        }))
+                      }
+                      onPointerUp={stopEllipseAdjustmentRepeat}
+                      onPointerCancel={stopEllipseAdjustmentRepeat}
+                      onPointerLeave={stopEllipseAdjustmentRepeat}
                       onClick={() =>
-                        selectedEllipse &&
-                        void updateSelectedEllipse({ centerX: selectedEllipse.centerX + 5 })
+                        clickEllipseAdjustment((ellipse) => ({ centerX: ellipse.centerX + 5 }))
                       }
                       data-testid="nudge-training-ellipse-right-button"
                       title="Nudge right"
@@ -3379,9 +3519,16 @@ function TrainingCropAnnotationPanel({
                     <button
                       type="button"
                       disabled={controlLocked || !canNudgeDown}
+                      onPointerDown={(event) =>
+                        startEllipseAdjustmentRepeat(event, (ellipse) => ({
+                          centerY: ellipse.centerY + 5
+                        }))
+                      }
+                      onPointerUp={stopEllipseAdjustmentRepeat}
+                      onPointerCancel={stopEllipseAdjustmentRepeat}
+                      onPointerLeave={stopEllipseAdjustmentRepeat}
                       onClick={() =>
-                        selectedEllipse &&
-                        void updateSelectedEllipse({ centerY: selectedEllipse.centerY + 5 })
+                        clickEllipseAdjustment((ellipse) => ({ centerY: ellipse.centerY + 5 }))
                       }
                       data-testid="nudge-training-ellipse-down-button"
                       title="Nudge down"
@@ -3394,11 +3541,18 @@ function TrainingCropAnnotationPanel({
                     <button
                       type="button"
                       disabled={controlLocked || !canRotateAntiClockwise}
+                      onPointerDown={(event) =>
+                        startEllipseAdjustmentRepeat(event, (ellipse) => ({
+                          rotationDegrees: ellipse.rotationDegrees - 5
+                        }))
+                      }
+                      onPointerUp={stopEllipseAdjustmentRepeat}
+                      onPointerCancel={stopEllipseAdjustmentRepeat}
+                      onPointerLeave={stopEllipseAdjustmentRepeat}
                       onClick={() =>
-                        selectedEllipse &&
-                        void updateSelectedEllipse({
-                          rotationDegrees: selectedEllipse.rotationDegrees - 5
-                        })
+                        clickEllipseAdjustment((ellipse) => ({
+                          rotationDegrees: ellipse.rotationDegrees - 5
+                        }))
                       }
                       data-testid="rotate-training-ellipse-anticlockwise-button"
                       title="Rotate anti-clockwise"
@@ -3409,11 +3563,18 @@ function TrainingCropAnnotationPanel({
                     <button
                       type="button"
                       disabled={controlLocked || !canRotateClockwise}
+                      onPointerDown={(event) =>
+                        startEllipseAdjustmentRepeat(event, (ellipse) => ({
+                          rotationDegrees: ellipse.rotationDegrees + 5
+                        }))
+                      }
+                      onPointerUp={stopEllipseAdjustmentRepeat}
+                      onPointerCancel={stopEllipseAdjustmentRepeat}
+                      onPointerLeave={stopEllipseAdjustmentRepeat}
                       onClick={() =>
-                        selectedEllipse &&
-                        void updateSelectedEllipse({
-                          rotationDegrees: selectedEllipse.rotationDegrees + 5
-                        })
+                        clickEllipseAdjustment((ellipse) => ({
+                          rotationDegrees: ellipse.rotationDegrees + 5
+                        }))
                       }
                       data-testid="rotate-training-ellipse-button"
                       title="Rotate clockwise"
@@ -3441,9 +3602,16 @@ function TrainingCropAnnotationPanel({
                     <button
                       type="button"
                       disabled={controlLocked || !canShrinkRadiusX}
+                      onPointerDown={(event) =>
+                        startEllipseAdjustmentRepeat(event, (ellipse) => ({
+                          radiusX: ellipse.radiusX - 5
+                        }))
+                      }
+                      onPointerUp={stopEllipseAdjustmentRepeat}
+                      onPointerCancel={stopEllipseAdjustmentRepeat}
+                      onPointerLeave={stopEllipseAdjustmentRepeat}
                       onClick={() =>
-                        selectedEllipse &&
-                        void updateSelectedEllipse({ radiusX: selectedEllipse.radiusX - 5 })
+                        clickEllipseAdjustment((ellipse) => ({ radiusX: ellipse.radiusX - 5 }))
                       }
                       data-testid="shrink-training-ellipse-x-button"
                       title="Reduce horizontal radius"
@@ -3454,9 +3622,16 @@ function TrainingCropAnnotationPanel({
                     <button
                       type="button"
                       disabled={controlLocked || !canGrowRadiusX}
+                      onPointerDown={(event) =>
+                        startEllipseAdjustmentRepeat(event, (ellipse) => ({
+                          radiusX: ellipse.radiusX + 5
+                        }))
+                      }
+                      onPointerUp={stopEllipseAdjustmentRepeat}
+                      onPointerCancel={stopEllipseAdjustmentRepeat}
+                      onPointerLeave={stopEllipseAdjustmentRepeat}
                       onClick={() =>
-                        selectedEllipse &&
-                        void updateSelectedEllipse({ radiusX: selectedEllipse.radiusX + 5 })
+                        clickEllipseAdjustment((ellipse) => ({ radiusX: ellipse.radiusX + 5 }))
                       }
                       data-testid="grow-training-ellipse-x-button"
                       title="Increase horizontal radius"
@@ -3467,9 +3642,16 @@ function TrainingCropAnnotationPanel({
                     <button
                       type="button"
                       disabled={controlLocked || !canShrinkRadiusY}
+                      onPointerDown={(event) =>
+                        startEllipseAdjustmentRepeat(event, (ellipse) => ({
+                          radiusY: ellipse.radiusY - 5
+                        }))
+                      }
+                      onPointerUp={stopEllipseAdjustmentRepeat}
+                      onPointerCancel={stopEllipseAdjustmentRepeat}
+                      onPointerLeave={stopEllipseAdjustmentRepeat}
                       onClick={() =>
-                        selectedEllipse &&
-                        void updateSelectedEllipse({ radiusY: selectedEllipse.radiusY - 5 })
+                        clickEllipseAdjustment((ellipse) => ({ radiusY: ellipse.radiusY - 5 }))
                       }
                       data-testid="shrink-training-ellipse-y-button"
                       title="Reduce vertical radius"
@@ -3480,9 +3662,16 @@ function TrainingCropAnnotationPanel({
                     <button
                       type="button"
                       disabled={controlLocked || !canGrowRadiusY}
+                      onPointerDown={(event) =>
+                        startEllipseAdjustmentRepeat(event, (ellipse) => ({
+                          radiusY: ellipse.radiusY + 5
+                        }))
+                      }
+                      onPointerUp={stopEllipseAdjustmentRepeat}
+                      onPointerCancel={stopEllipseAdjustmentRepeat}
+                      onPointerLeave={stopEllipseAdjustmentRepeat}
                       onClick={() =>
-                        selectedEllipse &&
-                        void updateSelectedEllipse({ radiusY: selectedEllipse.radiusY + 5 })
+                        clickEllipseAdjustment((ellipse) => ({ radiusY: ellipse.radiusY + 5 }))
                       }
                       data-testid="grow-training-ellipse-y-button"
                       title="Increase vertical radius"
@@ -3705,7 +3894,7 @@ function TrainingCropAnnotationPanel({
                 <Metric label="Review" value={selectedCrop.reviewStatus} />
                 <Metric label="Visible bees" value={selectedCrop.visibleBeeStatus} />
                 <Metric label="Dataset role" value={formatDatasetRoleLabel(selectedCropDatasetRole)} />
-                <Metric label="Ellipses" value={evidence?.beeEllipses.length ?? 0} />
+                <Metric label="Ellipses" value={selectedCropEvidence?.beeEllipses.length ?? 0} />
                 <Metric label="Coordinates" value="source px" />
               </div>
 
@@ -3925,7 +4114,7 @@ function TrainingCropAnnotationPanel({
                       Boolean(workingLabel) ||
                       selectedCrop.reviewStatus !== "review_complete" ||
                       selectedCrop.visibleBeeStatus !== "has_visible_bees" ||
-                      (evidence?.beeEllipses.length ?? 0) === 0 ||
+                      (selectedCropEvidence?.beeEllipses.length ?? 0) === 0 ||
                       Boolean(selectedCropActiveReviewItem)
                     }
                     onClick={() => void requestSelectedCropReview()}
@@ -4627,9 +4816,7 @@ function ReviewWorkPage({
           ) : null}
           <div
             className="review-crop-surface"
-            style={{
-              aspectRatio: `${selectedItem.evidenceSnapshot.cropWidth} / ${selectedItem.evidenceSnapshot.cropHeight}`
-            }}
+            style={reviewQueueSurfaceStyle(selectedItem)}
             data-testid="review-work-crop-surface"
           >
             <img
