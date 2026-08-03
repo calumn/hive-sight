@@ -69,6 +69,95 @@ def test_training_crop_creation_lists_multiple_crops_for_one_photo() -> None:
         app.dependency_overrides.clear()
 
 
+def test_dataset_curator_can_delete_unassigned_training_crop_with_ellipses() -> None:
+    state = build_dev_state(
+        id_values=[
+            UUID("00000000-0000-0000-0000-000000009016"),
+            UUID("00000000-0000-0000-0000-000000009017"),
+            UUID("00000000-0000-0000-0000-000000009018"),
+            UUID("00000000-0000-0000-0000-000000009019"),
+            UUID("00000000-0000-0000-0000-000000009020"),
+            UUID("00000000-0000-0000-0000-000000009021"),
+        ],
+        clock=lambda: datetime(2026, 7, 30, 9, 7, tzinfo=UTC),
+    )
+    app.dependency_overrides[get_dev_state] = lambda: state
+    client = TestClient(app)
+
+    try:
+        workspace_id, inspection_photo_id = _upload_photo(client, "training_data_collection")
+        crop = _create_crop(client, workspace_id, inspection_photo_id).json()
+        ellipse = _create_ellipse(client, workspace_id, crop["training_crop_id"])
+
+        deleted = client.delete(
+            f"/v1/training-crops/{crop['training_crop_id']}?workspace_id={workspace_id}",
+            headers={"x-hivesight-dev-user-id": str(USER_ID)},
+        )
+        listing = client.get(
+            f"/v1/inspection-photos/{inspection_photo_id}/training-crops"
+            f"?workspace_id={workspace_id}",
+            headers={"x-hivesight-dev-user-id": str(USER_ID)},
+        )
+        evidence = client.get(
+            f"/v1/training-crops/{crop['training_crop_id']}/evidence?workspace_id={workspace_id}",
+            headers={"x-hivesight-dev-user-id": str(USER_ID)},
+        )
+
+        assert ellipse.status_code == 201
+        assert deleted.status_code == 204
+        assert listing.status_code == 200
+        assert listing.json()["training_crops"] == []
+        assert evidence.status_code == 404
+        assert evidence.json()["detail"]["code"] == "training_crop_not_found"
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_dataset_curator_cannot_delete_training_crop_after_dataset_assignment() -> None:
+    state = build_dev_state(
+        id_values=[
+            UUID("00000000-0000-0000-0000-000000009022"),
+            UUID("00000000-0000-0000-0000-000000009023"),
+            UUID("00000000-0000-0000-0000-000000009024"),
+            UUID("00000000-0000-0000-0000-000000009025"),
+            UUID("00000000-0000-0000-0000-000000009026"),
+            UUID("00000000-0000-0000-0000-000000009027"),
+            UUID("00000000-0000-0000-0000-000000009028"),
+            UUID("00000000-0000-0000-0000-000000009029"),
+        ],
+        clock=lambda: datetime(2026, 7, 30, 9, 8, tzinfo=UTC),
+    )
+    app.dependency_overrides[get_dev_state] = lambda: state
+    client = TestClient(app)
+
+    try:
+        workspace_id, inspection_photo_id = _upload_photo(client, "training_data_collection")
+        crop = _create_completed_crop(client, workspace_id, inspection_photo_id, crop_x=100)
+        assigned = _assign_training_crop_to_dataset(
+            client,
+            workspace_id,
+            crop["training_crop_id"],
+            "training",
+        )
+
+        deleted = client.delete(
+            f"/v1/training-crops/{crop['training_crop_id']}?workspace_id={workspace_id}",
+            headers={"x-hivesight-dev-user-id": str(USER_ID)},
+        )
+        listing = client.get(
+            f"/v1/inspection-photos/{inspection_photo_id}/training-crops"
+            f"?workspace_id={workspace_id}",
+            headers={"x-hivesight-dev-user-id": str(USER_ID)},
+        )
+
+        assert assigned.status_code == 201
+        assert deleted.status_code == 409
+        assert deleted.json()["detail"]["code"] == "training_crop_dataset_item_exists"
+        assert len(listing.json()["training_crops"]) == 1
+    finally:
+        app.dependency_overrides.clear()
+
+
 def test_crop_bounds_are_validated_and_lock_after_first_ellipse() -> None:
     state = build_dev_state(
         id_values=[

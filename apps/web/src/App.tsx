@@ -49,6 +49,7 @@ import {
   createYoloObbExport,
   createReviewDecision,
   deleteTrainingRun,
+  deleteTrainingCrop,
   deleteTrainingCropEllipse,
   fetchAnalysisEvidence,
   fetchApiaries,
@@ -2717,6 +2718,26 @@ function TrainingCropAnnotationPanel({
     });
   }
 
+  async function deleteSelectedCrop() {
+    if (!selectedCrop || selectedCropIsAssigned || selectedCropActiveReviewItem) {
+      return;
+    }
+    await runCropAction("Deleting Training Crop", async () => {
+      await deleteTrainingCrop({
+        devUserId,
+        workspaceId,
+        trainingCropId: selectedCrop.trainingCropId
+      });
+      setEvidence(null);
+      setSelectedCropId(null);
+      setSelectedEllipseId(null);
+      setCandidateProposals([]);
+      setSelectedProposalId(null);
+      setEditedProposalIds(new Set());
+      if (selectedPhoto) await refreshCropsForPhoto(selectedPhoto.inspectionPhotoId);
+    });
+  }
+
   async function assignSelectedCropToDataset() {
     if (!selectedCrop) {
       return;
@@ -3749,6 +3770,19 @@ function TrainingCropAnnotationPanel({
                     Reopen crop
                   </button>
                 ) : null}
+                <button
+                  type="button"
+                  disabled={
+                    selectedCropIsAssigned ||
+                    Boolean(selectedCropActiveReviewItem) ||
+                    Boolean(workingLabel)
+                  }
+                  onClick={() => void deleteSelectedCrop()}
+                  data-testid="delete-training-crop-button"
+                >
+                  <Trash2 size={18} />
+                  Delete crop
+                </button>
               </div>
 
               <div className="metadata-panel crop-dataset-controls">

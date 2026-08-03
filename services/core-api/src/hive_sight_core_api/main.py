@@ -596,6 +596,21 @@ def update_training_crop(
     )
 
 
+@app.delete("/v1/training-crops/{training_crop_id}", status_code=204)
+def delete_training_crop(
+    training_crop_id: UUID,
+    workspace_id: UUID,
+    user: AuthenticatedUserDep,
+    workflow: TrainingCropWorkflowDep,
+) -> Response:
+    workflow.delete_training_crop(
+        user=user,
+        workspace_id=workspace_id,
+        training_crop_id=training_crop_id,
+    )
+    return Response(status_code=204)
+
+
 @app.post(
     "/v1/training-crops/{training_crop_id}/dataset-item",
     response_model=DatasetItemResponse,

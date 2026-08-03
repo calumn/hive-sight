@@ -1819,6 +1819,23 @@ export async function updateTrainingCrop({
   return parseTrainingCrop(await response.json());
 }
 
+export async function deleteTrainingCrop({
+  devUserId,
+  workspaceId,
+  trainingCropId
+}: {
+  devUserId: string;
+  workspaceId: string;
+  trainingCropId: string;
+}): Promise<void> {
+  const params = new URLSearchParams({ workspace_id: workspaceId });
+  const response = await fetch(`${coreApiUrl}/v1/training-crops/${trainingCropId}?${params}`, {
+    method: "DELETE",
+    headers: devAuthHeaders(devUserId)
+  });
+  await ensureOk(response);
+}
+
 export async function fetchTrainingCropEvidence({
   devUserId,
   workspaceId,

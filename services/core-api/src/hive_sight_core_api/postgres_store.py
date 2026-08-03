@@ -209,6 +209,23 @@ class PostgresProductDataStore(InMemoryProductDataStore):
         with self._connect() as connection, connection.cursor() as cursor:
             cursor.execute("DELETE FROM oriented_bee_ellipses WHERE id = %s", (annotation_id,))
 
+    def delete_training_crop_record(self, training_crop_id: UUID) -> None:
+        ellipse_ids = [
+            annotation_id
+            for annotation_id, ellipse in self.training_crop_ellipses.items()
+            if ellipse.training_crop_id == training_crop_id
+        ]
+        super().delete_training_crop_record(training_crop_id)
+        with self._connect() as connection, connection.cursor() as cursor:
+            cursor.execute(
+                "DELETE FROM oriented_bee_ellipses WHERE training_crop_id = %s",
+                (training_crop_id,),
+            )
+            cursor.execute("DELETE FROM training_crops WHERE id = %s", (training_crop_id,))
+        for annotation_id in ellipse_ids:
+            self._delete_record("training_crop_ellipse", annotation_id)
+        self._delete_record("training_crop", training_crop_id)
+
     def save_dataset_item(self, dataset_item: DatasetItemResponse):
         response = super().save_dataset_item(dataset_item)
         self._persist_model("dataset_item", response.dataset_item_id, response)

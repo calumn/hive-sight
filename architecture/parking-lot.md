@@ -1033,3 +1033,26 @@ Before Blind Independent Review, Third-Party Adjudication, multi-review benchmar
 Suggested owner or area:
 
 Review workflow, queue operations, authorization, and model governance.
+
+## PARK-0044: Crop Boundary Duplicate Partial Bee Handling
+
+Status: parked
+Date parked: 2026-08-03
+Source: Annotation seeding discussion
+Area: dataset quality, sampling validity, bee localisation, Varroa denominator logic
+
+Context:
+
+Early Bee Localisation seeding uses manually placed Training Crops within a larger frame photo. When adjacent crops touch or overlap, the same physical bee can appear partly in two crops. The curator may correctly annotate each visible fragment as `partial_visible_bee`, which is useful for teaching the Bee Detector that edge-visible bee fragments are still bees.
+
+Why parked:
+
+This is acceptable for early YOLO OBB seeding, but it is not safe to treat duplicated partial crop-edge annotations as independent bees for counting, infestation-rate estimation, protected benchmark claims, or Varroa sampling. Complete visible bees can support bee-population denominator logic more directly; partial visible bees need source-frame-level reconciliation before they can be interpreted as unique physical bees.
+
+Revisit trigger:
+
+Before using Training Crop evidence for user-facing bee counts, infestation-rate denominators, protected full-frame benchmark evidence, Varroa crop sampling, or any statistically stated claim that depends on unique bee counts across crop boundaries.
+
+Suggested owner or area:
+
+Dataset governance, Bee Localisation evaluation, Varroa sampling design, and future full-frame annotation/reconciliation workflow.

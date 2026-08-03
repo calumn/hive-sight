@@ -93,6 +93,7 @@ Use this when you want to cut a large frame photo into smaller annotation areas.
 5. Select the saved crop from the crop list.
 
 Saved crops and their reviewed ellipses persist when using the Postgres-backed local stack.
+If a saved crop was created by mistake, select it and click `Delete crop`. Deletion is available only before the crop has an active review request or has been assigned into the dataset.
 
 ## Annotate Bees In A Training Crop
 

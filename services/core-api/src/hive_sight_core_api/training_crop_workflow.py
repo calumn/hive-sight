@@ -175,6 +175,26 @@ class TrainingCropWorkflow:
         self.store.save_training_crop(updated)
         return updated
 
+    def delete_training_crop(
+        self,
+        user: UserContext,
+        workspace_id: UUID,
+        training_crop_id: UUID,
+    ) -> None:
+        crop = self.store.require_training_crop(
+            user=user,
+            workspace_id=workspace_id,
+            training_crop_id=training_crop_id,
+        )
+        _require_no_available_review_queue_item(self.store, crop.training_crop_id)
+        if self.store.get_dataset_item_for_training_crop(crop.training_crop_id) is not None:
+            raise DomainError(
+                "training_crop_dataset_item_exists",
+                "A Training Crop cannot be deleted after it has been assigned to a Dataset Item.",
+                409,
+            )
+        self.store.delete_training_crop_record(crop.training_crop_id)
+
     def create_training_crop_ellipse(
         self,
         user: UserContext,

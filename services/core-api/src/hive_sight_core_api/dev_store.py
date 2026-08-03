@@ -994,6 +994,16 @@ class InMemoryProductDataStore:
     def delete_training_crop_ellipse_record(self, annotation_id: UUID) -> None:
         del self.training_crop_ellipses[annotation_id]
 
+    def delete_training_crop_record(self, training_crop_id: UUID) -> None:
+        ellipse_ids = [
+            annotation_id
+            for annotation_id, ellipse in self.training_crop_ellipses.items()
+            if ellipse.training_crop_id == training_crop_id
+        ]
+        for annotation_id in ellipse_ids:
+            self.training_crop_ellipses.pop(annotation_id, None)
+        self.training_crops.pop(training_crop_id, None)
+
     def get_training_crop_evidence(
         self,
         user: UserContext,
