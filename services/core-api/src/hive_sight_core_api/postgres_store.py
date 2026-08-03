@@ -20,9 +20,9 @@ from hive_sight_core_api.models import (
     ApiaryResponse,
     ArtifactResponse,
     BenchmarkEvaluationResponse,
-    DatasetVersionResponse,
     DatasetItemResponse,
     DatasetLabellingSessionResponse,
+    DatasetVersionResponse,
     HiveConfigurationResponse,
     HiveResponse,
     InspectionPhotoResponse,
@@ -32,8 +32,8 @@ from hive_sight_core_api.models import (
     ReviewDecisionResponse,
     ReviewQueueItemRecord,
     ReviewQueueOutcomeRecord,
-    TrainingRunResponse,
     TrainingCropResponse,
+    TrainingRunResponse,
 )
 
 MODEL_RECORD_TYPES: dict[str, type] = {
@@ -79,10 +79,10 @@ class PostgresProductDataStore(InMemoryProductDataStore):
         for seed in DEV_USERS:
             self._persist_payload("user", seed.user_id, {"user_id": str(seed.user_id)})
             self._persist_workspace(seed.workspace_id)
+            self._upsert_workspace_projection(seed.workspace_id)
+            self._upsert_seeded_user_projection(seed)
             self._persist_model("apiary", seed.apiary_id, self.apiaries[seed.apiary_id])
             self._persist_model("hive", seed.hive_id, self.hives[seed.hive_id])
-            self._upsert_apiary_projection(self.apiaries[seed.apiary_id])
-            self._upsert_hive_projection(self.hives[seed.hive_id])
             membership = next(
                 membership
                 for membership in self.memberships
@@ -95,8 +95,8 @@ class PostgresProductDataStore(InMemoryProductDataStore):
                 f"{membership.user_id}:{membership.workspace_id}:{membership.role}",
                 _jsonable(asdict(membership)),
             )
-            self._upsert_seeded_user_projection(seed)
-            self._upsert_workspace_projection(seed.workspace_id)
+            self._upsert_apiary_projection(self.apiaries[seed.apiary_id])
+            self._upsert_hive_projection(self.hives[seed.hive_id])
 
     def accept_data_use_agreement(self, *args: Any, **kwargs: Any):
         response = super().accept_data_use_agreement(*args, **kwargs)

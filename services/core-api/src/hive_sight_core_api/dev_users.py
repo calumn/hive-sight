@@ -32,7 +32,7 @@ DEV_USERS: tuple[DevUserSeed, ...] = (
     DevUserSeed(
         code="DEV-OWNER-CURATOR",
         user_id=UUID("00000000-0000-0000-0000-000000000101"),
-        display_name="Default Dev Owner Curator",
+        display_name="Calum",
         description="Continuity user for current local owner, curator, and reviewer workflows.",
         workspace_id=UUID("00000000-0000-0000-0000-000000000201"),
         workspace_display_name="Dev Owner Curator Workspace",
@@ -47,7 +47,7 @@ DEV_USERS: tuple[DevUserSeed, ...] = (
     DevUserSeed(
         code="OWNER-A",
         user_id=UUID("00000000-0000-0000-0000-000000000102"),
-        display_name="Workspace Owner A",
+        display_name="Sally",
         description="Ordinary beekeeper owner with no internal capability.",
         workspace_id=UUID("00000000-0000-0000-0000-000000000202"),
         workspace_display_name="Owner A Workspace",
@@ -59,7 +59,7 @@ DEV_USERS: tuple[DevUserSeed, ...] = (
     DevUserSeed(
         code="OWNER-B",
         user_id=UUID("00000000-0000-0000-0000-000000000103"),
-        display_name="Workspace Owner B",
+        display_name="Lily",
         description="Second ordinary beekeeper owner for workspace separation checks.",
         workspace_id=UUID("00000000-0000-0000-0000-000000000203"),
         workspace_display_name="Owner B Workspace",
@@ -71,7 +71,7 @@ DEV_USERS: tuple[DevUserSeed, ...] = (
     DevUserSeed(
         code="CURATOR-1",
         user_id=UUID("00000000-0000-0000-0000-000000000104"),
-        display_name="Dataset Curator",
+        display_name="Izzy",
         description="Normal User with Dataset Curator internal capability.",
         workspace_id=UUID("00000000-0000-0000-0000-000000000204"),
         workspace_display_name="Dataset Curator Workspace",
@@ -84,7 +84,7 @@ DEV_USERS: tuple[DevUserSeed, ...] = (
     DevUserSeed(
         code="REVIEWER-1",
         user_id=UUID("00000000-0000-0000-0000-000000000105"),
-        display_name="Reviewer 1",
+        display_name="Ben",
         description="Distinct reviewer identity for future blind-review paths.",
         workspace_id=UUID("00000000-0000-0000-0000-000000000205"),
         workspace_display_name="Reviewer 1 Workspace",
@@ -97,7 +97,7 @@ DEV_USERS: tuple[DevUserSeed, ...] = (
     DevUserSeed(
         code="REVIEWER-2",
         user_id=UUID("00000000-0000-0000-0000-000000000106"),
-        display_name="Reviewer 2",
+        display_name="Callum",
         description="Second distinct reviewer identity for future blind-review paths.",
         workspace_id=UUID("00000000-0000-0000-0000-000000000206"),
         workspace_display_name="Reviewer 2 Workspace",
@@ -110,7 +110,7 @@ DEV_USERS: tuple[DevUserSeed, ...] = (
     DevUserSeed(
         code="REVIEWER-3",
         user_id=UUID("00000000-0000-0000-0000-000000000107"),
-        display_name="Reviewer 3 / Adjudicator",
+        display_name="Euan",
         description="Third reviewer identity for future adjudication proof points.",
         workspace_id=UUID("00000000-0000-0000-0000-000000000207"),
         workspace_display_name="Reviewer 3 Workspace",
@@ -123,7 +123,7 @@ DEV_USERS: tuple[DevUserSeed, ...] = (
     DevUserSeed(
         code="CONTRIBUTOR-1",
         user_id=UUID("00000000-0000-0000-0000-000000000108"),
-        display_name="External Contributor",
+        display_name="Jade",
         description="Contributor identity with its own Workspace and no broad foreign access.",
         workspace_id=UUID("00000000-0000-0000-0000-000000000208"),
         workspace_display_name="Contributor Workspace",
@@ -135,7 +135,7 @@ DEV_USERS: tuple[DevUserSeed, ...] = (
     DevUserSeed(
         code="BASIC-OWNER",
         user_id=UUID("00000000-0000-0000-0000-000000000109"),
-        display_name="Basic Workspace Owner",
+        display_name="Lula",
         description="Valid owner User with no elevated internal capability.",
         workspace_id=UUID("00000000-0000-0000-0000-000000000209"),
         workspace_display_name="Basic Owner Workspace",

@@ -34,8 +34,8 @@ from hive_sight_core_api.models import (
     ReviewQueueOutcomeRecord,
     ReviewQueueOutcomeValue,
     ReviewQueueSubjectType,
-    TrainingRunResponse,
     TrainingCropReviewStatus,
+    TrainingRunResponse,
     VisibleBeeStatus,
 )
 from hive_sight_core_api.postgres_store import PostgresProductDataStore
@@ -352,6 +352,38 @@ def test_postgres_store_seeds_development_users_with_separate_workspaces() -> No
     with pytest.raises(DomainError) as error:
         store.list_apiaries(UserContext(owner_b.user_id), owner_a.workspace_id)
     assert error.value.code == "workspace_access_denied"
+
+
+@pytest.mark.skipif(
+    importlib.util.find_spec("psycopg") is None or not os.getenv("HIVESIGHT_TEST_DATABASE_URL"),
+    reason="Set HIVESIGHT_TEST_DATABASE_URL and install psycopg to run Postgres persistence integration.",
+)
+def test_postgres_dev_user_seed_repairs_missing_workspace_projection_before_apiary() -> None:
+    database_url = os.environ["HIVESIGHT_TEST_DATABASE_URL"]
+    reset_database(database_url)
+    owner_a = DEV_USERS[1]
+
+    store = _build_postgres_state(database_url).store
+    with store._connect() as connection, connection.cursor() as cursor:
+        cursor.execute("DELETE FROM hives WHERE workspace_id = %s", (owner_a.workspace_id,))
+        cursor.execute("DELETE FROM apiaries WHERE workspace_id = %s", (owner_a.workspace_id,))
+        cursor.execute(
+            "DELETE FROM workspace_memberships WHERE workspace_id = %s",
+            (owner_a.workspace_id,),
+        )
+        cursor.execute("DELETE FROM internal_capabilities WHERE user_id = %s", (owner_a.user_id,))
+        cursor.execute("DELETE FROM workspaces WHERE id = %s", (owner_a.workspace_id,))
+
+    repaired_store = _build_postgres_state(database_url).store
+    repaired_store.seed_development_users()
+
+    with repaired_store._connect() as connection, connection.cursor() as cursor:
+        cursor.execute("SELECT 1 FROM workspaces WHERE id = %s", (owner_a.workspace_id,))
+        assert cursor.fetchone() == (1,)
+        cursor.execute("SELECT 1 FROM apiaries WHERE id = %s", (owner_a.apiary_id,))
+        assert cursor.fetchone() == (1,)
+        cursor.execute("SELECT 1 FROM hives WHERE id = %s", (owner_a.hive_id,))
+        assert cursor.fetchone() == (1,)
 
 
 @pytest.mark.skipif(
