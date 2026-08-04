@@ -24,8 +24,8 @@ The existing `bee_detector` API and persistence value remains the implementation
 
 - Directed reviewed bee ellipses are training evidence for future Bee Orientation work; YOLO OBB labels remain a derived Bee Localisation export.
 - `architecture/bee-orientation-classifier-design.md` defines the first planned Bee Orientation classifier design, including the Head Up crop convention, dataset builder, training adapter, benchmark, inference adapter, pipeline integration, and governance records.
-- Reviewed Bee Annotations record Orientation Reliability as `reliable` or `unreliable`; it is not inferred from the existence of a directed ellipse.
-- Existing directed ellipses must receive one-time human Orientation Reliability review before a shared marked-bee Dataset Version can be used for Bee Orientation or Head-Up Normalized Varroa exports.
+- Reviewed Bee Annotations record Orientation Reliability as `reliable` or `unreliable`; new Oriented Bee Ellipses default to `reliable`, and the annotator changes them to `unreliable` when head/tail direction is doubtful.
+- Existing local test directed ellipses may be normalized to `reliable`; future missing Orientation Reliability is not eligible for Bee Orientation or Head-Up Normalized Varroa exports until normalized or corrected.
 - Marked oriented-bee Dataset Versions are shared source evidence across Bee Localisation and Bee Orientation. YOLO OBB labels and Head Up / Head Down crops are purpose-specific projections; HiveSight must not promote separate source Dataset Versions for localisation and orientation from the same marked bees.
 - The first Bee Orientation training and benchmark corpora contain reliably oriented complete visible bees only; reliably oriented partial bees are retained for later separately reported evaluation.
 - Benchmark reports must name the evaluated Model Purpose. Slice 0015.4 evaluates Bee Localisation only, not head direction or Varroa detection.

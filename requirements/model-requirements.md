@@ -108,9 +108,9 @@ Rationale: The first trainable detector baseline is expected to use YOLO OBB, wh
 
 ### MR-008B Orientation Reliability
 
-Every reviewed Bee Annotation shall record Orientation Reliability as `reliable` or `unreliable`. It shall be distinct from bee-presence confidence and review status.
+Every reviewed Bee Annotation shall record Orientation Reliability as `reliable` or `unreliable`. It shall be distinct from bee-presence confidence and review status. New Oriented Bee Ellipses should default to `reliable` because obvious head direction is the normal annotation case; the annotator changes it to `unreliable` when head/tail direction is doubtful.
 
-Existing Bee Annotations created before Orientation Reliability is implemented shall be returned for one-time human reliability review before a shared marked-bee Dataset Version is used for Bee Orientation or Head-Up Normalized Varroa exports.
+Existing local test Bee Annotations created before Orientation Reliability is implemented may be normalized to `reliable` without a separate defaulted-provenance flag. Any future annotation evidence without Orientation Reliability shall be excluded from Bee Orientation or Head-Up Normalized Varroa exports until it is normalized or corrected.
 
 Rationale: A visible bee can be correctly localised while its head direction remains unknowable. The distinction preserves honest orientation training evidence and supplies the first Varroa corpus inclusion rule.
 

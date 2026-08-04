@@ -1,12 +1,12 @@
 # Vertical Slice 0021: Orientation Reliability Review
 
-Status: draft for acceptance scenario sign-off.
+Status: grilled and accepted for slice planning.
 
 ## Purpose
 
-Let a Dataset Curator review the head direction already recorded on each directed Oriented Bee Ellipse and mark whether that direction is trustworthy.
+Let an annotation editor record whether each directed Oriented Bee Ellipse has trustworthy head direction without adding a click to the normal obvious-head case.
 
-This slice proves the first required evidence gate for Bee Orientation. HiveSight already stores directed ellipse rotation, where `rotation_degrees` points from the ellipse centre toward the bee's head. That direction is useful only if a human can say whether the visible evidence supports it. A bee can be correctly localised while its head/tail direction is still visually unreliable.
+This slice proves the first required evidence gate for Bee Orientation. HiveSight already stores directed ellipse rotation, where `rotation_degrees` points from the ellipse centre toward the bee's head. A new ellipse defaults to reliable because, in normal annotation work, the bee's head direction is usually obvious once the annotator has drawn, rotated, and flipped the ellipse. The annotator changes the value only when head/tail direction is genuinely doubtful.
 
 The slice does not train the Bee Orientation Model. It creates the reviewed Orientation Reliability evidence that later shared marked-bee Dataset Versions, Head Up / Head Down dataset exports, and Head-Up Normalized Varroa evidence must consume.
 
@@ -26,134 +26,143 @@ When a marked-bee Dataset Version is promoted, it should apply to both Bee Local
 - `architecture/domain-model.md`: Reviewed Bee Annotations must carry Orientation Reliability before shared marked-bee Dataset Versions are used for Bee Orientation or head-normalized Varroa exports.
 - `architecture/parking-lot.md`: PARK-0029 Orientation Reliability Review And Dataset Gate.
 
-## Acceptance Scenarios For Sign-Off
+## Accepted Acceptance Scenarios
 
 ```gherkin
 Feature: Orientation Reliability Review
 
-  Scenario: Curator marks directed ellipse orientation as reliable
-    Given a Dataset Curator is working in a Training Data Collection Inspection
-    And a selected Training Crop has a reviewed Oriented Bee Ellipse without Orientation Reliability
-    When the curator marks the bee's Orientation Reliability as reliable
-    Then HiveSight saves the reliability decision for that bee annotation
-    And the selected crop shows one fewer bee needing orientation review
-    And the same reliability decision is still shown after the inspection is reopened
+  Scenario: New bee annotations default to reliable head direction
+    Given an annotation editor is working on an editable Training Crop
+    When they create a new Oriented Bee Ellipse
+    Then HiveSight saves the bee annotation with Orientation Reliability reliable
+    And the Bee Annotation UI shows the selected bee as Head direction reliable
+    And no extra click is required for the normal obvious-head case
 
-  Scenario: Curator marks directed ellipse orientation as unreliable
-    Given a Dataset Curator is working in a Training Data Collection Inspection
-    And a selected Training Crop has a reviewed Oriented Bee Ellipse whose head direction is not visually trustworthy
-    When the curator marks the bee's Orientation Reliability as unreliable
-    Then HiveSight saves the reliability decision for that bee annotation
-    And Crop Governance shows the crop has unreliable orientation evidence
+  Scenario: Annotation editor marks head direction as unreliable
+    Given an annotation editor is working on an editable Training Crop
+    And a selected Oriented Bee Ellipse has doubtful head direction
+    When they switch Head direction reliable off
+    Then HiveSight saves Orientation Reliability unreliable for that bee annotation
+    And the crop can still be marked review complete
     And later shared marked-bee dataset readiness excludes that bee from reliable-orientation evidence
 
-  Scenario: Missing reliability blocks orientation-dependent dataset readiness
-    Given a completed Training Crop contains reviewed Oriented Bee Ellipses
-    And at least one ellipse has no Orientation Reliability decision
-    When the Dataset Curator views governance readiness for the crop
-    Then HiveSight shows that orientation review is still needed
-    And HiveSight does not count that ellipse as eligible reliable evidence for orientation-dependent exports from the shared marked-bee Dataset Version
+  Scenario: Existing local test annotations are treated as reliable
+    Given existing local test Training Crops contain Oriented Bee Ellipses created before Slice 0021
+    When HiveSight loads or migrates those annotations
+    Then HiveSight treats their Orientation Reliability as reliable
+    And HiveSight does not show those bees as needing one-time orientation review
+    And no separate defaulted-provenance flag is required for this bootstrap test data
 
-  Scenario: Non-curators cannot change Orientation Reliability
-    Given a User without Dataset Curator capability can view or resume an allowed inspection workflow
-    When they view a Training Crop with Oriented Bee Ellipses
-    Then HiveSight does not offer controls to change Orientation Reliability
-    And the Core API rejects any direct attempt to change Orientation Reliability for that User
+  Scenario: Assigned dataset evidence cannot be silently changed
+    Given a Training Crop has been assigned into a Dataset Item
+    When an annotation editor opens that crop
+    Then HiveSight does not allow Orientation Reliability to be changed in place
+    And any later correction requires the existing reopen or supersession workflow
+
+  Scenario: Crop Governance summarizes orientation readiness
+    Given a completed Training Crop contains reliable and unreliable Oriented Bee Ellipses
+    When the Dataset Curator views the crop in Crop Governance
+    Then HiveSight shows how many bees are reliable for orientation-dependent exports
+    And HiveSight shows how many bees are excluded because head direction is unreliable
+    And Crop Governance links back to Bee Annotation rather than editing Orientation Reliability directly
 ```
 
 ## User Path
 
-Given a Dataset Curator is reviewing Bee Annotations in a Training Data Collection Inspection
-When they select a bee ellipse in Bee Annotation or inspect a crop in Crop Governance
-Then HiveSight shows whether that ellipse's Orientation Reliability is missing, reliable, or unreliable
-And the curator can mark the selected ellipse as reliable or unreliable
-And the decision persists with reviewer and timestamp provenance
-And crop-level governance shows whether orientation review is complete enough for future orientation-dependent dataset work.
+Given an annotation editor is working in Bee Annotation for an editable Training Crop
+When they create or select an Oriented Bee Ellipse
+Then HiveSight shows the plain-language control `Head direction reliable`
+And the bee defaults to reliable head direction
+And the editor can switch it to unreliable when the head/tail direction is doubtful
+And Crop Governance summarizes reliable and unreliable orientation evidence without becoming the editing surface.
 
 ## Preconditions
 
 - The selected Inspection has intent `training_data_collection`.
-- The selected User has Dataset Curator capability.
+- The selected User is allowed to edit bee annotations in the Training Data Collection workflow.
 - Workspace Data Use Agreement requirements remain enforced.
 - The Training Crop and Oriented Bee Ellipse already exist.
-- Existing directed ellipses may have no Orientation Reliability yet. Missing reliability is represented as "needs orientation review", not as a third reviewed reliability value.
+- Existing local test annotations created before Slice 0021 are treated as `reliable` without a separate defaulted-provenance flag.
+- New Oriented Bee Ellipses default to `reliable` immediately on creation.
 - Dataset Item assignment and Dataset Version creation continue to use existing marked-bee evidence. This slice adds orientation-dependent readiness evidence, not a new dataset builder.
 - Orientation Reliability extends the same reviewed bee annotation evidence used by Bee Localisation. It must not create a parallel source dataset or duplicate provenance chain.
 - A future promoted marked-bee Dataset Version must be shared by Bee Localisation and Bee Orientation; only the derived export packages are purpose-specific.
+- Once annotation evidence has been assigned into a Dataset Item, Orientation Reliability is frozen with that evidence. Any later correction requires the existing reopen or supersession workflow.
 
 ## End-To-End Behaviour
 
-The Bee Annotation stage adds Orientation Reliability controls for the selected Oriented Bee Ellipse.
+The Bee Annotation stage adds a plain-language `Head direction reliable` control for the selected Oriented Bee Ellipse.
 
 The control has two reviewed decisions:
 
-- `reliable`: the curator can visually trust that the directed ellipse points toward the bee's head.
-- `unreliable`: the curator cannot visually trust head/tail direction, even if the bee geometry itself is acceptable.
+- `reliable`: the annotation editor can visually trust that the directed ellipse points toward the bee's head. This is the default for new and existing local test annotations.
+- `unreliable`: the annotation editor cannot visually trust head/tail direction, even if the bee geometry itself is acceptable.
 
-If an existing annotation has no recorded Orientation Reliability, the UI shows it as needing orientation review. This missing state exists for migration and workflow readiness. It is not a reviewed domain outcome and must not be exported as reliable evidence.
+The stored domain value remains binary: `reliable` or `unreliable`. The UI must not introduce a numeric confidence value. A missing value should not normally exist after this slice; if encountered from bad legacy or integration data, it should be treated as not eligible for orientation-dependent exports until normalized.
 
 The Crop Governance stage adds crop-level orientation-readiness evidence:
 
-- number of bee annotations needing orientation review;
 - number marked reliable;
 - number marked unreliable;
-- a compact warning when any completed crop still contains missing or unreliable orientation evidence.
+- number eligible for orientation-dependent exports;
+- number excluded from orientation-dependent exports because head direction is unreliable.
 
 Where the UI already shows Dataset Role or dataset readiness warnings, it should distinguish Bee Localisation readiness from future Bee Orientation / Head-Up Normalized Varroa export readiness. A crop may still be useful for Bee Localisation while not yet usable as reliable orientation evidence, but both claims come from the same reviewed source annotation record and same promoted Dataset Version.
 
-The Core API persists Orientation Reliability on each reviewed Bee Annotation, including the reviewer User id and review timestamp. Updating reliability should not change the ellipse geometry, visibility class, review status, Dataset Item assignment, or existing Bee Localisation dataset evidence.
+The Core API persists Orientation Reliability on each Bee Annotation. Updating reliability while the crop is editable should not change ellipse geometry, visibility class, or review status.
+
+Changing Orientation Reliability is not allowed in place once the annotation evidence has been assigned into a Dataset Item or frozen into a Dataset Version. Corrections after that point use the existing reopen or supersession workflow so frozen evidence stays frozen.
 
 Existing Dataset Items and Dataset Versions remain immutable snapshots. If a future orientation-dependent dataset builder consumes an annotation, it must use the reliability value from the relevant shared marked-bee Dataset Version snapshot or explicitly record why the item was excluded from the derived export. This slice may expose readiness counts before that builder exists, but it must not pretend to create a separate Bee Orientation source Dataset Version.
 
 ## Layers Touched
 
-- Web UI: Add selected-ellipse Orientation Reliability controls in Bee Annotation; add crop-level orientation-readiness status in Crop Governance; hide controls for non-curator Users.
+- Web UI: Add selected-ellipse `Head direction reliable` controls in Bee Annotation; add crop-level orientation-readiness status in Crop Governance; hide editing controls when the crop is not editable.
 - Core API: Add or extend the smallest endpoint needed to update Orientation Reliability for one bee annotation and return reliability provenance in existing crop/annotation responses.
 - Analysis Service: Not touched.
-- Storage: Persist nullable Orientation Reliability and review provenance for existing and new Oriented Bee Ellipses. Existing rows start with no reliability decision.
+- Storage: Persist Orientation Reliability for existing and new Oriented Bee Ellipses. Existing local test rows are normalized to `reliable`.
 - Queue or async boundary: Not touched.
-- Contracts: Extend the bee annotation response and update request shape with `orientation_reliability`, `orientation_reliability_reviewed_by_user_id`, and `orientation_reliability_reviewed_at`.
+- Contracts: Extend the bee annotation response and update request shape with `orientation_reliability`.
 - Observability: Existing request logging is sufficient; API error responses should use normal authorization and validation paths.
 
 ## Test Seams
 
-- Seam: Core API annotation update
-- Behaviour verified: a Dataset Curator can set Orientation Reliability to `reliable` or `unreliable`; the value and provenance are returned when the crop/annotation is reloaded.
+- Seam: Core API annotation creation and update
+- Behaviour verified: new Oriented Bee Ellipses default to Orientation Reliability `reliable`; an annotation editor can set editable annotation evidence to `reliable` or `unreliable`; the value is returned when the crop/annotation is reloaded.
 - Test style: focused Core API test against the existing in-memory dev store, plus Postgres persistence coverage when practical.
 
-- Seam: Core API authorization
-- Behaviour verified: a User without Dataset Curator capability cannot change Orientation Reliability, even if they can otherwise view the relevant workflow.
+- Seam: Core API frozen evidence protection
+- Behaviour verified: Orientation Reliability cannot be changed in place after the annotation evidence has been assigned into a Dataset Item.
 - Test style: focused Core API regression test.
 
 - Seam: Web Bee Annotation review control
-- Behaviour verified: selecting a bee ellipse shows missing/reliable/unreliable state; marking each state updates the visible selected bee and survives reload.
+- Behaviour verified: creating a bee ellipse shows `Head direction reliable` on by default; switching it off marks the selected bee unreliable and survives reload.
 - Test style: Playwright browser acceptance using existing training-crop fixture flow.
 
 - Seam: Web Crop Governance readiness
-- Behaviour verified: crop rows or selected-crop detail show counts for missing, reliable, and unreliable orientation evidence, and distinguish orientation-readiness warnings from Bee Localisation dataset-role status.
+- Behaviour verified: crop rows or selected-crop detail show reliable and unreliable orientation evidence counts, distinguish orientation export readiness from Bee Localisation dataset-role status, and link back to Bee Annotation for changes.
 - Test style: Playwright browser acceptance extending Slice 0020 stage coverage.
 
 ## Data Shape
 
 Minimum fields on reviewed bee annotation records:
 
-- `orientation_reliability`: nullable enum, `reliable` or `unreliable`; null means no reviewed decision recorded yet.
-- `orientation_reliability_reviewed_by_user_id`: nullable User id.
-- `orientation_reliability_reviewed_at`: nullable timestamp.
+- `orientation_reliability`: enum, `reliable` or `unreliable`.
 
 Minimum update command:
 
 - target annotation id;
 - desired Orientation Reliability value: `reliable` or `unreliable`;
 - acting User from the Core API development/auth boundary;
-- expected Workspace and Training Crop context, if needed for authorization and stale-state protection.
+- expected Workspace and Training Crop context, if needed for authorization and stale-state protection;
+- editable-evidence guard rejecting updates after Dataset Item assignment or Dataset Version freezing.
 
 Minimum derived crop summary:
 
-- `orientation_reliability_missing_count`;
 - `orientation_reliable_count`;
 - `orientation_unreliable_count`;
-- `orientation_review_complete`: true when every in-scope reviewed Oriented Bee Ellipse has a reliability decision.
+- `orientation_export_eligible_count`;
+- `orientation_export_excluded_count`.
 
 ## Out Of Scope
 
@@ -164,21 +173,22 @@ Minimum derived crop summary:
 - Varroa Detector training or user-facing Varroa Assessment results.
 - Blind independent review of Orientation Reliability.
 - Numeric thresholds for model-predicted orientation reliability.
+- Notes or reason codes for unreliable head direction.
 - Reworking historical Dataset Versions or Training Runs.
 
 ## Acceptance Criteria
 
-- [ ] A Dataset Curator can mark each reviewed Oriented Bee Ellipse as orientation `reliable` or `unreliable`.
-- [ ] Existing ellipses without a decision are shown as needing orientation review, not silently treated as reliable.
-- [ ] Orientation Reliability and review provenance persist after reload and through the configured metadata backend.
-- [ ] Crop Governance shows missing, reliable, and unreliable orientation counts for the selected crop.
+- [ ] New Oriented Bee Ellipses default to Orientation Reliability `reliable`.
+- [ ] Existing local test ellipses are treated as `reliable` without a separate defaulted-provenance flag.
+- [ ] An annotation editor can mark each editable Oriented Bee Ellipse as orientation `reliable` or `unreliable`.
+- [ ] Orientation Reliability persists after reload and through the configured metadata backend.
+- [ ] Assigned or frozen Dataset Item evidence cannot have Orientation Reliability changed in place.
+- [ ] Crop Governance shows reliable and unreliable orientation counts for the selected crop, and links back to Bee Annotation for edits.
 - [ ] Orientation-dependent readiness excludes missing and unreliable orientation evidence, while the promoted source Dataset Version remains shared with Bee Localisation.
-- [ ] Non-curator Users cannot change Orientation Reliability in the UI or Core API.
+- [ ] Crop completion remains allowed when one or more bees have `unreliable` Orientation Reliability.
 - [ ] Focused Core API and Playwright regression guards cover persistence, authorization, and the main review path.
 - [ ] `pnpm verify:slice` passes before implementation closeout, with live Postgres verification recorded if the persistence path is changed.
 
 ## Open Questions
 
-- Should Orientation Reliability be reviewed primarily in Bee Annotation, Crop Governance, or both in the first UI pass? This slice proposes Bee Annotation for per-ellipse editing and Crop Governance for summary/readiness.
-- Should changing Orientation Reliability on an annotation that is already snapshotted into a Dataset Item require a reopen/supersession workflow, or is the decision only consumed by future shared marked-bee Dataset Version snapshots? This slice proposes no mutation of existing Dataset Items or Dataset Versions.
-- Should partial visible bees receive Orientation Reliability now for future retained evidence, even though the first Bee Orientation corpus will use complete visible bees only? This slice proposes yes: record reliability on every reviewed Oriented Bee Ellipse, then let later dataset builders choose eligible visibility classes.
+- None after Slice 0021 grilling. Implementation should preserve the agreed scope and avoid adding separate orientation dataset promotion, numeric reliability, notes, or Crop Governance editing.

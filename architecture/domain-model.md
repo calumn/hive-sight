@@ -637,8 +637,8 @@ Rules:
 
 - The canonical reviewed geometry for bee annotations is an oriented bee ellipse.
 - Oriented Bee Ellipse rotation is directed: `rotation_degrees` points from the ellipse center toward the bee's head along the major axis; the opposite end is the tail.
-- Reviewed Bee Annotations record Orientation Reliability as `reliable` or `unreliable`, independently of their visibility class, bee-presence confidence, and review status.
-- Existing Bee Annotations without Orientation Reliability must be returned for one-time human review before a shared marked-bee Dataset Version is used for Bee Orientation or Head-Up Normalized Varroa exports.
+- Reviewed Bee Annotations record Orientation Reliability as `reliable` or `unreliable`, independently of their visibility class, bee-presence confidence, and review status. New Oriented Bee Ellipses default to `reliable`; the annotator changes them to `unreliable` when head/tail direction is doubtful.
+- Existing local test Bee Annotations without Orientation Reliability may be normalized to `reliable` without a separate defaulted-provenance flag. Future annotation evidence missing Orientation Reliability is excluded from Bee Orientation or Head-Up Normalized Varroa exports until normalized or corrected.
 - Candidate Annotations are not ground truth until human reviewed.
 - Reviewed Annotations still require Dataset Role assignment before dataset use.
 - Model-specific exports may project oriented ellipses into other shapes such as YOLO OBB labels.

@@ -690,15 +690,15 @@ Area: annotation workflow, dataset governance, persistence
 
 Context:
 
-ADR 0007 requires reviewed Bee Annotations to carry Orientation Reliability: `reliable` or `unreliable`, independently of bee-presence confidence and review status. Existing directed ellipses do not yet have this field, so their head direction must not be assumed reliable merely because a rotation was recorded.
+ADR 0007 requires reviewed Bee Annotations to carry Orientation Reliability: `reliable` or `unreliable`, independently of bee-presence confidence and review status. Slice 0021 planning decides that new ellipses default to `reliable`, existing local test ellipses are normalized to `reliable`, and future missing values are excluded from orientation-dependent exports until normalized or corrected.
 
 Why parked:
 
-The current implementation provides directed ellipse review but does not yet persist Orientation Reliability or provide a dedicated review queue. The current early corpus is small enough for a one-time human review when the field is introduced.
+The current implementation provides directed ellipse review but does not yet persist Orientation Reliability. The current early corpus is local test data, so it can be normalized to reliable as part of Slice 0021 instead of requiring a one-time review queue.
 
 Promotion note:
 
-Promoted into `architecture/vertical-slice-0021-orientation-reliability-review.md` as the first Bee Orientation preparation slice. The slice records per-ellipse Orientation Reliability, shows missing/reliable/unreliable crop readiness, and gates later orientation-dependent export work without building the shared marked-bee Dataset Version, Bee Orientation export package, or classifier yet.
+Promoted into `architecture/vertical-slice-0021-orientation-reliability-review.md` as the first Bee Orientation preparation slice. The slice records per-ellipse Orientation Reliability, defaults editable annotations to reliable, shows reliable/unreliable crop readiness, and gates later orientation-dependent export work without building the shared marked-bee Dataset Version, Bee Orientation export package, or classifier yet.
 
 Revisit trigger:
 
