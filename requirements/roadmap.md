@@ -44,7 +44,7 @@ These are the strongest near-term candidates based on the current project state.
 | Benchmark Dataset Curation Browser | Business / Technical | Let a Dataset Curator see and manage protected benchmark evidence as a named asset. | Slice 0015.4 uses benchmark items frozen inside a training Dataset Version; comparing candidates fairly soon needs a reusable benchmark lifecycle. |
 | Full-Frame Bee Localisation Evaluation | Technical | Evaluate whether the Bee Localisation candidate can find bees in realistic whole-frame photos, not just reviewed crops. | Crop-level success does not prove the model works on real inspection photos. |
 | Orientation Reliability Review | Business / Technical | Add explicit `reliable` / `unreliable` orientation review for directed bee ellipses. | Promoted into `architecture/vertical-slice-0021-orientation-reliability-review.md`. |
-| Bee Orientation Model Baseline | Technical | Train the first model that predicts Head Up / Head Down direction for localised bees. | Varroa crops need consistent Head-Up Normalized Bee Crops. |
+| Bee Orientation Model Baseline | Technical | Train the first model that predicts Head Up / Head Down direction for localised bees from the shared Bee Detection and Bee Orientation marked-bee Dataset Version. | Drafted as `architecture/vertical-slice-0022-bee-orientation-training-baseline.md`; Varroa crops need consistent Head-Up Normalized Bee Crops. |
 | Varroa Review Outcome Labelling | Business | Add the CAPTCHA-like workflow for `visible_varroa_present`, `no_visible_varroa`, and `not_determined`. | Varroa training needs active positives and active negatives, not silent absence. |
 | Public Dataset Candidate Import | Technical / Governance | Import public USDA-ARS image/XML evidence as Candidate Annotations requiring human review. | This could accelerate dataset growth, but only if provenance and source rights are handled correctly. |
 
@@ -70,7 +70,7 @@ These are the strongest near-term candidates based on the current project state.
 | Orientation Reliability Review | Business / Technical | Promoted into `architecture/vertical-slice-0021-orientation-reliability-review.md` to let a curator mark whether each directed ellipse has reliable head direction. |
 | Shared Marked-Bee Dataset Version Promotion | Technical / Governance | Promote one marked oriented-bee Dataset Version that stays in lockstep for Bee Localisation and Bee Orientation source evidence. |
 | Bee Orientation Dataset Builder | Technical / Governance | Export reliable directed ellipses from the shared Dataset Version into reproducible Head Up / Head Down crop packages with source maps and exclusion reasons. |
-| Bee Orientation Model Baseline | Technical | Train and record the first Head Up / Head Down classifier on body-axis-normalised bee crops. |
+| Bee Orientation Model Baseline | Technical | Drafted as `architecture/vertical-slice-0022-bee-orientation-training-baseline.md` to train and record the first Head Up / Head Down classifier from the shared Bee Detection and Bee Orientation marked-bee Dataset Version. |
 | Bee Orientation Benchmark Report | Technical | Report directed head/tail accuracy, angular error, unreliable-orientation rate, and performance by image quality and occlusion. |
 | Orientation-Assisted Crop Normalisation | Technical | Produce Head-Up Normalized Bee Crops for Varroa labelling and model input, while excluding unreliable orientation from the first Varroa corpus. |
 
