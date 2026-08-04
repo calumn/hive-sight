@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { networkInterfaces } from "node:os";
+import { runDevPreflight } from "./dev-preflight.mjs";
 
 const lanHost = localLanAddress();
 const mode = process.argv[3] === "--lan" ? "lan" : "local";
@@ -88,6 +89,12 @@ async function printStatus() {
 }
 
 async function startServices() {
+  const preflightPassed = await runDevPreflight();
+  if (!preflightPassed) {
+    process.exitCode = 1;
+    return;
+  }
+
   process.stdout.write("Starting HiveSight local servers. Press Ctrl+C to stop them.\n\n");
   if (mode === "lan") {
     process.stdout.write(`LAN Web UI: ${webOrigin}\n`);

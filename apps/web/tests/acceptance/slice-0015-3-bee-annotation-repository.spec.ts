@@ -22,6 +22,8 @@ test("Dataset Curator browses Bee Annotation Repository across inspections", asy
   await expect(page.getByTestId("repository-item-card")).toHaveCount(2);
   await expect(page.getByTestId("repository-item-detail")).toContainText("Complete bees");
   await expect(page.getByTestId("repository-crop-preview")).toBeVisible();
+  await expectLoadedImage(page, "repository-thumbnail-image");
+  await expectLoadedImage(page, "repository-crop-preview-image");
   await expect(page.getByTestId("repository-crop-ellipse")).toHaveCount(1);
 
   await page.getByTestId("repository-role-filter").selectOption("validation");
@@ -150,4 +152,17 @@ function devHeaders() {
 
 function jsonHeaders() {
   return { ...devHeaders(), "content-type": "application/json" };
+}
+
+async function expectLoadedImage(page: Page, testId: string) {
+  const image = page.getByTestId(testId).first();
+  await expect(image).toBeVisible();
+  await expect
+    .poll(async () =>
+      image.evaluate((element) => {
+        const img = element as HTMLImageElement;
+        return img.complete && img.naturalWidth > 0 && img.naturalHeight > 0;
+      })
+    )
+    .toBe(true);
 }

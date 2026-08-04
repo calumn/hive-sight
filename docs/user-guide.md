@@ -61,6 +61,8 @@ Then start the stack with Postgres-backed metadata and the real YOLO adapter:
 pnpm dev:all:yolo
 ```
 
+If Docker Desktop is not running or local Postgres is stopped, the dev launcher stops early and tells you to start Docker Desktop and run `pnpm db:up`. That check does not reset or wipe the dev database.
+
 Open:
 
 ```text

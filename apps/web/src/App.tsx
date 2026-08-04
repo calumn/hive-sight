@@ -1676,7 +1676,7 @@ function BeeAnnotationRepositoryPage({
               onClick={() => setSelectedDatasetItemId(item.datasetItemId)}
               data-testid="repository-item-card"
             >
-              <RepositoryThumbnail item={item} />
+              <RepositoryThumbnail item={item} devUserId={devUserId} onError={onError} />
               <span>
                 <strong>{item.humanReadableId}</strong>
                 <span>
@@ -1709,7 +1709,7 @@ function BeeAnnotationRepositoryPage({
                   <span className="intent-badge">Protected benchmark</span>
                 ) : null}
               </div>
-              <RepositoryCropPreview detail={detail} />
+              <RepositoryCropPreview detail={detail} devUserId={devUserId} onError={onError} />
               <div className="repository-summary">
                 <Metric label="Complete bees" value={detail.completeVisibleBeeCount} />
                 <Metric label="Partial bees" value={detail.partialVisibleBeeCount} />
@@ -1781,7 +1781,21 @@ function BeeAnnotationRepositoryPage({
   );
 }
 
-function RepositoryThumbnail({ item }: { item: DatasetRepositoryItem }) {
+function RepositoryThumbnail({
+  item,
+  devUserId,
+  onError
+}: {
+  item: DatasetRepositoryItem;
+  devUserId: string;
+  onError: (error: ApiError) => void;
+}) {
+  const thumbnailUrl = useAuthenticatedImageUrl({
+    devUserId,
+    onError,
+    viewUrl: item.previewStatus === "available" ? item.thumbnailUrl : null
+  });
+
   if (!item.thumbnailUrl || item.previewStatus !== "available") {
     return (
       <span className="repository-thumbnail unavailable">
@@ -1791,13 +1805,27 @@ function RepositoryThumbnail({ item }: { item: DatasetRepositoryItem }) {
   }
   return (
     <span className="repository-thumbnail">
-      <img src={toCoreApiContentUrl(item.thumbnailUrl)} alt="" />
+      {thumbnailUrl ? <img src={thumbnailUrl} alt="" data-testid="repository-thumbnail-image" /> : null}
     </span>
   );
 }
 
-function RepositoryCropPreview({ detail }: { detail: DatasetRepositoryItemDetail }) {
+function RepositoryCropPreview({
+  detail,
+  devUserId,
+  onError
+}: {
+  detail: DatasetRepositoryItemDetail;
+  devUserId: string;
+  onError: (error: ApiError) => void;
+}) {
   const basis = detail.reviewedEllipseSnapshots[0];
+  const previewImageUrl = useAuthenticatedImageUrl({
+    devUserId,
+    onError,
+    viewUrl: detail.previewStatus === "available" ? detail.previewUrl : null
+  });
+
   if (!detail.previewUrl || detail.previewStatus !== "available" || !basis) {
     return (
       <div className="repository-crop-preview unavailable" data-testid="repository-crop-preview">
@@ -1816,11 +1844,14 @@ function RepositoryCropPreview({ detail }: { detail: DatasetRepositoryItemDetail
       }}
       data-testid="repository-crop-preview"
     >
-      <img
-        src={toCoreApiContentUrl(detail.previewUrl)}
-        alt=""
-        style={repositoryCropImageStyle(detail, basis)}
-      />
+      {previewImageUrl ? (
+        <img
+          src={previewImageUrl}
+          alt=""
+          style={repositoryCropImageStyle(detail, basis)}
+          data-testid="repository-crop-preview-image"
+        />
+      ) : null}
       {detail.reviewedEllipseSnapshots.map((ellipse) => (
         <span
           key={ellipse.annotationId}
@@ -1833,6 +1864,62 @@ function RepositoryCropPreview({ detail }: { detail: DatasetRepositoryItemDetail
       ))}
     </div>
   );
+}
+
+function useAuthenticatedImageUrl({
+  devUserId,
+  onError,
+  viewUrl
+}: {
+  devUserId: string;
+  onError: (error: ApiError) => void;
+  viewUrl: string | null;
+}) {
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const onErrorRef = useRef(onError);
+
+  useEffect(() => {
+    onErrorRef.current = onError;
+  }, [onError]);
+
+  useEffect(() => {
+    if (!viewUrl) {
+      setImageUrl((current) => {
+        if (current) URL.revokeObjectURL(current);
+        return null;
+      });
+      return;
+    }
+
+    let cancelled = false;
+    fetchInspectionPhotoObjectUrl({ devUserId, viewUrl })
+      .then((nextImageUrl) => {
+        if (cancelled) {
+          URL.revokeObjectURL(nextImageUrl);
+          return;
+        }
+        setImageUrl((current) => {
+          if (current) URL.revokeObjectURL(current);
+          return nextImageUrl;
+        });
+      })
+      .catch((error) => onErrorRef.current(toApiError(error)));
+
+    return () => {
+      cancelled = true;
+    };
+  }, [devUserId, viewUrl]);
+
+  useEffect(() => {
+    return () => {
+      setImageUrl((current) => {
+        if (current) URL.revokeObjectURL(current);
+        return null;
+      });
+    };
+  }, []);
+
+  return imageUrl;
 }
 
 function repositoryCropImageStyle(

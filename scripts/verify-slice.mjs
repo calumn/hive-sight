@@ -28,6 +28,12 @@ const checks = [
     args: ["pnpm", "--filter", "@hive-sight/web", "check"]
   },
   {
+    name: "Dev script tests",
+    command: "node --test scripts/dev-preflight.test.mjs",
+    cwd: ".",
+    args: ["node", "--test", "scripts/dev-preflight.test.mjs"]
+  },
+  {
     name: "Web browser acceptance tests",
     command: "pnpm --filter @hive-sight/web test:acceptance",
     cwd: ".",
