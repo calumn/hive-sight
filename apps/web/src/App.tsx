@@ -1364,6 +1364,8 @@ function TrainingWorkflowStageButton({
   return (
     <button
       type="button"
+      role="tab"
+      aria-selected={selected}
       className={selected ? "selected" : ""}
       onClick={onClick}
       data-testid={testId}
@@ -3204,6 +3206,7 @@ function TrainingCropAnnotationPanel({
       <div
         className="training-workflow-stage-nav"
         data-testid="training-workflow-stage-nav"
+        role="tablist"
         aria-label="Training Inspection workflow stages"
       >
         <TrainingWorkflowStageButton
@@ -4214,19 +4217,32 @@ function TrainingCropAnnotationPanel({
               aria-label="Crop Governance"
             >
               <div className="crop-governance-layout">
-                <div className="crop-governance-list" data-testid="crop-governance-list">
-                  {crops.map((crop, index) => (
-                    <button
-                      key={crop.trainingCropId}
-                      type="button"
-                      className={crop.trainingCropId === selectedCropId ? "selected-row" : ""}
-                      onClick={() => setSelectedCropId(crop.trainingCropId)}
-                      data-testid="training-crop-list-item"
-                    >
-                      Crop {index + 1} / {crop.reviewStatus} / {crop.visibleBeeStatus} /{" "}
-                      {formatDatasetRoleLabel(crop.datasetRole)}
-                    </button>
-                  ))}
+                <div className="crop-governance-list-panel">
+                  <strong>Crops in this inspection</strong>
+                  <div
+                    className="crop-governance-list"
+                    data-testid="crop-governance-list"
+                    role="listbox"
+                    aria-label="Training Crops for this inspection"
+                  >
+                    {crops.map((crop, index) => (
+                      <button
+                        key={crop.trainingCropId}
+                        type="button"
+                        role="option"
+                        aria-selected={crop.trainingCropId === selectedCropId}
+                        className={crop.trainingCropId === selectedCropId ? "selected-row" : ""}
+                        onClick={() => setSelectedCropId(crop.trainingCropId)}
+                        data-testid="training-crop-list-item"
+                      >
+                        <span>Crop {index + 1}</span>
+                        <small>
+                          {crop.reviewStatus} / {crop.visibleBeeStatus} /{" "}
+                          {formatDatasetRoleLabel(crop.datasetRole)}
+                        </small>
+                      </button>
+                    ))}
+                  </div>
                 </div>
                 <div className="crop-governance-detail" data-testid="crop-governance-detail">
                   <div className="export-summary">

@@ -24,11 +24,14 @@ test("Dataset Curator works through separated Training Inspection stages", async
   await page.getByTestId("create-inspection-button").click();
 
   await expect(page.getByTestId("training-workflow-stage-nav")).toBeVisible();
+  await expect(page.getByTestId("training-workflow-stage-nav")).toHaveAttribute("role", "tablist");
+  await expect(page.getByTestId("workflow-stage-setup-button")).toHaveAttribute("aria-selected", "true");
   await expect(page.getByTestId("training-workflow-stage-setup")).toBeVisible();
   await expect(page.getByTestId("workflow-stage-crop-selection-button")).toContainText("0 crops");
   await expect(page.getByTestId("workflow-stage-bee-annotation-button")).toContainText("0 pending");
 
   await page.getByTestId("workflow-stage-crop-selection-button").click();
+  await expect(page.getByTestId("workflow-stage-crop-selection-button")).toHaveAttribute("aria-selected", "true");
   await expect(page.getByTestId("training-workflow-stage-crop-selection")).toBeVisible();
   await expect(page.getByTestId("training-crop-review-controls")).toHaveCount(0);
   await expect(page.getByTestId("training-crop-review-request-panel")).toHaveCount(0);
@@ -56,6 +59,10 @@ test("Dataset Curator works through separated Training Inspection stages", async
 
   await page.getByTestId("workflow-stage-crop-governance-button").click();
   await expect(page.getByTestId("training-workflow-stage-crop-governance")).toBeVisible();
+  await expect(page.getByTestId("workflow-stage-crop-governance-button")).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByTestId("crop-governance-list")).toHaveAttribute("role", "listbox");
+  await expect(page.getByTestId("training-crop-list-item")).toHaveAttribute("role", "option");
+  await expect(page.getByTestId("training-crop-list-item")).toHaveAttribute("aria-selected", "true");
   await expect(page.getByTestId("crop-governance-list")).toContainText("Crop 1");
   await expect(page.getByTestId("crop-governance-detail")).toContainText("Complete visible bees 1");
   await expect(page.getByTestId("request-training-crop-review-button")).toBeVisible();

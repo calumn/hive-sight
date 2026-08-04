@@ -693,23 +693,47 @@ label span {
 
 .training-workflow-stage-nav {
   display: grid;
-  gap: 8px;
+  gap: 0;
   grid-template-columns: repeat(4, minmax(0, 1fr));
+  border-bottom: 2px solid #31572c;
 }
 
 .training-workflow-stage-nav button {
   align-items: flex-start;
+  background: #eef1e9;
+  border-color: #c9d4c5;
+  border-radius: 8px 8px 0 0;
+  border-bottom: 0;
   display: grid;
   gap: 4px;
   justify-content: stretch;
   min-height: 68px;
+  position: relative;
   text-align: left;
 }
 
+.training-workflow-stage-nav button + button {
+  margin-left: -1px;
+}
+
 .training-workflow-stage-nav button.selected {
-  background: #31572c;
+  background: #ffffff;
   border-color: #31572c;
-  color: #ffffff;
+  color: #20241f;
+  margin-bottom: -2px;
+  min-height: 70px;
+  z-index: 1;
+}
+
+.training-workflow-stage-nav button.selected::before {
+  background: #31572c;
+  border-radius: 8px 8px 0 0;
+  content: "";
+  height: 5px;
+  left: -1px;
+  position: absolute;
+  right: -1px;
+  top: -1px;
 }
 
 .training-workflow-stage-nav button span,
@@ -1131,20 +1155,63 @@ label span {
   grid-template-columns: minmax(260px, 0.55fr) minmax(0, 1.45fr);
 }
 
-.crop-governance-list {
+.crop-governance-list-panel {
+  background: #f7f9f5;
+  border: 1px solid #dce2d7;
+  border-radius: 8px;
   display: grid;
   gap: 8px;
+  padding: 10px;
+}
+
+.crop-governance-list-panel > strong {
+  font-size: 0.88rem;
+}
+
+.crop-governance-list {
+  border: 1px solid #cfd8c9;
+  border-radius: 6px;
+  display: grid;
+  overflow: hidden;
 }
 
 .crop-governance-list button {
+  align-items: flex-start;
+  background: #ffffff;
+  border: 0;
+  border-bottom: 1px solid #e1e7dd;
+  border-left: 5px solid transparent;
+  border-radius: 0;
+  display: grid;
+  gap: 2px;
   justify-content: flex-start;
+  min-height: 54px;
   text-align: left;
+  width: 100%;
+}
+
+.crop-governance-list button:last-child {
+  border-bottom: 0;
+}
+
+.crop-governance-list button span {
+  font-weight: 800;
+}
+
+.crop-governance-list button small {
+  color: #55604f;
+  font-size: 0.8rem;
+  font-weight: 700;
 }
 
 .crop-governance-list button.selected-row {
-  background: #31572c;
-  border-color: #31572c;
-  color: #ffffff;
+  background: #eaf7ec;
+  border-left-color: #31572c;
+  color: #20241f;
+}
+
+.crop-governance-list button.selected-row small {
+  color: #31572c;
 }
 
 .crop-governance-detail {
