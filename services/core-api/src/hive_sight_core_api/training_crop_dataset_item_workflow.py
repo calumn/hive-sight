@@ -66,6 +66,7 @@ class TrainingCropDatasetItemWorkflow:
                 radius_x=ellipse.radius_x,
                 radius_y=ellipse.radius_y,
                 rotation_degrees=ellipse.rotation_degrees,
+                orientation_reliability=ellipse.orientation_reliability,
                 coordinate_space=ellipse.coordinate_space,
                 source_image_width_px=ellipse.source_image_width_px,
                 source_image_height_px=ellipse.source_image_height_px,

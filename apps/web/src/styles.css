@@ -1593,6 +1593,18 @@ label span {
   margin-bottom: 0;
 }
 
+.checkbox-control {
+  align-items: center;
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+}
+
+.checkbox-control input {
+  min-height: 18px;
+  width: 18px;
+}
+
 .candidate-controls {
   border-color: #b8d3eb;
 }

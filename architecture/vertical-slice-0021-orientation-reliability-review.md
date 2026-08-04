@@ -1,6 +1,6 @@
 # Vertical Slice 0021: Orientation Reliability Review
 
-Status: grilled and accepted for slice planning.
+Status: implemented and verified locally on 2026-08-04.
 
 ## Purpose
 
@@ -178,16 +178,16 @@ Minimum derived crop summary:
 
 ## Acceptance Criteria
 
-- [ ] New Oriented Bee Ellipses default to Orientation Reliability `reliable`.
-- [ ] Existing local test ellipses are treated as `reliable` without a separate defaulted-provenance flag.
-- [ ] An annotation editor can mark each editable Oriented Bee Ellipse as orientation `reliable` or `unreliable`.
-- [ ] Orientation Reliability persists after reload and through the configured metadata backend.
-- [ ] Assigned or frozen Dataset Item evidence cannot have Orientation Reliability changed in place.
-- [ ] Crop Governance shows reliable and unreliable orientation counts for the selected crop, and links back to Bee Annotation for edits.
-- [ ] Orientation-dependent readiness excludes missing and unreliable orientation evidence, while the promoted source Dataset Version remains shared with Bee Localisation.
-- [ ] Crop completion remains allowed when one or more bees have `unreliable` Orientation Reliability.
-- [ ] Focused Core API and Playwright regression guards cover persistence, authorization, and the main review path.
-- [ ] `pnpm verify:slice` passes before implementation closeout, with live Postgres verification recorded if the persistence path is changed.
+- [x] New Oriented Bee Ellipses default to Orientation Reliability `reliable`.
+- [x] Existing local test ellipses are treated as `reliable` without a separate defaulted-provenance flag.
+- [x] An annotation editor can mark each editable Oriented Bee Ellipse as orientation `reliable` or `unreliable`.
+- [x] Orientation Reliability persists after reload and through the configured metadata backend.
+- [x] Assigned or frozen Dataset Item evidence cannot have Orientation Reliability changed in place.
+- [x] Crop Governance shows reliable and unreliable orientation counts for the selected crop, and links back to Bee Annotation for edits.
+- [x] Orientation-dependent readiness excludes unreliable orientation evidence in the Crop Governance summary, while the promoted source Dataset Version remains shared with Bee Localisation.
+- [x] Crop completion remains allowed when one or more bees have `unreliable` Orientation Reliability.
+- [x] Focused Core API and Playwright regression guards cover persistence, authorization, and the main review path.
+- [x] `pnpm verify:slice` passes before implementation closeout, with live Postgres verification recorded if the persistence path is changed.
 
 ## Open Questions
 

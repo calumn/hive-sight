@@ -116,6 +116,11 @@ class VisibleBeeStatus(StrEnum):
     no_visible_bees = "no_visible_bees"
 
 
+class OrientationReliability(StrEnum):
+    reliable = "reliable"
+    unreliable = "unreliable"
+
+
 class TrainingCropExclusionReason(StrEnum):
     poor_image_quality = "poor_image_quality"
     no_visible_bees = "no_visible_bees"
@@ -546,6 +551,7 @@ class ReviewedEllipseSnapshot(BaseModel):
     radius_x: float
     radius_y: float
     rotation_degrees: float
+    orientation_reliability: OrientationReliability = OrientationReliability.reliable
     coordinate_space: CoordinateSpace
     source_image_width_px: int
     source_image_height_px: int
@@ -1160,6 +1166,7 @@ class OrientedBeeEllipseCreateRequest(BaseModel):
     radius_x: float = Field(gt=0)
     radius_y: float = Field(gt=0)
     rotation_degrees: float = 0
+    orientation_reliability: OrientationReliability = OrientationReliability.reliable
     source: BeeEllipseAnnotationSource = BeeEllipseAnnotationSource.human_from_scratch
     review_method: BeeEllipseReviewMethod = BeeEllipseReviewMethod.human_from_scratch
     model_candidate_id: UUID | None = None
@@ -1178,6 +1185,7 @@ class OrientedBeeEllipseUpdateRequest(BaseModel):
     radius_x: float | None = Field(default=None, gt=0)
     radius_y: float | None = Field(default=None, gt=0)
     rotation_degrees: float | None = None
+    orientation_reliability: OrientationReliability | None = None
 
 
 class OrientedBeeEllipseResponse(BaseModel):
@@ -1191,6 +1199,7 @@ class OrientedBeeEllipseResponse(BaseModel):
     radius_x: float
     radius_y: float
     rotation_degrees: float
+    orientation_reliability: OrientationReliability = OrientationReliability.reliable
     coordinate_space: CoordinateSpace
     source_image_width_px: int
     source_image_height_px: int

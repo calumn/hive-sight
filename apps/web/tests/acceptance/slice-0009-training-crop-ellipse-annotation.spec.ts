@@ -52,6 +52,7 @@ test("Dataset Curator creates a crop, adds an oriented bee ellipse, and complete
 
   await page.getByTestId("training-crop-surface").click({ position: { x: 180, y: 120 } });
   await expect(page.getByTestId("training-crop-ellipse")).toHaveCount(1);
+  await expect(page.getByTestId("training-ellipse-head-direction-reliable-checkbox")).toBeChecked();
   await expect.poll(() => headShadingIsObvious(page)).toBe(true);
 
   await page.getByTestId("training-ellipse-type-select").selectOption("partial_visible_bee");
@@ -138,6 +139,8 @@ test("Dataset Curator creates a crop, adds an oriented bee ellipse, and complete
     "aria-label",
     /head direction 180 degrees/
   );
+  await page.getByTestId("training-ellipse-head-direction-reliable-checkbox").uncheck();
+  await expect(page.getByTestId("training-ellipse-head-direction-reliable-checkbox")).not.toBeChecked();
 
   await expect(page.getByTestId("training-crop-visible-status-select")).toHaveValue(
     "has_visible_bees"
@@ -146,6 +149,14 @@ test("Dataset Curator creates a crop, adds an oriented bee ellipse, and complete
   await expect(page.getByTestId("training-crop-list-item")).toContainText("review_complete");
   await expect(page.getByTestId("training-crop-list-item")).toContainText("has_visible_bees");
   await expect(page.getByTestId("delete-training-ellipse-button")).toBeDisabled();
+  await page.getByTestId("workflow-stage-crop-governance-button").click();
+  await expect(page.getByTestId("crop-governance-orientation-reliable-count")).toContainText(
+    "Head direction reliable 0"
+  );
+  await expect(page.getByTestId("crop-governance-orientation-unreliable-count")).toContainText(
+    "Orientation export excluded 1"
+  );
+  await page.getByTestId("workflow-stage-bee-annotation-button").click();
   await page.getByTestId("reopen-training-crop-button").click();
   await expect(page.getByTestId("training-crop-list-item")).toContainText("review_pending");
   await expect(page.getByTestId("delete-training-ellipse-button")).toBeEnabled();

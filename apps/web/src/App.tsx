@@ -2141,6 +2141,14 @@ function countBeeEllipses(evidence: TrainingCropEvidence | null, annotationType:
   return evidence?.beeEllipses.filter((ellipse) => ellipse.annotationType === annotationType).length ?? 0;
 }
 
+function countOrientationReliableEllipses(evidence: TrainingCropEvidence | null) {
+  return evidence?.beeEllipses.filter((ellipse) => ellipse.orientationReliability === "reliable").length ?? 0;
+}
+
+function countOrientationUnreliableEllipses(evidence: TrainingCropEvidence | null) {
+  return evidence?.beeEllipses.filter((ellipse) => ellipse.orientationReliability === "unreliable").length ?? 0;
+}
+
 function formatDateTime(value: string | null) {
   return value ? new Date(value).toLocaleString() : "n/a";
 }
@@ -2623,7 +2631,7 @@ function TrainingCropAnnotationPanel({
     candidateProposals.find((proposal) => proposal.proposalId === selectedProposalId) ?? null;
   const cropLocked =
     selectedCrop?.reviewStatus === "review_complete" || selectedCrop?.reviewStatus === "excluded";
-  const controlLocked = !selectedEllipse || cropLocked || Boolean(workingLabel);
+  const controlLocked = !selectedEllipse || cropLocked || selectedCropIsAssigned || Boolean(workingLabel);
   const canNudgeLeft = canAdjustEllipse(selectedCrop, selectedEllipse, {
     centerX: (selectedEllipse?.centerX ?? 0) - 5
   });
@@ -2893,9 +2901,24 @@ function TrainingCropAnnotationPanel({
   }
 
   async function updateSelectedEllipse(values: Partial<OrientedBeeEllipse>) {
-    if (!selectedCrop || !selectedEllipse || cropLocked) {
+    if (!selectedCrop || !selectedEllipse || cropLocked || selectedCropIsAssigned) {
       return;
     }
+    setEvidence((current) =>
+      current
+        ? {
+            ...current,
+            beeEllipses: current.beeEllipses.map((ellipse) =>
+              ellipse.annotationId === selectedEllipse.annotationId
+                ? {
+                    ...ellipse,
+                    ...values
+                  }
+                : ellipse
+            )
+          }
+        : current
+    );
     await runCropAction("Updating bee ellipse", async () => {
       await updateTrainingCropEllipse({
         devUserId,
@@ -2906,7 +2929,8 @@ function TrainingCropAnnotationPanel({
         centerY: values.centerY,
         radiusX: values.radiusX,
         radiusY: values.radiusY,
-        rotationDegrees: values.rotationDegrees
+        rotationDegrees: values.rotationDegrees,
+        orientationReliability: values.orientationReliability
       });
       await refreshEvidence(selectedCrop.trainingCropId);
     });
@@ -3894,6 +3918,21 @@ function TrainingCropAnnotationPanel({
                       <option value="partial_visible_bee">Partial visible bee</option>
                     </select>
                   </label>
+                  <label className="checkbox-control">
+                    <input
+                      type="checkbox"
+                      checked={selectedEllipse?.orientationReliability !== "unreliable"}
+                      onChange={(event) =>
+                        selectedEllipse &&
+                        void updateSelectedEllipse({
+                          orientationReliability: event.target.checked ? "reliable" : "unreliable"
+                        })
+                      }
+                      disabled={controlLocked}
+                      data-testid="training-ellipse-head-direction-reliable-checkbox"
+                    />
+                    <span>Head direction reliable</span>
+                  </label>
                   <div className="control-cluster" aria-label="Move selected ellipse">
                     <button
                       type="button"
@@ -4511,113 +4550,119 @@ function TrainingCropAnnotationPanel({
                     <span>{formatDatasetRoleLabel(selectedCropDatasetRole)}</span>
                     <span>Complete visible bees {countBeeEllipses(selectedCropEvidence, "complete_visible_bee")}</span>
                     <span>Partial visible bees {countBeeEllipses(selectedCropEvidence, "partial_visible_bee")}</span>
+                    <span data-testid="crop-governance-orientation-reliable-count">
+                      Head direction reliable {countOrientationReliableEllipses(selectedCropEvidence)}
+                    </span>
+                    <span data-testid="crop-governance-orientation-unreliable-count">
+                      Orientation export excluded {countOrientationUnreliableEllipses(selectedCropEvidence)}
+                    </span>
                   </div>
-              <div className="metadata-panel crop-dataset-controls">
-                <div>
-                  <strong>Bee Annotation Repository</strong>
-                  <p>
-                    Assign this completed Training Crop into the workspace dataset, then create a
-                    YOLO OBB manifest from eligible items.
-                  </p>
-                </div>
-                <label>
-                  <span>Dataset role</span>
-                  <select
-                    value={datasetRole}
-                    onChange={(event) => setDatasetRole(event.target.value as DatasetRole)}
-                    disabled={selectedCropIsAssigned || Boolean(workingLabel)}
-                    data-testid="training-crop-dataset-role-select"
-                  >
-                    <option value="training">Training</option>
-                    <option value="validation">Validation</option>
-                    <option value="benchmark">Benchmark</option>
-                    <option value="excluded">Excluded</option>
-                  </select>
-                </label>
-                <label>
-                  <span>Assignment note</span>
-                  <input
-                    value={datasetAssignmentNote}
-                    maxLength={500}
-                    onChange={(event) => setDatasetAssignmentNote(event.target.value)}
-                    disabled={selectedCropIsAssigned || Boolean(workingLabel)}
-                    data-testid="training-crop-dataset-assignment-note-input"
-                  />
-                </label>
-                {datasetRole === "benchmark" ? (
-                  <label>
-                    <span>Source group key</span>
-                    <input
-                      value={datasetSourceGroupKey}
-                      maxLength={100}
-                      onChange={(event) => setDatasetSourceGroupKey(event.target.value)}
-                      disabled={selectedCropIsAssigned || Boolean(workingLabel)}
-                      data-testid="training-crop-dataset-source-group-key-input"
-                    />
-                  </label>
-                ) : null}
-                {datasetRole === "excluded" ? (
-                  <label>
-                    <span>Dataset exclusion reason</span>
-                    <select
-                      value={datasetExclusionReason}
-                      onChange={(event) =>
-                        setDatasetExclusionReason(event.target.value as DatasetExclusionReason)
-                      }
-                      disabled={selectedCropIsAssigned || Boolean(workingLabel)}
-                      data-testid="training-crop-dataset-exclusion-reason-select"
+                  <div className="metadata-panel crop-dataset-controls">
+                    <div>
+                      <strong>Bee Annotation Repository</strong>
+                      <p>
+                        Assign this completed Training Crop into the workspace dataset, then create a
+                        YOLO OBB manifest from eligible items.
+                      </p>
+                    </div>
+                    <label>
+                      <span>Dataset role</span>
+                      <select
+                        value={datasetRole}
+                        onChange={(event) => setDatasetRole(event.target.value as DatasetRole)}
+                        disabled={selectedCropIsAssigned || Boolean(workingLabel)}
+                        data-testid="training-crop-dataset-role-select"
+                      >
+                        <option value="training">Training</option>
+                        <option value="validation">Validation</option>
+                        <option value="benchmark">Benchmark</option>
+                        <option value="excluded">Excluded</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>Assignment note</span>
+                      <input
+                        value={datasetAssignmentNote}
+                        maxLength={500}
+                        onChange={(event) => setDatasetAssignmentNote(event.target.value)}
+                        disabled={selectedCropIsAssigned || Boolean(workingLabel)}
+                        data-testid="training-crop-dataset-assignment-note-input"
+                      />
+                    </label>
+                    {datasetRole === "benchmark" ? (
+                      <label>
+                        <span>Source group key</span>
+                        <input
+                          value={datasetSourceGroupKey}
+                          maxLength={100}
+                          onChange={(event) => setDatasetSourceGroupKey(event.target.value)}
+                          disabled={selectedCropIsAssigned || Boolean(workingLabel)}
+                          data-testid="training-crop-dataset-source-group-key-input"
+                        />
+                      </label>
+                    ) : null}
+                    {datasetRole === "excluded" ? (
+                      <label>
+                        <span>Dataset exclusion reason</span>
+                        <select
+                          value={datasetExclusionReason}
+                          onChange={(event) =>
+                            setDatasetExclusionReason(event.target.value as DatasetExclusionReason)
+                          }
+                          disabled={selectedCropIsAssigned || Boolean(workingLabel)}
+                          data-testid="training-crop-dataset-exclusion-reason-select"
+                        >
+                          <option value="poor_image_quality">Poor image quality</option>
+                          <option value="ambiguous_subject">Ambiguous subject</option>
+                          <option value="duplicate_or_near_duplicate">Duplicate or near duplicate</option>
+                          <option value="privacy_concern">Privacy concern</option>
+                          <option value="unsuitable_crop">Unsuitable crop</option>
+                          <option value="insufficient_review_confidence">
+                            Insufficient review confidence
+                          </option>
+                          <option value="other">Other</option>
+                        </select>
+                      </label>
+                    ) : null}
+                    <button
+                      type="button"
+                      disabled={Boolean(selectedCropDatasetAssignmentBlockedReason) || Boolean(workingLabel)}
+                      onClick={() => void assignSelectedCropToDataset()}
+                      data-testid="assign-training-crop-dataset-role-button"
                     >
-                      <option value="poor_image_quality">Poor image quality</option>
-                      <option value="ambiguous_subject">Ambiguous subject</option>
-                      <option value="duplicate_or_near_duplicate">Duplicate or near duplicate</option>
-                      <option value="privacy_concern">Privacy concern</option>
-                      <option value="unsuitable_crop">Unsuitable crop</option>
-                      <option value="insufficient_review_confidence">
-                        Insufficient review confidence
-                      </option>
-                      <option value="other">Other</option>
-                    </select>
-                  </label>
-                ) : null}
-                <button
-                  type="button"
-                  disabled={Boolean(selectedCropDatasetAssignmentBlockedReason) || Boolean(workingLabel)}
-                  onClick={() => void assignSelectedCropToDataset()}
-                  data-testid="assign-training-crop-dataset-role-button"
-                >
-                  <ShieldCheck size={18} />
-                  Assign item
-                </button>
-                <button
-                  type="button"
-                  disabled={Boolean(workingLabel)}
-                  onClick={() => void createExportManifest()}
-                  data-testid="create-yolo-obb-export-button"
-                >
-                  <FileImage size={18} />
-                  Export manifest
-                </button>
-                <button
-                  type="button"
-                  disabled={Boolean(workingLabel)}
-                  onClick={() => void createPhysicalExportPackage()}
-                  data-testid="create-physical-yolo-obb-export-button"
-                >
-                  <CloudUpload size={18} />
-                  Export package
-                </button>
-                <div className="review-state" data-testid="training-crop-dataset-item-state">
-                  {selectedCropDatasetRole
-                    ? `Dataset item: ${formatDatasetRoleLabel(selectedCropDatasetRole)}${
-                        trainingCropDatasetItem
-                          ? ` / ${trainingCropDatasetItem.reviewedEllipseSnapshots.length} ellipse snapshots`
-                          : ""
-                      }`
-                    : selectedCropDatasetAssignmentBlockedReason
-                      ? selectedCropDatasetAssignmentBlockedReason
-                      : "Ready for Dataset Item assignment."}
-                </div>
-                <div className="review-request-panel" data-testid="training-crop-review-request-panel">
+                      <ShieldCheck size={18} />
+                      Assign item
+                    </button>
+                    <button
+                      type="button"
+                      disabled={Boolean(workingLabel)}
+                      onClick={() => void createExportManifest()}
+                      data-testid="create-yolo-obb-export-button"
+                    >
+                      <FileImage size={18} />
+                      Export manifest
+                    </button>
+                    <button
+                      type="button"
+                      disabled={Boolean(workingLabel)}
+                      onClick={() => void createPhysicalExportPackage()}
+                      data-testid="create-physical-yolo-obb-export-button"
+                    >
+                      <CloudUpload size={18} />
+                      Export package
+                    </button>
+                    <div className="review-state" data-testid="training-crop-dataset-item-state">
+                      {selectedCropDatasetRole
+                        ? `Dataset item: ${formatDatasetRoleLabel(selectedCropDatasetRole)}${
+                            trainingCropDatasetItem
+                              ? ` / ${trainingCropDatasetItem.reviewedEllipseSnapshots.length} ellipse snapshots`
+                              : ""
+                          }`
+                        : selectedCropDatasetAssignmentBlockedReason
+                          ? selectedCropDatasetAssignmentBlockedReason
+                          : "Ready for Dataset Item assignment."}
+                    </div>
+                    <div className="review-request-panel" data-testid="training-crop-review-request-panel">
                   <div>
                     <strong>Requested Reviews</strong>
                     <p>Make this completed Training Crop available to eligible Reviewers.</p>

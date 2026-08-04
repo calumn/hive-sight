@@ -208,6 +208,7 @@ class TrainingCropWorkflow:
         )
         _require_no_available_review_queue_item(self.store, crop.training_crop_id)
         _require_crop_editable(crop)
+        _require_no_dataset_item_assignment(self.store, crop.training_crop_id)
         if crop.visible_bee_status == VisibleBeeStatus.no_visible_bees:
             raise DomainError(
                 "no_visible_bees_conflicts_with_ellipses",
@@ -238,6 +239,7 @@ class TrainingCropWorkflow:
             radius_x=request.radius_x,
             radius_y=request.radius_y,
             rotation_degrees=rotation,
+            orientation_reliability=request.orientation_reliability,
             coordinate_space=CoordinateSpace.source_image_pixels,
             source_image_width_px=crop.source_image_width_px,
             source_image_height_px=crop.source_image_height_px,
@@ -285,6 +287,7 @@ class TrainingCropWorkflow:
         )
         _require_no_available_review_queue_item(self.store, crop.training_crop_id)
         _require_crop_editable(crop)
+        _require_no_dataset_item_assignment(self.store, crop.training_crop_id)
         annotation_type = request.annotation_type or ellipse.annotation_type
         _validate_bee_annotation_type(annotation_type)
         next_values = {
@@ -298,8 +301,21 @@ class TrainingCropWorkflow:
                 if request.rotation_degrees is None
                 else _normalize_rotation(request.rotation_degrees)
             ),
+            "orientation_reliability": (
+                ellipse.orientation_reliability
+                if request.orientation_reliability is None
+                else request.orientation_reliability
+            ),
         }
-        _validate_ellipse_for_crop(crop=crop, **next_values)
+        _validate_ellipse_for_crop(
+            crop=crop,
+            annotation_type=next_values["annotation_type"],
+            center_x=next_values["center_x"],
+            center_y=next_values["center_y"],
+            radius_x=next_values["radius_x"],
+            radius_y=next_values["radius_y"],
+            rotation_degrees=next_values["rotation_degrees"],
+        )
         updated = ellipse.model_copy(update={**next_values, "updated_at": self.store.clock()})
         self.store.save_training_crop_ellipse(updated)
         return updated
@@ -324,6 +340,7 @@ class TrainingCropWorkflow:
         )
         _require_no_available_review_queue_item(self.store, crop.training_crop_id)
         _require_crop_editable(crop)
+        _require_no_dataset_item_assignment(self.store, crop.training_crop_id)
         self.store.delete_training_crop_ellipse_record(annotation_id)
 
     def get_training_crop_evidence(
@@ -619,6 +636,18 @@ def _require_no_available_review_queue_item(
         raise DomainError(
             "training_crop_review_request_active",
             "Cancel the available Review Queue Item before editing this Training Crop.",
+            409,
+        )
+
+
+def _require_no_dataset_item_assignment(
+    store: InMemoryProductDataStore,
+    training_crop_id: UUID,
+) -> None:
+    if store.get_dataset_item_for_training_crop(training_crop_id) is not None:
+        raise DomainError(
+            "training_crop_dataset_item_exists",
+            "Assigned Training Crop evidence cannot be edited in place.",
             409,
         )
 

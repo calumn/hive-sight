@@ -143,6 +143,7 @@ def test_postgres_store_survives_restart_for_training_crop_dataset_item_path() -
                 "radius_x": 20,
                 "radius_y": 12,
                 "rotation_degrees": 15,
+                "orientation_reliability": "unreliable",
             },
             headers=_headers(),
         )
@@ -242,6 +243,11 @@ def test_postgres_store_survives_restart_for_training_crop_dataset_item_path() -
             params={"workspace_id": workspace_id},
             headers=_headers(),
         )
+        repository_detail = restarted_client.get(
+            f"/v1/dataset-repository/items/{dataset_item_id}",
+            params={"workspace_id": workspace_id},
+            headers=_headers(),
+        )
 
         assert inspections.status_code == 200
         assert inspections.json()["inspections"][0]["inspection_id"] == inspection_id
@@ -251,6 +257,7 @@ def test_postgres_store_survives_restart_for_training_crop_dataset_item_path() -
         assert crops.json()["training_crops"][0]["training_crop_id"] == crop["training_crop_id"]
         assert evidence.status_code == 200
         assert evidence.json()["bee_ellipses"][0]["rotation_degrees"] == 15
+        assert evidence.json()["bee_ellipses"][0]["orientation_reliability"] == "unreliable"
         assert content.status_code == 200
         assert content.content == _minimal_png()
         assert repository.status_code == 200
@@ -258,6 +265,11 @@ def test_postgres_store_survives_restart_for_training_crop_dataset_item_path() -
         assert repository_body["summary"]["latest_dataset_version"]["human_readable_id"] == "HS-DV-PERSIST"
         assert repository_body["items"][0]["dataset_item_id"] == dataset_item_id
         assert repository_body["items"][0]["latest_dataset_version_membership"]["membership"] == "training"
+        assert repository_detail.status_code == 200
+        assert (
+            repository_detail.json()["reviewed_ellipse_snapshots"][0]["orientation_reliability"]
+            == "unreliable"
+        )
 
         cleanup = restarted_client.post(
             "/v1/dev/directed-ellipse-orientation-cleanup",

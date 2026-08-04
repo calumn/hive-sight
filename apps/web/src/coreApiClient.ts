@@ -164,6 +164,8 @@ export type DatasetExclusionReason =
 
 export type VisibleBeeStatus = "unassessed" | "has_visible_bees" | "no_visible_bees";
 
+export type OrientationReliability = "reliable" | "unreliable";
+
 export type TrainingCropReviewStatus = "review_pending" | "review_complete" | "excluded";
 
 export type TrainingCropExclusionReason =
@@ -456,6 +458,7 @@ export type OrientedBeeEllipse = {
   radiusX: number;
   radiusY: number;
   rotationDegrees: number;
+  orientationReliability: OrientationReliability;
   coordinateSpace: "source_image_pixels";
   sourceImageWidthPx: number;
   sourceImageHeightPx: number;
@@ -509,6 +512,7 @@ export type ReviewedEllipseSnapshot = {
   radiusX: number;
   radiusY: number;
   rotationDegrees: number;
+  orientationReliability: OrientationReliability;
   coordinateSpace: "source_image_pixels";
   sourceImageWidthPx: number;
   sourceImageHeightPx: number;
@@ -2022,6 +2026,7 @@ export async function createTrainingCropEllipse({
   radiusX,
   radiusY,
   rotationDegrees,
+  orientationReliability,
   provenance
 }: {
   devUserId: string;
@@ -2033,6 +2038,7 @@ export async function createTrainingCropEllipse({
   radiusX: number;
   radiusY: number;
   rotationDegrees: number;
+  orientationReliability?: OrientationReliability;
   provenance?: {
     source: "model_candidate";
     reviewMethod: "human_reviewed_candidate";
@@ -2051,7 +2057,8 @@ export async function createTrainingCropEllipse({
     center_y: centerY,
     radius_x: radiusX,
     radius_y: radiusY,
-    rotation_degrees: rotationDegrees
+    rotation_degrees: rotationDegrees,
+    orientation_reliability: orientationReliability ?? "reliable"
   };
   if (provenance) {
     body.source = provenance.source;
@@ -2113,7 +2120,8 @@ export async function updateTrainingCropEllipse({
   centerY,
   radiusX,
   radiusY,
-  rotationDegrees
+  rotationDegrees,
+  orientationReliability
 }: {
   devUserId: string;
   workspaceId: string;
@@ -2124,6 +2132,7 @@ export async function updateTrainingCropEllipse({
   radiusX?: number;
   radiusY?: number;
   rotationDegrees?: number;
+  orientationReliability?: OrientationReliability;
 }): Promise<OrientedBeeEllipse> {
   const body: Record<string, unknown> = { workspace_id: workspaceId };
   if (annotationType !== undefined) body.annotation_type = annotationType;
@@ -2132,6 +2141,7 @@ export async function updateTrainingCropEllipse({
   if (radiusX !== undefined) body.radius_x = radiusX;
   if (radiusY !== undefined) body.radius_y = radiusY;
   if (rotationDegrees !== undefined) body.rotation_degrees = rotationDegrees;
+  if (orientationReliability !== undefined) body.orientation_reliability = orientationReliability;
   const response = await fetch(`${coreApiUrl}/v1/training-crop-bee-ellipses/${annotationId}`, {
     method: "PATCH",
     headers: jsonHeaders(devUserId),
@@ -2626,6 +2636,9 @@ function parseOrientedBeeEllipse(value: unknown): OrientedBeeEllipse {
     radiusX: requireNumber(record.radius_x, "radius_x"),
     radiusY: requireNumber(record.radius_y, "radius_y"),
     rotationDegrees: requireNumber(record.rotation_degrees, "rotation_degrees"),
+    orientationReliability: requireOrientationReliability(
+      record.orientation_reliability ?? "reliable"
+    ),
     coordinateSpace: requireSourceImagePixelCoordinateSpace(record.coordinate_space),
     sourceImageWidthPx: requireNumber(record.source_image_width_px, "source_image_width_px"),
     sourceImageHeightPx: requireNumber(record.source_image_height_px, "source_image_height_px"),
@@ -2701,6 +2714,9 @@ function parseReviewedEllipseSnapshot(value: unknown): ReviewedEllipseSnapshot {
     radiusX: requireNumber(record.radius_x, "radius_x"),
     radiusY: requireNumber(record.radius_y, "radius_y"),
     rotationDegrees: requireNumber(record.rotation_degrees, "rotation_degrees"),
+    orientationReliability: requireOrientationReliability(
+      record.orientation_reliability ?? "reliable"
+    ),
     coordinateSpace: requireSourceImagePixelCoordinateSpace(record.coordinate_space),
     sourceImageWidthPx: requireNumber(record.source_image_width_px, "source_image_width_px"),
     sourceImageHeightPx: requireNumber(record.source_image_height_px, "source_image_height_px"),
@@ -3607,6 +3623,13 @@ function requireBeeAnnotationType(value: unknown): BeeAnnotationType {
     return value;
   }
   throw new Error("Core API response had an unexpected bee annotation type");
+}
+
+function requireOrientationReliability(value: unknown): OrientationReliability {
+  if (value === "reliable" || value === "unreliable") {
+    return value;
+  }
+  throw new Error("Core API response had an unexpected Orientation Reliability");
 }
 
 function requireCoordinateSpace(value: unknown): "normalized" {

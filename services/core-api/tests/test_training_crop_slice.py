@@ -330,6 +330,83 @@ def test_partial_visible_bee_ellipse_can_cross_crop_boundary() -> None:
         app.dependency_overrides.clear()
 
 
+def test_orientation_reliability_defaults_updates_and_freezes_with_dataset_item() -> None:
+    state = build_dev_state(
+        id_values=[
+            UUID("00000000-0000-0000-0000-000000009091"),
+            UUID("00000000-0000-0000-0000-000000009092"),
+            UUID("00000000-0000-0000-0000-000000009093"),
+            UUID("00000000-0000-0000-0000-000000009094"),
+            UUID("00000000-0000-0000-0000-000000009095"),
+            UUID("00000000-0000-0000-0000-000000009096"),
+            UUID("00000000-0000-0000-0000-000000009097"),
+            UUID("00000000-0000-0000-0000-000000009098"),
+        ],
+        clock=lambda: datetime(2026, 8, 4, 10, 15, tzinfo=UTC),
+    )
+    app.dependency_overrides[get_dev_state] = lambda: state
+    client = TestClient(app)
+
+    try:
+        workspace_id, inspection_photo_id = _upload_photo(client, "training_data_collection")
+        crop = _create_crop(client, workspace_id, inspection_photo_id).json()
+        created = _create_ellipse(client, workspace_id, crop["training_crop_id"], center_x=300)
+        updated = client.patch(
+            f"/v1/training-crop-bee-ellipses/{created.json()['annotation_id']}",
+            json={
+                "workspace_id": workspace_id,
+                "orientation_reliability": "unreliable",
+            },
+            headers={"x-hivesight-dev-user-id": str(USER_ID)},
+        )
+        completed = client.patch(
+            f"/v1/training-crops/{crop['training_crop_id']}",
+            json={
+                "workspace_id": workspace_id,
+                "visible_bee_status": "has_visible_bees",
+                "review_status": "review_complete",
+            },
+            headers={"x-hivesight-dev-user-id": str(USER_ID)},
+        )
+        assigned = _assign_training_crop_to_dataset(
+            client,
+            workspace_id,
+            crop["training_crop_id"],
+            "training",
+        )
+        reopened = client.patch(
+            f"/v1/training-crops/{crop['training_crop_id']}",
+            json={
+                "workspace_id": workspace_id,
+                "review_status": "review_pending",
+            },
+            headers={"x-hivesight-dev-user-id": str(USER_ID)},
+        )
+        frozen_update = client.patch(
+            f"/v1/training-crop-bee-ellipses/{created.json()['annotation_id']}",
+            json={
+                "workspace_id": workspace_id,
+                "orientation_reliability": "reliable",
+            },
+            headers={"x-hivesight-dev-user-id": str(USER_ID)},
+        )
+
+        assert created.status_code == 201
+        assert created.json()["orientation_reliability"] == "reliable"
+        assert updated.status_code == 200
+        assert updated.json()["orientation_reliability"] == "unreliable"
+        assert completed.status_code == 200
+        assert completed.json()["review_status"] == "review_complete"
+        assert assigned.status_code == 201
+        assert assigned.json()["reviewed_ellipse_snapshots"][0]["orientation_reliability"] == "unreliable"
+        assert reopened.status_code == 200
+        assert reopened.json()["review_status"] == "review_pending"
+        assert frozen_update.status_code == 409
+        assert frozen_update.json()["detail"]["code"] == "training_crop_dataset_item_exists"
+    finally:
+        app.dependency_overrides.clear()
+
+
 def test_crop_review_completion_and_zero_bee_rules() -> None:
     state = build_dev_state(
         id_values=[
