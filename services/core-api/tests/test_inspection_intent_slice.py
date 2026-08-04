@@ -8,6 +8,7 @@ from hive_sight_core_api.dependencies import build_dev_state, get_dev_state
 from hive_sight_core_api.main import app
 
 USER_ID = UUID("00000000-0000-0000-0000-000000000101")
+NON_CURATOR_USER_ID = UUID("00000000-0000-0000-0000-000000000199")
 
 
 def test_inspection_creation_requires_valid_intent() -> None:
@@ -54,6 +55,56 @@ def test_inspection_creation_requires_valid_intent() -> None:
         assert unknown_intent.status_code == 422
         assert valid.status_code == 201
         assert valid.json()["intent"] == "training_data_collection"
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_training_data_collection_intent_requires_dataset_curator_capability() -> None:
+    state = build_dev_state(
+        id_values=[
+            UUID("00000000-0000-0000-0000-000000008101"),
+            UUID("00000000-0000-0000-0000-000000008102"),
+            UUID("00000000-0000-0000-0000-000000008103"),
+            UUID("00000000-0000-0000-0000-000000008104"),
+        ],
+        clock=lambda: datetime(2026, 7, 29, 18, 2, tzinfo=UTC),
+    )
+    app.dependency_overrides[get_dev_state] = lambda: state
+    client = TestClient(app)
+
+    try:
+        workspace_id, hive_id = _create_hive_context(client, user_id=NON_CURATOR_USER_ID)
+
+        varroa = client.post(
+            "/v1/inspections",
+            json={
+                "hive_id": hive_id,
+                "inspection_date": str(date(2026, 7, 29)),
+                "intent": "varroa_assessment",
+            },
+            headers={"x-hivesight-dev-user-id": str(NON_CURATOR_USER_ID)},
+        )
+        blocked_create = client.post(
+            "/v1/inspections",
+            json={
+                "hive_id": hive_id,
+                "inspection_date": str(date(2026, 7, 29)),
+                "intent": "training_data_collection",
+            },
+            headers={"x-hivesight-dev-user-id": str(NON_CURATOR_USER_ID)},
+        )
+        blocked_update = client.patch(
+            f"/v1/inspections/{varroa.json()['inspection_id']}/intent",
+            json={"workspace_id": workspace_id, "intent": "training_data_collection"},
+            headers={"x-hivesight-dev-user-id": str(NON_CURATOR_USER_ID)},
+        )
+
+        assert varroa.status_code == 201
+        assert varroa.json()["intent"] == "varroa_assessment"
+        assert blocked_create.status_code == 403
+        assert blocked_create.json()["detail"]["code"] == "dataset_curator_access_required"
+        assert blocked_update.status_code == 403
+        assert blocked_update.json()["detail"]["code"] == "dataset_curator_access_required"
     finally:
         app.dependency_overrides.clear()
 
@@ -168,28 +219,29 @@ def test_dataset_labelling_requires_training_data_collection_intent() -> None:
 def _create_hive_context(
     client: TestClient,
     accept_terms: bool = False,
+    user_id: UUID = USER_ID,
 ) -> tuple[str, str]:
     workspace_id = client.get(
         "/v1/dev/session",
-        headers={"x-hivesight-dev-user-id": str(USER_ID)},
+        headers={"x-hivesight-dev-user-id": str(user_id)},
     ).json()["workspace_id"]
     if accept_terms:
         client.post(
             "/v1/workspace-data-use-agreements/acceptances",
             json={"workspace_id": workspace_id, "terms_version": "2026-07-29"},
-            headers={"x-hivesight-dev-user-id": str(USER_ID)},
+            headers={"x-hivesight-dev-user-id": str(user_id)},
         )
     apiary_id = client.post(
         "/v1/apiaries",
         json={"workspace_id": workspace_id, "name": "Home apiary"},
-        headers={"x-hivesight-dev-user-id": str(USER_ID)},
+        headers={"x-hivesight-dev-user-id": str(user_id)},
     ).json()["apiary_id"]
     hive_id = client.post(
         "/v1/hives",
         json={"apiary_id": apiary_id, "name": "Hive A"},
-        headers={"x-hivesight-dev-user-id": str(USER_ID)},
+        headers={"x-hivesight-dev-user-id": str(user_id)},
     ).json()["hive_id"]
-    configure_hive(client, workspace_id=workspace_id, hive_id=hive_id, user_id=USER_ID)
+    configure_hive(client, workspace_id=workspace_id, hive_id=hive_id, user_id=user_id)
     return workspace_id, hive_id
 
 

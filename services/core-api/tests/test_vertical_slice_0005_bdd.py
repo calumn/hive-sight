@@ -89,6 +89,10 @@ def beekeeper_has_uploaded_photo(slice_context: SliceContext) -> None:
     assert slice_context.workspace_id is not None
     assert slice_context.current_user_id is not None
 
+    had_dataset_curator_capability = (
+        slice_context.current_user_id in slice_context.state.store.dataset_curator_user_ids
+    )
+    slice_context.state.store.dataset_curator_user_ids.add(slice_context.current_user_id)
     apiary_id = slice_context.client.post(
         "/v1/apiaries",
         json={"workspace_id": slice_context.workspace_id, "name": "Home apiary"},
@@ -129,6 +133,8 @@ def beekeeper_has_uploaded_photo(slice_context: SliceContext) -> None:
     slice_context.inspection_photo_id = intake_response.json()["inspection_photo"][
         "inspection_photo_id"
     ]
+    if not had_dataset_curator_capability:
+        slice_context.state.store.dataset_curator_user_ids.discard(slice_context.current_user_id)
 
 
 @given("an uploaded Inspection Photo contains an ambiguous bee-like object")

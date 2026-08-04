@@ -109,6 +109,8 @@ class HiveConfigurationWorkflow:
                 "Record Hive Configuration before creating an Inspection for this Hive.",
                 409,
             )
+        if intent == InspectionIntent.training_data_collection:
+            self.store.require_dataset_curator_capability(user)
         inspection = InspectionResponse(
             inspection_id=self.store.id_factory(),
             hive_id=hive_id,
@@ -128,6 +130,8 @@ class HiveConfigurationWorkflow:
     ) -> InspectionResponse:
         self.store.require_workspace_access(user, workspace_id)
         inspection = self.store.require_inspection(workspace_id, inspection_id)
+        if intent == InspectionIntent.training_data_collection:
+            self.store.require_dataset_curator_capability(user)
         if self.store.inspection_has_photos(inspection_id):
             raise DomainError(
                 "inspection_intent_locked",

@@ -300,6 +300,11 @@ export function App() {
       setAppView("inspection");
     }
   }, [appView, session]);
+  useEffect(() => {
+    if (session && !session.datasetCuratorCapability && inspectionIntent === "training_data_collection") {
+      setInspectionIntent("varroa_assessment");
+    }
+  }, [inspectionIntent, session]);
   const termsAccepted = session?.workspaceDataUseAgreementStatus === "accepted";
   const selectedFrameStandard = frameStandards.find(
     (standard) => standard.frameStandardId === selectedFrameStandardId
@@ -315,7 +320,11 @@ export function App() {
       selectedFrameStandardId &&
       (!hiveConfigurationNotesRequired || hiveConfigurationNotes.trim().length > 0)
   );
-  const canCreateInspection = Boolean(hive && hiveConfiguration);
+  const canCreateInspection = Boolean(
+    hive &&
+      hiveConfiguration &&
+      (inspectionIntent !== "training_data_collection" || session?.datasetCuratorCapability)
+  );
   const canUpload = Boolean(termsAccepted && inspection && file);
   const isTrainingDataCollection = inspection?.intent === "training_data_collection";
   const isVarroaAssessment = inspection?.intent === "varroa_assessment";
@@ -1309,7 +1318,9 @@ export function App() {
                       data-testid="inspection-intent-select"
                     >
                       <option value="varroa_assessment">Varroa assessment</option>
-                      <option value="training_data_collection">Training data collection</option>
+                      {loadState.session.datasetCuratorCapability ? (
+                        <option value="training_data_collection">Training data collection</option>
+                      ) : null}
                     </select>
                   </label>
                   <button

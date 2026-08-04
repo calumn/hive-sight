@@ -211,12 +211,12 @@ def test_dataset_curator_capability_is_required_for_labelling() -> None:
             UUID("00000000-0000-0000-0000-000000001035"),
         ],
     )
-    state.store.dataset_curator_user_ids.clear()
     app.dependency_overrides[get_dev_state] = lambda: state
     client = TestClient(app)
 
     try:
         workspace_id, inspection_photo_id = _upload_inspection_photo(client)
+        state.store.dataset_curator_user_ids.clear()
 
         response = client.post(
             "/v1/dataset-labelling-sessions",

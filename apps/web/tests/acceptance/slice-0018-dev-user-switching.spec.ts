@@ -10,10 +10,20 @@ test("Development User switching reloads the selected User workspace and hides i
   await expect(userSelect).toBeVisible();
   await expect(page.getByTestId("development-user-code")).toContainText("DEV-OWNER-CURATOR");
   await expect(page.getByTestId("bee-annotation-repository-page-button")).toBeVisible();
+  await expect(page.getByTestId("inspection-intent-select")).toHaveValue(
+    "training_data_collection"
+  );
+  await expect(
+    page.getByTestId("inspection-intent-select").locator("option[value='training_data_collection']")
+  ).toHaveCount(1);
 
   await userSelect.selectOption("00000000-0000-0000-0000-000000000102");
   await expect(page.getByTestId("development-user-code")).toContainText("OWNER-A");
   await expect(page.getByTestId("development-user-capabilities")).toContainText("None");
+  await expect(page.getByTestId("inspection-intent-select")).toHaveValue("varroa_assessment");
+  await expect(
+    page.getByTestId("inspection-intent-select").locator("option[value='training_data_collection']")
+  ).toHaveCount(0);
   await expect(page.getByTestId("selected-apiary-summary")).toContainText("Owner A Apiary");
   await expect(page.getByTestId("selected-apiary-summary")).not.toContainText(
     "Dev Owner Curator Apiary"
