@@ -35,3 +35,31 @@ test("Beekeeper records Hive Configuration before creating an Inspection", async
     "Training data collection"
   );
 });
+
+test("Beekeeper configures an existing Hive before creating an Inspection", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByText("core-api online")).toBeVisible();
+
+  await page
+    .getByTestId("development-user-select")
+    .selectOption("00000000-0000-0000-0000-000000000103");
+  await expect(page.getByTestId("development-user-code")).toContainText("OWNER-B");
+  await expect(page.getByTestId("hive-list")).toContainText("Owner B Hive");
+  await expect(page.getByTestId("hive-configuration-state")).toContainText(
+    "Hive Configuration is needed"
+  );
+  await expect(page.getByTestId("create-inspection-button")).toBeDisabled();
+
+  await expect(page.getByTestId("hive-setup-form")).toBeVisible();
+  await expect(page.getByTestId("hive-name-input")).toHaveCount(0);
+  await page
+    .getByTestId("hive-configuration-frame-standard-select")
+    .selectOption("british_national_deep_brood");
+  await expect(page.getByTestId("hive-configuration-dimensions")).toContainText("432 mm");
+  await page.getByTestId("create-hive-button").click();
+
+  await expect(page.getByTestId("hive-configuration-state")).toContainText(
+    "British National deep brood"
+  );
+  await expect(page.getByTestId("create-inspection-button")).toBeEnabled();
+});

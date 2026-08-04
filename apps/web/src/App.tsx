@@ -310,12 +310,19 @@ export function App() {
       selectedFrameStandardId &&
       (!hiveConfigurationNotesRequired || hiveConfigurationNotes.trim().length > 0)
   );
+  const canConfigureSelectedHive = Boolean(
+    hive &&
+      selectedFrameStandardId &&
+      (!hiveConfigurationNotesRequired || hiveConfigurationNotes.trim().length > 0)
+  );
   const canCreateInspection = Boolean(hive && hiveConfiguration);
   const canUpload = Boolean(termsAccepted && inspection && file);
   const isTrainingDataCollection = inspection?.intent === "training_data_collection";
   const isVarroaAssessment = inspection?.intent === "varroa_assessment";
   const showApiarySetupForm = showApiarySetup || apiaries.length === 0;
-  const showHiveSetupForm = showHiveSetup || Boolean(apiary && hives.length === 0);
+  const isConfiguringSelectedHive = Boolean(hive && !hiveConfiguration && hives.length > 0);
+  const showHiveSetupForm =
+    showHiveSetup || Boolean(apiary && hives.length === 0) || isConfiguringSelectedHive;
   const showTrainingCropPanel = Boolean(
     isTrainingDataCollection && session?.datasetCuratorCapability
   );
@@ -403,6 +410,7 @@ export function App() {
       const apiError = toApiError(error);
       if (apiError.code === "hive_configuration_required") {
         setHiveConfiguration(null);
+        setHiveConfigurationNotes("");
         return;
       }
       throw error;
@@ -560,6 +568,24 @@ export function App() {
       setHiveConfiguration(configuration);
       setShowHiveSetup(false);
       await refreshHivesForApiary(created.workspaceId, apiary, created.hiveId);
+    });
+  }
+
+  async function onConfigureSelectedHive(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!session || !hive) {
+      return;
+    }
+    await runAction("Configuring hive", async () => {
+      const configuration = await upsertHiveConfiguration({
+        devUserId,
+        workspaceId: session.workspaceId,
+        hiveId: hive.hiveId,
+        frameStandardId: selectedFrameStandardId,
+        notes: hiveConfigurationNotes
+      });
+      setHiveConfiguration(configuration);
+      setShowHiveSetup(false);
     });
   }
 
@@ -1108,7 +1134,7 @@ export function App() {
               <section className="setup-context-panel primary-workflow-panel">
                 <div className="setup-context-header">
                   <PanelHeading icon={<Plus size={20} />} title="Hives" />
-                  {apiary && hives.length > 0 ? (
+                  {apiary && hives.length > 0 && !isConfiguringSelectedHive ? (
                     <button
                       type="button"
                       className="compact-action"
@@ -1156,16 +1182,26 @@ export function App() {
                   </p>
                 ) : null}
                 {showHiveSetupForm ? (
-                  <form className="inline-setup-form hive-setup-form" onSubmit={onCreateHive} data-testid="hive-setup-form">
-                    <label>
-                      <span>{hives.length > 0 ? "New Hive name" : "Name"}</span>
-                      <input
-                        value={hiveName}
-                        onChange={(event) => setHiveName(event.target.value)}
-                        required
-                        data-testid="hive-name-input"
-                      />
-                    </label>
+                  <form
+                    className="inline-setup-form hive-setup-form"
+                    onSubmit={isConfiguringSelectedHive ? onConfigureSelectedHive : onCreateHive}
+                    data-testid="hive-setup-form"
+                  >
+                    {isConfiguringSelectedHive ? (
+                      <p className="setup-copy">
+                        Record this Hive's frame context before creating Inspections.
+                      </p>
+                    ) : (
+                      <label>
+                        <span>{hives.length > 0 ? "New Hive name" : "Name"}</span>
+                        <input
+                          value={hiveName}
+                          onChange={(event) => setHiveName(event.target.value)}
+                          required
+                          data-testid="hive-name-input"
+                        />
+                      </label>
+                    )}
                     <label>
                       <span>Frame Standard</span>
                       <select
@@ -1212,10 +1248,17 @@ export function App() {
                     </label>
                     <button
                       type="submit"
-                      disabled={!canCreateHive || actionState.kind === "working"}
+                      disabled={
+                        (isConfiguringSelectedHive ? !canConfigureSelectedHive : !canCreateHive) ||
+                        actionState.kind === "working"
+                      }
                       data-testid="create-hive-button"
                     >
-                      {hives.length > 0 ? "Add hive" : "Create hive"}
+                      {isConfiguringSelectedHive
+                        ? "Save Hive Configuration"
+                        : hives.length > 0
+                          ? "Add hive"
+                          : "Create hive"}
                     </button>
                   </form>
                 ) : null}
