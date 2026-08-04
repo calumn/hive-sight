@@ -70,7 +70,7 @@ flowchart LR
         inspect["Varroa Assessment Inspection<br/>multi-photo frame evidence"]:::input
         localise["1. Bee Localisation<br/>find visible bees<br/>and body geometry"]:::model
         orient["2. Bee Orientation<br/>predict head direction<br/>or mark unreliable"]:::future
-        bee_crop["Head-normalized<br/>bee-relative crop"]:::future
+        bee_crop["Head-Up Normalized<br/>Bee Crop"]:::future
         varroa["3. Varroa Detection<br/>visible mite point or tight box"]:::future
         result["Result Evidence Breakdown<br/>positive / active negative<br/>not determined / unassessed"]:::future
         rate["Visible Varroa Rate<br/>with coverage warning<br/>or suppression"]:::future
@@ -124,7 +124,7 @@ flowchart LR
 - The current trainable model path is the middle section: reviewed bee ellipses become Dataset Items, Dataset Versions, YOLO OBB Bee Localisation Training Runs, Model Candidates, and Benchmark Evaluation reports.
 - YOLO OBB geometry is body localisation. It does not prove bee head direction.
 - Bee Orientation is a separate future model purpose. Human-directed ellipses provide the first source of orientation evidence.
-- Varroa Detection is also separate. It should work on head-normalized bee crops where orientation is reliable.
+- Varroa Detection is also separate. It should work on Head-Up Normalized Bee Crops where orientation is reliable.
 - Benchmark Evaluation is an `evaluation` use and must respect Source Rights Records, Contributor Contribution Permissions, permitted-use scopes, attribution, withdrawal, and rights invalidation.
 - Recovery feedback from beekeeper-facing inspections is product evidence first. It enters model data only after an explicit Dataset Contribution Decision and independent Dataset Curator review.
 

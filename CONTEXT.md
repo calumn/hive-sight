@@ -284,7 +284,8 @@ _Avoid_: Model type when the point is product/domain role rather than implementa
 
 **Dataset Version**:
 A named version of a dataset used for training, validation, or benchmark evaluation.
-_Avoid_: Dataset when traceability to an evaluation matters.
+A Dataset Version freezes governed source evidence. For marked oriented-bee evidence, the same Dataset Version is the source for Bee Localisation and Bee Orientation projections; model-specific exports may differ, but the promoted source dataset must stay in lockstep.
+_Avoid_: Dataset when traceability to an evaluation matters. Avoid separate YOLO dataset and orientation dataset when both are projections of the same marked oriented-bee evidence.
 
 **Dataset Item**:
 A reviewed image-and-annotation unit assigned to a Dataset Role and eligible for inclusion in a Dataset Version.
@@ -343,11 +344,15 @@ The model purpose that finds visible bees and estimates their body geometry in a
 _Avoid_: Bee orientation model, Varroa detector.
 
 **Bee Orientation Model**:
-The model purpose that determines the head/tail direction of a localised bee. It converts a body-axis estimate into a directed centre-to-head orientation.
+The model purpose that determines the head/tail direction of a localised bee. The first planned implementation is a classifier that decides whether a body-axis-normalized bee crop is `head_up` or `head_down`, so downstream crops can be normalized with the bee's head at the top.
 _Avoid_: Oriented bounding-box rotation when biological head direction is meant.
 
+**Head-Up Normalized Bee Crop**:
+A bee-relative image crop rotated so the bee's head is at the top of the crop. It is the intended input convention for Varroa Detection when Bee Orientation is reliable.
+_Avoid_: Oriented crop when the direction of the bee's head is the important convention.
+
 **Varroa Detector**:
-The future model purpose for detecting likely visible Varroa mites on or near a bee, preferably from a bee-relative crop normalized to head direction.
+The future model purpose for detecting likely visible Varroa mites on or near a bee, preferably from a Head-Up Normalized Bee Crop.
 _Avoid_: Mite Detector when the intended product scope is specifically Varroa.
 
 **YOLO OBB**:

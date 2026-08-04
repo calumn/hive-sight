@@ -14,7 +14,7 @@ The logical model pipeline has three stages:
 
 1. **Bee Localisation**: detect visible bees and estimate their body geometry and major axis.
 2. **Bee Orientation**: determine which end of each localised bee is its head.
-3. **Varroa Detection**: detect likely visible Varroa mites on or near the head-normalised bee crop.
+3. **Varroa Detection**: detect likely visible Varroa mites on or near the Head-Up Normalized Bee Crop.
 
 These are separate logical model purposes. The implementation may initially use separate models, or later combine compatible capabilities, but it must preserve their independent inputs, outputs, provenance, evaluation, and governance. A model that supplies only a body axis has not supplied Bee Orientation.
 
@@ -32,13 +32,13 @@ Rationale: Bee localisation provides the denominator for the first Varroa estima
 
 ### MR-001A Bee Head Direction
 
-The Bee Orientation Model shall determine directed centre-to-head orientation for each localised bee when the visible evidence is sufficient. It shall be allowed to report that orientation is unreliable for an occluded or partial bee. For the first head-normalized Varroa training and benchmark corpora, bees with unreliable orientation shall be excluded while remaining eligible for Bee Localisation evidence and supplementary Varroa evidence.
+The Bee Orientation Model shall determine directed centre-to-head orientation for each localised bee when the visible evidence is sufficient. The first implementation shall use a Head Up / Head Down classifier on body-axis-normalized bee crops. It shall be allowed to report that orientation is unreliable for an occluded or partial bee. For the first Head-Up Normalized Varroa training and benchmark corpora, bees with unreliable orientation shall be excluded while remaining eligible for Bee Localisation evidence and supplementary Varroa evidence.
 
-Rationale: A body axis alone is ambiguous by 180 degrees. Consistent head direction permits a bee-relative crop to be normalized before Varroa detection, which may strengthen learning and inference because likely mite location is anatomy-dependent.
+Rationale: A body axis alone is ambiguous by 180 degrees. Consistent Head Up orientation permits a bee-relative crop to be normalized before Varroa detection, which may strengthen learning and inference because likely mite location is anatomy-dependent.
 
 ### MR-002 Varroa Detection
 
-The Varroa Detector shall detect likely visible Varroa mites on or near bees from bee-relative crops normalized to head direction when reliable orientation is available. Each positive result shall include explicit reviewed or predicted mite location, using a point marker or tight bounding box. In the first live pipeline, a localised bee with unreliable orientation shall be recorded as `not_assessed_orientation_unreliable`; the Varroa Detector shall not run on a guessed rotation.
+The Varroa Detector shall detect likely visible Varroa mites on or near bees from Head-Up Normalized Bee Crops when reliable orientation is available. Each positive result shall include explicit reviewed or predicted mite location, using a point marker or tight bounding box. In the first live pipeline, a localised bee with unreliable orientation shall be recorded as `not_assessed_orientation_unreliable`; the Varroa Detector shall not run on a guessed rotation.
 
 The first Varroa baseline shall use high-resolution, standard axis-aligned YOLO detection on normalized bee crops. Oriented mite boxes and segmentation are deferred.
 
@@ -110,7 +110,7 @@ Rationale: The first trainable detector baseline is expected to use YOLO OBB, wh
 
 Every reviewed Bee Annotation shall record Orientation Reliability as `reliable` or `unreliable`. It shall be distinct from bee-presence confidence and review status.
 
-Existing Bee Annotations created before Orientation Reliability is implemented shall be returned for one-time human reliability review before entering a Bee Orientation or head-normalized Varroa Dataset Version.
+Existing Bee Annotations created before Orientation Reliability is implemented shall be returned for one-time human reliability review before a shared marked-bee Dataset Version is used for Bee Orientation or Head-Up Normalized Varroa exports.
 
 Rationale: A visible bee can be correctly localised while its head direction remains unknowable. The distinction preserves honest orientation training evidence and supplies the first Varroa corpus inclusion rule.
 
@@ -259,6 +259,12 @@ Rationale: YOLO OBB gives a practical local baseline for rotated bee-like object
 Any Dataset Version used by a Training Run shall freeze the included Dataset Item ids and the key metadata needed to reproduce and explain the run.
 
 Rationale: Later Dataset Item withdrawal, supersession, correction, or role changes must not silently change historical training evidence.
+
+### MR-017FA Shared Marked-Bee Dataset Version
+
+For marked oriented-bee evidence, HiveSight shall promote one shared Dataset Version as the governed source dataset for both Bee Localisation and Bee Orientation. Bee Localisation exports, such as YOLO OBB labels, and Bee Orientation exports, such as Head Up / Head Down normalized crops, shall be derived projections of that same Dataset Version. HiveSight shall not allow a separate YOLO source Dataset Version and separate Bee Orientation source Dataset Version to advance independently when both claim to represent the same marked oriented-bee training set.
+
+Rationale: The Dataset Curator supplies one reviewed training set of marked, oriented bees. Keeping the source Dataset Version in lockstep prevents provenance drift, split leakage, and accidental quality differences between the localisation and orientation evidence derived from the same annotations.
 
 ### MR-017G Contribution Withdrawal Enforcement
 

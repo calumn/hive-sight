@@ -43,8 +43,8 @@ These are the strongest near-term candidates based on the current project state.
 | --- | --- | --- | --- |
 | Benchmark Dataset Curation Browser | Business / Technical | Let a Dataset Curator see and manage protected benchmark evidence as a named asset. | Slice 0015.4 uses benchmark items frozen inside a training Dataset Version; comparing candidates fairly soon needs a reusable benchmark lifecycle. |
 | Full-Frame Bee Localisation Evaluation | Technical | Evaluate whether the Bee Localisation candidate can find bees in realistic whole-frame photos, not just reviewed crops. | Crop-level success does not prove the model works on real inspection photos. |
-| Orientation Reliability Review | Business / Technical | Add explicit `reliable` / `unreliable` orientation review for directed bee ellipses. | Bee head direction is now meaningful, but reliability is not yet captured. |
-| Bee Orientation Model Baseline | Technical | Train the first model that predicts head/tail direction for localised bees. | Varroa crops need consistent head-normalised orientation. |
+| Orientation Reliability Review | Business / Technical | Add explicit `reliable` / `unreliable` orientation review for directed bee ellipses. | Promoted into `architecture/vertical-slice-0021-orientation-reliability-review.md`. |
+| Bee Orientation Model Baseline | Technical | Train the first model that predicts Head Up / Head Down direction for localised bees. | Varroa crops need consistent Head-Up Normalized Bee Crops. |
 | Varroa Review Outcome Labelling | Business | Add the CAPTCHA-like workflow for `visible_varroa_present`, `no_visible_varroa`, and `not_determined`. | Varroa training needs active positives and active negatives, not silent absence. |
 | Public Dataset Candidate Import | Technical / Governance | Import public USDA-ARS image/XML evidence as Candidate Annotations requiring human review. | This could accelerate dataset growth, but only if provenance and source rights are handled correctly. |
 
@@ -67,11 +67,12 @@ These are the strongest near-term candidates based on the current project state.
 
 | Candidate Slice | Type | Outcome |
 | --- | --- | --- |
-| Orientation Reliability Review | Business / Technical | Let a curator mark whether each directed ellipse has reliable head direction. |
-| Bee Orientation Dataset Version | Technical / Governance | Freeze reliable complete-visible-bee evidence for orientation training and benchmark use. |
-| Bee Orientation Model Baseline | Technical | Train and record the first head/tail classifier on body-axis-normalised bee crops. |
+| Orientation Reliability Review | Business / Technical | Promoted into `architecture/vertical-slice-0021-orientation-reliability-review.md` to let a curator mark whether each directed ellipse has reliable head direction. |
+| Shared Marked-Bee Dataset Version Promotion | Technical / Governance | Promote one marked oriented-bee Dataset Version that stays in lockstep for Bee Localisation and Bee Orientation source evidence. |
+| Bee Orientation Dataset Builder | Technical / Governance | Export reliable directed ellipses from the shared Dataset Version into reproducible Head Up / Head Down crop packages with source maps and exclusion reasons. |
+| Bee Orientation Model Baseline | Technical | Train and record the first Head Up / Head Down classifier on body-axis-normalised bee crops. |
 | Bee Orientation Benchmark Report | Technical | Report directed head/tail accuracy, angular error, unreliable-orientation rate, and performance by image quality and occlusion. |
-| Orientation-Assisted Crop Normalisation | Technical | Produce head-normalised bee crops for Varroa labelling and model input, while excluding unreliable orientation from the first Varroa corpus. |
+| Orientation-Assisted Crop Normalisation | Technical | Produce Head-Up Normalized Bee Crops for Varroa labelling and model input, while excluding unreliable orientation from the first Varroa corpus. |
 
 ## Varroa Detection
 
@@ -80,7 +81,7 @@ These are the strongest near-term candidates based on the current project state.
 | Varroa Review Outcome Labelling | Business | Let a reviewer actively mark a bee crop as `visible_varroa_present`, `no_visible_varroa`, or `not_determined`, with mite point or tight-box markers for positives. |
 | Varroa Model-Curation Sampling Plan | Business / Technical | Select Varroa labelling tasks using `stratified_random`, `curator_targeted`, and explicit `human_selected` versus `upstream_model_selected` metadata. |
 | Varroa Dataset Repository Browser | Business / Technical | Show positive, active negative, and not-determined Varroa evidence by dataset role, source, orientation reliability, and selection method. |
-| Varroa Detector Baseline | Technical | Train the first Varroa Detection model on head-normalised bee crops using active positives and active negatives. |
+| Varroa Detector Baseline | Technical | Train the first Varroa Detection model on Head-Up Normalized Bee Crops using active positives and active negatives. |
 | Varroa Benchmark Report | Technical / Governance | Evaluate Varroa precision, recall, false positives, false negatives, marker agreement, and review-strength caveats. |
 | Blind Independent Review For Varroa Benchmark | Business / Governance | Add second-review and adjudication workflow for benchmark Varroa evidence before any user-facing promotion claim. |
 
@@ -168,7 +169,7 @@ The likely next tranche should stay model-evidence focused:
 
 1. Improve benchmark curation and comparison so model quality claims are not tied to a single training run.
 2. Evaluate Bee Localisation on full-frame evidence before assuming crop-level success transfers.
-3. Add Orientation Reliability and then train/evaluate the first Bee Orientation baseline.
+3. Add Orientation Reliability, build the Bee Orientation dataset package, and then train/evaluate the first Head Up / Head Down Bee Orientation baseline.
 4. Add Varroa Review Outcome labelling with active negative evidence.
 5. Train and benchmark the first Varroa Detector.
 6. Only then design the first user-facing Varroa assessment result and statistical inference workflow.

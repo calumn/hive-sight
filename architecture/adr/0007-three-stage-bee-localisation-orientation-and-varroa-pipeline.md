@@ -4,7 +4,7 @@ Status: accepted
 
 ## Context
 
-HiveSight needs to identify likely visible Varroa mites on bees in a full hive-frame photo. The initial HiveSight Bee Detector uses YOLO OBB to locate rotated bee bodies, but an oriented bounding-box axis is geometrically ambiguous by 180 degrees and does not reliably identify the biological head end. Likely Varroa position is bee-anatomy dependent, so a Varroa model should receive bee-relative crops normalized to a consistent head direction.
+HiveSight needs to identify likely visible Varroa mites on bees in a full hive-frame photo. The initial HiveSight Bee Detector uses YOLO OBB to locate rotated bee bodies, but an oriented bounding-box axis is geometrically ambiguous by 180 degrees and does not reliably identify the biological head end. Likely Varroa position is bee-anatomy dependent, so a Varroa model should receive bee-relative crops normalized to a consistent head direction. The chosen convention for normalized downstream crops is Head Up: the bee's head is at the top of the crop.
 
 ## Decision
 
@@ -12,9 +12,9 @@ HiveSight will preserve three logical Model Purposes:
 
 1. **Bee Localisation** finds visible bees and their body geometry in a frame or crop.
 2. **Bee Orientation** resolves a localised bee's directed centre-to-head orientation when the visual evidence is sufficient.
-3. **Varroa Detection** identifies likely visible mites on or near the resulting head-normalized bee crop.
+3. **Varroa Detection** identifies likely visible mites on or near the resulting Head-Up Normalized Bee Crop.
 
-The current YOLO OBB HiveSight Bee Detector implements Bee Localisation only. It must not be represented as head-direction prediction merely because it emits rotated geometry. The first Bee Orientation implementation will be a lightweight binary head/tail classifier on body-axis-normalized crops, while a keypoint/pose or multi-head model remains a valid later alternative if benchmark evidence shows it is needed. The first Varroa implementation will use high-resolution, standard axis-aligned YOLO detection and return an explicit mite location from each normalized bee crop, rather than only a bee-level presence/absence classification. Oriented mite boxes and segmentation are deferred.
+The current YOLO OBB HiveSight Bee Detector implements Bee Localisation only. It must not be represented as head-direction prediction merely because it emits rotated geometry. The first Bee Orientation implementation will be a lightweight binary `head_up` / `head_down` classifier on body-axis-normalized crops, while a keypoint/pose or multi-head model remains a valid later alternative if benchmark evidence shows it is needed. The first Varroa implementation will use high-resolution, standard axis-aligned YOLO detection and return an explicit mite location from each Head-Up Normalized Bee Crop, rather than only a bee-level presence/absence classification. Oriented mite boxes and segmentation are deferred.
 
 The three purposes are logical boundaries, not an irreversible mandate for exactly three independently deployed neural networks. Any future combined model must preserve separate outputs, provenance, confidence/uncertainty, benchmark evaluation, and promotion evidence for each purpose.
 
@@ -23,13 +23,15 @@ The existing `bee_detector` API and persistence value remains the implementation
 ## Consequences
 
 - Directed reviewed bee ellipses are training evidence for future Bee Orientation work; YOLO OBB labels remain a derived Bee Localisation export.
+- `architecture/bee-orientation-classifier-design.md` defines the first planned Bee Orientation classifier design, including the Head Up crop convention, dataset builder, training adapter, benchmark, inference adapter, pipeline integration, and governance records.
 - Reviewed Bee Annotations record Orientation Reliability as `reliable` or `unreliable`; it is not inferred from the existence of a directed ellipse.
-- Existing directed ellipses must receive one-time human Orientation Reliability review before entering a Bee Orientation or head-normalized Varroa Dataset Version.
+- Existing directed ellipses must receive one-time human Orientation Reliability review before a shared marked-bee Dataset Version can be used for Bee Orientation or Head-Up Normalized Varroa exports.
+- Marked oriented-bee Dataset Versions are shared source evidence across Bee Localisation and Bee Orientation. YOLO OBB labels and Head Up / Head Down crops are purpose-specific projections; HiveSight must not promote separate source Dataset Versions for localisation and orientation from the same marked bees.
 - The first Bee Orientation training and benchmark corpora contain reliably oriented complete visible bees only; reliably oriented partial bees are retained for later separately reported evaluation.
 - Benchmark reports must name the evaluated Model Purpose. Slice 0015.4 evaluates Bee Localisation only, not head direction or Varroa detection.
 - The Varroa training and benchmark strategy must include human-selected bee crops independent of upstream model output so downstream data does not inherit upstream localisation or orientation blind spots by construction.
 - Varroa Dataset Items record Dataset Selection Method. `human_selected` requires blind selection before upstream model suggestions are seen; any model-influenced selection is `upstream_model_selected`. Benchmark reports show the distribution rather than claiming an unmeasured independence property.
-- Partial and heavily occluded bees may receive an explicit unreliable-orientation outcome. The first head-normalized Varroa training and benchmark corpora exclude them rather than inventing a direction, while retaining them for Bee Localisation evidence and supplementary Varroa evidence.
+- Partial and heavily occluded bees may receive an explicit unreliable-orientation outcome. The first Head-Up Normalized Varroa training and benchmark corpora exclude them rather than inventing a direction, while retaining them for Bee Localisation evidence and supplementary Varroa evidence.
 - In the first live pipeline, a localised bee with unreliable orientation is recorded as `not_assessed_orientation_unreliable`; no Varroa inference runs on a guessed rotation.
 - Varroa dataset curation is CAPTCHA-like: each bee-relative crop receives `visible_varroa_present`, `no_visible_varroa`, or `not_determined`. Only active positive and negative outcomes form the first Varroa corpus; absent markers alone are never treated as negatives.
 - Varroa reviews have a Sampling Purpose. `model_curation` creates representative model evidence; future `inspection_rate_estimation` is a separate statistical policy, even though both may use the same review UI.

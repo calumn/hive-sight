@@ -638,7 +638,7 @@ Rules:
 - The canonical reviewed geometry for bee annotations is an oriented bee ellipse.
 - Oriented Bee Ellipse rotation is directed: `rotation_degrees` points from the ellipse center toward the bee's head along the major axis; the opposite end is the tail.
 - Reviewed Bee Annotations record Orientation Reliability as `reliable` or `unreliable`, independently of their visibility class, bee-presence confidence, and review status.
-- Existing Bee Annotations without Orientation Reliability must be returned for one-time human review before entering Bee Orientation or head-normalized Varroa Dataset Versions.
+- Existing Bee Annotations without Orientation Reliability must be returned for one-time human review before a shared marked-bee Dataset Version is used for Bee Orientation or Head-Up Normalized Varroa exports.
 - Candidate Annotations are not ground truth until human reviewed.
 - Reviewed Annotations still require Dataset Role assignment before dataset use.
 - Model-specific exports may project oriented ellipses into other shapes such as YOLO OBB labels.
@@ -1449,6 +1449,7 @@ Rules:
 - A Dataset Version includes only active reviewed Dataset Items as training or validation evidence.
 - A Dataset Version freezes the metadata needed to explain a Training Run.
 - A Dataset Version referenced by a Training Run is immutable.
+- Marked oriented-bee Dataset Versions stay in lockstep across Bee Localisation and Bee Orientation; YOLO OBB labels and Head Up / Head Down crops are purpose-specific projections from the same promoted source evidence, not separate source dataset promotions.
 - A Training Run creates a Model Candidate, not an approved Model Version.
 - Bee Localisation, Bee Orientation, and Varroa Detection are separate Model Purposes.
 - Bee Localisation does not establish biological head direction or assess Varroa evidence.

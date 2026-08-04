@@ -476,7 +476,7 @@ Dataset labelling:
 - `uncertain_bee` remains a required concept, but may be deferred from the first implementation slice. The gap should be recorded with an acceptance scenario and later executable pending coverage.
 - Reviewed directed ellipse orientation is retained as future Bee Orientation training evidence; YOLO OBB output remains Bee Localisation geometry rather than head-direction evidence.
 - Orientation Reliability is reviewed evidence with values `reliable` or `unreliable`; it is distinct from bee-presence confidence and review status.
-- Existing directed ellipses require a one-time human Orientation Reliability review before they may enter Bee Orientation or head-normalized Varroa Dataset Versions.
+- Existing directed ellipses require a one-time human Orientation Reliability review before a shared marked-bee Dataset Version may be used for Bee Orientation or head-normalized Varroa exports.
 - HiveSight's target pipeline has three logical model purposes: Bee Localisation, Bee Orientation, and Varroa Detection. The current YOLO OBB baseline implements Bee Localisation only.
 - Dataset-labelling review and product model-output review require separate workflow/provenance types.
 - Training Runs record reproducibility metadata including dataset versions, model family/service, settings, code/artifact reference, random seed where applicable, timing, and outcome.

@@ -128,7 +128,7 @@ Requirements, domain model, and model governance.
 
 ## PARK-0006: YOLO OBB Training Baseline
 
-Status: parked
+Status: promoted
 Date parked: 2026-07-30
 Source: Slice renumbering after external review remediation
 Area: model training
@@ -665,13 +665,13 @@ Context:
 
 Slice 0015.35 makes reviewed Oriented Bee Ellipses direction-aware by defining `rotation_degrees` as center-to-head orientation. The first implementation keeps head/tail direction under human review. YOLO OBB can propose Bee Localisation geometry and body-axis alignment, but it should not be assumed to predict biologically meaningful head direction reliably.
 
-ADR 0007 defines Bee Orientation as a distinct logical Model Purpose between Bee Localisation and Varroa Detection. The first implementation will be a binary head/tail classifier on body-axis-normalized bee crops; a keypoint/pose or multi-head model remains an alternative if benchmark evidence shows the classifier is inadequate.
+ADR 0007 defines Bee Orientation as a distinct logical Model Purpose between Bee Localisation and Varroa Detection. `architecture/bee-orientation-classifier-design.md` defines the first planned implementation as a binary Head Up / Head Down classifier on body-axis-normalized bee crops; a keypoint/pose or multi-head model remains an alternative if benchmark evidence shows the classifier is inadequate.
 
 For future real hive inspections, HiveSight needs a model pipeline that can identify every visible bee and its correct head/tail orientation without human intervention. This matters because the future Varroa Detector is expected to work on bee-relative crops: each bee image may be extracted, rotated into a consistent head/tail orientation, and then passed into Varroa mite detection. If head direction is wrong, Varroa-location evidence and mite detection quality may degrade.
 
 Why parked:
 
-The current training-data workflow is still building the first governed bee dataset. Predicting head direction may require a different model task or multi-model pipeline, such as bee detection plus keypoint/pose prediction, a head/tail classifier on bee crops, or another specialist orientation model. Designing that before there is enough reviewed directed-ellipse evidence would be premature.
+The current training-data workflow is still building the first governed bee dataset. The first design is recorded, but implementation should wait until Orientation Reliability and enough reviewed directed-ellipse evidence exist to produce a meaningful shared marked-bee Dataset Version, Bee Orientation export package, and benchmark.
 
 Revisit trigger:
 
@@ -696,9 +696,13 @@ Why parked:
 
 The current implementation provides directed ellipse review but does not yet persist Orientation Reliability or provide a dedicated review queue. The current early corpus is small enough for a one-time human review when the field is introduced.
 
+Promotion note:
+
+Promoted into `architecture/vertical-slice-0021-orientation-reliability-review.md` as the first Bee Orientation preparation slice. The slice records per-ellipse Orientation Reliability, shows missing/reliable/unreliable crop readiness, and gates later orientation-dependent export work without building the shared marked-bee Dataset Version, Bee Orientation export package, or classifier yet.
+
 Revisit trigger:
 
-Before creating the first Bee Orientation Dataset Version, the first head-normalized Varroa Dataset Version, or any model evaluation that claims head-direction evidence.
+Before using a shared marked-bee Dataset Version for the first Bee Orientation export package, the first Head-Up Normalized Varroa export package, or any model evaluation that claims head-direction evidence.
 
 Suggested owner or area:
 
