@@ -76,6 +76,14 @@ _Avoid_: Mode when the domain purpose of the inspection is meant.
 An Inspection Intent for gathering reviewed image and annotation evidence to improve HiveSight models.
 _Avoid_: Real inspection when the purpose is dataset creation rather than beekeeper assessment.
 
+**Training Inspection Workflow**:
+The staged Web UI workflow used for a Training Data Collection Inspection. Its current stages are Inspection Setup, Crop Selection, Bee Annotation, and Crop Governance. Stage changes are navigation only; saved photos, crops, ellipses, review requests, and Dataset Items remain the durable state.
+_Avoid_: Treating the selected UI stage as domain state or persisted inspection status.
+
+**Crop Governance**:
+The Training Inspection Workflow stage where a Dataset Curator reviews the selected Inspection's completed Training Crops, requests independent review, cancels pending review requests, assigns Dataset Roles, and sees why governance actions are unavailable.
+_Avoid_: Bee Annotation when the actor is governing completed crop evidence rather than drawing or editing ellipses.
+
 **Varroa Assessment**:
 An Inspection Intent for estimating visible Varroa evidence from inspection photos for beekeeper-facing support.
 _Avoid_: Training data collection when the purpose is product analysis.
