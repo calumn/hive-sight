@@ -52,7 +52,7 @@ The Core API exposes a narrow Inspection read endpoint:
 
 The endpoint returns Inspections belonging to the selected Hive and Workspace. It enforces Workspace access. A missing Hive returns `404 hive_not_found`. A Hive in another Workspace returns `403 workspace_access_denied`. The response is ordered newest Inspection first by `inspection_date`, then id as a deterministic fallback. This slice does not attempt to infer "most recently active annotation work" from crop, ellipse, dataset, or upload timestamps.
 
-The UI shows a `Resume Training Inspection` selector near the existing Inspection creation controls. The selector shows only Training Data Collection Inspections in this slice. If Training Data Collection Inspections exist, the newest Inspection is auto-selected by default and the selection is visible and changeable. The User does not need an extra resume button. The current create Inspection form stays in place below the resume selector.
+The UI shows a Training Data Collection Inspection list near the existing Inspection creation controls. The list shows only Training Data Collection Inspections in this slice. If Training Data Collection Inspections exist, the newest Inspection is auto-selected by default and the selection is visible and changeable. The User does not need an extra resume button. The current create Inspection form stays in place below the list.
 
 Selecting an Inspection:
 
@@ -82,7 +82,7 @@ This slice supports same-process resume in the in-memory dev stack, but the acro
 
 The UI should make saved state legible:
 
-- Inspection selector label includes date and intent.
+- Inspection list rows include date, intent, and a compact derived status.
 - Photo list shows uploaded photos for the selected Inspection.
 - Training Crop list shows saved crop count and per-crop status.
 - Selected crop shows saved ellipse count and geometry.
@@ -92,7 +92,7 @@ The slice does not need full routes/pages. It can remain on the current one-page
 
 ## Layers Touched
 
-- Web UI: Add `Resume Training Inspection` list/select controls for the selected Hive; auto-select newest Training Data Collection Inspection; reload photos and Training Crop panel state when the selected Inspection changes; select newly created Inspections; render the Training Crop panel for resumed Training Data Collection Inspections with photos; auto-scroll to the crop panel after resume.
+- Web UI: Add a Training Data Collection Inspection list for the selected Hive; auto-select newest Training Data Collection Inspection; reload photos and Training Crop panel state when the selected Inspection changes; select newly created Inspections; render the Training Crop panel for resumed Training Data Collection Inspections with photos; auto-scroll to the crop panel after resume.
 - Core API: Add a read endpoint for Inspections by Hive and optional intent.
 - Analysis Service: Not touched.
 - Storage: Reuse existing Inspection records in in-memory and Postgres-backed stores. No new table is expected.

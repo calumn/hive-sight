@@ -6,12 +6,13 @@ Status: implemented.
 
 Make Training Data Collection inspections easier and safer to work through by separating the current overloaded Inspection page into task-focused workflow stages.
 
-The slice does not change the underlying domain model. It reorganises the existing Training Data Collection workflow so the Dataset Curator can move through four clear jobs:
+The slice does not change the underlying domain model. It reorganises the existing Training Data Collection workflow so the Dataset Curator can move through five clear jobs:
 
 - set up or resume the Inspection;
 - upload photos and define Training Crops;
 - annotate bees within those crops;
-- govern completed crops through review requests and Dataset Role assignment.
+- govern completed crops through review requests and Dataset Role assignment;
+- govern cross-crop model evidence, Dataset Versions, Training Runs, Model Candidates, and Benchmark Evaluations.
 
 This is not cosmetic. It reduces the chance of accidentally working in the wrong state, makes long annotation sessions easier to resume, and creates a cleaner home for review/governance rules without crowding the crop editor.
 
@@ -43,9 +44,10 @@ UI-level Gherkin remains parked as a harness choice. Slice 0020 should define si
 Given a Dataset Curator is working in a Training Data Collection Inspection
 And the Inspection may contain multiple uploaded photos and multiple saved Training Crops
 When the Dataset Curator opens the Inspection workflow
-Then HiveSight presents separate workflow stages for setup, crop selection, bee annotation, and crop governance
+Then HiveSight presents separate workflow stages for setup, crop selection, bee annotation, crop governance, and model governance
+And HiveSight presents Model Governance separately from per-crop governance
 And each stage shows only the controls needed for that task
-And moving between stages preserves the same saved Inspection, photo, crop, ellipse, review, and Dataset Item state.
+And moving between stages preserves the same saved Inspection, photo, crop, ellipse, review, Dataset Item, and model-governance state.
 
 ## Preconditions
 
@@ -79,14 +81,14 @@ Stage progress counts are inspection-wide. Crop Selection may additionally show 
 
 ### Stage 1: Inspection Setup
 
-The setup stage lets the Dataset Curator select or create:
+The setup stage lets the Dataset Curator select, list, or create:
 
 - Apiary;
 - Hive;
 - Hive Configuration;
 - Training Data Collection Inspection.
 
-It keeps the current resume selector for existing Training Data Collection Inspections. The selected Inspection is visibly stable across stage changes.
+The current implementation keeps Apiary creation behind an `Add apiary` action, shows Hives as a selectable list for the selected Apiary, and shows existing Training Data Collection Inspections as a list for the selected Hive. The selected Inspection is visibly stable across stage changes.
 
 This stage does not show crop-ellipse controls, review-request controls, Dataset Role assignment controls, model training, or benchmark evaluation controls.
 
@@ -211,7 +213,7 @@ Model Governance must not require one selected Training Crop. It must not show p
 
 ## Layers Touched
 
-- Web UI: Split the current Inspection surface into task-focused stages for setup, crop selection, bee annotation, and crop governance. Add stage navigation, empty states, status summaries, basic responsive behaviour, safe state resets, and a small purposeful component split around the stages.
+- Web UI: Split the current Inspection surface into task-focused stages for setup, crop selection, bee annotation, crop governance, and model governance. Add stage navigation, empty states, status summaries, basic responsive behaviour, safe state resets, and a small purposeful component split around the stages.
 - Core API: Ideally not touched. Existing Inspection, photo, Training Crop, ellipse, Review Queue, Dataset Item, Dataset Version, Training Run, Model Candidate, and Benchmark Evaluation endpoints should be reused. Add a smallest-possible read-only workflow summary only if the UI cannot assemble coherent state safely from existing endpoints.
 - Analysis Service: Not touched.
 - Storage: Not touched.
@@ -222,7 +224,7 @@ Model Governance must not require one selected Training Crop. It must not show p
 ## Test Seams
 
 - Seam: Web workflow stage separation
-- Behaviour verified: setup, crop selection, bee annotation, and crop governance are visibly separate workflow stages, stage counts are inspection-wide, and each stage hides controls that belong to the other tasks.
+- Behaviour verified: setup, crop selection, bee annotation, crop governance, and model governance are visibly separate workflow stages, stage counts are inspection-wide, and each stage hides controls that belong to the other tasks.
 - Test style: Playwright browser acceptance.
 
 - Seam: Web crop-selection stage

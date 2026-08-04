@@ -62,31 +62,31 @@ Authorized empty lists return `200 []`. Unauthorized Workspace access returns `4
 
 If the Workspace has no Apiaries, the UI shows an empty setup-needed state and keeps the create Apiary form available.
 
-If the Workspace has one or more Apiaries, the UI selects the first Apiary by default. The selected Apiary is shown in an always-visible selector. The create Apiary form remains available as a secondary add action.
+If the Workspace has one or more Apiaries, the UI selects the first Apiary by default. The selected Apiary is shown as a compact context summary. If more than one Apiary exists, the UI shows a compact selectable Apiary list. The create Apiary form remains available behind an `Add apiary` action.
 
 Default selection uses stable ordering: creation order oldest first when available, otherwise `name`, then id. Creating a new Apiary selects the newly created Apiary immediately, even if it would not be first under the normal default rule.
 
 When the selected Apiary changes, the UI loads Hives for that Apiary.
 
-If the selected Apiary has no Hives, the UI shows an empty Hive selector state and keeps the create Hive form available.
+If the selected Apiary has no Hives, the UI shows an empty Hive state and keeps the create Hive form available.
 
-If the selected Apiary has one or more Hives, the UI selects the first Hive by default using the same stable-ordering rule and attempts to load the current Hive Configuration. The selected Hive is shown in an always-visible selector. If a Hive Configuration exists, the UI displays it and allows Inspection creation. If no Hive Configuration exists, the UI treats that as a normal setup-needed state, shows Hive Configuration controls, and keeps Inspection creation disabled until configuration is recorded. A missing Hive Configuration is not shown as a red error banner.
+If the selected Apiary has one or more Hives, the UI selects the first Hive by default using the same stable-ordering rule and attempts to load the current Hive Configuration. Hives are shown as a selectable list, with the selected Hive highlighted. If a Hive Configuration exists, the UI displays it and allows Inspection creation. If no Hive Configuration exists, the UI treats that as a normal setup-needed state, shows Hive Configuration controls behind `Add hive` or the empty-Hive setup state, and keeps Inspection creation disabled until configuration is recorded. A missing Hive Configuration is not shown as a red error banner.
 
 Creating an Apiary selects the newly created Apiary and aggressively clears any selected Hive, Inspection, selected file, photos, analysis result/evidence, labelling evidence, Training Crop panel state, Dataset Versions, and Training Runs that belonged to the previous selection.
 
 Creating a Hive selects the newly created Hive, records its Hive Configuration from the selected Frame Standard and notes, and clears any selected Inspection and downstream evidence from the previous Hive selection. This slice keeps the current combined create-Hive-and-record-Hive-Configuration flow. Existing Hive Configurations are displayed but not made editable as a first-class edit flow in this slice.
 
-The existing create forms stay on the same page for now. They should no longer imply that Apiary and Hive creation are mandatory every time the app starts.
+The existing create forms stay on the same page for now, but are secondary controls rather than always-visible setup panels. They should no longer imply that Apiary and Hive creation are mandatory every time the app starts.
 
 The top of the one-page UI should be modestly reorganized into a clearer context-picker surface:
 
 - Workspace gate/status
-- Apiary selector and add Apiary action
-- Hive selector, Hive Configuration display/setup, and add Hive action
+- selected Apiary summary, optional Apiary list, and add Apiary action
+- Hive list, Hive Configuration display/setup, and add Hive action
 - Inspection creation controls
 - upload, Training Crops, Dataset Version, and Training Run controls
 
-The selector labels should show Apiary and Hive names. UUID fragments may remain as secondary debug/status text, but they should not dominate the working UI.
+The context rows should show Apiary and Hive names. UUID fragments may remain as secondary debug/status text where useful, but they should not dominate the working UI.
 
 Inspection creation remains explicit. Selecting a Hive does not automatically create an Inspection. The UI default Inspection Intent changes to `training_data_collection` for current development and dataset-building work, while keeping both Intent options visible. The API continues to require explicit intent.
 
@@ -103,7 +103,7 @@ The older Dataset Labelling Session UI remains in code, API history, and existin
 
 ## Layers Touched
 
-- Web UI: Add always-visible Apiary and Hive list/select controls once records exist; auto-select defaults; load Hive Configuration for selected Hive; reset downstream state when selection changes; keep create forms as secondary add actions; default Inspection Intent to Training Data Collection; hide legacy Dataset Labelling panel from the normal Training Data Collection workflow.
+- Web UI: Add compact Apiary context, Hive list/select controls once records exist, auto-select defaults, load Hive Configuration for selected Hive, reset downstream state when selection changes, keep create forms as secondary add actions, default Inspection Intent to Training Data Collection, and hide legacy Dataset Labelling panel from the normal Training Data Collection workflow.
 - Core API: Add separate read endpoints for Workspace Apiaries and Apiary Hives. Reuse the existing current Hive Configuration endpoint.
 - Analysis Service: Not touched.
 - Storage: Reuse existing Apiary, Hive, and Hive Configuration records in the in-memory and Postgres-backed stores. No new table is expected unless implementation reveals a missing projection.

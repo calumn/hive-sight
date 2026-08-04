@@ -1131,23 +1131,23 @@ Web UI, inspection resume, and annotation productivity.
 Status: parked
 Date parked: 2026-08-03
 Source: Slice 0020 grilling
-Area: model governance, Repository UX
+Area: model governance, Training Inspection Workflow UX
 
 Context:
 
-Slice 0020 keeps Dataset Version creation, Bee Detector Training Runs, Model Candidate selection, and Benchmark Evaluation controls in the Repository page. Crop Governance is limited to decisions about the selected Inspection's crops.
+Slice 0020 moved Dataset Version creation, Bee Detector Training Runs, Model Candidate selection, and Benchmark Evaluation controls into the Training Inspection Workflow's Model Governance stage. Crop Governance is limited to decisions about the selected Inspection's crops.
 
 Why parked:
 
-The model-governance controls are now substantial enough that they may deserve a separate page, but moving them while also separating the Training Inspection workflow would widen Slice 0020 unnecessarily.
+The model-governance controls are now substantial enough that they may deserve a dedicated top-level page, but the first separation keeps them inside the Training Inspection workflow until comparison, promotion, reusable benchmarks, or job operations make that crowded.
 
 Revisit trigger:
 
-When comparing multiple Model Candidates, managing reusable benchmark sets, promoting candidates, or operating model jobs becomes too crowded for the Repository page.
+When comparing multiple Model Candidates, managing reusable benchmark sets, promoting candidates, or operating model jobs becomes too crowded for the Training Inspection Workflow's Model Governance stage.
 
 Suggested owner or area:
 
-Model governance, Repository UX, and operations.
+Model governance, Training Inspection Workflow UX, and operations.
 
 ## PARK-0049: Negative Or Background Bee Localisation Dataset Role
 

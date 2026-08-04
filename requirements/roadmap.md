@@ -27,6 +27,9 @@ Recent slices have established:
 - A Dataset Repository Browser.
 - A Bee Localisation benchmark evaluation and report path for Training Crop benchmark items.
 - Postgres-backed product and model-governance metadata for the local development stack.
+- Development User switching across seeded Users and Workspaces.
+- A Reviewer Work Queue for eligible shared review work.
+- A staged Training Inspection Workflow with Inspection Setup, Crop Selection, Bee Annotation, Crop Governance, and Model Governance.
 
 Important current limitation:
 
@@ -43,7 +46,6 @@ These are the strongest near-term candidates based on the current project state.
 | Orientation Reliability Review | Business / Technical | Add explicit `reliable` / `unreliable` orientation review for directed bee ellipses. | Bee head direction is now meaningful, but reliability is not yet captured. |
 | Bee Orientation Model Baseline | Technical | Train the first model that predicts head/tail direction for localised bees. | Varroa crops need consistent head-normalised orientation. |
 | Varroa Review Outcome Labelling | Business | Add the CAPTCHA-like workflow for `visible_varroa_present`, `no_visible_varroa`, and `not_determined`. | Varroa training needs active positives and active negatives, not silent absence. |
-| Dev User And Role Switching | Technical / UX | Let local development and acceptance testing switch between seeded development Users with their own Workspaces and capabilities. | Review, curation, contributor, and owner flows are now central enough that one hard-coded dev user hides behaviour. |
 | Public Dataset Candidate Import | Technical / Governance | Import public USDA-ARS image/XML evidence as Candidate Annotations requiring human review. | This could accelerate dataset growth, but only if provenance and source rights are handled correctly. |
 
 ## Bee Localisation And Dataset Quality
@@ -109,18 +111,17 @@ HiveSight remains the system of record for hive identity, Varroa assessment evid
 | Candidate Slice | Type | Outcome |
 | --- | --- | --- |
 | Modern Candidate Annotation Review Workflow | Business | Replace legacy dataset labelling with a current candidate-review workflow aligned to Model Candidate pre-labelling and public imports. |
-| Training Inspection Workflow Separation | Business / UX | Split Training Data Collection into setup, crop selection, bee annotation, and crop governance stages so long annotation sessions are easier to run and resume. |
+| Training Inspection Workflow Separation Follow-ons | Business / UX | Refine the implemented staged Training Data Collection workflow, especially exact resume position, completion semantics, and productivity improvements. |
 | Annotation Productivity Improvements | Business | Add keyboard shortcuts, bulk accept/reject, better selection, zoom presets, last-saved status, and safer navigation for long annotation sessions. |
 | Crop Bounds Editing After Save | Business / UX | Let a Dataset Curator safely resize or reposition saved Training Crops with clear invalidation rules for annotations, reviews, and Dataset Items. |
 | Inspection Completion Semantics | Business | Define when a Training Data Collection inspection is complete and how incomplete work is reported. |
 | Inspection History And Resume | Business | List inspections for a selected hive, resume recent work, and separate training-data collection from Varroa assessment history. |
 | Resume Exact Training Workflow Position | Business / UX | Resume the exact stage, photo, crop, and editor context from a long-running annotation session once workflow state is stable. |
 | Hive Setup Edit And Rename | Business / Technical | Edit Apiary, Hive, and Hive Configuration safely while preserving historical provenance snapshots. |
-| Dev User Switcher | Technical / UX | Let local testing switch between seeded Users, each with stable identity, default Workspace, and capabilities, before real auth exists. |
 | Auth Boundary Decision | Business / Technical | Decide how external identity providers, HiveSight User records, Workspace Memberships, Contributor Access Scope, and internal capabilities fit together. |
 | First External Login Provider | Business / Technical | Add the first real OpenID Connect login path, likely Google first, with Apple parked as a later provider option. |
 | Workspace Collaboration And Membership Model | Business / Technical | Decide how multiple Users can share one Workspace, and whether one User can later belong to multiple Workspaces. |
-| Reviewer Work Queue | Business / Technical | Let eligible Reviewer Users see shared review work from another User's Workspace without broad Workspace Membership or brittle named assignment. |
+| Reviewer Work Queue Follow-ons | Business / Technical | Extend the implemented Reviewer Work Queue with claiming, multi-reviewer rules, correction workflow, and broader review operations where needed. |
 | Reviewer Correction Workflow | Business / Governance | Let reviewers identify wrong individual annotations, propose corrected geometry/classification, and keep correction provenance separate from the original evidence. |
 | Task-Oriented User Guide Maintenance | Business / Technical | Keep `docs/user-guide.md` aligned with implemented workflows and add a closeout check when slices change user behaviour. |
 
@@ -165,12 +166,12 @@ HiveSight remains the system of record for hive identity, Varroa assessment evid
 
 The likely next tranche should stay model-evidence focused:
 
-1. Add Dev User And Role Switching before the next role-sensitive workflow, so owner, Dataset Curator, Reviewer, Contributor, and unprivileged-user paths can be exercised honestly.
-2. Improve benchmark curation and comparison so model quality claims are not tied to a single training run.
-3. Evaluate Bee Localisation on full-frame evidence before assuming crop-level success transfers.
-4. Add Orientation Reliability and then train/evaluate the first Bee Orientation baseline.
-5. Add Varroa Review Outcome labelling with active negative evidence.
-6. Train and benchmark the first Varroa Detector.
-7. Only then design the first user-facing Varroa assessment result and statistical inference workflow.
+1. Improve benchmark curation and comparison so model quality claims are not tied to a single training run.
+2. Evaluate Bee Localisation on full-frame evidence before assuming crop-level success transfers.
+3. Add Orientation Reliability and then train/evaluate the first Bee Orientation baseline.
+4. Add Varroa Review Outcome labelling with active negative evidence.
+5. Train and benchmark the first Varroa Detector.
+6. Only then design the first user-facing Varroa assessment result and statistical inference workflow.
+7. Add Hive treatment-history and Advisor-integration slices after the first user-facing Varroa result shape is credible enough to produce treatment-relevant evidence.
 
 This order can change if annotation productivity becomes the limiting factor, or if source-rights/contributor governance becomes necessary before using external evidence.
