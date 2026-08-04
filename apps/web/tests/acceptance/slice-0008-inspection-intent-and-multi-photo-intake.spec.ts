@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { fileURLToPath } from "node:url";
+import { createApiaryAndHive } from "./support/setup-workflow";
 
 const fixtureImagePath = fileURLToPath(new URL("../fixtures/bee-frame-test.png", import.meta.url));
 
@@ -16,12 +17,7 @@ test("Beekeeper creates an Inspection with intent and sees repeated photo upload
   await expect(acceptTerms).toContainText("Terms accepted");
 
   const suffix = Date.now().toString();
-  await page.getByTestId("apiary-name-input").fill(`Slice 8 apiary ${suffix}`);
-  await page.getByTestId("create-apiary-button").click();
-  await expect(page.getByTestId("create-hive-button")).toBeEnabled();
-
-  await page.getByTestId("hive-name-input").fill(`Slice 8 hive ${suffix}`);
-  await page.getByTestId("create-hive-button").click();
+  await createApiaryAndHive(page, `Slice 8 apiary ${suffix}`, `Slice 8 hive ${suffix}`);
   await expect(page.getByTestId("create-inspection-button")).toBeEnabled();
 
   await page.getByTestId("inspection-date-input").fill("2026-07-29");
@@ -54,10 +50,7 @@ test("Training-data collection intent exposes crop annotation instead of analysi
   await expect(acceptTerms).toContainText("Terms accepted");
 
   const suffix = Date.now().toString();
-  await page.getByTestId("apiary-name-input").fill(`Training apiary ${suffix}`);
-  await page.getByTestId("create-apiary-button").click();
-  await page.getByTestId("hive-name-input").fill(`Training hive ${suffix}`);
-  await page.getByTestId("create-hive-button").click();
+  await createApiaryAndHive(page, `Training apiary ${suffix}`, `Training hive ${suffix}`);
 
   await page.getByTestId("inspection-date-input").fill("2026-07-29");
   await page.getByTestId("inspection-intent-select").selectOption("training_data_collection");

@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { createApiary } from "./support/setup-workflow";
 
 test("Beekeeper records Hive Configuration before creating an Inspection", async ({ page }) => {
   await page.goto("/");
@@ -11,8 +12,7 @@ test("Beekeeper records Hive Configuration before creating an Inspection", async
   await expect(acceptTerms).toContainText("Terms accepted");
 
   const suffix = Date.now().toString();
-  await page.getByTestId("apiary-name-input").fill(`Slice 12 apiary ${suffix}`);
-  await page.getByTestId("create-apiary-button").click();
+  await createApiary(page, `Slice 12 apiary ${suffix}`);
 
   await expect(page.getByTestId("hive-configuration-frame-standard-select")).toBeVisible();
   await page

@@ -133,8 +133,8 @@ h1 {
 .workspace-panel,
 .workflow-panel,
 .loading-panel,
-.stacked-form,
-.upload-panel {
+.upload-panel,
+.setup-context-panel {
   background: #ffffff;
   border: 1px solid #dce2d7;
   border-radius: 8px;
@@ -262,17 +262,121 @@ h1 {
   color: #24592d;
 }
 
-.form-grid {
+.inspection-workspace-layout {
   display: grid;
-  gap: 14px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  grid-template-columns: minmax(180px, 260px) minmax(260px, 0.9fr) minmax(320px, 1.25fr);
 }
 
-.stacked-form,
-.upload-panel {
+.upload-panel,
+.setup-context-panel {
   display: grid;
   gap: 12px;
   padding: 16px;
+}
+
+.primary-workflow-panel {
+  align-content: start;
+}
+
+.setup-context-header {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.setup-context-header .panel-heading {
+  margin-bottom: 0;
+}
+
+.compact-action {
+  min-height: 34px;
+  padding: 6px 10px;
+}
+
+.selected-context {
+  background: #f7f9f5;
+  border: 1px solid #dce2d7;
+  border-radius: 6px;
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+}
+
+.selected-context span {
+  color: #626a5f;
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.selection-list,
+.inspection-list {
+  display: grid;
+  gap: 8px;
+}
+
+.selection-list.compact {
+  gap: 6px;
+}
+
+.selection-list button,
+.inspection-list button {
+  align-items: center;
+  background: #ffffff;
+  border-color: #dce2d7;
+  display: grid;
+  gap: 4px;
+  justify-items: start;
+  min-height: 44px;
+  padding: 10px;
+  text-align: left;
+  width: 100%;
+}
+
+.selection-list button.selected,
+.inspection-list button.selected {
+  background: #eaf7ec;
+  border-color: #9fd3a8;
+  color: #24592d;
+}
+
+.selection-list button strong,
+.inspection-list button span:last-child {
+  color: #626a5f;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.inspection-list button {
+  grid-template-columns: minmax(92px, auto) minmax(0, 1fr) auto;
+}
+
+.inspection-list button span {
+  overflow-wrap: anywhere;
+}
+
+.inline-setup-form {
+  background: #fbfcfa;
+  border: 1px solid #e8ece4;
+  border-radius: 6px;
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+}
+
+.hive-setup-form,
+.inspection-create-form {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.hive-setup-form .compact-facts,
+.hive-setup-form label:has(textarea) {
+  grid-column: 1 / -1;
+}
+
+.inspection-create-form button {
+  align-self: end;
 }
 
 label {
@@ -1608,8 +1712,10 @@ label span {
 
 @media (max-width: 980px) {
   .intake-layout,
-  .form-grid,
+  .inspection-workspace-layout,
   .upload-panel,
+  .hive-setup-form,
+  .inspection-create-form,
   .result-grid,
   .metadata-panel,
   .review-panel,
@@ -1629,6 +1735,14 @@ label span {
   .crop-governance-layout,
   .control-cluster {
     grid-template-columns: 1fr;
+  }
+
+  .inspection-list button {
+    grid-template-columns: 1fr;
+  }
+
+  .workflow-panel {
+    order: -1;
   }
 
   .evidence-heading {

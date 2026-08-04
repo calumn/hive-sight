@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { fileURLToPath } from "node:url";
+import { createApiaryAndHive } from "./support/setup-workflow";
 
 const fixtureImagePath = fileURLToPath(new URL("../fixtures/bee-frame-test.png", import.meta.url));
 
@@ -14,12 +15,7 @@ test("Reviewer records an annotation Review Decision", async ({ page }) => {
   await expect(acceptTerms).toContainText("Terms accepted");
 
   const suffix = Date.now().toString();
-  await page.getByTestId("apiary-name-input").fill(`Acceptance apiary ${suffix}`);
-  await page.getByTestId("create-apiary-button").click();
-  await expect(page.getByTestId("create-hive-button")).toBeEnabled();
-
-  await page.getByTestId("hive-name-input").fill(`Hive ${suffix}`);
-  await page.getByTestId("create-hive-button").click();
+  await createApiaryAndHive(page, `Acceptance apiary ${suffix}`, `Hive ${suffix}`);
   await expect(page.getByTestId("create-inspection-button")).toBeEnabled();
 
   await page.getByTestId("inspection-date-input").fill("2026-07-29");

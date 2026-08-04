@@ -203,6 +203,8 @@ export function App() {
   } | null>(null);
   const [apiaryName, setApiaryName] = useState("Home apiary");
   const [hiveName, setHiveName] = useState("Hive A");
+  const [showApiarySetup, setShowApiarySetup] = useState(false);
+  const [showHiveSetup, setShowHiveSetup] = useState(false);
   const [inspectionDate, setInspectionDate] = useState(new Date().toISOString().slice(0, 10));
   const [inspectionIntent, setInspectionIntent] =
     useState<InspectionIntent>("training_data_collection");
@@ -312,6 +314,8 @@ export function App() {
   const canUpload = Boolean(termsAccepted && inspection && file);
   const isTrainingDataCollection = inspection?.intent === "training_data_collection";
   const isVarroaAssessment = inspection?.intent === "varroa_assessment";
+  const showApiarySetupForm = showApiarySetup || apiaries.length === 0;
+  const showHiveSetupForm = showHiveSetup || Boolean(apiary && hives.length === 0);
   const showTrainingCropPanel = Boolean(
     isTrainingDataCollection && session?.datasetCuratorCapability
   );
@@ -415,6 +419,7 @@ export function App() {
     }
     await runAction("Selecting apiary", async () => {
       setApiary(selectedApiary);
+      setShowHiveSetup(false);
       await refreshHivesForApiary(session.workspaceId, selectedApiary);
     });
   }
@@ -532,6 +537,7 @@ export function App() {
         workspaceId: session.workspaceId,
         name: apiaryName
       });
+      setShowApiarySetup(false);
       await refreshWorkspaceContext(session.workspaceId, created.apiaryId);
     });
   }
@@ -552,6 +558,7 @@ export function App() {
       });
       setHive(created);
       setHiveConfiguration(configuration);
+      setShowHiveSetup(false);
       await refreshHivesForApiary(created.workspaceId, apiary, created.hiveId);
     });
   }
@@ -874,6 +881,8 @@ export function App() {
     setHives([]);
     setHive(null);
     setHiveConfiguration(null);
+    setShowApiarySetup(false);
+    setShowHiveSetup(false);
     setTrainingInspections([]);
     setInspection(null);
     setInspectionPhotos([]);
@@ -1031,137 +1040,112 @@ export function App() {
               />
             ) : (
               <>
-            <div className="form-grid">
-              <form className="stacked-form" onSubmit={onCreateApiary}>
-                <PanelHeading icon={<Plus size={20} />} title="Apiary" />
-                {apiaries.length > 0 ? (
-                  <label>
-                    <span>Selected Apiary</span>
-                    <select
-                      value={apiary?.apiaryId ?? ""}
-                      onChange={(event) => void onSelectApiary(event.target.value)}
+            <div className="inspection-workspace-layout">
+              <section className="setup-context-panel" data-testid="apiary-context-panel">
+                <div className="setup-context-header">
+                  <PanelHeading icon={<Check size={20} />} title="Apiary" />
+                  {apiaries.length > 0 ? (
+                    <button
+                      type="button"
+                      className="compact-action"
+                      onClick={() => setShowApiarySetup((current) => !current)}
                       disabled={actionState.kind === "working"}
-                      data-testid="apiary-select"
+                      data-testid="show-apiary-setup-button"
                     >
-                      {apiaries.map((candidate) => (
-                        <option key={candidate.apiaryId} value={candidate.apiaryId}>
-                          {candidate.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                      <Plus size={18} />
+                      Add apiary
+                    </button>
+                  ) : null}
+                </div>
+                {apiary ? (
+                  <div className="selected-context" data-testid="selected-apiary-summary">
+                    <strong>{apiary.name}</strong>
+                    <span>{apiaries.length} apiar{apiaries.length === 1 ? "y" : "ies"}</span>
+                  </div>
                 ) : (
                   <p className="setup-copy" data-testid="apiary-empty-state">
                     Add an Apiary to start organising Hives in this Workspace.
                   </p>
                 )}
-                <label>
-                  <span>{apiaries.length > 0 ? "New Apiary name" : "Name"}</span>
-                <input
-                  value={apiaryName}
-                  onChange={(event) => setApiaryName(event.target.value)}
-                  required
-                  data-testid="apiary-name-input"
-                />
-                </label>
-                <button
-                  type="submit"
-                  disabled={actionState.kind === "working"}
-                  data-testid="create-apiary-button"
-                >
-                  {apiaries.length > 0 ? "Add apiary" : "Create apiary"}
-                </button>
-                <RecordBadge value={apiary?.apiaryId} />
-              </form>
+                {apiaries.length > 1 ? (
+                  <div className="selection-list compact" data-testid="apiary-list">
+                    {apiaries.map((candidate) => (
+                      <button
+                        key={candidate.apiaryId}
+                        type="button"
+                        className={candidate.apiaryId === apiary?.apiaryId ? "selected" : ""}
+                        onClick={() => void onSelectApiary(candidate.apiaryId)}
+                        disabled={actionState.kind === "working"}
+                        data-testid="apiary-list-item"
+                      >
+                        <span>{candidate.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+                {showApiarySetupForm ? (
+                  <form className="inline-setup-form" onSubmit={onCreateApiary} data-testid="apiary-setup-form">
+                    <label>
+                      <span>{apiaries.length > 0 ? "New Apiary name" : "Name"}</span>
+                      <input
+                        value={apiaryName}
+                        onChange={(event) => setApiaryName(event.target.value)}
+                        required
+                        data-testid="apiary-name-input"
+                      />
+                    </label>
+                    <button
+                      type="submit"
+                      disabled={actionState.kind === "working"}
+                      data-testid="create-apiary-button"
+                    >
+                      {apiaries.length > 0 ? "Add apiary" : "Create apiary"}
+                    </button>
+                  </form>
+                ) : null}
+              </section>
 
-              <form className="stacked-form" onSubmit={onCreateHive}>
-                <PanelHeading icon={<Plus size={20} />} title="Hive Configuration" />
+              <section className="setup-context-panel primary-workflow-panel">
+                <div className="setup-context-header">
+                  <PanelHeading icon={<Plus size={20} />} title="Hives" />
+                  {apiary && hives.length > 0 ? (
+                    <button
+                      type="button"
+                      className="compact-action"
+                      onClick={() => setShowHiveSetup((current) => !current)}
+                      disabled={actionState.kind === "working"}
+                      data-testid="show-hive-setup-button"
+                    >
+                      <Plus size={18} />
+                      Add hive
+                    </button>
+                  ) : null}
+                </div>
                 {!apiary ? (
                   <p className="setup-copy" data-testid="hive-empty-state">
                     Select or add an Apiary before adding a Hive.
                   </p>
                 ) : hives.length > 0 ? (
-                  <label>
-                    <span>Selected Hive</span>
-                    <select
-                      value={hive?.hiveId ?? ""}
-                      onChange={(event) => void onSelectHive(event.target.value)}
-                      disabled={actionState.kind === "working"}
-                      data-testid="hive-select"
-                    >
-                      {hives.map((candidate) => (
-                        <option key={candidate.hiveId} value={candidate.hiveId}>
-                          {candidate.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                  <div className="selection-list hive-list" data-testid="hive-list">
+                    {hives.map((candidate) => (
+                      <button
+                        key={candidate.hiveId}
+                        type="button"
+                        className={candidate.hiveId === hive?.hiveId ? "selected" : ""}
+                        onClick={() => void onSelectHive(candidate.hiveId)}
+                        disabled={actionState.kind === "working"}
+                        data-testid="hive-list-item"
+                      >
+                        <span>{candidate.name}</span>
+                        {candidate.hiveId === hive?.hiveId ? <strong>Selected</strong> : null}
+                      </button>
+                    ))}
+                  </div>
                 ) : (
                   <p className="setup-copy" data-testid="hive-empty-state">
                     Add a Hive and its frame context before creating Inspections.
                   </p>
                 )}
-                <label>
-                  <span>{hives.length > 0 ? "New Hive name" : "Name"}</span>
-                <input
-                  value={hiveName}
-                  onChange={(event) => setHiveName(event.target.value)}
-                  required
-                  data-testid="hive-name-input"
-                />
-                </label>
-                <label>
-                  <span>Frame Standard</span>
-                  <select
-                    value={selectedFrameStandardId}
-                    onChange={(event) => setSelectedFrameStandardId(event.target.value)}
-                    required
-                    data-testid="hive-configuration-frame-standard-select"
-                  >
-                    {frameStandards.map((standard) => (
-                      <option key={standard.frameStandardId} value={standard.frameStandardId}>
-                        {standard.displayName}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                {selectedFrameStandard ? (
-                  <dl
-                    className="compact-facts"
-                    data-testid="hive-configuration-dimensions"
-                  >
-                    <div>
-                      <dt>Top bar</dt>
-                      <dd>{formatFrameStandardDimension(selectedFrameStandard.topBarLengthMm)}</dd>
-                    </div>
-                    <div>
-                      <dt>Bottom bar</dt>
-                      <dd>{formatFrameStandardDimension(selectedFrameStandard.bottomBarLengthMm)}</dd>
-                    </div>
-                    <div>
-                      <dt>Side bar</dt>
-                      <dd>{formatFrameStandardDimension(selectedFrameStandard.sideBarHeightMm)}</dd>
-                    </div>
-                  </dl>
-                ) : null}
-                <label>
-                  <span>{hiveConfigurationNotesRequired ? "Notes required" : "Notes"}</span>
-                  <textarea
-                    value={hiveConfigurationNotes}
-                    onChange={(event) => setHiveConfigurationNotes(event.target.value)}
-                    required={hiveConfigurationNotesRequired}
-                    rows={3}
-                    data-testid="hive-configuration-notes-input"
-                  />
-                </label>
-                <button
-                  type="submit"
-                  disabled={!canCreateHive || actionState.kind === "working"}
-                  data-testid="create-hive-button"
-                >
-                  {hives.length > 0 ? "Add hive" : "Create hive"}
-                </button>
-                <RecordBadge value={hive?.hiveId} />
                 {hiveConfiguration ? (
                   <p className="intent-badge" data-testid="hive-configuration-state">
                     {hiveConfiguration.frameStandard.displayName}
@@ -1171,68 +1155,134 @@ export function App() {
                     Hive Configuration is needed before this Hive can be used for Inspections.
                   </p>
                 ) : null}
-              </form>
-
-              <form className="stacked-form" onSubmit={onCreateInspection}>
-                <PanelHeading icon={<Plus size={20} />} title="Inspection" />
-                {hive && trainingInspections.length > 0 ? (
-                  <label>
-                    <span>Resume Training Inspection</span>
-                    <select
-                      value={inspection?.inspectionId ?? ""}
-                      onChange={(event) => void onSelectTrainingInspection(event.target.value)}
-                      disabled={actionState.kind === "working"}
-                      data-testid="resume-training-inspection-select"
+                {showHiveSetupForm ? (
+                  <form className="inline-setup-form hive-setup-form" onSubmit={onCreateHive} data-testid="hive-setup-form">
+                    <label>
+                      <span>{hives.length > 0 ? "New Hive name" : "Name"}</span>
+                      <input
+                        value={hiveName}
+                        onChange={(event) => setHiveName(event.target.value)}
+                        required
+                        data-testid="hive-name-input"
+                      />
+                    </label>
+                    <label>
+                      <span>Frame Standard</span>
+                      <select
+                        value={selectedFrameStandardId}
+                        onChange={(event) => setSelectedFrameStandardId(event.target.value)}
+                        required
+                        data-testid="hive-configuration-frame-standard-select"
+                      >
+                        {frameStandards.map((standard) => (
+                          <option key={standard.frameStandardId} value={standard.frameStandardId}>
+                            {standard.displayName}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    {selectedFrameStandard ? (
+                      <dl
+                        className="compact-facts"
+                        data-testid="hive-configuration-dimensions"
+                      >
+                        <div>
+                          <dt>Top bar</dt>
+                          <dd>{formatFrameStandardDimension(selectedFrameStandard.topBarLengthMm)}</dd>
+                        </div>
+                        <div>
+                          <dt>Bottom bar</dt>
+                          <dd>{formatFrameStandardDimension(selectedFrameStandard.bottomBarLengthMm)}</dd>
+                        </div>
+                        <div>
+                          <dt>Side bar</dt>
+                          <dd>{formatFrameStandardDimension(selectedFrameStandard.sideBarHeightMm)}</dd>
+                        </div>
+                      </dl>
+                    ) : null}
+                    <label>
+                      <span>{hiveConfigurationNotesRequired ? "Notes required" : "Notes"}</span>
+                      <textarea
+                        value={hiveConfigurationNotes}
+                        onChange={(event) => setHiveConfigurationNotes(event.target.value)}
+                        required={hiveConfigurationNotesRequired}
+                        rows={3}
+                        data-testid="hive-configuration-notes-input"
+                      />
+                    </label>
+                    <button
+                      type="submit"
+                      disabled={!canCreateHive || actionState.kind === "working"}
+                      data-testid="create-hive-button"
                     >
-                      {trainingInspections.map((candidate) => (
-                        <option key={candidate.inspectionId} value={candidate.inspectionId}>
-                          {formatInspectionOption(candidate)}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                      {hives.length > 0 ? "Add hive" : "Create hive"}
+                    </button>
+                  </form>
+                ) : null}
+              </section>
+
+              <section className="setup-context-panel primary-workflow-panel">
+                <PanelHeading icon={<Plus size={20} />} title="Inspections" />
+                {hive && trainingInspections.length > 0 ? (
+                  <div className="inspection-list" data-testid="inspection-list">
+                    {trainingInspections.map((candidate) => (
+                      <button
+                        key={candidate.inspectionId}
+                        type="button"
+                        className={candidate.inspectionId === inspection?.inspectionId ? "selected" : ""}
+                        onClick={() => void onSelectTrainingInspection(candidate.inspectionId)}
+                        disabled={actionState.kind === "working"}
+                        data-testid="inspection-list-item"
+                      >
+                        <strong>{candidate.inspectionDate}</strong>
+                        <span>{formatInspectionIntent(candidate.intent)}</span>
+                        <span>{formatInspectionStatus(candidate, inspection, inspectionPhotos)}</span>
+                      </button>
+                    ))}
+                  </div>
                 ) : hive ? (
                   <p className="setup-copy" data-testid="resume-training-inspection-empty-state">
                     No Training Data Collection Inspections to resume for this Hive.
                   </p>
                 ) : null}
-                <label>
-                  <span>Date</span>
-                  <input
-                    type="date"
-                  value={inspectionDate}
-                  onChange={(event) => setInspectionDate(event.target.value)}
-                  required
-                  data-testid="inspection-date-input"
-                />
-                </label>
-                <label>
-                  <span>Intent</span>
-                  <select
-                    value={inspectionIntent}
-                    onChange={(event) =>
-                      setInspectionIntent(event.target.value as InspectionIntent)
-                    }
-                    data-testid="inspection-intent-select"
+                <form className="inline-setup-form inspection-create-form" onSubmit={onCreateInspection}>
+                  <label>
+                    <span>Date</span>
+                    <input
+                      type="date"
+                      value={inspectionDate}
+                      onChange={(event) => setInspectionDate(event.target.value)}
+                      required
+                      data-testid="inspection-date-input"
+                    />
+                  </label>
+                  <label>
+                    <span>Intent</span>
+                    <select
+                      value={inspectionIntent}
+                      onChange={(event) =>
+                        setInspectionIntent(event.target.value as InspectionIntent)
+                      }
+                      data-testid="inspection-intent-select"
+                    >
+                      <option value="varroa_assessment">Varroa assessment</option>
+                      <option value="training_data_collection">Training data collection</option>
+                    </select>
+                  </label>
+                  <button
+                    type="submit"
+                    disabled={!canCreateInspection || actionState.kind === "working"}
+                    data-testid="create-inspection-button"
                   >
-                    <option value="varroa_assessment">Varroa assessment</option>
-                    <option value="training_data_collection">Training data collection</option>
-                  </select>
-                </label>
-                <button
-                  type="submit"
-                  disabled={!canCreateInspection || actionState.kind === "working"}
-                  data-testid="create-inspection-button"
-                >
-                  Create inspection
-                </button>
-                <RecordBadge value={inspection?.inspectionId} />
+                    Create inspection
+                  </button>
+                </form>
                 {inspection ? (
                   <p className="intent-badge" data-testid="inspection-intent-badge">
-                    {formatInspectionIntent(inspection.intent)}
+                    {formatInspectionIntent(inspection.intent)} / {formatInspectionStatus(inspection, inspection, inspectionPhotos)}
                   </p>
                 ) : null}
-              </form>
+              </section>
             </div>
 
             <form className="upload-panel" onSubmit={onUpload}>
@@ -1447,8 +1497,17 @@ function formatInspectionIntent(intent: InspectionIntent) {
   return intent === "training_data_collection" ? "Training data collection" : "Varroa assessment";
 }
 
-function formatInspectionOption(inspection: Inspection) {
-  return `${inspection.inspectionDate} / ${formatInspectionIntent(inspection.intent)} / ${inspection.inspectionId.slice(0, 8)}`;
+function formatInspectionStatus(
+  inspection: Inspection,
+  selectedInspection: Inspection | null,
+  selectedInspectionPhotos: InspectionPhoto[]
+) {
+  if (inspection.inspectionId !== selectedInspection?.inspectionId) {
+    return "Saved";
+  }
+  return selectedInspectionPhotos.length > 0
+    ? `${selectedInspectionPhotos.length} photo${selectedInspectionPhotos.length === 1 ? "" : "s"}`
+    : "No photos";
 }
 
 function sortInspectionsNewestFirst(inspections: Inspection[]) {

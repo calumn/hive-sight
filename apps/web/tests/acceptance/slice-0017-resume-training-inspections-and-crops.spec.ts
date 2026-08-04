@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { fileURLToPath } from "node:url";
+import { createApiaryAndHive } from "./support/setup-workflow";
 
 const fixtureImagePath = fileURLToPath(new URL("../fixtures/bee-frame-test.png", import.meta.url));
 
@@ -19,17 +20,14 @@ test("Dataset Curator resumes saved Training Inspection crops and ellipses after
   const apiaryName = ` Slice 17 apiary ${suffix}`;
   const hiveName = ` Slice 17 hive ${suffix}`;
 
-  await page.getByTestId("apiary-name-input").fill(apiaryName);
-  await page.getByTestId("create-apiary-button").click();
-  await page.getByTestId("hive-name-input").fill(hiveName);
-  await page.getByTestId("create-hive-button").click();
+  await createApiaryAndHive(page, apiaryName, hiveName);
 
   await page.getByTestId("inspection-date-input").fill("2026-07-31");
   await page.getByTestId("inspection-intent-select").selectOption("training_data_collection");
   await page.getByTestId("create-inspection-button").click();
-  await expect(page.getByTestId("resume-training-inspection-select")).toContainText(
-    "2026-07-31 / Training data collection"
-  );
+  await expect(page.getByTestId("inspection-list")).toContainText("2026-07-31");
+  await expect(page.getByTestId("inspection-list")).toContainText("Training data collection");
+  await expect(page.getByTestId("inspection-list")).toContainText("No photos");
 
   await page.getByTestId("inspection-photo-input").setInputFiles(fixtureImagePath);
   await page.getByTestId("upload-photo-button").click();
@@ -44,11 +42,11 @@ test("Dataset Curator resumes saved Training Inspection crops and ellipses after
 
   await page.reload();
   await expect(page.getByText("core-api online")).toBeVisible();
-  await expect(page.getByTestId("apiary-select")).toContainText(apiaryName);
-  await expect(page.getByTestId("hive-select")).toContainText(hiveName);
-  await expect(page.getByTestId("resume-training-inspection-select")).toContainText(
-    "2026-07-31 / Training data collection"
-  );
+  await expect(page.getByTestId("selected-apiary-summary")).toContainText(apiaryName);
+  await expect(page.getByTestId("hive-list")).toContainText(hiveName);
+  await expect(page.getByTestId("inspection-list")).toContainText("2026-07-31");
+  await expect(page.getByTestId("inspection-list")).toContainText("Training data collection");
+  await expect(page.getByTestId("inspection-list")).toContainText("1 photo");
   await expect(page.getByTestId("inspection-photo-list")).toContainText("bee-frame-test.png");
   await expect(page.getByTestId("training-crop-panel")).toBeVisible();
   await expect(page.getByTestId("training-crop-list-item")).toContainText("review_pending");

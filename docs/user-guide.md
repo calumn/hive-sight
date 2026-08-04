@@ -75,12 +75,11 @@ Use this when you want to upload frame photos and create Training Crops for bee 
 
 1. Open the Web UI.
 2. Accept the Workspace Data Use Agreement if prompted.
-3. Select an existing Apiary, or create one.
-4. Select an existing Hive, or create one.
-5. Make sure the Hive has a Hive Configuration and Frame Standard.
-6. Create an Inspection with intent `Training data collection`.
-7. If an earlier Training Inspection exists, choose it from `Resume Training Inspection`.
-8. Use the workflow stage buttons to move between `Inspection Setup`, `Crop Selection`, `Bee Annotation`, `Crop Governance`, and `Model Governance`.
+3. Confirm the loaded Apiary. If you need another one, click `Add apiary`.
+4. Pick the Hive from the Hive list. If you need another one, click `Add hive` and record its Frame Standard.
+5. Use the Inspection list to resume earlier Training Data Collection work for the selected Hive.
+6. Create a new Inspection with intent `Training data collection` when no existing Inspection is the right one.
+7. Use the workflow stage buttons to move between `Inspection Setup`, `Crop Selection`, `Bee Annotation`, `Crop Governance`, and `Model Governance`.
 
 Training-data collection inspections show the Training Crop workflow. Varroa assessment inspections do not.
 

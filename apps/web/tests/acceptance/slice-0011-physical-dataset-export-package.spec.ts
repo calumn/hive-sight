@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { fileURLToPath } from "node:url";
+import { createApiaryAndHive } from "./support/setup-workflow";
 
 const fixtureImagePath = fileURLToPath(new URL("../fixtures/bee-frame-test.png", import.meta.url));
 
@@ -16,10 +17,7 @@ test("Dataset Curator creates a physical YOLO OBB package from a completed Train
   await expect(acceptTerms).toContainText("Terms accepted");
 
   const suffix = Date.now().toString();
-  await page.getByTestId("apiary-name-input").fill(`Slice 11 apiary ${suffix}`);
-  await page.getByTestId("create-apiary-button").click();
-  await page.getByTestId("hive-name-input").fill(`Slice 11 hive ${suffix}`);
-  await page.getByTestId("create-hive-button").click();
+  await createApiaryAndHive(page, `Slice 11 apiary ${suffix}`, `Slice 11 hive ${suffix}`);
 
   await page.getByTestId("inspection-date-input").fill("2026-07-30");
   await page.getByTestId("inspection-intent-select").selectOption("training_data_collection");

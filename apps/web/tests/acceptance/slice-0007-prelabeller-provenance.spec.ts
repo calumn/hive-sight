@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { fileURLToPath } from "node:url";
+import { createApiaryAndHive } from "./support/setup-workflow";
 
 const fixtureImagePath = fileURLToPath(new URL("../fixtures/bee-frame-test.png", import.meta.url));
 
@@ -16,12 +17,7 @@ test.skip("Dataset Curator sees pre-labelling helper provenance before reviewing
   await expect(acceptTerms).toContainText("Terms accepted");
 
   const suffix = Date.now().toString();
-  await page.getByTestId("apiary-name-input").fill(`Prelabel apiary ${suffix}`);
-  await page.getByTestId("create-apiary-button").click();
-  await expect(page.getByTestId("create-hive-button")).toBeEnabled();
-
-  await page.getByTestId("hive-name-input").fill(`Prelabel hive ${suffix}`);
-  await page.getByTestId("create-hive-button").click();
+  await createApiaryAndHive(page, `Prelabel apiary ${suffix}`, `Prelabel hive ${suffix}`);
   await expect(page.getByTestId("create-inspection-button")).toBeEnabled();
 
   await page.getByTestId("inspection-date-input").fill("2026-07-29");
