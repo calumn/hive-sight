@@ -78,6 +78,46 @@ def test_analysis_result_detail_is_not_visible_across_workspaces() -> None:
         app.dependency_overrides.clear()
 
 
+def test_inspection_analysis_runs_can_be_listed_for_resume() -> None:
+    state = build_dev_state(
+        id_values=[
+            UUID("00000000-0000-0000-0000-000000000021"),
+            UUID("00000000-0000-0000-0000-000000000022"),
+            UUID("00000000-0000-0000-0000-000000000023"),
+            UUID("00000000-0000-0000-0000-000000000024"),
+            UUID("00000000-0000-0000-0000-000000000025"),
+            UUID("00000000-0000-0000-0000-000000000026"),
+        ],
+    )
+    app.dependency_overrides[get_dev_state] = lambda: state
+    client = TestClient(app)
+
+    try:
+        workspace_id, analysis_run_id = _create_queued_analysis_run(client)
+        analysis_run = state.store.get_analysis_run(UUID(analysis_run_id))
+        assert analysis_run is not None
+        photo = state.store.get_inspection_photo(analysis_run.inspection_photo_id)
+        assert photo is not None
+        client.post(
+            f"/v1/analysis-runs/{analysis_run_id}/process",
+            json={"workspace_id": workspace_id},
+            headers={"x-hivesight-dev-user-id": str(USER_ID)},
+        )
+
+        response = client.get(
+            f"/v1/inspections/{photo.inspection_id}/analysis-runs?workspace_id={workspace_id}",
+            headers={"x-hivesight-dev-user-id": str(USER_ID)},
+        )
+
+        assert response.status_code == 200
+        body = response.json()
+        assert [run["analysis_run_id"] for run in body["analysis_runs"]] == [analysis_run_id]
+        assert body["analysis_runs"][0]["status"] == "completed"
+        assert body["analysis_runs"][0]["analysis_result"]["complete_visible_bee_count"] == 3
+    finally:
+        app.dependency_overrides.clear()
+
+
 def test_analysis_evidence_returns_original_photo_reference_and_bee_annotations() -> None:
     state = build_dev_state(
         id_values=[

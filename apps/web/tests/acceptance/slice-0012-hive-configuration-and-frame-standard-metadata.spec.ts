@@ -42,9 +42,9 @@ test("Beekeeper configures an existing Hive before creating an Inspection", asyn
 
   await page
     .getByTestId("development-user-select")
-    .selectOption("00000000-0000-0000-0000-000000000103");
-  await expect(page.getByTestId("development-user-code")).toContainText("OWNER-B");
-  await expect(page.getByTestId("hive-list")).toContainText("Owner B Hive");
+    .selectOption("00000000-0000-0000-0000-000000000102");
+  await expect(page.getByTestId("development-user-code")).toContainText("OWNER-A");
+  await expect(page.getByTestId("hive-list")).toContainText("Owner A Hive");
   await expect(page.getByTestId("hive-configuration-state")).toContainText(
     "Hive Configuration is needed"
   );

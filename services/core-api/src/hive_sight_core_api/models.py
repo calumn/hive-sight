@@ -436,6 +436,10 @@ class AnalysisRunDetailResponse(BaseModel):
     analysis_result: AnalysisResultResponse | None = None
 
 
+class AnalysisRunDetailListResponse(BaseModel):
+    analysis_runs: list[AnalysisRunDetailResponse]
+
+
 class InspectionPhotoEvidenceResponse(BaseModel):
     inspection_photo_id: UUID
     filename: str

@@ -43,6 +43,7 @@ from hive_sight_core_api.inspection_photo_access import InspectionPhotoAccess
 from hive_sight_core_api.review_queue_workflow import ReviewQueueWorkflow
 from hive_sight_core_api.models import (
     AnalysisEvidenceResponse,
+    AnalysisRunDetailListResponse,
     AnalysisRunDetailResponse,
     AnalysisRunRequest,
     AnalysisRunResponse,
@@ -465,6 +466,23 @@ def get_analysis_run_detail(
         user=user,
         workspace_id=workspace_id,
         analysis_run_id=analysis_run_id,
+    )
+
+
+@app.get(
+    "/v1/inspections/{inspection_id}/analysis-runs",
+    response_model=AnalysisRunDetailListResponse,
+)
+def list_inspection_analysis_runs(
+    inspection_id: UUID,
+    workspace_id: UUID,
+    user: AuthenticatedUserDep,
+    workflow: AnalysisProcessingWorkflowDep,
+) -> AnalysisRunDetailListResponse:
+    return workflow.list_inspection_analysis_runs(
+        user=user,
+        workspace_id=workspace_id,
+        inspection_id=inspection_id,
     )
 
 

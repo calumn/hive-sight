@@ -64,6 +64,7 @@ import {
   fetchHiveConfiguration,
   fetchHives,
   fetchHiveInspections,
+  fetchInspectionAnalysisRuns,
   fetchInspectionPhotos,
   fetchInspectionPhotoObjectUrl,
   fetchBenchmarkEvaluationReadiness,
@@ -467,8 +468,7 @@ export function App() {
     const listing = await fetchHiveInspections({
       devUserId: activeDevUserId,
       workspaceId,
-      hiveId: selectedHive.hiveId,
-      intent: "training_data_collection"
+      hiveId: selectedHive.hiveId
     });
     setTrainingInspections(listing.inspections);
     const nextInspection =
@@ -505,10 +505,51 @@ export function App() {
     });
     setInspection(listing.inspection);
     setInspectionPhotos(listing.photos);
+    await restoreAnalysisForInspection(workspaceId, listing.inspection, activeDevUserId);
     if (scrollToCrops && listing.photos.length > 0 && selectedInspection.intent === "training_data_collection") {
       window.setTimeout(() => {
         trainingCropPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       }, 0);
+    }
+  }
+
+  async function restoreAnalysisForInspection(
+    workspaceId: string,
+    selectedInspection: Inspection,
+    activeDevUserId = devUserId
+  ) {
+    if (selectedInspection.intent !== "varroa_assessment") {
+      return;
+    }
+    const runs = await fetchInspectionAnalysisRuns({
+      devUserId: activeDevUserId,
+      workspaceId,
+      inspectionId: selectedInspection.inspectionId
+    });
+    const latestRun = [...runs.analysisRuns].reverse().find((run) => run.status === "completed") ??
+      runs.analysisRuns.at(-1) ??
+      null;
+    if (!latestRun) {
+      return;
+    }
+    setAnalysisDetail(latestRun);
+    if (latestRun.status === "completed") {
+      const evidence = await fetchAnalysisEvidence({
+        devUserId: activeDevUserId,
+        workspaceId,
+        analysisRunId: latestRun.analysisRunId
+      });
+      const nextImageUrl = await fetchInspectionPhotoObjectUrl({
+        devUserId: activeDevUserId,
+        viewUrl: evidence.inspectionPhoto.viewUrl
+      });
+      setAnalysisEvidence(evidence);
+      setEvidenceImageUrl((current) => {
+        if (current) {
+          URL.revokeObjectURL(current);
+        }
+        return nextImageUrl;
+      });
     }
   }
 
@@ -522,7 +563,7 @@ export function App() {
     if (!selectedInspection) {
       return;
     }
-    await runAction("Resuming Training Inspection", async () => {
+    await runAction("Resuming inspection", async () => {
       await selectInspection(session.workspaceId, selectedInspection, true);
     });
   }
@@ -610,27 +651,19 @@ export function App() {
         inspectionDate,
         intent: inspectionIntent
       });
-      if (hive && created.intent === "training_data_collection") {
-        setInspection(created);
-        setInspectionPhotos([]);
-        setAnalysisDetail(null);
-        clearEvidenceImage();
-        clearLabellingImage();
-        setTrainingInspections((current) =>
-          sortInspectionsNewestFirst([
-            created,
-            ...current.filter(
-              (candidate) => candidate.inspectionId !== created.inspectionId
-            )
-          ])
-        );
-      } else {
-        setInspection(created);
-        setInspectionPhotos([]);
-        setAnalysisDetail(null);
-        clearEvidenceImage();
-        clearLabellingImage();
-      }
+      setInspection(created);
+      setInspectionPhotos([]);
+      setAnalysisDetail(null);
+      clearEvidenceImage();
+      clearLabellingImage();
+      setTrainingInspections((current) =>
+        sortInspectionsNewestFirst([
+          created,
+          ...current.filter(
+            (candidate) => candidate.inspectionId !== created.inspectionId
+          )
+        ])
+      );
     });
   }
 
@@ -669,22 +702,28 @@ export function App() {
   }
 
   async function onProcessAnalysis() {
-    if (!session || actionState.kind !== "accepted") {
+    if (!session || (!inspection && actionState.kind !== "accepted")) {
       return;
     }
-    const acceptedIntake = actionState.intake;
+    const analysisRunId =
+      actionState.kind === "accepted"
+        ? actionState.intake.analysisRun.analysisRunId
+        : analysisDetail?.analysisRunId;
+    if (!analysisRunId) {
+      return;
+    }
     await runAction("Processing analysis", async () => {
       const detail = await processAnalysisRun({
         devUserId,
         workspaceId: session.workspaceId,
-        analysisRunId: acceptedIntake.analysisRun.analysisRunId
+        analysisRunId
       });
       setAnalysisDetail(detail);
       if (detail.status === "completed") {
         const evidence = await fetchAnalysisEvidence({
           devUserId,
           workspaceId: session.workspaceId,
-          analysisRunId: acceptedIntake.analysisRun.analysisRunId
+          analysisRunId
         });
         const nextImageUrl = await fetchInspectionPhotoObjectUrl({
           devUserId,
@@ -698,7 +737,9 @@ export function App() {
           return nextImageUrl;
         });
       }
-      setActionState({ kind: "accepted", intake: acceptedIntake });
+      if (actionState.kind === "accepted") {
+        setActionState({ kind: "accepted", intake: actionState.intake });
+      }
     });
   }
 
@@ -1294,7 +1335,7 @@ export function App() {
                   </div>
                 ) : hive ? (
                   <p className="setup-copy" data-testid="resume-training-inspection-empty-state">
-                    No Training Data Collection Inspections to resume for this Hive.
+                    No Inspections to resume for this Hive.
                   </p>
                 ) : null}
                 <form className="inline-setup-form inspection-create-form" onSubmit={onCreateInspection}>
@@ -1367,22 +1408,26 @@ export function App() {
             ) : null}
 
             <Outcome state={actionState} analysisDetail={analysisDetail} />
-            {actionState.kind === "accepted" ? (
-              <>
-                {isVarroaAssessment ? (
-                  <AnalysisPanel
-                    analysisRunId={actionState.intake.analysisRun.analysisRunId}
-                    queuedStatus={actionState.intake.analysisRun.status}
-                    detail={analysisDetail}
-                    evidence={analysisEvidence}
-                    imageUrl={evidenceImageUrl}
-                    reviewerCapability={loadState.session.reviewerCapability}
-                    reviewState={reviewState}
-                    onProcessAnalysis={onProcessAnalysis}
-                    onSubmitReviewDecision={onSubmitReviewDecision}
-                  />
-                ) : null}
-              </>
+            {isVarroaAssessment && (actionState.kind === "accepted" || analysisDetail) ? (
+              <AnalysisPanel
+                analysisRunId={
+                  actionState.kind === "accepted"
+                    ? actionState.intake.analysisRun.analysisRunId
+                    : analysisDetail?.analysisRunId ?? ""
+                }
+                queuedStatus={
+                  actionState.kind === "accepted"
+                    ? actionState.intake.analysisRun.status
+                    : analysisDetail?.status ?? "queued"
+                }
+                detail={analysisDetail}
+                evidence={analysisEvidence}
+                imageUrl={evidenceImageUrl}
+                reviewerCapability={loadState.session.reviewerCapability}
+                reviewState={reviewState}
+                onProcessAnalysis={onProcessAnalysis}
+                onSubmitReviewDecision={onSubmitReviewDecision}
+              />
             ) : null}
             {showTrainingCropPanel ? (
               <div ref={trainingCropPanelRef}>

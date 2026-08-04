@@ -575,6 +575,27 @@ class InMemoryProductDataStore:
     def get_analysis_run(self, analysis_run_id: UUID) -> AnalysisRunResponse | None:
         return self.analysis_runs.get(analysis_run_id)
 
+    def list_analysis_runs_for_inspection(
+        self,
+        user: UserContext,
+        workspace_id: UUID,
+        inspection_id: UUID,
+    ) -> list[AnalysisRunResponse]:
+        self.require_workspace_access(user, workspace_id)
+        self.require_data_use_agreement(workspace_id)
+        self.require_inspection(workspace_id, inspection_id)
+        photo_ids = {
+            photo.inspection_photo_id
+            for photo in self.inspection_photos.values()
+            if photo.workspace_id == workspace_id and photo.inspection_id == inspection_id
+        }
+        runs = [
+            run
+            for run in self.analysis_runs.values()
+            if run.workspace_id == workspace_id and run.inspection_photo_id in photo_ids
+        ]
+        return sorted(runs, key=lambda run: (run.queued_at, str(run.analysis_run_id)))
+
     def require_analysis_run(
         self,
         user: UserContext,

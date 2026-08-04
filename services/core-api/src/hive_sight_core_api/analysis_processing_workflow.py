@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from hive_sight_core_api.dev_store import DomainError, InMemoryProductDataStore, UserContext
 from hive_sight_core_api.models import (
     AnalysisEvidenceResponse,
+    AnalysisRunDetailListResponse,
     AnalysisRunDetailResponse,
     AnalysisRunResponse,
     AnnotationCreate,
@@ -176,6 +177,23 @@ class AnalysisProcessingWorkflow:
     ) -> AnalysisRunDetailResponse:
         analysis_run = self.store.require_analysis_run(user, workspace_id, analysis_run_id)
         return self._to_detail(analysis_run)
+
+    def list_inspection_analysis_runs(
+        self,
+        user: UserContext,
+        workspace_id: UUID,
+        inspection_id: UUID,
+    ) -> AnalysisRunDetailListResponse:
+        return AnalysisRunDetailListResponse(
+            analysis_runs=[
+                self._to_detail(run)
+                for run in self.store.list_analysis_runs_for_inspection(
+                    user=user,
+                    workspace_id=workspace_id,
+                    inspection_id=inspection_id,
+                )
+            ]
+        )
 
     def get_analysis_evidence(
         self,

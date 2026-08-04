@@ -902,6 +902,10 @@ export type AnalysisRunDetail = {
   analysisResult: AnalysisResult | null;
 };
 
+export type AnalysisRunDetailList = {
+  analysisRuns: AnalysisRunDetail[];
+};
+
 export type ApiError = {
   code: string;
   message: string;
@@ -1171,6 +1175,26 @@ export async function fetchAnalysisRunDetail({
   });
   await ensureOk(response);
   return parseAnalysisRunDetail(await response.json());
+}
+
+export async function fetchInspectionAnalysisRuns({
+  devUserId,
+  workspaceId,
+  inspectionId
+}: {
+  devUserId: string;
+  workspaceId: string;
+  inspectionId: string;
+}): Promise<AnalysisRunDetailList> {
+  const params = new URLSearchParams({ workspace_id: workspaceId });
+  const response = await fetch(
+    `${coreApiUrl}/v1/inspections/${inspectionId}/analysis-runs?${params}`,
+    {
+      headers: devAuthHeaders(devUserId)
+    }
+  );
+  await ensureOk(response);
+  return parseAnalysisRunDetailList(await response.json());
 }
 
 export async function processAnalysisRun({
@@ -2385,6 +2409,13 @@ function parseAnalysisRunDetail(value: unknown): AnalysisRunDetail {
     message: requireString(record.message, "message"),
     analysisResult:
       record.analysis_result === null ? null : parseAnalysisResult(record.analysis_result)
+  };
+}
+
+function parseAnalysisRunDetailList(value: unknown): AnalysisRunDetailList {
+  const record = requireRecord(value, "Analysis run detail list response");
+  return {
+    analysisRuns: requireArray(record.analysis_runs, "analysis_runs").map(parseAnalysisRunDetail)
   };
 }
 
