@@ -93,6 +93,17 @@ These are the strongest near-term candidates based on the current project state.
 | Beekeeper Result Explanation | Business | Explain count, coverage, uncertainty, caveats, and action thresholds in language a beekeeper can act on. |
 | Inspection Recovery Review | Business / Governance | Let a Workspace owner review and correct a suppressed or inadequate model-only result without rewriting the original result. |
 
+## Treatment And Advisor Integration
+
+HiveSight remains the system of record for hive identity, Varroa assessment evidence, and treatment history. HiveSight Advisor may recommend a treatment plan from grounded guidance, but HiveSight owns whether the beekeeper accepts it, records it, applies it, and later judges the result.
+
+| Candidate Slice | Type | Outcome |
+| --- | --- | --- |
+| Hive Treatment History | Business / Technical | Let a Beekeeper record a Hive Treatment Course, one or more Treatment Applications, and simple notes against a selected Hive. |
+| Advisor Treatment Recommendation Intake | Business / Technical | Accept a Treatment Recommendation from HiveSight Advisor, show it to the Beekeeper as suggested rather than applied, and let the Beekeeper accept or decline it. |
+| Advisor Context API | Technical / Integration | Expose the minimum hive, apiary, jurisdiction, recent Varroa assessment, and treatment-history context Advisor needs to produce grounded guidance. |
+| Treatment Completion And Follow-up Outcome | Business | Let a Beekeeper mark a Hive Treatment Course complete and relate later Inspection evidence to the treatment outcome without rewriting the original recommendation. |
+
 ## Product Workflow And UX
 
 | Candidate Slice | Type | Outcome |

@@ -92,6 +92,22 @@ _Avoid_: Crop Governance when the actor is governing cross-crop model evidence r
 An Inspection Intent for estimating visible Varroa evidence from inspection photos for beekeeper-facing support.
 _Avoid_: Training data collection when the purpose is product analysis.
 
+**Treatment Recommendation**:
+An advisory suggestion for managing a Hive health concern, such as Varroa, that has not yet been accepted or applied by the Beekeeper.
+_Avoid_: Treatment Course when the recommendation is not yet the beekeeper's own treatment record.
+
+**Hive Treatment Course**:
+A beekeeper-owned treatment plan or record for one Hive, covering the intended purpose and lifecycle of a treatment from planning through completion or cancellation.
+_Avoid_: Treatment Recommendation when the beekeeper has not accepted responsibility for carrying out or recording the treatment.
+
+**Treatment Application**:
+One dated application or dose within a Hive Treatment Course.
+_Avoid_: Treatment Course when referring to a single event in a multi-step schedule.
+
+**Treatment Outcome**:
+The beekeeper-recorded or inspection-supported result observed after a Hive Treatment Course.
+_Avoid_: Cure, success, diagnosis.
+
 **Frame Label**:
 An optional label that groups photos believed to show the same frame during one inspection.
 _Avoid_: Frame record, frame inventory.
