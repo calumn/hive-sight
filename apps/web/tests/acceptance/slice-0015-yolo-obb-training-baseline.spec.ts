@@ -34,6 +34,8 @@ test("Dataset Curator creates a Dataset Version and fake Bee Detector training b
   await expect(page.getByTestId("training-crop-list-item").nth(0)).toContainText("Training");
   await expect(page.getByTestId("training-crop-list-item").nth(1)).toContainText("Validation");
 
+  await page.getByTestId("workflow-stage-model-governance-button").click();
+  await expect(page.getByTestId("training-workflow-stage-model-governance")).toBeVisible();
   await page.getByTestId("model-training-readiness-button").click();
   await expect(page.getByTestId("model-training-readiness-summary")).toContainText(/Training [1-9]/);
   await expect(page.getByTestId("model-training-readiness-summary")).toContainText(

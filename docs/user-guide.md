@@ -80,7 +80,7 @@ Use this when you want to upload frame photos and create Training Crops for bee 
 5. Make sure the Hive has a Hive Configuration and Frame Standard.
 6. Create an Inspection with intent `Training data collection`.
 7. If an earlier Training Inspection exists, choose it from `Resume Training Inspection`.
-8. Use the workflow stage buttons to move between `Inspection Setup`, `Crop Selection`, `Bee Annotation`, and `Crop Governance`.
+8. Use the workflow stage buttons to move between `Inspection Setup`, `Crop Selection`, `Bee Annotation`, `Crop Governance`, and `Model Governance`.
 
 Training-data collection inspections show the Training Crop workflow. Varroa assessment inspections do not.
 
@@ -200,10 +200,11 @@ The queue is shared. Once one eligible Reviewer completes an item, it disappears
 
 Use this when you have at least one Training item and one Validation item.
 
-1. In `Bee Detector training baseline`, click `Check readiness`.
-2. Review any warnings.
-3. Click `Dataset Version`.
-4. Confirm the summary shows the expected Training, Validation, and Benchmark counts.
+1. Open the `Model Governance` workflow stage.
+2. In `Bee Detector model workflow`, click `Check readiness`.
+3. Review any warnings.
+4. Click `Dataset Version`.
+5. Confirm the summary shows the expected Training, Validation, and Benchmark counts.
 
 Dataset Versions are frozen model-training evidence. Benchmark items are protected from training export.
 
@@ -217,12 +218,13 @@ Use this when you want to train a local YOLO OBB Model Candidate from the curren
 pnpm dev:all:yolo
 ```
 
-2. Create or select a Dataset Version.
-3. Acknowledge high-severity warnings if you deliberately want to continue with a small or incomplete dataset.
-4. Click `Train baseline`.
-5. Watch the Training Run summary for status, phase, heartbeat, elapsed time, log excerpt, and candidate creation.
-6. When the run completes, click `Use candidate for crop YOLO` if you want that candidate to power crop pre-labelling.
-7. Confirm the Training Run summary says `Now using HS-MC-... for crop YOLO`.
+2. Open the `Model Governance` workflow stage.
+3. Create or select a Dataset Version.
+4. Acknowledge high-severity warnings if you deliberately want to continue with a small or incomplete dataset.
+5. Click `Train baseline`.
+6. Watch the Training Run summary for status, phase, heartbeat, elapsed time, log excerpt, and candidate creation.
+7. When the run completes, click `Use candidate for crop YOLO` if you want that candidate to power crop pre-labelling.
+8. Confirm the Training Run summary says `Now using HS-MC-... for crop YOLO`.
 
 A completed run creates a Model Candidate. These baseline candidates are not user-facing production models.
 
@@ -238,11 +240,12 @@ Use this when you want internal model-governance evidence for a completed Bee De
 
 1. Make sure your Dataset Version has protected Benchmark items from source images that were not used for Training or Validation.
 2. Train a Bee Detector baseline and select the completed Model Candidate.
-3. In the model-governance panel, click `Check benchmark`.
-4. Review warnings such as `SMALL_BENCHMARK_SET`.
-5. Click `Run benchmark`.
-6. Watch status, phase, heartbeat, progress, precision, recall, activity, and log excerpt.
-7. Open the `Report` and `Raw predictions` links when the run completes.
+3. Open the `Model Governance` workflow stage.
+4. In the benchmark evaluation section, click `Check benchmark`.
+5. Review warnings such as `SMALL_BENCHMARK_SET`.
+6. Click `Run benchmark`.
+7. Watch status, phase, heartbeat, progress, precision, recall, activity, and log excerpt.
+8. Open the `Report` and `Raw predictions` links when the run completes.
 
 The report is Training Crop benchmark only. It does not evaluate full-frame bee localisation, bee head-end prediction, or Varroa detection.
 

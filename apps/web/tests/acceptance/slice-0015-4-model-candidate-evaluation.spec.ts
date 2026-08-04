@@ -36,6 +36,8 @@ test("Dataset Curator runs a fake Model Candidate benchmark evaluation", async (
   await page.getByTestId("training-crop-photo-select").selectOption({ index: 1 });
   await createCompletedDatasetCrop(page, { x: 420, y: 220 }, "benchmark");
 
+  await page.getByTestId("workflow-stage-model-governance-button").click();
+  await expect(page.getByTestId("training-workflow-stage-model-governance")).toBeVisible();
   await page.getByTestId("create-dataset-version-button").click();
   await expect(page.getByTestId("dataset-version-summary")).toContainText("Benchmark protected 1");
   await page.getByTestId("acknowledge-model-training-warnings-checkbox").check();

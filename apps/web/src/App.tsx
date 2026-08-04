@@ -159,7 +159,12 @@ type CropDraft = {
 };
 
 type AppView = "inspection" | "repository" | "review-work";
-type TrainingWorkflowStage = "setup" | "crop_selection" | "bee_annotation" | "crop_governance";
+type TrainingWorkflowStage =
+  | "setup"
+  | "crop_selection"
+  | "bee_annotation"
+  | "crop_governance"
+  | "model_governance";
 
 export function App() {
   const trainingCropPanelRef = useRef<HTMLDivElement | null>(null);
@@ -3324,6 +3329,13 @@ function TrainingCropAnnotationPanel({
           testId="workflow-stage-crop-governance-button"
           onClick={() => setActiveWorkflowStage("crop_governance")}
         />
+        <TrainingWorkflowStageButton
+          label="Model Governance"
+          summary={`${trainingRuns.length + benchmarkEvaluations.length} jobs`}
+          selected={activeWorkflowStage === "model_governance"}
+          testId="workflow-stage-model-governance-button"
+          onClick={() => setActiveWorkflowStage("model_governance")}
+        />
       </div>
 
       {activeWorkflowStage === "setup" ? (
@@ -3339,7 +3351,7 @@ function TrainingCropAnnotationPanel({
             Crops.
           </p>
         </section>
-      ) : photos.length === 0 ? (
+      ) : activeWorkflowStage !== "model_governance" && photos.length === 0 ? (
         <section
           className="workflow-stage-panel"
           data-testid={
@@ -3347,7 +3359,9 @@ function TrainingCropAnnotationPanel({
               ? "training-workflow-stage-crop-selection"
               : activeWorkflowStage === "bee_annotation"
                 ? "training-workflow-stage-bee-annotation"
-                : "training-workflow-stage-crop-governance"
+                : activeWorkflowStage === "crop_governance"
+                  ? "training-workflow-stage-crop-governance"
+                  : "training-workflow-stage-model-governance"
           }
         >
           <p className="analysis-caveat">Upload a training data photo before creating crops.</p>
@@ -4550,210 +4564,255 @@ function TrainingCropAnnotationPanel({
                     <p>{physicalYoloObbExport.caveat}</p>
                   </div>
                 ) : null}
+                </div>
+                </div>
+              </div>
+            </section>
+          ) : null}
+
+          {activeWorkflowStage === "model_governance" ? (
+            <section
+              className="workflow-stage-panel model-governance-stage"
+              data-testid="training-workflow-stage-model-governance"
+              aria-label="Model Governance"
+            >
                 <div className="model-training-panel" data-testid="model-training-panel">
-                  <div>
-                    <strong>Bee Detector training baseline</strong>
-                    <p>
-                      Create a locked Dataset Version, then run the local YOLO OBB training adapter.
-                    </p>
-                  </div>
-                  <div className="button-row">
-                    <button
-                      type="button"
-                      disabled={Boolean(workingLabel)}
-                      onClick={() => void refreshModelTrainingReadiness()}
-                      data-testid="model-training-readiness-button"
-                    >
-                      <RefreshCw size={18} />
-                      Check readiness
-                    </button>
-                    <button
-                      type="button"
-                      disabled={Boolean(workingLabel)}
-                      onClick={() => void createModelDatasetVersion()}
-                      data-testid="create-dataset-version-button"
-                    >
-                      <FileImage size={18} />
-                      Dataset Version
-                    </button>
-                    <button
-                      type="button"
-                      disabled={!canStartModelTraining}
-                      onClick={() => void startBeeDetectorTrainingRun()}
-                      data-testid="start-model-training-run-button"
-                    >
-                      <Play size={18} />
-                      Train baseline
-                    </button>
-                  </div>
-                  <label className="checkbox-row">
-                    <input
-                      type="checkbox"
-                      checked={acknowledgeModelWarnings}
-                      onChange={(event) => setAcknowledgeModelWarnings(event.target.checked)}
-                      data-testid="acknowledge-model-training-warnings-checkbox"
-                    />
-                    <span>Acknowledge high-severity dataset warnings for this baseline run</span>
-                  </label>
-                  {modelTrainingReadiness ? (
-                    <div className="export-summary" data-testid="model-training-readiness-summary">
-                      <strong>
-                        {modelTrainingReadiness.adapterType} / {modelTrainingReadiness.databasePurpose}
-                      </strong>
-                      <span>Training {modelTrainingReadiness.trainingItemCount}</span>
-                      <span>Validation {modelTrainingReadiness.validationItemCount}</span>
-                      <span>Benchmark {modelTrainingReadiness.benchmarkItemCount}</span>
-                      <span>
-                        {modelTrainingReadiness.realAdapterAvailable
-                          ? "Real adapter available"
-                          : "Real adapter unavailable"}
-                      </span>
-                      {modelTrainingReadiness.warnings.map((warning) => (
-                        <span key={warning.code}>
-                          {warning.severity}: {warning.code}
+                  <header className="model-workflow-header">
+                    <div>
+                      <strong>Bee Detector model workflow</strong>
+                      <p>Prepare evidence, freeze a Dataset Version, train a baseline candidate, then benchmark it against protected evidence.</p>
+                    </div>
+                    <span>Baseline only; not user-facing.</span>
+                  </header>
+
+                  <section className="model-workflow-stage" aria-label="Prepare Dataset Version">
+                    <div className="model-workflow-stage-heading">
+                      <span className="workflow-step-number">1</span>
+                      <div>
+                        <strong>Prepare Dataset Version</strong>
+                        <p>Check eligible Training and Validation items before locking a version for training.</p>
+                      </div>
+                    </div>
+                    <div className="model-workflow-actions">
+                      <button
+                        type="button"
+                        disabled={Boolean(workingLabel)}
+                        onClick={() => void refreshModelTrainingReadiness()}
+                        data-testid="model-training-readiness-button"
+                      >
+                        <RefreshCw size={18} />
+                        Check readiness
+                      </button>
+                      <button
+                        type="button"
+                        disabled={Boolean(workingLabel)}
+                        onClick={() => void createModelDatasetVersion()}
+                        data-testid="create-dataset-version-button"
+                      >
+                        <FileImage size={18} />
+                        Dataset Version
+                      </button>
+                    </div>
+                    {modelTrainingReadiness ? (
+                      <div className="model-workflow-summary" data-testid="model-training-readiness-summary">
+                        <strong>{modelTrainingReadiness.adapterType}</strong>
+                        <span>{modelTrainingReadiness.databasePurpose}</span>
+                        <span>Training {modelTrainingReadiness.trainingItemCount}</span>
+                        <span>Validation {modelTrainingReadiness.validationItemCount}</span>
+                        <span>Benchmark {modelTrainingReadiness.benchmarkItemCount}</span>
+                        <span>
+                          {modelTrainingReadiness.realAdapterAvailable
+                            ? "Real adapter available"
+                            : "Real adapter unavailable"}
                         </span>
-                      ))}
-                      {!modelTrainingReadiness.eligibleToStartTraining ? (
-                        <p data-testid="model-training-blocker">
-                          Training cannot start until readiness blockers are resolved.
-                        </p>
-                      ) : null}
+                        {modelTrainingReadiness.warnings.map((warning) => (
+                          <span key={warning.code} className={`model-warning ${warning.severity}`}>
+                            {warning.severity}: {warning.code}
+                          </span>
+                        ))}
+                        {!modelTrainingReadiness.eligibleToStartTraining ? (
+                          <p data-testid="model-training-blocker">
+                            Training cannot start until readiness blockers are resolved.
+                          </p>
+                        ) : null}
+                      </div>
+                    ) : null}
+                    {datasetVersion ? (
+                      <div className="model-workflow-record" data-testid="dataset-version-summary">
+                        <strong>{datasetVersion.humanReadableId}</strong>
+                        <span>Training {datasetVersion.trainingItemCount}</span>
+                        <span>Validation {datasetVersion.validationItemCount}</span>
+                        <span>Benchmark protected {datasetVersion.benchmarkItemCount}</span>
+                        <span>Warnings {datasetVersion.warnings.length}</span>
+                        <code>{datasetVersion.exportFormat}</code>
+                      </div>
+                    ) : null}
+                  </section>
+
+                  <section className="model-workflow-stage" aria-label="Train Bee Detector baseline">
+                    <div className="model-workflow-stage-heading">
+                      <span className="workflow-step-number">2</span>
+                      <div>
+                        <strong>Train baseline</strong>
+                        <p>Run the local adapter against the locked Dataset Version and record the resulting Model Candidate.</p>
+                      </div>
                     </div>
-                  ) : null}
-                  {datasetVersion ? (
-                    <div className="export-summary" data-testid="dataset-version-summary">
-                      <strong>{datasetVersion.humanReadableId}</strong>
-                      <span>Training {datasetVersion.trainingItemCount}</span>
-                      <span>Validation {datasetVersion.validationItemCount}</span>
-                      <span>Benchmark protected {datasetVersion.benchmarkItemCount}</span>
-                      <span>Warnings {datasetVersion.warnings.length}</span>
-                      <code>{datasetVersion.exportFormat}</code>
+                    <div className="model-workflow-actions">
+                      <button
+                        type="button"
+                        disabled={!canStartModelTraining}
+                        onClick={() => void startBeeDetectorTrainingRun()}
+                        data-testid="start-model-training-run-button"
+                      >
+                        <Play size={18} />
+                        Train baseline
+                      </button>
+                      <label className="checkbox-row">
+                        <input
+                          type="checkbox"
+                          checked={acknowledgeModelWarnings}
+                          onChange={(event) => setAcknowledgeModelWarnings(event.target.checked)}
+                          data-testid="acknowledge-model-training-warnings-checkbox"
+                        />
+                        <span>Acknowledge high-severity dataset warnings for this baseline run</span>
+                      </label>
                     </div>
-                  ) : null}
-                  {trainingRun ? (
-                    <div className="export-summary" data-testid="model-training-run-summary">
-                      <strong>{trainingRun.humanReadableId}</strong>
-                      <span>{trainingRun.status}</span>
-                      <span>Phase {trainingRun.phase}</span>
-                      <span>Progress {formatProgressPercent(trainingRun.progressPercent)}</span>
-                      <span>{trainingRun.adapterType}</span>
-                      <span>Candidate {trainingRun.modelCandidateId ?? "not created"}</span>
-                      <span>Started {formatDateTime(trainingRun.startedAt)}</span>
-                      <span>Last heartbeat {formatDateTime(trainingRun.lastHeartbeatAt)}</span>
-                      <span>
-                        Elapsed{" "}
-                        {formatElapsedTime(
-                          trainingRun.startedAt,
-                          trainingRun.completedAt,
-                          trainingRunClockTick
-                        )}
-                      </span>
-                      <span>Precision {formatMetric(trainingRun.metricsSummary.precision)}</span>
-                      <span>Recall {formatMetric(trainingRun.metricsSummary.recall)}</span>
-                      {trainingRun.lastActivityMessage ? (
-                        <p data-testid="model-training-activity">
-                          Activity: {trainingRun.lastActivityMessage}
-                        </p>
-                      ) : null}
-                      {isActiveTrainingRun(trainingRun) ? (
-                        <p data-testid="model-training-active-status">
-                          Training is active. Polling the Core API every 3 seconds for updates.
-                        </p>
-                      ) : null}
-                      {trainingRun.isStale ? (
-                        <p className="analysis-caveat failed" data-testid="model-training-stale">
-                          No heartbeat within {trainingRun.staleAfterSeconds ?? "the configured"}{" "}
-                          seconds. This run may be orphaned.
-                        </p>
-                      ) : null}
-                      {trainingRun.status === "failed" ? (
-                        <p className="analysis-caveat failed" data-testid="model-training-failure">
-                          {trainingRun.failureCode ?? "training_failed"}:{" "}
-                          {trainingRun.failureMessage ?? "Training failed before a model candidate was created."}
-                        </p>
-                      ) : null}
-                      {trainingRun.cancelReason ? (
-                        <p data-testid="model-training-cancel-reason">
-                          Cancel reason: {trainingRun.cancelReason}
-                        </p>
-                      ) : null}
-                      {trainingRun.abandonReason ? (
-                        <p data-testid="model-training-abandon-reason">
-                          Abandon reason: {trainingRun.abandonReason}
-                        </p>
-                      ) : null}
-                      {trainingRun.latestLogExcerpt ? (
-                        <pre className="training-log-excerpt" data-testid="model-training-log-excerpt">
-                          {trainingRun.latestLogExcerpt}
-                        </pre>
-                      ) : null}
-                      <div className="button-row">
-                        {trainingRun.modelCandidateId ? (
+                    {trainingRun ? (
+                      <div className="model-run-detail" data-testid="model-training-run-summary">
+                        <div className="model-run-title">
+                          <strong>{trainingRun.humanReadableId}</strong>
+                          <span>{trainingRun.status}</span>
+                          <span>Phase {trainingRun.phase}</span>
+                          <span>Progress {formatProgressPercent(trainingRun.progressPercent)}</span>
+                          <span>{trainingRun.adapterType}</span>
+                        </div>
+                        <div className="model-workflow-facts">
+                          <span>Candidate {trainingRun.modelCandidateId ?? "not created"}</span>
+                          <span>Started {formatDateTime(trainingRun.startedAt)}</span>
+                          <span>Last heartbeat {formatDateTime(trainingRun.lastHeartbeatAt)}</span>
+                          <span>
+                            Elapsed{" "}
+                            {formatElapsedTime(
+                              trainingRun.startedAt,
+                              trainingRun.completedAt,
+                              trainingRunClockTick
+                            )}
+                          </span>
+                          <span>Precision {formatMetric(trainingRun.metricsSummary.precision)}</span>
+                          <span>Recall {formatMetric(trainingRun.metricsSummary.recall)}</span>
+                        </div>
+                        {trainingRun.lastActivityMessage ? (
+                          <p data-testid="model-training-activity">
+                            Activity: {trainingRun.lastActivityMessage}
+                          </p>
+                        ) : null}
+                        {isActiveTrainingRun(trainingRun) ? (
+                          <p data-testid="model-training-active-status">
+                            Training is active. Polling the Core API every 3 seconds for updates.
+                          </p>
+                        ) : null}
+                        {trainingRun.isStale ? (
+                          <p className="analysis-caveat failed" data-testid="model-training-stale">
+                            No heartbeat within {trainingRun.staleAfterSeconds ?? "the configured"}{" "}
+                            seconds. This run may be orphaned.
+                          </p>
+                        ) : null}
+                        {trainingRun.status === "failed" ? (
+                          <p className="analysis-caveat failed" data-testid="model-training-failure">
+                            {trainingRun.failureCode ?? "training_failed"}:{" "}
+                            {trainingRun.failureMessage ?? "Training failed before a model candidate was created."}
+                          </p>
+                        ) : null}
+                        {trainingRun.cancelReason ? (
+                          <p data-testid="model-training-cancel-reason">
+                            Cancel reason: {trainingRun.cancelReason}
+                          </p>
+                        ) : null}
+                        {trainingRun.abandonReason ? (
+                          <p data-testid="model-training-abandon-reason">
+                            Abandon reason: {trainingRun.abandonReason}
+                          </p>
+                        ) : null}
+                        {trainingRun.latestLogExcerpt ? (
+                          <pre className="training-log-excerpt" data-testid="model-training-log-excerpt">
+                            {trainingRun.latestLogExcerpt}
+                          </pre>
+                        ) : null}
+                        <div className="model-workflow-actions secondary">
+                          {trainingRun.modelCandidateId ? (
+                            <button
+                              type="button"
+                              disabled={Boolean(workingLabel)}
+                              onClick={() =>
+                                void useTrainingRunCandidateForCropYolo(trainingRun.modelCandidateId!)
+                              }
+                              data-testid="use-model-candidate-for-crop-yolo-button"
+                            >
+                              <Check size={18} />
+                              Use candidate for crop YOLO
+                            </button>
+                          ) : null}
                           <button
                             type="button"
-                            disabled={Boolean(workingLabel)}
-                            onClick={() =>
-                              void useTrainingRunCandidateForCropYolo(trainingRun.modelCandidateId!)
-                            }
-                            data-testid="use-model-candidate-for-crop-yolo-button"
+                            disabled={!isActiveTrainingRun(trainingRun) || Boolean(workingLabel)}
+                            onClick={() => void cancelSelectedTrainingRun()}
+                            data-testid="cancel-model-training-run-button"
                           >
-                            <Check size={18} />
-                            Use candidate for crop YOLO
+                            <CircleAlert size={18} />
+                            Cancel run
                           </button>
+                          <button
+                            type="button"
+                            disabled={
+                              !trainingRunCanBeAbandoned(trainingRun) || Boolean(workingLabel)
+                            }
+                            onClick={() => void abandonSelectedTrainingRun()}
+                            data-testid="abandon-model-training-run-button"
+                          >
+                            <RotateCcw size={18} />
+                            {trainingRun.status === "cancelling"
+                              ? "Abandon cancelling run"
+                              : "Abandon stale run"}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={!trainingRunCanBeDeleted(trainingRun) || Boolean(workingLabel)}
+                            onClick={() => void deleteSelectedTrainingRun()}
+                            data-testid="delete-model-training-run-button"
+                          >
+                            <Trash2 size={18} />
+                            Delete run
+                          </button>
+                        </div>
+                        {modelCandidateSelectionMessage ? (
+                          <p
+                            className="review-state success"
+                            role="status"
+                            data-testid="model-candidate-selection-confirmation"
+                          >
+                            {modelCandidateSelectionMessage}
+                          </p>
                         ) : null}
-                        <button
-                          type="button"
-                          disabled={!isActiveTrainingRun(trainingRun) || Boolean(workingLabel)}
-                          onClick={() => void cancelSelectedTrainingRun()}
-                          data-testid="cancel-model-training-run-button"
-                        >
-                          <CircleAlert size={18} />
-                          Cancel run
-                        </button>
-                        <button
-                          type="button"
-                          disabled={
-                            !trainingRunCanBeAbandoned(trainingRun) || Boolean(workingLabel)
-                          }
-                          onClick={() => void abandonSelectedTrainingRun()}
-                          data-testid="abandon-model-training-run-button"
-                        >
-                          <RotateCcw size={18} />
-                          {trainingRun.status === "cancelling"
-                            ? "Abandon cancelling run"
-                            : "Abandon stale run"}
-                        </button>
-                        <button
-                          type="button"
-                          disabled={!trainingRunCanBeDeleted(trainingRun) || Boolean(workingLabel)}
-                          onClick={() => void deleteSelectedTrainingRun()}
-                          data-testid="delete-model-training-run-button"
-                        >
-                          <Trash2 size={18} />
-                          Delete run
-                        </button>
                       </div>
-                      {modelCandidateSelectionMessage ? (
-                        <p
-                          className="review-state success"
-                          role="status"
-                          data-testid="model-candidate-selection-confirmation"
-                        >
-                          {modelCandidateSelectionMessage}
-                        </p>
-                      ) : null}
-                      <p>Baseline only; not user-facing.</p>
-                    </div>
-                  ) : null}
-                  <div
-                    className="export-summary"
+                    ) : null}
+                  </section>
+
+                  <section
+                    className="model-workflow-stage"
+                    aria-label="Benchmark Model Candidate"
                     data-testid="benchmark-evaluation-panel"
                   >
-                    <strong>Bee Detector benchmark evaluation</strong>
-                    <span>Training Crop benchmark only</span>
+                    <div className="model-workflow-stage-heading">
+                      <span className="workflow-step-number">3</span>
+                      <div>
+                        <strong>Bee Detector benchmark evaluation</strong>
+                        <p>Evaluate the selected Model Candidate against protected Training Crop benchmark evidence.</p>
+                      </div>
+                    </div>
                     {benchmarkReadiness ? (
-                      <>
-                        <span>Candidate {benchmarkReadiness.modelCandidateHumanReadableId}</span>
+                      <div className="model-workflow-summary">
+                        <strong>Candidate {benchmarkReadiness.modelCandidateHumanReadableId}</strong>
+                        <span>Training Crop benchmark only</span>
                         <span>Benchmark {benchmarkReadiness.benchmarkItemCount}</span>
                         <span>{benchmarkReadiness.evaluationAdapterType}</span>
                         <span>{benchmarkReadiness.databasePurpose}</span>
@@ -4764,7 +4823,7 @@ function TrainingCropAnnotationPanel({
                           </span>
                         ) : null}
                         {benchmarkReadiness.warnings.map((warning) => (
-                          <span key={warning.code}>
+                          <span key={warning.code} className={`model-warning ${warning.severity}`}>
                             {warning.severity}: {warning.code}
                           </span>
                         ))}
@@ -4773,11 +4832,11 @@ function TrainingCropAnnotationPanel({
                             Evaluation cannot start until readiness blockers are resolved.
                           </p>
                         ) : null}
-                      </>
+                      </div>
                     ) : (
-                      <span>Select a Model Candidate to check benchmark readiness.</span>
+                      <p className="setup-copy">Select a Model Candidate to check benchmark readiness.</p>
                     )}
-                    <div className="button-row">
+                    <div className="model-workflow-actions">
                       <button
                         type="button"
                         disabled={!selectedModelCandidateId || Boolean(workingLabel)}
@@ -4816,32 +4875,36 @@ function TrainingCropAnnotationPanel({
                     </div>
                     {benchmarkEvaluation ? (
                       <div
-                        className="training-run-row"
+                        className="model-run-detail compact"
                         data-testid="benchmark-evaluation-summary"
                       >
-                        <span>{benchmarkEvaluation.humanReadableId}</span>
-                        <span>{benchmarkEvaluation.status}</span>
-                        <span>Phase {benchmarkEvaluation.phase}</span>
-                        <span>
-                          Progress {formatProgressPercent(benchmarkEvaluation.progressPercent)}
-                        </span>
-                        <span>
-                          Precision {formatMetric(benchmarkEvaluation.metricsSummary.precision)}
-                        </span>
-                        <span>
-                          Recall {formatMetric(benchmarkEvaluation.metricsSummary.recall)}
-                        </span>
-                        <span>
-                          Last heartbeat {formatDateTime(benchmarkEvaluation.lastHeartbeatAt)}
-                        </span>
-                        <span>
-                          Elapsed{" "}
-                          {formatElapsedTime(
-                            benchmarkEvaluation.startedAt,
-                            benchmarkEvaluation.completedAt,
-                            trainingRunClockTick
-                          )}
-                        </span>
+                        <div className="model-run-title">
+                          <strong>{benchmarkEvaluation.humanReadableId}</strong>
+                          <span>{benchmarkEvaluation.status}</span>
+                          <span>Phase {benchmarkEvaluation.phase}</span>
+                          <span>
+                            Progress {formatProgressPercent(benchmarkEvaluation.progressPercent)}
+                          </span>
+                        </div>
+                        <div className="model-workflow-facts">
+                          <span>
+                            Precision {formatMetric(benchmarkEvaluation.metricsSummary.precision)}
+                          </span>
+                          <span>
+                            Recall {formatMetric(benchmarkEvaluation.metricsSummary.recall)}
+                          </span>
+                          <span>
+                            Last heartbeat {formatDateTime(benchmarkEvaluation.lastHeartbeatAt)}
+                          </span>
+                          <span>
+                            Elapsed{" "}
+                            {formatElapsedTime(
+                              benchmarkEvaluation.startedAt,
+                              benchmarkEvaluation.completedAt,
+                              trainingRunClockTick
+                            )}
+                          </span>
+                        </div>
                         {benchmarkEvaluation.lastActivityMessage ? (
                           <p data-testid="benchmark-evaluation-activity">
                             Activity: {benchmarkEvaluation.lastActivityMessage}
@@ -4870,7 +4933,7 @@ function TrainingCropAnnotationPanel({
                             {benchmarkEvaluation.latestLogExcerpt}
                           </pre>
                         ) : null}
-                        <div className="button-row">
+                        <div className="model-workflow-actions secondary">
                           {benchmarkEvaluation.reportArtifactId ? (
                             <a
                               className="text-link"
@@ -4908,91 +4971,109 @@ function TrainingCropAnnotationPanel({
                         Could not refresh Benchmark Evaluations: {benchmarkEvaluationPollError}
                       </p>
                     ) : null}
-                  </div>
-                  {trainingRuns.length > 0 ? (
-                    <div className="export-summary" data-testid="model-training-run-list">
-                      <strong>Training runs</strong>
-                      {trainingRunsLastCheckedAt ? (
-                        <span data-testid="model-training-runs-last-checked">
-                          Last checked {formatDateTime(trainingRunsLastCheckedAt)}
-                        </span>
-                      ) : null}
-                      {hasActiveTrainingRun ? (
-                        <span data-testid="model-training-runs-polling">Auto-refreshing</span>
-                      ) : null}
-                      {trainingRunPollError ? (
-                        <p className="analysis-caveat failed" data-testid="model-training-poll-error">
-                          Could not refresh Training Runs: {trainingRunPollError}
-                        </p>
-                      ) : null}
-                      {trainingRuns.map((run) => (
-                        <div
-                          className="training-run-row"
-                          data-testid="model-training-run-list-item"
-                          key={run.trainingRunId}
-                        >
-                          <span>{run.humanReadableId}</span>
-                          <span>{run.status}</span>
-                          <span>Phase {run.phase}</span>
-                          <span>Progress {formatProgressPercent(run.progressPercent)}</span>
-                          <span>{run.adapterType}</span>
-                          <span>Dataset {run.datasetVersionId.slice(0, 8)}</span>
-                          <span>Candidate {run.modelCandidateId ?? "not created"}</span>
-                          <span>Started {formatDateTime(run.startedAt)}</span>
-                          <span>Heartbeat {formatDateTime(run.lastHeartbeatAt)}</span>
-                          <span>
-                            Elapsed{" "}
-                            {formatElapsedTime(run.startedAt, run.completedAt, trainingRunClockTick)}
-                          </span>
-                          {run.lastActivityMessage ? <span>{run.lastActivityMessage}</span> : null}
-                          {run.isStale ? <span>stale</span> : null}
-                          {run.failureCode || run.failureMessage ? (
-                            <span>
-                              {run.failureCode ?? "training_failed"}:{" "}
-                              {run.failureMessage ?? "No failure message recorded."}
-                            </span>
-                          ) : null}
+                  </section>
+
+                  {trainingRuns.length > 0 || benchmarkEvaluations.length > 0 ? (
+                    <section className="model-workflow-stage history" aria-label="Model job history">
+                      <div className="model-workflow-stage-heading">
+                        <span className="workflow-step-number">4</span>
+                        <div>
+                          <strong>Model job history</strong>
+                          <p>Recent Training Runs and Benchmark Evaluations for this Workspace.</p>
                         </div>
-                      ))}
-                    </div>
-                  ) : null}
-                  {benchmarkEvaluations.length > 0 ? (
-                    <div className="export-summary" data-testid="benchmark-evaluation-list">
-                      <strong>Benchmark evaluations</strong>
-                      {benchmarkEvaluationsLastCheckedAt ? (
-                        <span data-testid="benchmark-evaluations-last-checked">
-                          Last checked {formatDateTime(benchmarkEvaluationsLastCheckedAt)}
-                        </span>
-                      ) : null}
-                      {hasActiveBenchmarkEvaluation ? (
-                        <span data-testid="benchmark-evaluations-polling">Auto-refreshing</span>
-                      ) : null}
-                      {benchmarkEvaluations.map((evaluation) => (
-                        <div
-                          className="training-run-row"
-                          data-testid="benchmark-evaluation-list-item"
-                          key={evaluation.benchmarkEvaluationId}
-                        >
-                          <span>{evaluation.humanReadableId}</span>
-                          <span>{evaluation.status}</span>
-                          <span>Phase {evaluation.phase}</span>
-                          <span>Candidate {evaluation.modelCandidateHumanReadableId}</span>
-                          <span>
-                            Benchmark {String(evaluation.metricsSummary.benchmark_item_count ?? "n/a")}
-                          </span>
-                          <span>Precision {formatMetric(evaluation.metricsSummary.precision)}</span>
-                          <span>Recall {formatMetric(evaluation.metricsSummary.recall)}</span>
-                          {evaluation.lastActivityMessage ? (
-                            <span>{evaluation.lastActivityMessage}</span>
+                      </div>
+                      {trainingRuns.length > 0 ? (
+                        <div className="model-history-list" data-testid="model-training-run-list">
+                          <div className="model-history-heading">
+                            <strong>Training runs</strong>
+                            {trainingRunsLastCheckedAt ? (
+                              <span data-testid="model-training-runs-last-checked">
+                                Last checked {formatDateTime(trainingRunsLastCheckedAt)}
+                              </span>
+                            ) : null}
+                            {hasActiveTrainingRun ? (
+                              <span data-testid="model-training-runs-polling">Auto-refreshing</span>
+                            ) : null}
+                          </div>
+                          {trainingRunPollError ? (
+                            <p className="analysis-caveat failed" data-testid="model-training-poll-error">
+                              Could not refresh Training Runs: {trainingRunPollError}
+                            </p>
                           ) : null}
+                          {trainingRuns.map((run) => (
+                            <div
+                              className="training-run-row"
+                              data-testid="model-training-run-list-item"
+                              key={run.trainingRunId}
+                            >
+                              <span>{run.humanReadableId}</span>
+                              <span>{run.status}</span>
+                              <span>Phase {run.phase}</span>
+                              <span>Progress {formatProgressPercent(run.progressPercent)}</span>
+                              <span>{run.adapterType}</span>
+                              <span>Dataset {run.datasetVersionId.slice(0, 8)}</span>
+                              <span>Candidate {run.modelCandidateId ?? "not created"}</span>
+                              <span>Started {formatDateTime(run.startedAt)}</span>
+                              <span>Heartbeat {formatDateTime(run.lastHeartbeatAt)}</span>
+                              <span>
+                                Elapsed{" "}
+                                {formatElapsedTime(
+                                  run.startedAt,
+                                  run.completedAt,
+                                  trainingRunClockTick
+                                )}
+                              </span>
+                              {run.lastActivityMessage ? <span>{run.lastActivityMessage}</span> : null}
+                              {run.isStale ? <span>stale</span> : null}
+                              {run.failureCode || run.failureMessage ? (
+                                <span>
+                                  {run.failureCode ?? "training_failed"}:{" "}
+                                  {run.failureMessage ?? "No failure message recorded."}
+                                </span>
+                              ) : null}
+                            </div>
+                          ))}
                         </div>
-                      ))}
-                    </div>
+                      ) : null}
+                      {benchmarkEvaluations.length > 0 ? (
+                        <div className="model-history-list" data-testid="benchmark-evaluation-list">
+                          <div className="model-history-heading">
+                            <strong>Benchmark evaluations</strong>
+                            {benchmarkEvaluationsLastCheckedAt ? (
+                              <span data-testid="benchmark-evaluations-last-checked">
+                                Last checked {formatDateTime(benchmarkEvaluationsLastCheckedAt)}
+                              </span>
+                            ) : null}
+                            {hasActiveBenchmarkEvaluation ? (
+                              <span data-testid="benchmark-evaluations-polling">Auto-refreshing</span>
+                            ) : null}
+                          </div>
+                          {benchmarkEvaluations.map((evaluation) => (
+                            <div
+                              className="training-run-row"
+                              data-testid="benchmark-evaluation-list-item"
+                              key={evaluation.benchmarkEvaluationId}
+                            >
+                              <span>{evaluation.humanReadableId}</span>
+                              <span>{evaluation.status}</span>
+                              <span>Phase {evaluation.phase}</span>
+                              <span>Candidate {evaluation.modelCandidateHumanReadableId}</span>
+                              <span>
+                                Benchmark{" "}
+                                {String(evaluation.metricsSummary.benchmark_item_count ?? "n/a")}
+                              </span>
+                              <span>Precision {formatMetric(evaluation.metricsSummary.precision)}</span>
+                              <span>Recall {formatMetric(evaluation.metricsSummary.recall)}</span>
+                              {evaluation.lastActivityMessage ? (
+                                <span>{evaluation.lastActivityMessage}</span>
+                              ) : null}
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+                    </section>
                   ) : null}
                 </div>
-                </div>
-              </div>
-              </div>
             </section>
           ) : null}
 

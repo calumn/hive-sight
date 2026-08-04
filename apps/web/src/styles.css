@@ -770,8 +770,7 @@ label span {
 .crop-dataset-controls > div:first-child,
 .crop-dataset-controls .review-state,
 .crop-dataset-controls .export-summary,
-.crop-dataset-controls .review-request-panel,
-.crop-dataset-controls .model-training-panel {
+.crop-dataset-controls .review-request-panel {
   grid-column: 1 / -1;
 }
 
@@ -837,12 +836,150 @@ label span {
 }
 
 .model-training-panel {
-  background: #ffffff;
+  background: #fbfcfa;
   border: 1px solid #dce2d7;
   border-radius: 6px;
   display: grid;
-  gap: 10px;
+  gap: 0;
   padding: 12px;
+}
+
+.model-workflow-header,
+.model-workflow-stage {
+  border-bottom: 1px solid #dce2d7;
+  display: grid;
+  gap: 12px;
+  padding: 14px 0;
+}
+
+.model-workflow-header {
+  align-items: start;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding-top: 0;
+}
+
+.model-workflow-header > span {
+  background: #f7f9f5;
+  border: 1px solid #dce2d7;
+  border-radius: 6px;
+  color: #515b4c;
+  font-weight: 800;
+  padding: 6px 8px;
+}
+
+.model-workflow-header p,
+.model-workflow-stage p {
+  color: #515b4c;
+  line-height: 1.4;
+  margin: 4px 0 0;
+}
+
+.model-workflow-stage:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.model-workflow-stage-heading {
+  align-items: start;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 34px minmax(0, 1fr);
+}
+
+.workflow-step-number {
+  align-items: center;
+  background: #203522;
+  border-radius: 50%;
+  color: #ffffff;
+  display: inline-flex;
+  font-weight: 900;
+  height: 28px;
+  justify-content: center;
+  width: 28px;
+}
+
+.model-workflow-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.model-workflow-actions.secondary {
+  border-top: 1px solid #e8ece4;
+  padding-top: 10px;
+}
+
+.model-workflow-summary,
+.model-workflow-record,
+.model-run-title,
+.model-workflow-facts,
+.model-history-heading {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.model-workflow-summary,
+.model-workflow-record,
+.model-run-detail,
+.model-history-list {
+  background: #ffffff;
+  border: 1px solid #dce2d7;
+  border-radius: 6px;
+  padding: 10px;
+}
+
+.model-run-detail {
+  display: grid;
+  gap: 10px;
+}
+
+.model-run-detail.compact {
+  gap: 8px;
+}
+
+.model-workflow-summary span,
+.model-workflow-summary code,
+.model-workflow-record span,
+.model-workflow-record code,
+.model-run-title span,
+.model-workflow-facts span,
+.model-history-heading span,
+.training-run-row span {
+  background: #f7f9f5;
+  border: 1px solid #dce2d7;
+  border-radius: 6px;
+  font-weight: 800;
+  padding: 6px 8px;
+}
+
+.model-workflow-summary p,
+.model-run-detail p,
+.model-history-list p {
+  flex-basis: 100%;
+}
+
+.model-warning.warning {
+  background: #fff7d9;
+  border-color: #ead37b;
+  color: #6a5413;
+}
+
+.model-warning.info {
+  background: #eef5ff;
+  border-color: #b8ccea;
+  color: #25415f;
+}
+
+.model-history-list {
+  display: grid;
+  gap: 8px;
+}
+
+.model-history-heading {
+  justify-content: space-between;
 }
 
 .review-request-panel {
@@ -1487,6 +1624,7 @@ label span {
   .repository-summary,
   .repository-filters,
   .repository-browser,
+  .model-workflow-header,
   .training-workflow-stage-nav,
   .crop-governance-layout,
   .control-cluster {

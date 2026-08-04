@@ -70,7 +70,8 @@ The initial default stage is derived from saved state when the User first opens 
 - no selected or resumable Inspection: `Inspection Setup`;
 - selected Inspection but no uploaded photos: `Crop Selection`;
 - uploaded photos or crops with pending annotation: `Bee Annotation`;
-- all crops complete, Dataset Items exist, or review work exists: `Crop Governance`.
+- all crops complete, Dataset Items exist, or review work exists: `Crop Governance`;
+- Dataset Versions, Training Runs, Model Candidates, or Benchmark Evaluations are being managed: `Model Governance`.
 
 After that, the selected stage remains under the User's control. Completing a crop must not automatically bounce the User into Crop Governance; the UI should instead show clear next-action buttons.
 
@@ -178,7 +179,22 @@ Reopening an assigned crop invalidates or removes its active Dataset Item assign
 
 Crop Governance shows selected Inspection crops only, not the whole Workspace. It includes source-photo grouping or labels, and a light `Waiting for review` filter/section for crops from this Inspection. A broader cross-inspection dashboard for "my submitted crops waiting for review" remains parked.
 
-Dataset export and model training remain in the existing model-governance panel for this slice, but are separated from the primary bee-annotation editor by living in Crop Governance. A dedicated Model Governance page remains parked, because moving the whole model lifecycle is useful but wider than this workflow-separation slice.
+Dataset Item export remains near Crop Governance because Dataset Role assignment is a crop-governance action. Dataset Version, Training Run, Model Candidate, and Benchmark Evaluation controls now live in Model Governance because they operate across Dataset Items rather than one selected Training Crop. A dedicated top-level Model Governance page remains parked, because this slice keeps the first separation inside the Training Inspection workflow.
+
+### Stage 5: Model Governance
+
+Model Governance shows workspace-level model evidence and jobs derived from Dataset Items. It owns:
+
+- checking Bee Detector training readiness;
+- creating Dataset Versions;
+- acknowledging high-severity dataset warnings for baseline training;
+- starting, cancelling, abandoning, and deleting Training Runs;
+- selecting a completed Model Candidate for crop YOLO pre-labelling;
+- checking Benchmark Evaluation readiness;
+- starting and cancelling Benchmark Evaluations;
+- showing recent Training Run and Benchmark Evaluation history.
+
+Model Governance must not require one selected Training Crop. It must not show per-crop Dataset Role assignment controls, review-request controls, crop reopen/edit actions, or the selected-crop worklist.
 
 ## Workflow Rules
 
@@ -268,7 +284,7 @@ Persisting last selected stage/photo/crop is out of scope.
 - Per-ellipse reviewer comments or second-review/adjudication semantics.
 - Hard-gating Bee Detector training on independent Review Queue outcomes.
 - Full Dataset Item supersession workflow, including invalidating/removing an active assignment when a crop is reopened.
-- Moving dataset export/model training into a dedicated Model Governance page.
+- Moving model governance into a dedicated top-level Model Governance page outside the Training Inspection workflow.
 - Negative/background Dataset Role for zero-bee crops.
 - UI-level Gherkin harness implementation.
 - Changing dataset eligibility, review rules, or model training rules beyond displaying/locking actions correctly.
@@ -283,7 +299,7 @@ Feature: Training Inspection workflow separation
   Scenario: Dataset Curator works through training inspection stages
     Given a Dataset Curator has selected a Training Data Collection Inspection
     When the Dataset Curator opens the Training Inspection workflow
-    Then HiveSight shows separate stages for Inspection Setup, Crop Selection, Bee Annotation, and Crop Governance
+    Then HiveSight shows separate stages for Inspection Setup, Crop Selection, Bee Annotation, Crop Governance, and Model Governance
     And each stage shows controls for its own task without crowding the other stages
     And the stage progress counts describe the whole selected Inspection
 
@@ -325,7 +341,7 @@ Feature: Training Inspection workflow separation
 
 ## Documentation Updates
 
-- Update `docs/user-guide.md` so the Training Data Collection task is described as staged workflow: Inspection Setup, Crop Selection, Bee Annotation, Crop Governance, Repository.
+- Update `docs/user-guide.md` so the Training Data Collection task is described as staged workflow: Inspection Setup, Crop Selection, Bee Annotation, Crop Governance, Model Governance, Repository.
 - Update `requirements/roadmap.md` and `architecture/parking-lot.md` with deferred work from grilling.
 
 ## Grilling Decisions
@@ -337,7 +353,7 @@ Feature: Training Inspection workflow separation
 - Keep the Development User switcher outside the workflow.
 - Keep Photo Upload and crop drawing in Crop Selection.
 - Keep YOLO crop pre-labelling in Bee Annotation as a secondary annotation aid.
-- Keep Dataset export, Dataset Version, Training Run, Model Candidate, and Benchmark Evaluation controls out of the Bee Annotation stage. The implementation keeps them in Crop Governance for now; a dedicated Model Governance page remains parked.
+- Keep Dataset export, Dataset Version, Training Run, Model Candidate, and Benchmark Evaluation controls out of the Bee Annotation stage. The implementation keeps Dataset Item export in Crop Governance and moves Dataset Version, Training Run, Model Candidate, and Benchmark Evaluation controls into the Model Governance stage. A top-level Model Governance page remains parked.
 - Make Crop Governance a selected-Inspection worklist with selected-crop detail/actions.
 - Keep independent review and Dataset Role assignment separate, visible governance concepts.
 - Allow Dataset Role assignment before independent review for now, with clear warnings.

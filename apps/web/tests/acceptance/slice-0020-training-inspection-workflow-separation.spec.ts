@@ -29,6 +29,7 @@ test("Dataset Curator works through separated Training Inspection stages", async
   await expect(page.getByTestId("training-workflow-stage-setup")).toBeVisible();
   await expect(page.getByTestId("workflow-stage-crop-selection-button")).toContainText("0 crops");
   await expect(page.getByTestId("workflow-stage-bee-annotation-button")).toContainText("0 pending");
+  await expect(page.getByTestId("workflow-stage-model-governance-button")).toContainText("jobs");
 
   await page.getByTestId("workflow-stage-crop-selection-button").click();
   await expect(page.getByTestId("workflow-stage-crop-selection-button")).toHaveAttribute("aria-selected", "true");
@@ -67,6 +68,13 @@ test("Dataset Curator works through separated Training Inspection stages", async
   await expect(page.getByTestId("crop-governance-detail")).toContainText("Complete visible bees 1");
   await expect(page.getByTestId("request-training-crop-review-button")).toBeVisible();
   await expect(page.getByTestId("assign-training-crop-dataset-role-button")).toBeVisible();
+  await expect(page.getByTestId("model-training-panel")).toHaveCount(0);
+
+  await page.getByTestId("workflow-stage-model-governance-button").click();
+  await expect(page.getByTestId("training-workflow-stage-model-governance")).toBeVisible();
+  await expect(page.getByTestId("workflow-stage-model-governance-button")).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByTestId("model-training-panel")).toBeVisible();
+  await expect(page.getByTestId("training-crop-dataset-role-select")).toHaveCount(0);
 
   await page.getByTestId("workflow-stage-bee-annotation-button").click();
   await expect(page.getByTestId("training-crop-ellipse")).toHaveCount(1);

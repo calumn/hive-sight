@@ -77,12 +77,16 @@ An Inspection Intent for gathering reviewed image and annotation evidence to imp
 _Avoid_: Real inspection when the purpose is dataset creation rather than beekeeper assessment.
 
 **Training Inspection Workflow**:
-The staged Web UI workflow used for a Training Data Collection Inspection. Its current stages are Inspection Setup, Crop Selection, Bee Annotation, and Crop Governance. Stage changes are navigation only; saved photos, crops, ellipses, review requests, and Dataset Items remain the durable state.
+The staged Web UI workflow used for a Training Data Collection Inspection. Its current stages are Inspection Setup, Crop Selection, Bee Annotation, Crop Governance, and Model Governance. Stage changes are navigation only; saved photos, crops, ellipses, review requests, Dataset Items, Dataset Versions, Training Runs, Model Candidates, and Benchmark Evaluations remain the durable state.
 _Avoid_: Treating the selected UI stage as domain state or persisted inspection status.
 
 **Crop Governance**:
 The Training Inspection Workflow stage where a Dataset Curator reviews the selected Inspection's completed Training Crops, requests independent review, cancels pending review requests, assigns Dataset Roles, and sees why governance actions are unavailable.
 _Avoid_: Bee Annotation when the actor is governing completed crop evidence rather than drawing or editing ellipses.
+
+**Model Governance**:
+The Training Inspection Workflow stage where a Dataset Curator checks workspace-level dataset readiness, creates Dataset Versions, starts Bee Detector Training Runs, selects Model Candidates for crop pre-labelling, and runs Benchmark Evaluations. It operates across Dataset Items rather than one selected Training Crop.
+_Avoid_: Crop Governance when the actor is governing cross-crop model evidence rather than one crop's review or Dataset Role assignment.
 
 **Varroa Assessment**:
 An Inspection Intent for estimating visible Varroa evidence from inspection photos for beekeeper-facing support.
