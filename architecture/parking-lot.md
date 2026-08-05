@@ -671,7 +671,7 @@ For future real hive inspections, HiveSight needs a model pipeline that can iden
 
 Why parked:
 
-The current training-data workflow is still building the first governed bee dataset. The first design is recorded, but implementation should wait until Orientation Reliability and enough reviewed directed-ellipse evidence exist to produce a meaningful shared marked-bee Dataset Version, Bee Orientation export package, and benchmark.
+Slice 0022 now creates shared Marked-Bee Dataset Versions and validates the first Bee Orientation Head Up / Head Down package with a fake-adapter baseline candidate. What remains parked is real predictive Bee Orientation training, benchmark evaluation, inference, and the decision about whether the binary classifier is sufficient or should be replaced by a keypoint/pose or multi-head model.
 
 Revisit trigger:
 

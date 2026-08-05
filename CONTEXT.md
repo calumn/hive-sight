@@ -85,7 +85,7 @@ The Training Inspection Workflow stage where a Dataset Curator reviews the selec
 _Avoid_: Bee Annotation when the actor is governing completed crop evidence rather than drawing or editing ellipses.
 
 **Model Governance**:
-The Training Inspection Workflow stage where a Dataset Curator checks workspace-level dataset readiness, creates Dataset Versions, starts Bee Detector Training Runs, selects Model Candidates for crop pre-labelling, and runs Benchmark Evaluations. It operates across Dataset Items rather than one selected Training Crop.
+The Training Inspection Workflow stage where a Dataset Curator checks workspace-level dataset readiness, creates shared Marked-Bee Dataset Versions, starts Bee Detector and Bee Orientation Training Runs, selects Bee Detector Model Candidates for crop pre-labelling, and runs Benchmark Evaluations. It operates across Dataset Items rather than one selected Training Crop.
 _Avoid_: Crop Governance when the actor is governing cross-crop model evidence rather than one crop's review or Dataset Role assignment.
 
 **Varroa Assessment**:

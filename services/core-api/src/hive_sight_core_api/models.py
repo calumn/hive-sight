@@ -837,9 +837,20 @@ class ModelTrainingReadinessResponse(BaseModel):
     adapter_type: str
     real_adapter_available: bool
     active_training_run_id: UUID | None = None
+    model_purpose: str = "bee_detector"
+    dataset_version_id: UUID | None = None
+    dataset_version_human_readable_id: str | None = None
+    dataset_version_purpose: str | None = None
     training_item_count: int
     validation_item_count: int
     benchmark_item_count: int
+    eligible_training_source_bee_count: int = 0
+    eligible_validation_source_bee_count: int = 0
+    generated_training_example_count: int = 0
+    generated_validation_example_count: int = 0
+    protected_benchmark_source_bee_count: int = 0
+    excluded_unreliable_orientation_count: int = 0
+    excluded_partial_visible_bee_count: int = 0
     eligible_to_create_dataset_version: bool
     eligible_to_start_training: bool
     warnings: list[ModelTrainingWarningResponse]
@@ -847,7 +858,7 @@ class ModelTrainingReadinessResponse(BaseModel):
 
 class DatasetVersionCreateRequest(BaseModel):
     workspace_id: UUID
-    purpose: str = "bee_detector_training_baseline"
+    purpose: str = "marked_bee_detection_orientation"
 
 
 class DatasetVersionResponse(BaseModel):
@@ -886,6 +897,7 @@ class DatasetVersionResponse(BaseModel):
 class TrainingRunStartRequest(BaseModel):
     workspace_id: UUID
     dataset_version_id: UUID
+    model_purpose: str = "bee_detector"
     model_size: str = "nano"
     epochs: int = Field(default=1, ge=1, le=100)
     image_size: int = Field(default=640, ge=128, le=2048)

@@ -1,6 +1,6 @@
 # Vertical Slice 0022: Bee Orientation Training Baseline
 
-Status: accepted for implementation after renewed acceptance scenario signoff.
+Status: implemented; focused API, BDD, web type-check, Slice 0022 browser acceptance, and `pnpm verify:slice` have passed.
 
 ## Purpose
 
@@ -282,28 +282,28 @@ Minimum additions or generalizations:
 
 ## Acceptance Criteria
 
-- [ ] New Dataset Versions created by Model Governance are visibly Marked-Bee Dataset Versions for Bee Detection and Bee Orientation, not Bee Detector-only evidence.
-- [ ] Existing old Dataset Versions are not silently rewritten.
-- [ ] Bee Detection training remains compatible with old Bee Detector-only test versions and new Marked-Bee versions where needed.
-- [ ] Bee Orientation training requires the new shared Marked-Bee Dataset Version purpose.
-- [ ] Shared Dataset Version creation does not require orientation readiness.
-- [ ] Dataset Curator can check Bee Orientation readiness from Model Governance.
-- [ ] Readiness counts only reliable complete visible bee snapshots in Training and Validation as eligible orientation source bees.
-- [ ] Readiness reports unreliable, partial, and protected benchmark evidence separately.
-- [ ] Missing or unreadable source image bytes block orientation training.
-- [ ] Training is blocked unless at least one eligible Training bee and one eligible Validation bee exist.
-- [ ] Starting a Bee Orientation baseline builds a real derived Head Up / Head Down package from Dataset Item snapshots and original source image bytes.
-- [ ] The package creates two 224x224 PNG examples per eligible source bee: head-up and generated head-down.
-- [ ] Generated examples remain in the same split as their source Dataset Item.
-- [ ] Package artifacts include generated PNGs, `manifest.json`, `labels.jsonl`, `exclusions.jsonl`, deterministic package hash, image SHA-256 values, and a contact-sheet report with thumbnails.
-- [ ] Fake Bee Orientation adapter validates the package only and creates a completed Training Run and non-user-facing Model Candidate with `model_purpose` `bee_orientation`.
-- [ ] Fake adapter reports package/count metrics only, with no fake accuracy or fake confusion matrix.
-- [ ] Candidate artifact is a fake adapter manifest, not fake model weights.
-- [ ] Bee Detector and Bee Orientation Training Runs can coexist in job history and are clearly labelled by Model Purpose.
-- [ ] Bee Orientation Model Candidates cannot be used for Bee Detector crop pre-labelling, Bee Detector benchmark evaluation, Bee Orientation benchmark execution, orientation inference, or Varroa Assessment.
-- [ ] Focused Core API tests, package-builder tests, Playwright acceptance, and `pnpm verify:slice` pass.
-- [ ] Live Postgres verification is run or explicitly recorded as pending if Docker/Postgres is unavailable.
-- [ ] Slice 0022 implementation updates relevant document artifacts: `CONTEXT.md`, `requirements/roadmap.md`, `requirements/model-requirements.md`, `architecture/domain-model.md`, `architecture/bee-orientation-classifier-design.md`, this slice document, `architecture/parking-lot.md`, and Dataset Curator/Model Governance user-guide material where applicable.
+- [x] New Dataset Versions created by Model Governance are visibly Marked-Bee Dataset Versions for Bee Detection and Bee Orientation, not Bee Detector-only evidence.
+- [x] Existing old Dataset Versions are not silently rewritten.
+- [x] Bee Detection training remains compatible with old Bee Detector-only test versions and new Marked-Bee versions where needed.
+- [x] Bee Orientation training requires the new shared Marked-Bee Dataset Version purpose.
+- [x] Shared Dataset Version creation does not require orientation readiness.
+- [x] Dataset Curator can check Bee Orientation readiness from Model Governance.
+- [x] Readiness counts only reliable complete visible bee snapshots in Training and Validation as eligible orientation source bees.
+- [x] Readiness reports unreliable, partial, and protected benchmark evidence separately.
+- [x] Missing or unreadable source image bytes block orientation training.
+- [x] Training is blocked unless at least one eligible Training bee and one eligible Validation bee exist.
+- [x] Starting a Bee Orientation baseline builds a real derived Head Up / Head Down package from Dataset Item snapshots and original source image bytes.
+- [x] The package creates two 224x224 PNG examples per eligible source bee: head-up and generated head-down.
+- [x] Generated examples remain in the same split as their source Dataset Item.
+- [x] Package artifacts include generated PNGs, `manifest.json`, `labels.jsonl`, `exclusions.jsonl`, deterministic package hash, image SHA-256 values, and a contact-sheet report with thumbnails.
+- [x] Fake Bee Orientation adapter validates the package only and creates a completed Training Run and non-user-facing Model Candidate with `model_purpose` `bee_orientation`.
+- [x] Fake adapter reports package/count metrics only, with no fake accuracy or fake confusion matrix.
+- [x] Candidate artifact is a fake adapter manifest, not fake model weights.
+- [x] Bee Detector and Bee Orientation Training Runs can coexist in job history and are clearly labelled by Model Purpose.
+- [x] Bee Orientation Model Candidates cannot be used for Bee Detector crop pre-labelling, Bee Detector benchmark evaluation, Bee Orientation benchmark execution, orientation inference, or Varroa Assessment.
+- [x] Focused Core API tests, package-builder tests, Playwright acceptance, and `pnpm verify:slice` pass.
+- [x] Live Postgres verification is run or explicitly recorded as pending if Docker/Postgres is unavailable.
+- [x] Slice 0022 implementation updates relevant document artifacts: `CONTEXT.md`, `requirements/roadmap.md`, `requirements/model-requirements.md`, `architecture/domain-model.md`, `architecture/bee-orientation-classifier-design.md`, this slice document, `architecture/parking-lot.md`, and Dataset Curator/Model Governance user-guide material where applicable.
 
 ## Open Questions
 

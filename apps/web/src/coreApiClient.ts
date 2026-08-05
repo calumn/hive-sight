@@ -153,6 +153,13 @@ export type ImageQualityStatus = "unassessed" | "usable" | "poor_quality" | "exc
 
 export type DatasetRole = "training" | "validation" | "benchmark" | "excluded";
 
+export type ModelPurpose = "bee_detector" | "marked_bee" | "bee_orientation";
+
+export type TrainingExportFormat =
+  | "yolo_obb_v1"
+  | "marked_bee_dataset_v1"
+  | "bee_orientation_head_up_down_v1";
+
 export type DatasetExclusionReason =
   | "poor_image_quality"
   | "ambiguous_subject"
@@ -684,12 +691,23 @@ export type ModelTrainingReadiness = {
   adapterType: "fake" | "ultralytics_yolo_obb";
   databasePurpose: string;
   realAdapterAvailable: boolean;
+  modelPurpose: ModelPurpose;
+  datasetVersionId: string | null;
+  datasetVersionHumanReadableId: string | null;
+  datasetVersionPurpose: string | null;
   eligibleToCreateDatasetVersion: boolean;
   eligibleToStartTraining: boolean;
   activeTrainingRunId: string | null;
   trainingItemCount: number;
   validationItemCount: number;
   benchmarkItemCount: number;
+  eligibleTrainingSourceBeeCount: number;
+  eligibleValidationSourceBeeCount: number;
+  generatedTrainingExampleCount: number;
+  generatedValidationExampleCount: number;
+  protectedBenchmarkSourceBeeCount: number;
+  excludedUnreliableOrientationCount: number;
+  excludedPartialVisibleBeeCount: number;
   warnings: ModelTrainingWarning[];
 };
 
@@ -709,9 +727,9 @@ export type DatasetVersion = {
   humanReadableId: string;
   workspaceId: string;
   purpose: string;
-  modelPurpose: "bee_detector";
+  modelPurpose: ModelPurpose;
   status: string;
-  exportFormat: "yolo_obb_v1";
+  exportFormat: TrainingExportFormat;
   selectionCriteria: Record<string, unknown>;
   manifestHash: string;
   createdByUserId: string;
@@ -742,7 +760,7 @@ export type TrainingRun = {
   humanReadableId: string;
   workspaceId: string;
   datasetVersionId: string;
-  modelPurpose: "bee_detector";
+  modelPurpose: ModelPurpose;
   modelFamily: string;
   modelSize: string;
   baseWeights: string;
@@ -800,7 +818,7 @@ export type ModelCandidate = {
   displayName: string;
   workspaceId: string;
   trainingRunId: string;
-  modelPurpose: "bee_detector";
+  modelPurpose: ModelPurpose;
   modelFamily: string;
   adapterType: "fake" | "ultralytics_yolo_obb";
   artifactId: string;
@@ -1496,12 +1514,19 @@ export async function createPhysicalYoloObbExport({
 
 export async function fetchModelTrainingReadiness({
   devUserId,
-  workspaceId
+  workspaceId,
+  modelPurpose = "bee_detector",
+  datasetVersionId
 }: {
   devUserId: string;
   workspaceId: string;
+  modelPurpose?: ModelPurpose;
+  datasetVersionId?: string | null;
 }): Promise<ModelTrainingReadiness> {
-  const params = new URLSearchParams({ workspace_id: workspaceId });
+  const params = new URLSearchParams({ workspace_id: workspaceId, model_purpose: modelPurpose });
+  if (datasetVersionId) {
+    params.set("dataset_version_id", datasetVersionId);
+  }
   const response = await fetch(`${coreApiUrl}/v1/model-training/readiness?${params}`, {
     headers: devAuthHeaders(devUserId)
   });
@@ -1534,11 +1559,13 @@ export async function startModelTrainingRun({
   devUserId,
   workspaceId,
   datasetVersionId,
+  modelPurpose = "bee_detector",
   acknowledgeHighSeverityWarnings
 }: {
   devUserId: string;
   workspaceId: string;
   datasetVersionId: string;
+  modelPurpose?: ModelPurpose;
   acknowledgeHighSeverityWarnings: boolean;
 }): Promise<TrainingRun> {
   const response = await fetch(`${coreApiUrl}/v1/model-training/training-runs`, {
@@ -1547,6 +1574,7 @@ export async function startModelTrainingRun({
     body: JSON.stringify({
       workspace_id: workspaceId,
       dataset_version_id: datasetVersionId,
+      model_purpose: modelPurpose,
       acknowledge_high_severity_warnings: acknowledgeHighSeverityWarnings
     })
   });
@@ -3039,6 +3067,13 @@ function parseModelTrainingReadiness(value: unknown): ModelTrainingReadiness {
     adapterType: requireTrainingAdapterType(record.adapter_type),
     databasePurpose: requireString(record.database_purpose, "database_purpose"),
     realAdapterAvailable: requireBoolean(record.real_adapter_available, "real_adapter_available"),
+    modelPurpose: requireModelPurpose(record.model_purpose),
+    datasetVersionId: optionalString(record.dataset_version_id, "dataset_version_id"),
+    datasetVersionHumanReadableId: optionalString(
+      record.dataset_version_human_readable_id,
+      "dataset_version_human_readable_id"
+    ),
+    datasetVersionPurpose: optionalString(record.dataset_version_purpose, "dataset_version_purpose"),
     eligibleToCreateDatasetVersion: requireBoolean(
       record.eligible_to_create_dataset_version,
       "eligible_to_create_dataset_version"
@@ -3051,6 +3086,34 @@ function parseModelTrainingReadiness(value: unknown): ModelTrainingReadiness {
     trainingItemCount: requireNumber(record.training_item_count, "training_item_count"),
     validationItemCount: requireNumber(record.validation_item_count, "validation_item_count"),
     benchmarkItemCount: requireNumber(record.benchmark_item_count, "benchmark_item_count"),
+    eligibleTrainingSourceBeeCount: requireNumber(
+      record.eligible_training_source_bee_count,
+      "eligible_training_source_bee_count"
+    ),
+    eligibleValidationSourceBeeCount: requireNumber(
+      record.eligible_validation_source_bee_count,
+      "eligible_validation_source_bee_count"
+    ),
+    generatedTrainingExampleCount: requireNumber(
+      record.generated_training_example_count,
+      "generated_training_example_count"
+    ),
+    generatedValidationExampleCount: requireNumber(
+      record.generated_validation_example_count,
+      "generated_validation_example_count"
+    ),
+    protectedBenchmarkSourceBeeCount: requireNumber(
+      record.protected_benchmark_source_bee_count,
+      "protected_benchmark_source_bee_count"
+    ),
+    excludedUnreliableOrientationCount: requireNumber(
+      record.excluded_unreliable_orientation_count,
+      "excluded_unreliable_orientation_count"
+    ),
+    excludedPartialVisibleBeeCount: requireNumber(
+      record.excluded_partial_visible_bee_count,
+      "excluded_partial_visible_bee_count"
+    ),
     warnings: requireArray(record.warnings, "warnings").map(parseModelTrainingWarning)
   };
 }
@@ -3725,15 +3788,19 @@ function requireYoloObbExportFormat(value: unknown): "yolo_obb" {
   throw new Error("Core API response had an unexpected export format");
 }
 
-function requireTrainingExportFormat(value: unknown): "yolo_obb_v1" {
-  if (value === "yolo_obb_v1") {
+function requireTrainingExportFormat(value: unknown): TrainingExportFormat {
+  if (
+    value === "yolo_obb_v1" ||
+    value === "marked_bee_dataset_v1" ||
+    value === "bee_orientation_head_up_down_v1"
+  ) {
     return value;
   }
   throw new Error("Core API response had an unexpected training export format");
 }
 
-function requireModelPurpose(value: unknown): "bee_detector" {
-  if (value === "bee_detector") {
+function requireModelPurpose(value: unknown): ModelPurpose {
+  if (value === "bee_detector" || value === "marked_bee" || value === "bee_orientation") {
     return value;
   }
   throw new Error("Core API response had an unexpected model purpose");

@@ -1,6 +1,7 @@
 from datetime import UTC, date, datetime, timedelta
 from io import BytesIO
 from pathlib import Path
+import json
 import threading
 import time
 from uuid import UUID
@@ -54,7 +55,9 @@ def test_dataset_curator_creates_dataset_version_and_fake_training_run(
         assert dataset_version["human_readable_id"] == "HS-DV-000001"
         assert dataset_version["training_item_count"] == 1
         assert dataset_version["validation_item_count"] == 1
-        assert dataset_version["export_format"] == "yolo_obb_v1"
+        assert dataset_version["purpose"] == "marked_bee_detection_orientation"
+        assert dataset_version["model_purpose"] == "marked_bee"
+        assert dataset_version["export_format"] == "marked_bee_dataset_v1"
         assert dataset_version["protected_benchmark_dataset_item_ids"] == []
         assert dataset_version["report_artifact_id"] is not None
         assert dataset_version["preview_artifact_ids"]
@@ -133,6 +136,200 @@ def test_dataset_curator_creates_dataset_version_and_fake_training_run(
         )
         assert report.status_code == 200
         assert "Bee Detector localisation only" in report.text
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_dataset_curator_creates_marked_bee_dataset_version_and_orientation_baseline(
+    tmp_path: Path,
+) -> None:
+    state = _build_state(tmp_path)
+    app.dependency_overrides[get_dev_state] = lambda: state
+    client = TestClient(app)
+    try:
+        workspace_id = _workspace(client)
+        _create_reviewed_crop_item(client, workspace_id, "training", 10, 10)
+        _create_reviewed_crop_item(client, workspace_id, "validation", 260, 10)
+
+        dataset_version_response = client.post(
+            "/v1/model-training/dataset-versions",
+            json={"workspace_id": workspace_id},
+            headers=_headers(),
+        )
+        assert dataset_version_response.status_code == 201
+        dataset_version = dataset_version_response.json()
+        assert dataset_version["purpose"] == "marked_bee_detection_orientation"
+        assert dataset_version["model_purpose"] == "marked_bee"
+        assert dataset_version["export_format"] == "marked_bee_dataset_v1"
+
+        readiness = client.get(
+            "/v1/model-training/readiness"
+            f"?workspace_id={workspace_id}&model_purpose=bee_orientation"
+            f"&dataset_version_id={dataset_version['dataset_version_id']}",
+            headers=_headers(),
+        )
+        assert readiness.status_code == 200
+        assert readiness.json()["model_purpose"] == "bee_orientation"
+        assert readiness.json()["eligible_training_source_bee_count"] == 1
+        assert readiness.json()["eligible_validation_source_bee_count"] == 1
+        assert readiness.json()["generated_training_example_count"] == 2
+        assert readiness.json()["generated_validation_example_count"] == 2
+        assert readiness.json()["eligible_to_start_training"] is True
+
+        training_response = client.post(
+            "/v1/model-training/training-runs",
+            json={
+                "workspace_id": workspace_id,
+                "dataset_version_id": dataset_version["dataset_version_id"],
+                "model_purpose": "bee_orientation",
+                "acknowledge_high_severity_warnings": True,
+            },
+            headers=_headers(),
+        )
+        assert training_response.status_code == 202
+        training_run = _wait_for_training_run_status(
+            client,
+            workspace_id,
+            training_response.json()["training_run_id"],
+            "completed",
+        )
+
+        assert training_run["model_purpose"] == "bee_orientation"
+        assert training_run["model_family"] == "bee_orientation_binary_classifier"
+        assert training_run["metrics_summary"]["predictive_training_performed"] is False
+        assert training_run["metrics_summary"]["generated_training_example_count"] == 2
+        assert training_run["metrics_summary"]["generated_validation_example_count"] == 2
+        assert "accuracy" not in training_run["metrics_summary"]
+        assert training_run["model_candidate_id"] is not None
+
+        candidates = client.get(
+            f"/v1/model-training/model-candidates?workspace_id={workspace_id}",
+            headers=_headers(),
+        )
+        orientation_candidate = [
+            candidate
+            for candidate in candidates.json()["model_candidates"]
+            if candidate["model_candidate_id"] == training_run["model_candidate_id"]
+        ][0]
+        assert orientation_candidate["model_purpose"] == "bee_orientation"
+        assert orientation_candidate["model_family"] == "bee_orientation_binary_classifier"
+        assert orientation_candidate["not_user_facing_reason"] == "baseline_training_only"
+
+        report = client.get(
+            f"/v1/model-training/artifacts/{training_run['report_artifact_id']}?workspace_id={workspace_id}",
+            headers=_headers(),
+        )
+        assert report.status_code == 200
+        assert "No predictive model training was performed" in report.text
+        assert "head_up" in report.text
+        assert "head_down" in report.text
+
+        run_dir = (
+            state.model_artifact_root
+            / "training-runs"
+            / f"training-run-{training_run['training_run_id']}"
+        )
+        package_dir = run_dir / "bee-orientation-package"
+        assert (package_dir / "manifest.json").exists()
+        assert (package_dir / "labels.jsonl").exists()
+        assert (package_dir / "exclusions.jsonl").exists()
+        labels = [
+            json.loads(line)
+            for line in (package_dir / "labels.jsonl").read_text(encoding="utf-8").splitlines()
+        ]
+        assert {label["label"] for label in labels} == {"head_up", "head_down"}
+        assert {label["augmentation"] for label in labels} == {"none", "rotate_180"}
+        assert all(label["image_sha256"] for label in labels)
+        assert list((package_dir / "images" / "train").glob("*.png"))
+        manifest = json.loads((package_dir / "manifest.json").read_text(encoding="utf-8"))
+        assert manifest["image_size"] == 224
+        assert manifest["ellipse_margin_ratio"] == 0.2
+        assert manifest["package_hash"]
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_orientation_readiness_excludes_unreliable_partial_and_benchmark_evidence(
+    tmp_path: Path,
+) -> None:
+    state = _build_state(tmp_path)
+    app.dependency_overrides[get_dev_state] = lambda: state
+    client = TestClient(app)
+    try:
+        workspace_id = _workspace(client)
+        _create_reviewed_crop_item(client, workspace_id, "training", 10, 10)
+        _create_reviewed_crop_item(client, workspace_id, "validation", 260, 10)
+        _create_reviewed_crop_item(
+            client,
+            workspace_id,
+            "training",
+            10,
+            260,
+            orientation_reliability="unreliable",
+        )
+        _create_reviewed_crop_item(
+            client,
+            workspace_id,
+            "validation",
+            260,
+            260,
+            annotation_type="partial_visible_bee",
+        )
+        _create_reviewed_crop_item(client, workspace_id, "benchmark", 420, 10)
+
+        dataset_version = client.post(
+            "/v1/model-training/dataset-versions",
+            json={"workspace_id": workspace_id},
+            headers=_headers(),
+        ).json()
+        readiness = client.get(
+            "/v1/model-training/readiness"
+            f"?workspace_id={workspace_id}&model_purpose=bee_orientation"
+            f"&dataset_version_id={dataset_version['dataset_version_id']}",
+            headers=_headers(),
+        )
+
+        assert readiness.status_code == 200
+        body = readiness.json()
+        assert body["eligible_training_source_bee_count"] == 1
+        assert body["eligible_validation_source_bee_count"] == 1
+        assert body["protected_benchmark_source_bee_count"] == 1
+        assert body["excluded_unreliable_orientation_count"] == 1
+        assert body["excluded_partial_visible_bee_count"] == 1
+        assert body["eligible_to_start_training"] is True
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_orientation_readiness_blocks_missing_source_image_bytes(tmp_path: Path) -> None:
+    state = _build_state(tmp_path)
+    app.dependency_overrides[get_dev_state] = lambda: state
+    client = TestClient(app)
+    try:
+        workspace_id = _workspace(client)
+        _create_reviewed_crop_item(client, workspace_id, "training", 10, 10)
+        _create_reviewed_crop_item(client, workspace_id, "validation", 260, 10)
+        dataset_version = client.post(
+            "/v1/model-training/dataset-versions",
+            json={"workspace_id": workspace_id},
+            headers=_headers(),
+        ).json()
+        state.object_storage.objects.clear()
+
+        readiness = client.get(
+            "/v1/model-training/readiness"
+            f"?workspace_id={workspace_id}&model_purpose=bee_orientation"
+            f"&dataset_version_id={dataset_version['dataset_version_id']}",
+            headers=_headers(),
+        )
+        body = readiness.json()
+
+        assert readiness.status_code == 200
+        assert body["eligible_to_start_training"] is False
+        assert any(
+            warning["code"] == "SOURCE_IMAGE_BYTES_MISSING"
+            for warning in body["warnings"]
+        )
     finally:
         app.dependency_overrides.clear()
 
@@ -750,6 +947,9 @@ def _create_reviewed_crop_item(
     dataset_role: str,
     crop_x: int,
     crop_y: int,
+    *,
+    annotation_type: str = "complete_visible_bee",
+    orientation_reliability: str = "reliable",
 ) -> str:
     apiary_id = client.post(
         "/v1/apiaries",
@@ -799,12 +999,13 @@ def _create_reviewed_crop_item(
         f"/v1/training-crops/{crop['training_crop_id']}/bee-ellipses",
         json={
             "workspace_id": workspace_id,
-            "annotation_type": "complete_visible_bee",
+            "annotation_type": annotation_type,
             "center_x": crop_x + 80,
             "center_y": crop_y + 80,
             "radius_x": 24,
             "radius_y": 12,
             "rotation_degrees": 15,
+            "orientation_reliability": orientation_reliability,
         },
         headers=_headers(),
     )

@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import sys
 import threading
+import base64
 from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -16,6 +17,8 @@ from io import BytesIO
 from pathlib import Path
 from typing import Protocol
 from uuid import UUID
+
+from PIL import Image, ImageOps
 
 from hive_sight_core_api.dev_store import (
     DomainError,
@@ -50,6 +53,15 @@ from hive_sight_core_api.models import (
 CLASS_MAP = {"0": "complete_visible_bee", "1": "partial_visible_bee"}
 EXPORT_FORMAT = "yolo_obb_v1"
 CONVERSION_VERSION = "ellipse_to_yolo_obb_v1"
+MARKED_BEE_DATASET_PURPOSE = "marked_bee_detection_orientation"
+LEGACY_BEE_DETECTOR_DATASET_PURPOSE = "bee_detector_training_baseline"
+MARKED_BEE_MODEL_PURPOSE = "marked_bee"
+MARKED_BEE_EXPORT_FORMAT = "marked_bee_dataset_v1"
+ORIENTATION_EXPORT_FORMAT = "bee_orientation_head_up_down_v1"
+ORIENTATION_PACKAGE_VERSION = "bee_orientation_head_up_down_v1"
+ORIENTATION_CLASS_MAP = {"0": "head_up", "1": "head_down"}
+ORIENTATION_IMAGE_SIZE = 224
+ORIENTATION_ELLIPSE_MARGIN_RATIO = 0.2
 LOGGER = logging.getLogger(__name__)
 TERMINAL_TRAINING_RUN_STATUSES = {"completed", "failed", "cancelled", "abandoned"}
 
@@ -204,8 +216,26 @@ class BeeDetectorTrainingWorkflow:
         self.stale_after_seconds = stale_after_seconds
         self.heartbeat_interval_seconds = heartbeat_interval_seconds
 
-    def readiness(self, user: UserContext, workspace_id: UUID) -> ModelTrainingReadinessResponse:
+    def readiness(
+        self,
+        user: UserContext,
+        workspace_id: UUID,
+        model_purpose: str = "bee_detector",
+        dataset_version_id: UUID | None = None,
+    ) -> ModelTrainingReadinessResponse:
         self._require_curator(user=user, workspace_id=workspace_id)
+        if model_purpose == "bee_orientation":
+            return self._orientation_readiness(
+                user=user,
+                workspace_id=workspace_id,
+                dataset_version_id=dataset_version_id,
+            )
+        if model_purpose != "bee_detector":
+            raise DomainError(
+                "unsupported_model_purpose",
+                "Only Bee Detection and Bee Orientation training readiness are supported.",
+                422,
+            )
         real_adapter_available = (
             self.adapter.check_available() if self.adapter.adapter_type != "fake" else False
         )
@@ -226,6 +256,7 @@ class BeeDetectorTrainingWorkflow:
             database_purpose=self.database_purpose,
             adapter_type=self.adapter.adapter_type,
             real_adapter_available=real_adapter_available,
+            model_purpose="bee_detector",
             active_training_run_id=active.training_run_id if active else None,
             training_item_count=counts[DatasetRole.training],
             validation_item_count=counts[DatasetRole.validation],
@@ -235,6 +266,84 @@ class BeeDetectorTrainingWorkflow:
             ),
             eligible_to_start_training=active is None
             and (self.adapter.adapter_type == "fake" or real_adapter_available),
+            warnings=warnings,
+        )
+
+    def _orientation_readiness(
+        self,
+        *,
+        user: UserContext,
+        workspace_id: UUID,
+        dataset_version_id: UUID | None,
+    ) -> ModelTrainingReadinessResponse:
+        real_adapter_available = False
+        active = self.store.active_training_run(workspace_id)
+        dataset_version = None
+        if dataset_version_id is not None:
+            dataset_version = self.get_dataset_version(
+                user=user,
+                workspace_id=workspace_id,
+                dataset_version_id=dataset_version_id,
+            )
+        elif self.store.list_dataset_versions(workspace_id):
+            dataset_version = self.store.list_dataset_versions(workspace_id)[0]
+        items = []
+        if dataset_version is not None:
+            item_ids = [
+                *dataset_version.training_dataset_item_ids,
+                *dataset_version.validation_dataset_item_ids,
+                *dataset_version.protected_benchmark_dataset_item_ids,
+            ]
+            items = [
+                self.store.dataset_items[item_id]
+                for item_id in item_ids
+                if item_id in self.store.dataset_items
+            ]
+        counts = self._orientation_evidence_counts(items)
+        warnings = self._orientation_readiness_warnings(
+            dataset_version=dataset_version,
+            counts=counts,
+            missing_source_image_count=self._orientation_missing_source_image_count(items),
+        )
+        has_blocker = any(warning.severity == ModelTrainingWarningSeverity.high for warning in warnings)
+        return ModelTrainingReadinessResponse(
+            workspace_id=workspace_id,
+            persistence_backend=self.persistence_backend,
+            database_purpose=self.database_purpose,
+            adapter_type="fake",
+            real_adapter_available=real_adapter_available,
+            model_purpose="bee_orientation",
+            dataset_version_id=dataset_version.dataset_version_id if dataset_version else None,
+            dataset_version_human_readable_id=(
+                dataset_version.human_readable_id if dataset_version else None
+            ),
+            dataset_version_purpose=dataset_version.purpose if dataset_version else None,
+            active_training_run_id=active.training_run_id if active else None,
+            training_item_count=len(dataset_version.training_dataset_item_ids)
+            if dataset_version
+            else 0,
+            validation_item_count=len(dataset_version.validation_dataset_item_ids)
+            if dataset_version
+            else 0,
+            benchmark_item_count=len(dataset_version.protected_benchmark_dataset_item_ids)
+            if dataset_version
+            else 0,
+            eligible_training_source_bee_count=counts["eligible_training"],
+            eligible_validation_source_bee_count=counts["eligible_validation"],
+            generated_training_example_count=counts["eligible_training"] * 2,
+            generated_validation_example_count=counts["eligible_validation"] * 2,
+            protected_benchmark_source_bee_count=counts["benchmark_protected"],
+            excluded_unreliable_orientation_count=counts["orientation_unreliable"],
+            excluded_partial_visible_bee_count=counts["partial_visible_bee_deferred"],
+            eligible_to_create_dataset_version=False,
+            eligible_to_start_training=(
+                dataset_version is not None
+                and active is None
+                and counts["eligible_training"] >= 1
+                and counts["eligible_validation"] >= 1
+                and not has_blocker
+                and dataset_version.purpose == MARKED_BEE_DATASET_PURPOSE
+            ),
             warnings=warnings,
         )
 
@@ -336,9 +445,13 @@ class BeeDetectorTrainingWorkflow:
         )
         manifest_payload = {
             "workspace_id": str(workspace_id),
-            "purpose": purpose,
-            "model_purpose": "bee_detector",
-            "export_format": EXPORT_FORMAT,
+            "purpose": purpose or MARKED_BEE_DATASET_PURPOSE,
+            "model_purpose": MARKED_BEE_MODEL_PURPOSE,
+            "export_format": MARKED_BEE_EXPORT_FORMAT,
+            "derived_export_formats": {
+                "bee_detector": EXPORT_FORMAT,
+                "bee_orientation": ORIENTATION_EXPORT_FORMAT,
+            },
             "included_dataset_item_ids": [str(item_id) for item_id in included_ids],
             "protected_benchmark_dataset_item_ids": [str(item_id) for item_id in benchmark_ids],
             "excluded_dataset_items": [item.model_dump(mode="json") for item in excluded_items],
@@ -352,15 +465,16 @@ class BeeDetectorTrainingWorkflow:
             dataset_version_id=dataset_version_id,
             workspace_id=workspace_id,
             human_readable_id=self._human_id("HS-DV", self.store.list_dataset_versions(workspace_id)),
-            purpose=purpose,
-            model_purpose="bee_detector",
+            purpose=purpose or MARKED_BEE_DATASET_PURPOSE,
+            model_purpose=MARKED_BEE_MODEL_PURPOSE,
             status="active",
-            export_format=EXPORT_FORMAT,
+            export_format=MARKED_BEE_EXPORT_FORMAT,
             selection_criteria={
                 "status": "active",
                 "source_evidence_type": "training_crop",
                 "required_review": "reviewed_ellipses",
                 "roles": ["training", "validation", "benchmark", "excluded"],
+                "shared_source_for": ["bee_detector", "bee_orientation"],
             },
             manifest_hash=manifest_hash,
             included_dataset_item_ids=included_ids,
@@ -433,6 +547,12 @@ class BeeDetectorTrainingWorkflow:
         request: TrainingRunStartRequest,
     ) -> TrainingRunResponse:
         self._require_curator(user=user, workspace_id=request.workspace_id)
+        if request.model_purpose not in {"bee_detector", "bee_orientation"}:
+            raise DomainError(
+                "unsupported_model_purpose",
+                "Only Bee Detection and Bee Orientation Training Runs are supported.",
+                422,
+            )
         if self.adapter.adapter_type != "fake" and self.database_purpose == "test":
             raise DomainError(
                 "real_adapter_refuses_test_database",
@@ -463,6 +583,33 @@ class BeeDetectorTrainingWorkflow:
             workspace_id=request.workspace_id,
             dataset_version_id=request.dataset_version_id,
         )
+        if request.model_purpose == "bee_orientation":
+            if dataset_version.purpose != MARKED_BEE_DATASET_PURPOSE:
+                raise DomainError(
+                    "marked_bee_dataset_version_required",
+                    "Bee Orientation training requires a Marked-Bee Dataset Version.",
+                    409,
+                )
+            orientation_counts = self._orientation_evidence_counts(
+                [
+                    self.store.dataset_items[item_id]
+                    for item_id in [
+                        *dataset_version.training_dataset_item_ids,
+                        *dataset_version.validation_dataset_item_ids,
+                        *dataset_version.protected_benchmark_dataset_item_ids,
+                    ]
+                    if item_id in self.store.dataset_items
+                ]
+            )
+            if (
+                orientation_counts["eligible_training"] < 1
+                or orientation_counts["eligible_validation"] < 1
+            ):
+                raise DomainError(
+                    "orientation_training_and_validation_required",
+                    "Create at least one reliable complete visible bee in Training and Validation before starting Bee Orientation training.",
+                    409,
+                )
         high_warnings = [
             warning.code
             for warning in dataset_version.warnings
@@ -482,20 +629,42 @@ class BeeDetectorTrainingWorkflow:
             workspace_id=request.workspace_id,
             human_readable_id=self._human_id("HS-TR", self.store.list_training_runs(request.workspace_id)),
             dataset_version_id=dataset_version.dataset_version_id,
-            model_purpose="bee_detector",
-            model_family="yolo_obb",
+            model_purpose=request.model_purpose,
+            model_family=(
+                "bee_orientation_binary_classifier"
+                if request.model_purpose == "bee_orientation"
+                else "yolo_obb"
+            ),
             model_size=request.model_size,
-            base_weights="yolo11n-obb.pt",
+            base_weights=(
+                "fake_orientation_adapter_manifest"
+                if request.model_purpose == "bee_orientation"
+                else "yolo11n-obb.pt"
+            ),
             base_weights_source="pending",
             status="queued",
             phase="queued",
             adapter_type=self.adapter.adapter_type,
             database_purpose=self.database_purpose,
             training_settings={
+                "model_purpose": request.model_purpose,
                 "model_size": request.model_size,
                 "epochs": request.epochs,
-                "image_size": request.image_size,
+                "image_size": (
+                    ORIENTATION_IMAGE_SIZE
+                    if request.model_purpose == "bee_orientation"
+                    else request.image_size
+                ),
                 "batch_size": request.batch_size,
+                **(
+                    {
+                        "ellipse_margin_ratio": ORIENTATION_ELLIPSE_MARGIN_RATIO,
+                        "augmentation_policy": "head_down_rotate_180",
+                        "package_format_version": ORIENTATION_PACKAGE_VERSION,
+                    }
+                    if request.model_purpose == "bee_orientation"
+                    else {}
+                ),
             },
             random_seed=request.random_seed,
             git_commit_sha=_git_value(["git", "rev-parse", "HEAD"]),
@@ -739,6 +908,8 @@ class BeeDetectorTrainingWorkflow:
         dataset_version: DatasetVersionResponse,
         run_dir: Path,
     ) -> TrainingRunResponse:
+        if training_run.model_purpose == "bee_orientation":
+            return self._run_orientation_training_now(training_run, dataset_version, run_dir)
         run_dir.mkdir(parents=True, exist_ok=True)
         log_path = run_dir / "training.log"
         self._append_training_log(log_path, "Training Run worker started.")
@@ -911,6 +1082,223 @@ class BeeDetectorTrainingWorkflow:
             )
             return failed
 
+    def _run_orientation_training_now(
+        self,
+        training_run: TrainingRunResponse,
+        dataset_version: DatasetVersionResponse,
+        run_dir: Path,
+    ) -> TrainingRunResponse:
+        run_dir.mkdir(parents=True, exist_ok=True)
+        log_path = run_dir / "training.log"
+        self._append_training_log(log_path, "Training Run worker started.")
+        running = training_run.model_copy(
+            update={
+                "status": "running",
+                "phase": "generating_package",
+                "started_at": self.clock(),
+                "last_heartbeat_at": self.clock(),
+                "last_activity_message": "Preparing Bee Orientation package.",
+                "progress_percent": 5,
+                "latest_log_excerpt": self._latest_log_excerpt(log_path),
+            }
+        )
+        self.store.save_training_run(running)
+        try:
+            package_dir = run_dir / "bee-orientation-package"
+            package_result = self._write_orientation_package(
+                dataset_version=dataset_version,
+                package_dir=package_dir,
+            )
+            running = self._mark_training_run_phase(
+                running,
+                phase="validating_package",
+                message="Validating Bee Orientation package with fake adapter.",
+                progress_percent=75,
+                log_path=log_path,
+            )
+            fake_manifest_path = run_dir / "fake-orientation-candidate.json"
+            fake_manifest_path.write_text(
+                json.dumps(
+                    {
+                        "model_purpose": "bee_orientation",
+                        "model_family": "bee_orientation_binary_classifier",
+                        "adapter_type": "fake",
+                        "predictive_training_performed": False,
+                        "source_dataset_version_id": str(dataset_version.dataset_version_id),
+                        "package_hash": package_result["package_hash"],
+                        "class_map": ORIENTATION_CLASS_MAP,
+                    },
+                    indent=2,
+                    sort_keys=True,
+                ),
+                encoding="utf-8",
+            )
+            package_manifest_artifact = self._record_artifact(
+                owner_type="training_run",
+                owner_id=running.training_run_id,
+                artifact_type="bee_orientation_package_manifest",
+                path=package_dir / "manifest.json",
+                content_type="application/json",
+                required_or_diagnostic="required",
+            )
+            labels_artifact = self._record_artifact(
+                owner_type="training_run",
+                owner_id=running.training_run_id,
+                artifact_type="bee_orientation_labels",
+                path=package_dir / "labels.jsonl",
+                content_type="application/jsonl",
+                required_or_diagnostic="required",
+            )
+            exclusions_artifact = self._record_artifact(
+                owner_type="training_run",
+                owner_id=running.training_run_id,
+                artifact_type="bee_orientation_exclusions",
+                path=package_dir / "exclusions.jsonl",
+                content_type="application/jsonl",
+                required_or_diagnostic="diagnostic",
+            )
+            candidate_artifact = self._record_artifact(
+                owner_type="training_run",
+                owner_id=running.training_run_id,
+                artifact_type="fake_orientation_candidate_manifest",
+                path=fake_manifest_path,
+                content_type="application/json",
+                required_or_diagnostic="required",
+            )
+            contact_sheet_artifact = self._record_artifact(
+                owner_type="training_run",
+                owner_id=running.training_run_id,
+                artifact_type="bee_orientation_contact_sheet",
+                path=package_dir / "contact-sheet.md",
+                content_type="text/markdown",
+                required_or_diagnostic="diagnostic",
+            )
+            log_artifact = self._record_artifact(
+                owner_type="training_run",
+                owner_id=running.training_run_id,
+                artifact_type="training_log",
+                path=log_path,
+                content_type="text/plain",
+                required_or_diagnostic="diagnostic",
+            )
+            candidate = ModelCandidateResponse(
+                model_candidate_id=self.store.id_factory(),
+                workspace_id=running.workspace_id,
+                human_readable_id=self._human_id(
+                    "HS-MC", self.store.list_model_candidates(running.workspace_id)
+                ),
+                display_name=f"Bee orientation baseline {running.human_readable_id}",
+                training_run_id=running.training_run_id,
+                model_purpose="bee_orientation",
+                model_family="bee_orientation_binary_classifier",
+                adapter_type="fake",
+                artifact_id=candidate_artifact.artifact_id,
+                status="created",
+                promotion_status="not_evaluated",
+                not_user_facing_reason="baseline_training_only",
+                created_at=self.clock(),
+            )
+            self.store.save_model_candidate(candidate)
+            metrics = {
+                "predictive_training_performed": False,
+                "metric_scope": "fake_adapter_package_validation",
+                "eligible_training_source_bee_count": package_result[
+                    "eligible_training_source_bee_count"
+                ],
+                "eligible_validation_source_bee_count": package_result[
+                    "eligible_validation_source_bee_count"
+                ],
+                "generated_training_example_count": package_result[
+                    "generated_training_example_count"
+                ],
+                "generated_validation_example_count": package_result[
+                    "generated_validation_example_count"
+                ],
+                "protected_benchmark_source_bee_count": package_result[
+                    "protected_benchmark_source_bee_count"
+                ],
+                "excluded_unreliable_orientation_count": package_result[
+                    "excluded_unreliable_orientation_count"
+                ],
+                "excluded_partial_visible_bee_count": package_result[
+                    "excluded_partial_visible_bee_count"
+                ],
+                "package_hash": package_result["package_hash"],
+            }
+            updated = running.model_copy(
+                update={
+                    "status": "completed",
+                    "phase": "completed",
+                    "completed_at": self.clock(),
+                    "last_heartbeat_at": self.clock(),
+                    "last_activity_message": (
+                        "Bee Orientation package validated and fake Model Candidate created."
+                    ),
+                    "progress_percent": 100,
+                    "latest_log_excerpt": self._latest_log_excerpt(log_path),
+                    "base_weights_source": "fake_adapter_manifest",
+                    "artifact_ids": [
+                        package_manifest_artifact.artifact_id,
+                        labels_artifact.artifact_id,
+                        exclusions_artifact.artifact_id,
+                        contact_sheet_artifact.artifact_id,
+                        candidate_artifact.artifact_id,
+                        log_artifact.artifact_id,
+                    ],
+                    "metrics_summary": metrics,
+                    "model_candidate_id": candidate.model_candidate_id,
+                }
+            )
+            report_id = self._write_training_report(updated, dataset_version, candidate)
+            artifact_manifest_id = self._write_artifact_manifest(updated, report_id)
+            updated = updated.model_copy(
+                update={
+                    "artifact_ids": [*updated.artifact_ids, report_id, artifact_manifest_id],
+                    "report_artifact_id": report_id,
+                }
+            )
+            self.store.save_training_run(updated)
+            return updated
+        except DomainError as error:
+            failed = running.model_copy(
+                update={
+                    "status": "failed",
+                    "phase": "failed",
+                    "completed_at": self.clock(),
+                    "last_heartbeat_at": self.clock(),
+                    "last_activity_message": "Bee Orientation baseline failed.",
+                    "progress_percent": None,
+                    "latest_log_excerpt": self._latest_log_excerpt(log_path),
+                    "failure_code": error.code,
+                    "failure_message": error.message,
+                }
+            )
+            self.store.save_training_run(failed)
+            return failed
+        except Exception as error:
+            failed = running.model_copy(
+                update={
+                    "status": "failed",
+                    "phase": "failed",
+                    "completed_at": self.clock(),
+                    "last_heartbeat_at": self.clock(),
+                    "last_activity_message": "Bee Orientation baseline failed unexpectedly.",
+                    "progress_percent": None,
+                    "latest_log_excerpt": self._latest_log_excerpt(log_path),
+                    "failure_code": "orientation_training_run_failed",
+                    "failure_message": str(error),
+                }
+            )
+            self.store.save_training_run(failed)
+            LOGGER.exception(
+                "bee_orientation_training_run_failed",
+                extra={
+                    "workspace_id": str(failed.workspace_id),
+                    "training_run_id": str(failed.training_run_id),
+                },
+            )
+            return failed
+
     def _start_background_training(
         self,
         training_run: TrainingRunResponse,
@@ -1013,6 +1401,358 @@ class BeeDetectorTrainingWorkflow:
         timestamp = self.clock().isoformat()
         with log_path.open("a", encoding="utf-8") as file:
             file.write(f"{timestamp} {message}\n")
+
+    def _orientation_evidence_counts(self, items) -> Counter[str]:
+        counts: Counter[str] = Counter()
+        for item in items:
+            for ellipse in item.reviewed_ellipse_snapshots:
+                if item.dataset_role == DatasetRole.benchmark:
+                    if (
+                        ellipse.annotation_type == AnnotationType.complete_visible_bee
+                        and str(ellipse.orientation_reliability) == "reliable"
+                    ):
+                        counts["benchmark_protected"] += 1
+                    continue
+                if ellipse.annotation_type == AnnotationType.partial_visible_bee:
+                    counts["partial_visible_bee_deferred"] += 1
+                    continue
+                if ellipse.annotation_type != AnnotationType.complete_visible_bee:
+                    counts["unsupported_annotation_type"] += 1
+                    continue
+                if str(ellipse.orientation_reliability) != "reliable":
+                    counts["orientation_unreliable"] += 1
+                    continue
+                if item.dataset_role == DatasetRole.training:
+                    counts["eligible_training"] += 1
+                elif item.dataset_role == DatasetRole.validation:
+                    counts["eligible_validation"] += 1
+        return counts
+
+    def _orientation_readiness_warnings(
+        self,
+        *,
+        dataset_version: DatasetVersionResponse | None,
+        counts: Counter[str],
+        missing_source_image_count: int,
+    ) -> list[ModelTrainingWarningResponse]:
+        warnings: list[ModelTrainingWarningResponse] = []
+        if dataset_version is None:
+            warnings.append(
+                _warning(
+                    "NO_DATASET_VERSION",
+                    "high",
+                    "Create a Marked-Bee Dataset Version before Bee Orientation training.",
+                )
+            )
+            return warnings
+        if dataset_version.purpose != MARKED_BEE_DATASET_PURPOSE:
+            warnings.append(
+                _warning(
+                    "MARKED_BEE_DATASET_VERSION_REQUIRED",
+                    "high",
+                    "Bee Orientation training requires a Marked-Bee Dataset Version.",
+                )
+            )
+        if counts["eligible_training"] < 1:
+            warnings.append(
+                _warning(
+                    "NO_RELIABLE_TRAINING_HEAD_ORIENTATION",
+                    "high",
+                    "No reliable complete visible bees exist in Training evidence.",
+                )
+            )
+        if counts["eligible_validation"] < 1:
+            warnings.append(
+                _warning(
+                    "NO_RELIABLE_VALIDATION_HEAD_ORIENTATION",
+                    "high",
+                    "No reliable complete visible bees exist in Validation evidence.",
+                )
+            )
+        if missing_source_image_count > 0:
+            warnings.append(
+                _warning(
+                    "SOURCE_IMAGE_BYTES_MISSING",
+                    "high",
+                    "One or more source images cannot be read for Bee Orientation training.",
+                )
+            )
+        if counts["partial_visible_bee_deferred"] > 0:
+            warnings.append(
+                _warning(
+                    "PARTIAL_VISIBLE_BEES_DEFERRED",
+                    "warning",
+                    "Partial visible bees are excluded from the first Bee Orientation baseline.",
+                )
+            )
+        if counts["orientation_unreliable"] > 0:
+            warnings.append(
+                _warning(
+                    "UNRELIABLE_ORIENTATION_EXCLUDED",
+                    "warning",
+                    "Bees marked with unreliable head orientation are excluded from the baseline.",
+                )
+            )
+        if counts["benchmark_protected"] == 0:
+            warnings.append(
+                _warning(
+                    "NO_ORIENTATION_BENCHMARK_ITEMS",
+                    "warning",
+                    "No protected benchmark bees exist for future Bee Orientation evaluation.",
+                )
+            )
+        return warnings
+
+    def _orientation_missing_source_image_count(self, items) -> int:
+        missing_count = 0
+        for item in items:
+            photo = self.store.inspection_photos.get(item.inspection_photo_id)
+            if photo is None or self.image_loader(photo.original_object_key) is None:
+                missing_count += 1
+        return missing_count
+
+    def _write_orientation_package(
+        self,
+        *,
+        dataset_version: DatasetVersionResponse,
+        package_dir: Path,
+    ) -> dict[str, object]:
+        if package_dir.exists():
+            shutil.rmtree(package_dir)
+        (package_dir / "images" / "train").mkdir(parents=True)
+        (package_dir / "images" / "val").mkdir(parents=True)
+        labels: list[dict[str, object]] = []
+        exclusions: list[dict[str, object]] = []
+        image_payloads: list[dict[str, object]] = []
+        items = [
+            self.store.dataset_items[item_id]
+            for item_id in [
+                *dataset_version.training_dataset_item_ids,
+                *dataset_version.validation_dataset_item_ids,
+                *dataset_version.protected_benchmark_dataset_item_ids,
+            ]
+            if item_id in self.store.dataset_items
+        ]
+        for item in items:
+            photo = self.store.inspection_photos.get(item.inspection_photo_id)
+            if photo is None:
+                raise DomainError(
+                    "source_image_missing",
+                    "A Dataset Item references a missing source image.",
+                    409,
+                )
+            image_bytes = self.image_loader(photo.original_object_key)
+            if image_bytes is None:
+                raise DomainError(
+                    "source_image_missing",
+                    "A Dataset Item source image could not be read for Bee Orientation training.",
+                    409,
+                )
+            source_hash = sha256(image_bytes).hexdigest()
+            source_image = Image.open(BytesIO(image_bytes)).convert("RGB")
+            for ellipse in item.reviewed_ellipse_snapshots:
+                exclusion_reason = self._orientation_exclusion_reason(item, ellipse)
+                if exclusion_reason is not None:
+                    exclusions.append(
+                        self._orientation_exclusion_entry(
+                            item=item,
+                            ellipse=ellipse,
+                            reason=exclusion_reason,
+                        )
+                    )
+                    continue
+                split = "train" if item.dataset_role == DatasetRole.training else "val"
+                head_up_image = self._orientation_head_up_image(source_image, ellipse)
+                examples = [
+                    ("head_up", "none", head_up_image),
+                    ("head_down", "rotate_180", head_up_image.rotate(180)),
+                ]
+                for label_name, augmentation, generated_image in examples:
+                    filename = (
+                        f"{split}-{item.dataset_item_id.hex[:8]}-"
+                        f"{ellipse.annotation_id.hex[:8]}-{label_name}.png"
+                    )
+                    relative_path = f"images/{split}/{filename}"
+                    output_path = package_dir / relative_path
+                    generated_image.save(output_path, format="PNG")
+                    generated_bytes = output_path.read_bytes()
+                    generated_hash = sha256(generated_bytes).hexdigest()
+                    entry = {
+                        "generated_example_id": (
+                            f"{item.dataset_item_id}:{ellipse.annotation_id}:{label_name}"
+                        ),
+                        "dataset_item_id": str(item.dataset_item_id),
+                        "training_crop_id": str(item.training_crop_id),
+                        "inspection_photo_id": str(item.inspection_photo_id),
+                        "annotation_id": str(ellipse.annotation_id),
+                        "split": item.dataset_role,
+                        "image_path": relative_path,
+                        "label": label_name,
+                        "class_id": 0 if label_name == "head_up" else 1,
+                        "augmentation": augmentation,
+                        "source_image_sha256": source_hash,
+                        "image_sha256": generated_hash,
+                        "transform": {
+                            "source_rotation_degrees": ellipse.rotation_degrees,
+                            "head_up_rotation_degrees": -90 - ellipse.rotation_degrees,
+                            "image_size": ORIENTATION_IMAGE_SIZE,
+                            "ellipse_margin_ratio": ORIENTATION_ELLIPSE_MARGIN_RATIO,
+                        },
+                    }
+                    labels.append(entry)
+                    image_payloads.append(
+                        {
+                            "path": relative_path,
+                            "sha256": generated_hash,
+                            "label": label_name,
+                            "split": split,
+                        }
+                    )
+        counts = {
+            "eligible_training_source_bee_count": len(
+                {
+                    (label["dataset_item_id"], label["annotation_id"])
+                    for label in labels
+                    if label["split"] == DatasetRole.training
+                }
+            ),
+            "eligible_validation_source_bee_count": len(
+                {
+                    (label["dataset_item_id"], label["annotation_id"])
+                    for label in labels
+                    if label["split"] == DatasetRole.validation
+                }
+            ),
+            "generated_training_example_count": sum(
+                1 for label in labels if label["split"] == DatasetRole.training
+            ),
+            "generated_validation_example_count": sum(
+                1 for label in labels if label["split"] == DatasetRole.validation
+            ),
+            "protected_benchmark_source_bee_count": sum(
+                1 for exclusion in exclusions if exclusion["reason"] == "benchmark_protected"
+            ),
+            "excluded_unreliable_orientation_count": sum(
+                1 for exclusion in exclusions if exclusion["reason"] == "orientation_unreliable"
+            ),
+            "excluded_partial_visible_bee_count": sum(
+                1 for exclusion in exclusions if exclusion["reason"] == "partial_visible_bee_deferred"
+            ),
+        }
+        if (
+            counts["eligible_training_source_bee_count"] < 1
+            or counts["eligible_validation_source_bee_count"] < 1
+        ):
+            raise DomainError(
+                "orientation_training_and_validation_required",
+                "Bee Orientation training requires at least one reliable complete bee in Training and Validation.",
+                409,
+            )
+        hash_payload = {
+            "package_format_version": ORIENTATION_PACKAGE_VERSION,
+            "source_dataset_version_id": str(dataset_version.dataset_version_id),
+            "class_map": ORIENTATION_CLASS_MAP,
+            "image_size": ORIENTATION_IMAGE_SIZE,
+            "ellipse_margin_ratio": ORIENTATION_ELLIPSE_MARGIN_RATIO,
+            "labels": labels,
+            "exclusions": exclusions,
+            "images": image_payloads,
+        }
+        package_hash = sha256(
+            json.dumps(hash_payload, sort_keys=True, default=str).encode("utf-8")
+        ).hexdigest()
+        manifest = {
+            **hash_payload,
+            **counts,
+            "export_format": ORIENTATION_EXPORT_FORMAT,
+            "package_hash": package_hash,
+        }
+        (package_dir / "labels.jsonl").write_text(
+            "".join(json.dumps(label, sort_keys=True, default=str) + "\n" for label in labels),
+            encoding="utf-8",
+        )
+        (package_dir / "exclusions.jsonl").write_text(
+            "".join(
+                json.dumps(exclusion, sort_keys=True, default=str) + "\n"
+                for exclusion in exclusions
+            ),
+            encoding="utf-8",
+        )
+        (package_dir / "manifest.json").write_text(
+            json.dumps(manifest, indent=2, sort_keys=True, default=str),
+            encoding="utf-8",
+        )
+        self._write_orientation_contact_sheet(package_dir=package_dir, labels=labels)
+        return {**counts, "package_hash": package_hash}
+
+    def _orientation_exclusion_reason(self, item, ellipse) -> str | None:
+        if item.dataset_role == DatasetRole.benchmark:
+            return "benchmark_protected"
+        if item.dataset_role not in {DatasetRole.training, DatasetRole.validation}:
+            return "unsupported_dataset_role"
+        if ellipse.annotation_type == AnnotationType.partial_visible_bee:
+            return "partial_visible_bee_deferred"
+        if ellipse.annotation_type != AnnotationType.complete_visible_bee:
+            return "unsupported_annotation_type"
+        if str(ellipse.orientation_reliability) != "reliable":
+            return "orientation_unreliable"
+        return None
+
+    def _orientation_exclusion_entry(self, *, item, ellipse, reason: str) -> dict[str, object]:
+        return {
+            "dataset_item_id": str(item.dataset_item_id),
+            "training_crop_id": str(item.training_crop_id),
+            "inspection_photo_id": str(item.inspection_photo_id),
+            "annotation_id": str(ellipse.annotation_id),
+            "dataset_role": item.dataset_role,
+            "annotation_type": ellipse.annotation_type,
+            "orientation_reliability": ellipse.orientation_reliability,
+            "reason": reason,
+        }
+
+    def _orientation_head_up_image(self, source_image: Image.Image, ellipse) -> Image.Image:
+        margin = 1 + ORIENTATION_ELLIPSE_MARGIN_RATIO
+        half_side = max(ellipse.radius_x, ellipse.radius_y) * margin
+        left = int(round(ellipse.center_x - half_side))
+        top = int(round(ellipse.center_y - half_side))
+        right = int(round(ellipse.center_x + half_side))
+        bottom = int(round(ellipse.center_y + half_side))
+        crop = source_image.crop((left, top, right, bottom))
+        pad_left = max(0, -left)
+        pad_top = max(0, -top)
+        pad_right = max(0, right - source_image.width)
+        pad_bottom = max(0, bottom - source_image.height)
+        if any((pad_left, pad_top, pad_right, pad_bottom)):
+            crop = ImageOps.expand(
+                crop,
+                border=(pad_left, pad_top, pad_right, pad_bottom),
+                fill=(0, 0, 0),
+            )
+        crop = ImageOps.pad(crop, (ORIENTATION_IMAGE_SIZE, ORIENTATION_IMAGE_SIZE), color=(0, 0, 0))
+        return crop.rotate(-90 - ellipse.rotation_degrees, resample=Image.Resampling.BICUBIC)
+
+    def _write_orientation_contact_sheet(
+        self,
+        *,
+        package_dir: Path,
+        labels: list[dict[str, object]],
+    ) -> None:
+        rows = [
+            "# Bee Orientation package contact sheet",
+            "",
+            "No predictive model training was performed; this fake adapter validates the package only.",
+            "",
+            "| Split | Label | Preview |",
+            "| --- | --- | --- |",
+        ]
+        for label in labels[:12]:
+            image_bytes = (package_dir / str(label["image_path"])).read_bytes()
+            encoded = base64.b64encode(image_bytes).decode("ascii")
+            rows.append(
+                f"| {label['split']} | {label['label']} | "
+                f"![{label['label']}](data:image/png;base64,{encoded}) |"
+            )
+        (package_dir / "contact-sheet.md").write_text("\n".join(rows), encoding="utf-8")
 
     def _write_dataset_package(
         self,
@@ -1157,7 +1897,7 @@ class BeeDetectorTrainingWorkflow:
                         for warning in dataset_version.warnings
                     ],
                     "",
-                    "This Dataset Version is Bee Detector training evidence only.",
+                    "This Marked-Bee Dataset Version is shared source evidence for Bee Detection and Bee Orientation training baselines.",
                 ]
             ),
             encoding="utf-8",
@@ -1179,23 +1919,40 @@ class BeeDetectorTrainingWorkflow:
     ) -> UUID:
         run_dir = self.artifact_root / "training-runs" / f"training-run-{training_run.training_run_id}"
         report_path = run_dir / "training-run-report.md"
+        if training_run.model_purpose == "bee_orientation":
+            body = [
+                f"# Training Run {training_run.human_readable_id}",
+                "",
+                f"Dataset Version: {dataset_version.human_readable_id}",
+                f"Database purpose: {training_run.database_purpose}",
+                f"Adapter: {training_run.adapter_type}",
+                f"Model Candidate: {candidate.human_readable_id}",
+                f"Promotion status: {candidate.promotion_status}",
+                "",
+                "No predictive model training was performed; this fake adapter validates the Bee Orientation package only.",
+                "",
+                "Classes: head_up, head_down",
+                "",
+                "## Metrics",
+                json.dumps(training_run.metrics_summary, indent=2, sort_keys=True),
+            ]
+        else:
+            body = [
+                f"# Training Run {training_run.human_readable_id}",
+                "",
+                f"Dataset Version: {dataset_version.human_readable_id}",
+                f"Database purpose: {training_run.database_purpose}",
+                f"Adapter: {training_run.adapter_type}",
+                f"Model Candidate: {candidate.human_readable_id}",
+                f"Promotion status: {candidate.promotion_status}",
+                "",
+                "This run trains Bee Detector localisation only. It is not Varroa assessment, not production suitable, and not a user-facing Model Version.",
+                "",
+                "## Metrics",
+                json.dumps(training_run.metrics_summary, indent=2, sort_keys=True),
+            ]
         report_path.write_text(
-            "\n".join(
-                [
-                    f"# Training Run {training_run.human_readable_id}",
-                    "",
-                    f"Dataset Version: {dataset_version.human_readable_id}",
-                    f"Database purpose: {training_run.database_purpose}",
-                    f"Adapter: {training_run.adapter_type}",
-                    f"Model Candidate: {candidate.human_readable_id}",
-                    f"Promotion status: {candidate.promotion_status}",
-                    "",
-                    "This run trains Bee Detector localisation only. It is not Varroa assessment, not production suitable, and not a user-facing Model Version.",
-                    "",
-                    "## Metrics",
-                    json.dumps(training_run.metrics_summary, indent=2, sort_keys=True),
-                ]
-            ),
+            "\n".join(body),
             encoding="utf-8",
         )
         return self._record_artifact(

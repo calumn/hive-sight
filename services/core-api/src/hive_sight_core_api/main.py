@@ -844,8 +844,15 @@ def get_model_training_readiness(
     workspace_id: UUID,
     user: AuthenticatedUserDep,
     workflow: BeeDetectorTrainingWorkflowDep,
+    model_purpose: str = "bee_detector",
+    dataset_version_id: UUID | None = None,
 ) -> ModelTrainingReadinessResponse:
-    return workflow.readiness(user=user, workspace_id=workspace_id)
+    return workflow.readiness(
+        user=user,
+        workspace_id=workspace_id,
+        model_purpose=model_purpose,
+        dataset_version_id=dataset_version_id,
+    )
 
 
 @app.post(

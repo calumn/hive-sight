@@ -195,21 +195,21 @@ Use this when a Reviewer wants to pick up available review work from the shared 
 
 The queue is shared. Once one eligible Reviewer completes an item, it disappears for other Reviewers. Reviewers cannot see work they requested or originally annotated.
 
-## Create A YOLO OBB Dataset Version
+## Create A Marked-Bee Dataset Version
 
 Use this when you have at least one Training item and one Validation item.
 
 1. Open the `Model Governance` workflow stage.
 2. In `Bee Detector model workflow`, click `Check readiness`.
 3. Review any warnings.
-4. Click `Dataset Version`.
+4. Click `Marked-Bee Version`.
 5. Confirm the summary shows the expected Training, Validation, and Benchmark counts.
 
-Dataset Versions are frozen model-training evidence. Benchmark items are protected from training export.
+Marked-Bee Dataset Versions are frozen model-training evidence shared by Bee Detector and Bee Orientation baselines. Benchmark items are protected from training export.
 
 ## Train A Bee Detector Baseline
 
-Use this when you want to train a local YOLO OBB Model Candidate from the current Dataset Version.
+Use this when you want to train a local YOLO OBB Model Candidate from the current Marked-Bee Dataset Version.
 
 1. Start HiveSight with:
 
@@ -218,7 +218,7 @@ pnpm dev:all:yolo
 ```
 
 2. Open the `Model Governance` workflow stage.
-3. Create or select a Dataset Version.
+3. Create or select a Marked-Bee Dataset Version.
 4. Acknowledge high-severity warnings if you deliberately want to continue with a small or incomplete dataset.
 5. Click `Train baseline`.
 6. Watch the Training Run summary for status, phase, heartbeat, elapsed time, log excerpt, and candidate creation.
@@ -232,6 +232,20 @@ You can also start a run from the command line:
 ```sh
 pnpm model:train:bee:yolo
 ```
+
+## Train A Bee Orientation Baseline
+
+Use this when you want to validate the first Head Up / Head Down orientation training package from the same Marked-Bee Dataset Version.
+
+1. Open the `Model Governance` workflow stage.
+2. Create a Marked-Bee Dataset Version if one is not already available.
+3. Click `Check orientation`.
+4. Confirm Training and Validation each have reliable complete marked bees.
+5. Acknowledge high-severity warnings if you deliberately want to continue with a small or incomplete dataset.
+6. Click `Train orientation`.
+7. Watch the Bee Orientation Training Run summary for completion and open the orientation report if needed.
+
+This slice validates the package and records a non-user-facing Bee Orientation Model Candidate. It does not train a predictive orientation model yet, and orientation candidates cannot be used for crop YOLO, benchmark evaluation, live orientation inference, or Varroa Assessment.
 
 ## Evaluate A Bee Localisation Model Candidate
 
