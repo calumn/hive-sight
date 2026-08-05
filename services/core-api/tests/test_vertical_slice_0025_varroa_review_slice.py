@@ -1,5 +1,6 @@
 from datetime import date
 from io import BytesIO
+from math import cos, radians, sin
 from uuid import UUID
 
 from fastapi.testclient import TestClient
@@ -126,7 +127,7 @@ def test_head_up_normalized_preview_rotates_reviewed_head_direction_up(tmp_path)
 
         assert preview.status_code == 200
         assert preview.json()["image_width_px"] == 512
-        assert preview.json()["transform_metadata"]["rotation_applied_degrees"] == 90
+        assert preview.json()["transform_metadata"]["rotation_applied_degrees"] == 120
         assert image.status_code == 200
         assert red_y < blue_y
     finally:
@@ -337,7 +338,7 @@ def _completed_crop_with_head_marker(client: TestClient) -> tuple[str, str, str]
             "center_y": 150,
             "radius_x": 70,
             "radius_y": 24,
-            "rotation_degrees": 0,
+            "rotation_degrees": 30,
             "orientation_reliability": "reliable",
         },
         headers=_headers(),
@@ -409,8 +410,13 @@ def _source_png() -> bytes:
 def _head_marker_source_png() -> bytes:
     image = Image.new("RGB", (300, 300), color=(255, 255, 255))
     draw = ImageDraw.Draw(image)
-    draw.ellipse((210, 140, 230, 160), fill=(255, 0, 0))
-    draw.ellipse((70, 140, 90, 160), fill=(0, 60, 255))
+    angle = radians(30)
+    head_x = 150 + 70 * cos(angle)
+    head_y = 150 + 70 * sin(angle)
+    tail_x = 150 - 70 * cos(angle)
+    tail_y = 150 - 70 * sin(angle)
+    draw.ellipse((head_x - 10, head_y - 10, head_x + 10, head_y + 10), fill=(255, 0, 0))
+    draw.ellipse((tail_x - 10, tail_y - 10, tail_x + 10, tail_y + 10), fill=(0, 60, 255))
     output = BytesIO()
     image.save(output, format="PNG")
     return output.getvalue()

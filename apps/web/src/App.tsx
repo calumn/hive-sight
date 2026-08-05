@@ -2270,6 +2270,28 @@ function cropImageStyle(crop: TrainingCrop) {
   };
 }
 
+function cropOrdinal(crops: TrainingCrop[], trainingCropId: string) {
+  const cropIndex = crops.findIndex((crop) => crop.trainingCropId === trainingCropId);
+  return cropIndex >= 0 ? cropIndex + 1 : 1;
+}
+
+function cropReviewPickerLabel(crops: TrainingCrop[], crop: TrainingCrop) {
+  return `Crop ${cropOrdinal(crops, crop.trainingCropId)} / ${crop.cropWidth} x ${crop.cropHeight}`;
+}
+
+const NORMALIZED_BEE_REVIEW_AREA = {
+  centerX: 0.5,
+  centerY: 0.5,
+  radiusX: 0.22,
+  radiusY: 0.42
+};
+
+function pointIsInsideNormalizedBeeReviewArea(x: number, y: number) {
+  const horizontal = (x - NORMALIZED_BEE_REVIEW_AREA.centerX) / NORMALIZED_BEE_REVIEW_AREA.radiusX;
+  const vertical = (y - NORMALIZED_BEE_REVIEW_AREA.centerY) / NORMALIZED_BEE_REVIEW_AREA.radiusY;
+  return horizontal * horizontal + vertical * vertical <= 1;
+}
+
 function ellipseStyle(crop: TrainingCrop, ellipse: OrientedBeeEllipse) {
   return {
     left: `${((ellipse.centerX - crop.cropX - ellipse.radiusX) / crop.cropWidth) * 100}%`,
@@ -2283,6 +2305,16 @@ function ellipseStyle(crop: TrainingCrop, ellipse: OrientedBeeEllipse) {
 function sourceContextStyle(crop: TrainingCrop) {
   return {
     aspectRatio: `${crop.cropWidth} / ${crop.cropHeight}`
+  };
+}
+
+function normalizedHeadEndStyle() {
+  const { centerX, centerY, radiusX, radiusY } = NORMALIZED_BEE_REVIEW_AREA;
+  return {
+    left: `${(centerX - radiusX * 0.55) * 100}%`,
+    top: `${(centerY - radiusY) * 100}%`,
+    width: `${radiusX * 1.1 * 100}%`,
+    height: `${radiusY * 0.28 * 100}%`
   };
 }
 
@@ -3122,6 +3154,9 @@ function TrainingCropAnnotationPanel({
     const rect = event.currentTarget.getBoundingClientRect();
     const x = clamp((event.clientX - rect.left) / rect.width, 0, 1);
     const y = clamp((event.clientY - rect.top) / rect.height, 0, 1);
+    if (!pointIsInsideNormalizedBeeReviewArea(x, y)) {
+      return;
+    }
     setVarroaMarkers((current) => [...current, { x: roundMarkerCoordinate(x), y: roundMarkerCoordinate(y) }]);
     setVarroaOutcome("visible_varroa_present");
   }
@@ -5119,7 +5154,31 @@ function TrainingCropAnnotationPanel({
                   </div>
                   <div className="varroa-review-layout">
                     <div className="crop-governance-list-panel">
-                      <strong>Bees in selected crop</strong>
+                      <div className="varroa-selected-crop-header" data-testid="varroa-selected-crop-summary">
+                        <div>
+                          <strong>{cropReviewPickerLabel(crops, selectedCrop)}</strong>
+                          <small>
+                            {varroaReview.candidates.length} bees in this crop
+                          </small>
+                        </div>
+                        <label className="varroa-crop-picker">
+                          <span>Review crop</span>
+                          <select
+                            value={selectedCrop.trainingCropId}
+                            onChange={(event) => setSelectedCropId(event.target.value)}
+                            data-testid="varroa-review-crop-select"
+                          >
+                            {crops.map((crop) => (
+                              <option key={crop.trainingCropId} value={crop.trainingCropId}>
+                                {cropReviewPickerLabel(crops, crop)}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      </div>
+                      <strong>
+                        Bees in Crop {cropOrdinal(crops, selectedCrop.trainingCropId)}
+                      </strong>
                       <div
                         className="crop-governance-list"
                         role="listbox"
@@ -5203,8 +5262,7 @@ function TrainingCropAnnotationPanel({
                                     <div
                                       className="varroa-preview-content"
                                       style={{
-                                        width: `${Math.round(100 * varroaZoom)}%`,
-                                        height: `${Math.round(100 * varroaZoom)}%`
+                                        transform: `scale(${varroaZoom})`
                                       }}
                                       onClick={onVarroaPreviewClick}
                                       data-testid="head-up-normalized-bee-crop-image-plane"
@@ -5212,8 +5270,13 @@ function TrainingCropAnnotationPanel({
                                       {varroaPreviewUrl ? (
                                         <img src={varroaPreviewUrl} alt="Head-up bee crop" draggable={false} />
                                       ) : (
-                                        <span>Loading preview</span>
+                                        <span className="varroa-preview-placeholder">Loading preview</span>
                                       )}
+                                      <span
+                                        className="normalized-head-end-marker"
+                                        style={normalizedHeadEndStyle()}
+                                        data-testid="head-up-normalized-bee-head-end"
+                                      />
                                       {varroaMarkers.map((marker, index) => (
                                         <span
                                           key={`${marker.x}-${marker.y}-${index}`}

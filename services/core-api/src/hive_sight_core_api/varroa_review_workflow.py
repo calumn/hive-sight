@@ -462,7 +462,7 @@ def _source_crop_bounds(
 
 
 def _head_up_rotation_degrees(rotation_degrees: float) -> float:
-    return 90 - rotation_degrees
+    return rotation_degrees + 90
 
 
 def _clean_optional_text(value: str | None) -> str | None:
