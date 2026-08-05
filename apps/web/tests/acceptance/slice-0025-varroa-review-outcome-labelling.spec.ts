@@ -50,6 +50,24 @@ test("Dataset Curator records Varroa review cues and a visible Varroa outcome", 
   );
 
   await expect(page.getByTestId("head-up-normalized-bee-crop")).toBeVisible();
+  await expect(page.getByTestId("varroa-source-crop-context")).toBeVisible();
+  await expect(page.getByTestId("varroa-source-context-selected-bee")).toBeVisible();
+  const previewBoxBeforeZoom = await page.getByTestId("head-up-normalized-bee-crop").boundingBox();
+  const previewPlaneBeforeZoom = await page
+    .getByTestId("head-up-normalized-bee-crop-image-plane")
+    .boundingBox();
+  expect(previewBoxBeforeZoom).not.toBeNull();
+  expect(previewPlaneBeforeZoom).not.toBeNull();
+  await page.getByTitle("Zoom in").click();
+  const previewBoxAfterZoom = await page.getByTestId("head-up-normalized-bee-crop").boundingBox();
+  const previewPlaneAfterZoom = await page
+    .getByTestId("head-up-normalized-bee-crop-image-plane")
+    .boundingBox();
+  expect(previewBoxAfterZoom).not.toBeNull();
+  expect(previewPlaneAfterZoom).not.toBeNull();
+  expect(Math.round(previewBoxAfterZoom!.width)).toBe(Math.round(previewBoxBeforeZoom!.width));
+  expect(Math.round(previewBoxAfterZoom!.height)).toBe(Math.round(previewBoxBeforeZoom!.height));
+  expect(previewPlaneAfterZoom!.width).toBeGreaterThan(previewPlaneBeforeZoom!.width);
   await page.getByTestId("head-up-normalized-bee-crop").click({ position: { x: 120, y: 120 } });
   await expect(page.getByTestId("varroa-marker")).toHaveCount(1);
   await expect(page.getByTestId("varroa-review-outcome-select")).toHaveValue(

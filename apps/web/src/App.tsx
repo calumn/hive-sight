@@ -2280,6 +2280,12 @@ function ellipseStyle(crop: TrainingCrop, ellipse: OrientedBeeEllipse) {
   };
 }
 
+function sourceContextStyle(crop: TrainingCrop) {
+  return {
+    aspectRatio: `${crop.cropWidth} / ${crop.cropHeight}`
+  };
+}
+
 function proposalStyle(crop: TrainingCrop, proposal: BeeAnnotationProposal) {
   return {
     left: `${((proposal.centerX - crop.cropX - proposal.radiusX) / crop.cropWidth) * 100}%`,
@@ -5192,38 +5198,57 @@ function TrainingCropAnnotationPanel({
                                   </div>
                                   <div
                                     className="varroa-preview-surface"
-                                    style={{ width: `${Math.round(256 * varroaZoom)}px` }}
-                                    onClick={onVarroaPreviewClick}
                                     data-testid="head-up-normalized-bee-crop"
                                   >
-                                    {varroaPreviewUrl ? (
-                                      <img src={varroaPreviewUrl} alt="Head-up bee crop" draggable={false} />
-                                    ) : (
-                                      <span>Loading preview</span>
-                                    )}
-                                    {varroaMarkers.map((marker, index) => (
-                                      <span
-                                        key={`${marker.x}-${marker.y}-${index}`}
-                                        className="varroa-marker"
-                                        style={{
-                                          left: `${marker.x * 100}%`,
-                                          top: `${marker.y * 100}%`
-                                        }}
-                                        data-testid="varroa-marker"
-                                      />
-                                    ))}
+                                    <div
+                                      className="varroa-preview-content"
+                                      style={{
+                                        width: `${Math.round(100 * varroaZoom)}%`,
+                                        height: `${Math.round(100 * varroaZoom)}%`
+                                      }}
+                                      onClick={onVarroaPreviewClick}
+                                      data-testid="head-up-normalized-bee-crop-image-plane"
+                                    >
+                                      {varroaPreviewUrl ? (
+                                        <img src={varroaPreviewUrl} alt="Head-up bee crop" draggable={false} />
+                                      ) : (
+                                        <span>Loading preview</span>
+                                      )}
+                                      {varroaMarkers.map((marker, index) => (
+                                        <span
+                                          key={`${marker.x}-${marker.y}-${index}`}
+                                          className="varroa-marker"
+                                          style={{
+                                            left: `${marker.x * 100}%`,
+                                            top: `${marker.y * 100}%`
+                                          }}
+                                          data-testid="varroa-marker"
+                                        />
+                                      ))}
+                                    </div>
                                   </div>
                                 </div>
                                 {sourceImageUrl ? (
                                   <div>
                                     <strong>Source crop context</strong>
-                                    <div className="varroa-source-context">
+                                    <div
+                                      className="varroa-source-context"
+                                      style={sourceContextStyle(selectedCrop)}
+                                      data-testid="varroa-source-crop-context"
+                                    >
                                       <img
                                         src={sourceImageUrl}
                                         alt="Original selected crop context"
                                         style={cropImageStyle(selectedCrop)}
                                         draggable={false}
                                       />
+                                      <span
+                                        className="source-context-ellipse selected"
+                                        style={ellipseStyle(selectedCrop, selectedVarroaCandidate.beeAnnotation)}
+                                        data-testid="varroa-source-context-selected-bee"
+                                      >
+                                        <span className="ellipse-head-arrow" />
+                                      </span>
                                     </div>
                                   </div>
                                 ) : null}

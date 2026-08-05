@@ -4,7 +4,7 @@ from uuid import UUID
 
 from fastapi.testclient import TestClient
 from hive_configuration_test_support import configure_hive
-from PIL import Image
+from PIL import Image, ImageDraw
 
 from hive_sight_core_api.dependencies import build_dev_state, get_dev_state
 from hive_sight_core_api.main import app
@@ -84,7 +84,7 @@ def test_dataset_curator_saves_positive_varroa_review_with_marker_and_preview(tm
 
         assert preview.status_code == 200
         assert preview.json()["transform_version"] == "head_up_normalized_bee_crop_v1"
-        assert preview.json()["image_width_px"] == 256
+        assert preview.json()["image_width_px"] == 512
         assert image.status_code == 200
         assert image.headers["content-type"] == "image/png"
         assert saved.status_code == 200
@@ -103,6 +103,32 @@ def test_dataset_curator_saves_positive_varroa_review_with_marker_and_preview(tm
             if candidate["bee_annotation"]["annotation_id"] == ellipse_id
         )
         assert reviewed_candidate["review_outcome"]["markers"][0]["x"] == 0.1235
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_head_up_normalized_preview_rotates_reviewed_head_direction_up(tmp_path):
+    state = build_dev_state(dataset_export_root=tmp_path / "exports")
+    app.dependency_overrides[get_dev_state] = lambda: state
+    client = TestClient(app)
+    try:
+        workspace_id, crop_id, ellipse_id = _completed_crop_with_head_marker(client)
+
+        preview = client.get(
+            f"/v1/training-crops/{crop_id}/varroa-review-candidates/{ellipse_id}"
+            f"/head-up-normalized-preview?workspace_id={workspace_id}",
+            headers=_headers(),
+        )
+        image = client.get(preview.json()["image_url"], headers=_headers())
+        output = Image.open(BytesIO(image.content)).convert("RGB")
+        red_y = _average_y_for_pixels(output, lambda red, green, blue: red > 200 and green < 80 and blue < 80)
+        blue_y = _average_y_for_pixels(output, lambda red, green, blue: blue > 200 and red < 80 and green < 120)
+
+        assert preview.status_code == 200
+        assert preview.json()["image_width_px"] == 512
+        assert preview.json()["transform_metadata"]["rotation_applied_degrees"] == 90
+        assert image.status_code == 200
+        assert red_y < blue_y
     finally:
         app.dependency_overrides.clear()
 
@@ -257,6 +283,71 @@ def _completed_crop_with_two_bees(
     return workspace_id, crop["training_crop_id"], first, second
 
 
+def _completed_crop_with_head_marker(client: TestClient) -> tuple[str, str, str]:
+    workspace_id = _workspace(client)
+    apiary_id = client.post(
+        "/v1/apiaries",
+        json={"workspace_id": workspace_id, "name": "Head Up Apiary"},
+        headers=_headers(),
+    ).json()["apiary_id"]
+    hive_id = client.post(
+        "/v1/hives",
+        json={"apiary_id": apiary_id, "name": "Head Up Hive"},
+        headers=_headers(),
+    ).json()["hive_id"]
+    configure_hive(client, workspace_id=workspace_id, hive_id=hive_id, headers=_headers())
+    inspection_id = client.post(
+        "/v1/inspections",
+        json={
+            "hive_id": hive_id,
+            "inspection_date": str(date(2026, 8, 5)),
+            "intent": "training_data_collection",
+        },
+        headers=_headers(),
+    ).json()["inspection_id"]
+    intake = client.post(
+        f"/v1/inspection-photos/intake?workspace_id={workspace_id}&inspection_id={inspection_id}",
+        content=_head_marker_source_png(),
+        headers={
+            **_headers(),
+            "content-type": "image/png",
+            "x-hivesight-filename": "head-up-marker.png",
+        },
+    )
+    crop = client.post(
+        "/v1/training-crops",
+        json={
+            "workspace_id": workspace_id,
+            "inspection_photo_id": intake.json()["inspection_photo"]["inspection_photo_id"],
+            "crop_x": 0,
+            "crop_y": 0,
+            "crop_width": 300,
+            "crop_height": 300,
+            "source_image_width_px": 300,
+            "source_image_height_px": 300,
+        },
+        headers=_headers(),
+    ).json()
+    ellipse = client.post(
+        f"/v1/training-crops/{crop['training_crop_id']}/bee-ellipses",
+        json={
+            "workspace_id": workspace_id,
+            "annotation_type": "complete_visible_bee",
+            "center_x": 150,
+            "center_y": 150,
+            "radius_x": 70,
+            "radius_y": 24,
+            "rotation_degrees": 0,
+            "orientation_reliability": "reliable",
+        },
+        headers=_headers(),
+    )
+    assert ellipse.status_code == 201
+    completed = _complete_crop(client, workspace_id, crop["training_crop_id"])
+    assert completed.status_code == 200
+    return workspace_id, crop["training_crop_id"], ellipse.json()["annotation_id"]
+
+
 def _complete_crop(client: TestClient, workspace_id: str, training_crop_id: str):
     return client.patch(
         f"/v1/training-crops/{training_crop_id}",
@@ -313,3 +404,24 @@ def _source_png() -> bytes:
     output = BytesIO()
     image.save(output, format="PNG")
     return output.getvalue()
+
+
+def _head_marker_source_png() -> bytes:
+    image = Image.new("RGB", (300, 300), color=(255, 255, 255))
+    draw = ImageDraw.Draw(image)
+    draw.ellipse((210, 140, 230, 160), fill=(255, 0, 0))
+    draw.ellipse((70, 140, 90, 160), fill=(0, 60, 255))
+    output = BytesIO()
+    image.save(output, format="PNG")
+    return output.getvalue()
+
+
+def _average_y_for_pixels(image: Image.Image, predicate) -> float:
+    ys = [
+        y
+        for y in range(image.height)
+        for x in range(image.width)
+        if predicate(*image.getpixel((x, y)))
+    ]
+    assert ys
+    return sum(ys) / len(ys)

@@ -28,8 +28,8 @@ except ImportError:  # pragma: no cover - dependency is declared for the Core AP
 
 
 HEAD_UP_NORMALIZED_TRANSFORM_VERSION = "head_up_normalized_bee_crop_v1"
-HEAD_UP_NORMALIZED_IMAGE_SIZE_PX = 256
-HEAD_UP_NORMALIZED_MARGIN_RATIO = 0.35
+HEAD_UP_NORMALIZED_IMAGE_SIZE_PX = 512
+HEAD_UP_NORMALIZED_MARGIN_RATIO = 0.8
 
 
 @dataclass(frozen=True)
@@ -118,8 +118,9 @@ class VarroaReviewWorkflow:
         image = Image.open(BytesIO(body)).convert("RGB")
         bounds = _source_crop_bounds(crop=crop, ellipse=ellipse)
         cropped = image.crop(bounds)
+        rotation_applied_degrees = _head_up_rotation_degrees(ellipse.rotation_degrees)
         rotated = cropped.rotate(
-            -ellipse.rotation_degrees,
+            rotation_applied_degrees,
             resample=Image.Resampling.BICUBIC,
             expand=True,
             fillcolor=(255, 255, 255),
@@ -418,7 +419,7 @@ def _transform_metadata(
         "transform_version": HEAD_UP_NORMALIZED_TRANSFORM_VERSION,
         "output_size_px": HEAD_UP_NORMALIZED_IMAGE_SIZE_PX,
         "margin_ratio": HEAD_UP_NORMALIZED_MARGIN_RATIO,
-        "rotation_applied_degrees": round(-ellipse.rotation_degrees, 4),
+        "rotation_applied_degrees": round(_head_up_rotation_degrees(ellipse.rotation_degrees), 4),
         "source_crop_bounds": list(_source_crop_bounds(crop=crop, ellipse=ellipse)),
         "resize_pad_policy": "fit_with_white_padding",
     }
@@ -458,6 +459,10 @@ def _source_crop_bounds(
             409,
         )
     return left, top, right, bottom
+
+
+def _head_up_rotation_degrees(rotation_degrees: float) -> float:
+    return 90 - rotation_degrees
 
 
 def _clean_optional_text(value: str | None) -> str | None:
