@@ -133,6 +133,16 @@ class VarroaReviewOutcomeValue(StrEnum):
     not_determined = "not_determined"
 
 
+class VarroaDetectorPreviewStatus(StrEnum):
+    completed = "completed"
+    failed = "failed"
+    not_assessed = "not_assessed"
+
+
+class VarroaDetectorCoordinateSpace(StrEnum):
+    head_up_normalized_crop = "head_up_normalized_crop"
+
+
 class TrainingCropExclusionReason(StrEnum):
     poor_image_quality = "poor_image_quality"
     no_visible_bees = "no_visible_bees"
@@ -1453,6 +1463,44 @@ class HeadUpNormalizedBeeCropPreviewResponse(BaseModel):
     image_url: str
     transform_metadata: dict[str, object]
     bee_annotation_geometry_snapshot: dict[str, object]
+
+
+class VarroaDetectorPreviewRequest(BaseModel):
+    workspace_id: UUID
+
+
+class LikelyVarroaDetectionResponse(BaseModel):
+    detection_id: str
+    x: float = Field(ge=0, le=1)
+    y: float = Field(ge=0, le=1)
+    width: float = Field(gt=0, le=1)
+    height: float = Field(gt=0, le=1)
+    confidence: float = Field(ge=0, le=1)
+    coordinate_space: VarroaDetectorCoordinateSpace = (
+        VarroaDetectorCoordinateSpace.head_up_normalized_crop
+    )
+    source: str
+
+
+class VarroaDetectorPreviewResponse(BaseModel):
+    workspace_id: UUID
+    inspection_photo_id: UUID
+    training_crop_id: UUID
+    bee_annotation_id: UUID
+    model_purpose: str = "varroa_detection"
+    adapter_type: str
+    adapter_version: str
+    model_reference: str
+    status: VarroaDetectorPreviewStatus
+    failure_code: str | None = None
+    failure_message: str | None = None
+    not_assessed_reason: str | None = None
+    elapsed_ms: int
+    not_user_facing_reason: str
+    detections: list[LikelyVarroaDetectionResponse] = Field(default_factory=list)
+    detection_count: int
+    head_up_normalized_crop: HeadUpNormalizedBeeCropPreviewResponse | None = None
+    caveat: str
 
 
 class ReviewQueueEllipseEvidence(BaseModel):

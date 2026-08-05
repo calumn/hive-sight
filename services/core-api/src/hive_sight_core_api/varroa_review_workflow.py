@@ -1,7 +1,10 @@
+import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 from io import BytesIO
 from math import cos, radians, sin, sqrt
+from time import perf_counter
+from typing import Protocol
 from uuid import UUID
 
 from hive_sight_core_api.dev_store import DomainError, InMemoryProductDataStore, UserContext
@@ -9,9 +12,13 @@ from hive_sight_core_api.models import (
     AnnotationType,
     HeadUpNormalizedBeeCropPreviewResponse,
     InspectionIntent,
+    LikelyVarroaDetectionResponse,
     OrientedBeeEllipseResponse,
     TrainingCropResponse,
     TrainingCropReviewStatus,
+    VarroaDetectorCoordinateSpace,
+    VarroaDetectorPreviewResponse,
+    VarroaDetectorPreviewStatus,
     VarroaMarkerResponse,
     VarroaReviewCandidateListResponse,
     VarroaReviewCandidateResponse,
@@ -30,6 +37,11 @@ except ImportError:  # pragma: no cover - dependency is declared for the Core AP
 HEAD_UP_NORMALIZED_TRANSFORM_VERSION = "head_up_normalized_bee_crop_v1"
 HEAD_UP_NORMALIZED_IMAGE_SIZE_PX = 512
 HEAD_UP_NORMALIZED_MARGIN_RATIO = 0.8
+VARROA_DETECTOR_STUB_VERSION = "deterministic_stub_varroa_detector_v1"
+VARROA_DETECTOR_STUB_CAVEAT = (
+    "Deterministic stub preview only; not user-facing and not eligible for promotion."
+)
+LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -39,9 +51,61 @@ class HeadUpNormalizedCropImage:
 
 
 @dataclass(frozen=True)
+class VarroaDetectorRequest:
+    workspace_id: UUID
+    inspection_photo_id: UUID
+    training_crop_id: UUID
+    bee_annotation_id: UUID
+    head_up_normalized_image_bytes: bytes
+    image_width_px: int
+    image_height_px: int
+    transform_version: str
+    transform_metadata: dict[str, object]
+    source_geometry_snapshot: dict[str, object]
+
+
+class VarroaDetectorFailure(Exception):
+    def __init__(self, code: str, message: str) -> None:
+        self.code = code
+        self.message = message
+        super().__init__(message)
+
+
+class VarroaDetectorAdapter(Protocol):
+    adapter_type: str
+    adapter_version: str
+    model_reference: str
+
+    def detect(self, request: VarroaDetectorRequest) -> list[LikelyVarroaDetectionResponse]:
+        """Return likely visible Varroa mite detections for one Head-Up crop."""
+
+
+@dataclass(frozen=True)
+class DeterministicStubVarroaDetectorAdapter:
+    adapter_type: str = "deterministic_stub"
+    adapter_version: str = VARROA_DETECTOR_STUB_VERSION
+    model_reference: str = VARROA_DETECTOR_STUB_VERSION
+
+    def detect(self, request: VarroaDetectorRequest) -> list[LikelyVarroaDetectionResponse]:
+        return [
+            LikelyVarroaDetectionResponse(
+                detection_id="deterministic-stub-detection-1",
+                x=0.52,
+                y=0.34,
+                width=0.08,
+                height=0.06,
+                confidence=0.73,
+                coordinate_space=VarroaDetectorCoordinateSpace.head_up_normalized_crop,
+                source="deterministic_stub",
+            )
+        ]
+
+
+@dataclass(frozen=True)
 class VarroaReviewWorkflow:
     store: InMemoryProductDataStore
     image_loader: Callable[[str], bytes | None]
+    varroa_detector_adapter: VarroaDetectorAdapter = DeterministicStubVarroaDetectorAdapter()
 
     def list_candidates(
         self,
@@ -94,6 +158,128 @@ class VarroaReviewWorkflow:
             training_crop_id=training_crop_id,
             bee_annotation_id=bee_annotation_id,
         )
+        return self._build_head_up_normalized_crop_image(workspace_id=workspace_id, crop=crop, ellipse=ellipse)
+
+    def preview_varroa_detections(
+        self,
+        user: UserContext,
+        workspace_id: UUID,
+        training_crop_id: UUID,
+        bee_annotation_id: UUID,
+    ) -> VarroaDetectorPreviewResponse:
+        started = perf_counter()
+        crop = self._require_crop_for_varroa_review(
+            user=user,
+            workspace_id=workspace_id,
+            training_crop_id=training_crop_id,
+        )
+        ellipse = self.store.get_training_crop_ellipse(bee_annotation_id)
+        if (
+            ellipse is None
+            or ellipse.workspace_id != workspace_id
+            or ellipse.training_crop_id != training_crop_id
+        ):
+            raise DomainError(
+                "varroa_review_candidate_not_found",
+                "The requested bee is not available for Varroa Detection preview.",
+                404,
+            )
+
+        reasons = _ineligibility_reasons(crop=crop, ellipse=ellipse)
+        if reasons:
+            return self._not_assessed_preview_response(
+                workspace_id=workspace_id,
+                crop=crop,
+                ellipse=ellipse,
+                reason=", ".join(reasons),
+                elapsed_ms=_elapsed_ms(started),
+            )
+
+        head_up_crop = _preview_response(workspace_id=workspace_id, crop=crop, ellipse=ellipse)
+        try:
+            image = self._build_head_up_normalized_crop_image(
+                workspace_id=workspace_id,
+                crop=crop,
+                ellipse=ellipse,
+            )
+        except DomainError as error:
+            if error.code in {
+                "source_image_not_available",
+                "image_processing_unavailable",
+                "varroa_review_candidate_ineligible",
+            }:
+                return self._not_assessed_preview_response(
+                    workspace_id=workspace_id,
+                    crop=crop,
+                    ellipse=ellipse,
+                    reason=error.code,
+                    elapsed_ms=_elapsed_ms(started),
+                )
+            raise
+
+        request = VarroaDetectorRequest(
+            workspace_id=workspace_id,
+            inspection_photo_id=crop.inspection_photo_id,
+            training_crop_id=training_crop_id,
+            bee_annotation_id=bee_annotation_id,
+            head_up_normalized_image_bytes=image.body,
+            image_width_px=head_up_crop.image_width_px,
+            image_height_px=head_up_crop.image_height_px,
+            transform_version=head_up_crop.transform_version,
+            transform_metadata=head_up_crop.transform_metadata,
+            source_geometry_snapshot=head_up_crop.bee_annotation_geometry_snapshot,
+        )
+        try:
+            detections = self.varroa_detector_adapter.detect(request)
+        except VarroaDetectorFailure as error:
+            response = VarroaDetectorPreviewResponse(
+                workspace_id=workspace_id,
+                inspection_photo_id=crop.inspection_photo_id,
+                training_crop_id=training_crop_id,
+                bee_annotation_id=bee_annotation_id,
+                adapter_type=self.varroa_detector_adapter.adapter_type,
+                adapter_version=self.varroa_detector_adapter.adapter_version,
+                model_reference=self.varroa_detector_adapter.model_reference,
+                status=VarroaDetectorPreviewStatus.failed,
+                failure_code=error.code,
+                failure_message=error.message,
+                elapsed_ms=_elapsed_ms(started),
+                not_user_facing_reason="Varroa Detector preview only; not user-facing.",
+                detections=[],
+                detection_count=0,
+                head_up_normalized_crop=head_up_crop,
+                caveat=(
+                    f"{VARROA_DETECTOR_STUB_CAVEAT} Adapter failure cleared model-preview boxes."
+                ),
+            )
+            self._log_detector_preview(response)
+            return response
+
+        response = VarroaDetectorPreviewResponse(
+            workspace_id=workspace_id,
+            inspection_photo_id=crop.inspection_photo_id,
+            training_crop_id=training_crop_id,
+            bee_annotation_id=bee_annotation_id,
+            adapter_type=self.varroa_detector_adapter.adapter_type,
+            adapter_version=self.varroa_detector_adapter.adapter_version,
+            model_reference=self.varroa_detector_adapter.model_reference,
+            status=VarroaDetectorPreviewStatus.completed,
+            elapsed_ms=_elapsed_ms(started),
+            not_user_facing_reason="Deterministic stub preview only; not user-facing.",
+            detections=detections,
+            detection_count=len(detections),
+            head_up_normalized_crop=head_up_crop,
+            caveat=VARROA_DETECTOR_STUB_CAVEAT,
+        )
+        self._log_detector_preview(response)
+        return response
+
+    def _build_head_up_normalized_crop_image(
+        self,
+        workspace_id: UUID,
+        crop: TrainingCropResponse,
+        ellipse: OrientedBeeEllipseResponse,
+    ) -> HeadUpNormalizedCropImage:
         photo = self.store.get_inspection_photo(crop.inspection_photo_id)
         if photo is None or photo.workspace_id != workspace_id:
             raise DomainError(
@@ -142,6 +328,55 @@ class VarroaReviewWorkflow:
         output = BytesIO()
         canvas.save(output, format="PNG")
         return HeadUpNormalizedCropImage(body=output.getvalue(), content_type="image/png")
+
+    def _not_assessed_preview_response(
+        self,
+        *,
+        workspace_id: UUID,
+        crop: TrainingCropResponse,
+        ellipse: OrientedBeeEllipseResponse,
+        reason: str,
+        elapsed_ms: int,
+    ) -> VarroaDetectorPreviewResponse:
+        response = VarroaDetectorPreviewResponse(
+            workspace_id=workspace_id,
+            inspection_photo_id=crop.inspection_photo_id,
+            training_crop_id=crop.training_crop_id,
+            bee_annotation_id=ellipse.annotation_id,
+            adapter_type="not_called",
+            adapter_version="not_called",
+            model_reference="not_called",
+            status=VarroaDetectorPreviewStatus.not_assessed,
+            not_assessed_reason=reason,
+            elapsed_ms=elapsed_ms,
+            not_user_facing_reason="Varroa Detector preview only; not user-facing.",
+            detections=[],
+            detection_count=0,
+            head_up_normalized_crop=None,
+            caveat=(
+                f"Bee not assessed for Varroa Detection: {reason}. "
+                "This is not a negative Varroa result."
+            ),
+        )
+        self._log_detector_preview(response)
+        return response
+
+    def _log_detector_preview(self, response: VarroaDetectorPreviewResponse) -> None:
+        LOGGER.info(
+            "Calculated Varroa Detector preview",
+            extra={
+                "workspace_id": str(response.workspace_id),
+                "inspection_photo_id": str(response.inspection_photo_id),
+                "training_crop_id": str(response.training_crop_id),
+                "bee_annotation_id": str(response.bee_annotation_id),
+                "adapter_type": response.adapter_type,
+                "adapter_version": response.adapter_version,
+                "detection_count": response.detection_count,
+                "elapsed_ms": response.elapsed_ms,
+                "status": str(response.status),
+                "failure_code": response.failure_code,
+            },
+        )
 
     def save_outcome(
         self,
@@ -533,3 +768,7 @@ def _clean_optional_text(value: str | None) -> str | None:
         return None
     stripped = value.strip()
     return stripped or None
+
+
+def _elapsed_ms(started: float) -> int:
+    return max(0, round((perf_counter() - started) * 1000))

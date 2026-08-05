@@ -183,6 +183,8 @@ export type VarroaReviewOutcomeValue =
   | "no_visible_varroa"
   | "not_determined";
 
+export type VarroaDetectorPreviewStatus = "completed" | "failed" | "not_assessed";
+
 export type TrainingCropReviewStatus = "review_pending" | "review_complete" | "excluded";
 
 export type TrainingCropExclusionReason =
@@ -644,6 +646,38 @@ export type HeadUpNormalizedBeeCropPreview = {
   transformVersion: string;
   imageUrl: string;
   transformMetadata: Record<string, unknown>;
+};
+
+export type LikelyVarroaDetection = {
+  detectionId: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  confidence: number;
+  coordinateSpace: "head_up_normalized_crop";
+  source: string;
+};
+
+export type VarroaDetectorPreview = {
+  workspaceId: string;
+  inspectionPhotoId: string;
+  trainingCropId: string;
+  beeAnnotationId: string;
+  modelPurpose: "varroa_detection";
+  adapterType: string;
+  adapterVersion: string;
+  modelReference: string;
+  status: VarroaDetectorPreviewStatus;
+  failureCode: string | null;
+  failureMessage: string | null;
+  notAssessedReason: string | null;
+  elapsedMs: number;
+  notUserFacingReason: string;
+  detections: LikelyVarroaDetection[];
+  detectionCount: number;
+  headUpNormalizedCrop: HeadUpNormalizedBeeCropPreview | null;
+  caveat: string;
 };
 
 export type ReviewQueueItemStatus = "available" | "completed" | "cancelled";
@@ -2209,6 +2243,31 @@ export async function fetchHeadUpNormalizedBeeCropImageObjectUrl({
   return URL.createObjectURL(blob);
 }
 
+export async function runVarroaDetectorPreview({
+  devUserId,
+  workspaceId,
+  trainingCropId,
+  beeAnnotationId
+}: {
+  devUserId: string;
+  workspaceId: string;
+  trainingCropId: string;
+  beeAnnotationId: string;
+}): Promise<VarroaDetectorPreview> {
+  const response = await fetch(
+    `${coreApiUrl}/v1/training-crops/${trainingCropId}/varroa-review-candidates/${beeAnnotationId}/detector-preview`,
+    {
+      method: "POST",
+      headers: jsonHeaders(devUserId),
+      body: JSON.stringify({
+        workspace_id: workspaceId
+      })
+    }
+  );
+  await ensureOk(response);
+  return parseVarroaDetectorPreview(await response.json());
+}
+
 export async function saveVarroaReviewOutcome({
   devUserId,
   workspaceId,
@@ -3175,6 +3234,47 @@ function parseHeadUpNormalizedBeeCropPreview(value: unknown): HeadUpNormalizedBe
       record.transform_metadata === undefined
         ? {}
         : requireRecord(record.transform_metadata, "transform_metadata")
+  };
+}
+
+function parseVarroaDetectorPreview(value: unknown): VarroaDetectorPreview {
+  const record = requireRecord(value, "Varroa Detector Preview response");
+  return {
+    workspaceId: requireString(record.workspace_id, "workspace_id"),
+    inspectionPhotoId: requireString(record.inspection_photo_id, "inspection_photo_id"),
+    trainingCropId: requireString(record.training_crop_id, "training_crop_id"),
+    beeAnnotationId: requireString(record.bee_annotation_id, "bee_annotation_id"),
+    modelPurpose: requireLiteral(record.model_purpose, "varroa_detection", "model_purpose"),
+    adapterType: requireString(record.adapter_type, "adapter_type"),
+    adapterVersion: requireString(record.adapter_version, "adapter_version"),
+    modelReference: requireString(record.model_reference, "model_reference"),
+    status: requireVarroaDetectorPreviewStatus(record.status),
+    failureCode: optionalString(record.failure_code, "failure_code"),
+    failureMessage: optionalString(record.failure_message, "failure_message"),
+    notAssessedReason: optionalString(record.not_assessed_reason, "not_assessed_reason"),
+    elapsedMs: requireNumber(record.elapsed_ms, "elapsed_ms"),
+    notUserFacingReason: requireString(record.not_user_facing_reason, "not_user_facing_reason"),
+    detections: requireArray(record.detections, "detections").map(parseLikelyVarroaDetection),
+    detectionCount: requireNumber(record.detection_count, "detection_count"),
+    headUpNormalizedCrop:
+      record.head_up_normalized_crop === null
+        ? null
+        : parseHeadUpNormalizedBeeCropPreview(record.head_up_normalized_crop),
+    caveat: requireString(record.caveat, "caveat")
+  };
+}
+
+function parseLikelyVarroaDetection(value: unknown): LikelyVarroaDetection {
+  const record = requireRecord(value, "Likely Varroa Detection response");
+  return {
+    detectionId: requireString(record.detection_id, "detection_id"),
+    x: requireNumber(record.x, "x"),
+    y: requireNumber(record.y, "y"),
+    width: requireNumber(record.width, "width"),
+    height: requireNumber(record.height, "height"),
+    confidence: requireNumber(record.confidence, "confidence"),
+    coordinateSpace: requireVarroaDetectorCoordinateSpace(record.coordinate_space),
+    source: requireString(record.source, "source")
   };
 }
 
@@ -4304,6 +4404,20 @@ function requireVarroaReviewOutcomeValue(value: unknown): VarroaReviewOutcomeVal
     return value;
   }
   throw new Error("Core API response had an unexpected Varroa Review Outcome");
+}
+
+function requireVarroaDetectorPreviewStatus(value: unknown): VarroaDetectorPreviewStatus {
+  if (value === "completed" || value === "failed" || value === "not_assessed") {
+    return value;
+  }
+  throw new Error("Core API response had an unexpected Varroa Detector Preview status");
+}
+
+function requireVarroaDetectorCoordinateSpace(value: unknown): "head_up_normalized_crop" {
+  if (value === "head_up_normalized_crop") {
+    return value;
+  }
+  throw new Error("Core API response had an unexpected Varroa Detector coordinate space");
 }
 
 function requireVarroaReviewEligibility(value: unknown): "eligible" | "ineligible" {

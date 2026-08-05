@@ -1,6 +1,6 @@
 # Vertical Slice 0027: Varroa Detector Adapter Seam
 
-Status: designed; grilling decisions incorporated; acceptance scenarios signed off on 2026-08-05.
+Status: implemented; acceptance scenarios signed off on 2026-08-05; focused API/BDD, web type, Python style, and browser acceptance checks passed on 2026-08-05.
 
 ## Purpose
 

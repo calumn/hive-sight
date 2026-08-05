@@ -74,7 +74,41 @@ test("Dataset Curator records Varroa review cues and a visible Varroa outcome", 
     "data-marker-center-x",
     /^0\.\d+/
   );
+  await expect(page.getByTestId("head-up-normalized-bee-crop-clean")).toBeVisible();
+  await expect(page.getByTestId("head-up-normalized-bee-crop-clean-image")).toBeVisible();
+  await expect(page.getByTestId("varroa-review-place-marker-mode-button")).toHaveClass(/active/);
   await expect(page.getByText("Zoom 300%")).toBeVisible();
+  await expect(page.getByTestId("varroa-detector-preview-panel")).toContainText(
+    "No model preview run for this bee"
+  );
+  await page.getByTestId("run-varroa-detector-preview-button").click();
+  await expect(page.getByTestId("varroa-detector-preview-details")).toContainText(
+    "varroa_detection"
+  );
+  await expect(page.getByTestId("varroa-detector-preview-details")).toContainText(
+    "deterministic_stub"
+  );
+  await expect(page.getByTestId("varroa-detector-preview-box")).toHaveCount(1);
+  await expect(
+    page
+      .getByTestId("head-up-normalized-bee-crop-clean")
+      .getByTestId("varroa-detector-preview-box")
+  ).toHaveCount(0);
+  await page.getByTestId("varroa-review-pan-mode-button").click();
+  await expect(page.getByTestId("varroa-review-pan-mode-button")).toHaveClass(/active/);
+  const cleanSurface = page.getByTestId("head-up-normalized-bee-crop-clean");
+  const cleanBox = await cleanSurface.boundingBox();
+  expect(cleanBox).not.toBeNull();
+  await page.mouse.move(cleanBox!.x + cleanBox!.width / 2, cleanBox!.y + cleanBox!.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(cleanBox!.x + cleanBox!.width / 2 + 40, cleanBox!.y + cleanBox!.height / 2 + 20);
+  await page.mouse.up();
+  await expect(cleanSurface).not.toHaveAttribute("data-pan-x", "0");
+  await expect(page.getByTestId("head-up-normalized-bee-crop")).toHaveAttribute(
+    "data-pan-x",
+    await cleanSurface.getAttribute("data-pan-x") ?? ""
+  );
+  await page.getByTestId("varroa-review-place-marker-mode-button").click();
   await expect(page.getByTestId("varroa-source-crop-context")).toBeVisible();
   await expect(page.getByTestId("varroa-source-context-selected-bee")).toBeVisible();
   await expect(page.getByTestId("varroa-source-context-bee")).toHaveCount(1);
@@ -84,6 +118,7 @@ test("Dataset Curator records Varroa review cues and a visible Varroa outcome", 
   await expect(page.getByTestId("varroa-source-context-bee")).toHaveCount(2);
   await page.getByTestId("varroa-source-context-bee").first().click();
   await expect(page.getByTestId("varroa-source-context-selected-bee")).toHaveCount(1);
+  await expect(page.getByTestId("varroa-detector-preview-box")).toHaveCount(0);
   const previewBoxBeforeZoom = await page.getByTestId("head-up-normalized-bee-crop").boundingBox();
   const previewPlaneBeforeZoom = await page
     .getByTestId("head-up-normalized-bee-crop-image-plane")

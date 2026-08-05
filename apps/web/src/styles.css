@@ -1063,7 +1063,44 @@ label span {
   align-items: start;
   display: grid;
   gap: 20px;
-  grid-template-columns: minmax(360px, 480px) minmax(280px, 420px);
+  grid-template-columns: minmax(560px, 1fr) minmax(280px, 420px);
+}
+
+.varroa-review-mode-toggle {
+  display: flex;
+  gap: 8px;
+  margin: 8px 0 10px;
+}
+
+.varroa-review-mode-toggle button {
+  background: #ffffff;
+  border: 1px solid #d4dccf;
+  border-radius: 6px;
+  color: #20251f;
+  cursor: pointer;
+  font-weight: 900;
+  padding: 10px 14px;
+}
+
+.varroa-review-mode-toggle button.active {
+  background: #e7f5e8;
+  border-color: #9ed1a4;
+  color: #27632d;
+}
+
+.varroa-head-up-pair {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(260px, 1fr));
+}
+
+.varroa-preview-label {
+  color: #515b4c;
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 900;
+  margin-bottom: 4px;
+  text-transform: uppercase;
 }
 
 .varroa-preview-surface {
@@ -1074,7 +1111,16 @@ label span {
   max-width: 100%;
   overflow: hidden;
   position: relative;
-  width: 480px;
+  touch-action: none;
+  width: 100%;
+}
+
+.varroa-preview-surface.is-panning {
+  cursor: grab;
+}
+
+.varroa-preview-surface.is-panning:active {
+  cursor: grabbing;
 }
 
 .varroa-preview-content {
@@ -1111,11 +1157,43 @@ label span {
   width: 14px;
 }
 
+.varroa-detector-box {
+  border: 3px solid #7c3aed;
+  border-radius: 999px;
+  box-shadow:
+    0 0 0 2px rgb(255 255 255 / 0.85),
+    0 0 12px rgb(124 58 237 / 0.55);
+  pointer-events: none;
+  position: absolute;
+}
+
+.detector-preview-panel {
+  align-items: start;
+  border: 1px solid #dce2d7;
+  border-radius: 6px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  margin-top: 14px;
+  padding: 12px;
+}
+
+.detector-preview-panel p {
+  color: #515b4c;
+  font-size: 0.9rem;
+  font-weight: 700;
+  margin: 4px 0 0;
+}
+
+.detector-preview-panel .export-summary {
+  grid-column: 1 / -1;
+}
+
 .varroa-source-context {
   background: #ffffff;
   border: 1px solid #dce2d7;
   border-radius: 6px;
-  max-width: 420px;
+  max-width: 100%;
   overflow: hidden;
   position: relative;
   width: 420px;
@@ -1158,6 +1236,27 @@ label span {
 
 .source-context-ellipse .ellipse-head-arrow {
   display: none;
+}
+
+@media (max-width: 1500px) {
+  .varroa-preview-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .crop-governance-detail .metadata-panel {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .varroa-source-context {
+    width: min(100%, 640px);
+  }
+}
+
+@media (max-width: 900px) {
+  .varroa-head-up-pair,
+  .detector-preview-panel {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .model-workflow-stage:last-child {

@@ -89,7 +89,7 @@ The Training Inspection Workflow stage where a Dataset Curator checks workspace-
 _Avoid_: Crop Governance when the actor is governing cross-crop model evidence rather than one crop's review or Dataset Role assignment.
 
 **Varroa Review**:
-The Training Inspection Workflow stage where a Dataset Curator reviews one eligible Head-Up Normalized Bee Crop at a time and records a Varroa Review Outcome with marker evidence when visible Varroa is present. In Slice 0025 this is model-curation evidence only, scoped to the selected Training Crop; it is not a beekeeper-facing Varroa Assessment, Sampling Plan, Dataset Role assignment, or treatment trigger.
+The Training Inspection Workflow stage where a Dataset Curator reviews one eligible Head-Up Normalized Bee Crop at a time and records a Varroa Review Outcome with marker evidence when visible Varroa is present. The current review surface shows paired clean and annotated Head-Up views; deterministic Varroa Detector preview boxes may be overlaid for comparison but are not saved as human evidence. This remains model-curation evidence only, scoped to the selected Training Crop; it is not a beekeeper-facing Varroa Assessment, Sampling Plan, Dataset Role assignment, or treatment trigger.
 _Avoid_: Varroa Assessment when the work is internal model-curation labelling.
 
 **Varroa Corpus Governance**:
@@ -400,7 +400,7 @@ A bee-relative image crop rotated so the bee's head is at the top of the crop. I
 _Avoid_: Oriented crop when the direction of the bee's head is the important convention.
 
 **Varroa Detector**:
-The future model purpose for detecting likely visible Varroa mites on or near a bee, preferably from a Head-Up Normalized Bee Crop.
+The model purpose for detecting likely visible Varroa mites on or near a bee, preferably from a Head-Up Normalized Bee Crop. In Slice 0027 HiveSight exposes a replaceable deterministic stub adapter seam for single-bee preview only; its boxes are non-user-facing, non-promotable, and not persisted as Varroa Review Outcomes.
 _Avoid_: Mite Detector when the intended product scope is specifically Varroa.
 
 **YOLO OBB**:

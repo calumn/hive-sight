@@ -129,18 +129,22 @@ Use this when a completed Training Crop is ready for model-curation Varroa evide
 1. Open the `Varroa Review` workflow stage.
 2. Select a completed Training Crop.
 3. Pick an eligible bee from the candidate list. Suspected-visible-Varroa cues appear first.
-4. Review the Head-up bee crop and the source crop context.
-5. Click the Head-up bee crop to place point markers for visible mites.
-6. Choose an outcome:
+4. Review the paired Head-up bee crop:
+   - `Clean` keeps the bee image unobscured.
+   - `Marked` shows human mite markers and any model-preview boxes.
+5. Use `Place marker` mode to click the marked Head-up bee crop and place point markers for visible mites.
+6. Use `Pan` mode when you need to move the clean and marked views together at the current zoom.
+7. Optionally click `Run detector preview` to show deterministic stub Varroa Detector boxes for the selected eligible bee. These boxes are preview-only and do not save an outcome.
+8. Choose an outcome:
    - `Visible Varroa` requires one or more markers.
    - `No visible Varroa` records an active negative judgement and requires zero markers.
    - `Not determined` requires a note and requires zero markers.
-7. Delete and replace markers if needed.
-8. Click `Save outcome`.
+9. Delete and replace markers if needed.
+10. Click `Save outcome`.
 
 The `Photo-visible Varroa evidence` summary rolls the reviewed bee outcomes for the selected Inspection Photo into one current frame/photo-level view. It separates visible-Varroa bees from visible mite markers, active negatives, unresolved bees, unreviewed eligible bees, hidden or ineligible bees, completed crops, unfinished crops, review completion, and determinate coverage.
 
-The Varroa Review summary is model-curation progress only. It is not a Varroa assessment, visible mite rate, treatment recommendation, or HiveSight Advisor trigger.
+The Varroa Review summary is model-curation progress only. Detector preview boxes are deterministic stub output until replaced by a real adapter. Neither the summary nor the preview is a Varroa assessment, visible mite rate, treatment recommendation, or HiveSight Advisor trigger.
 
 ## Reopen And Continue A Training Crop
 

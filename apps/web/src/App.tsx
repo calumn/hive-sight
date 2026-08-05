@@ -87,6 +87,7 @@ import {
   fetchVarroaReviewCandidates,
   processAnalysisRun,
   requestTrainingCropReview,
+  runVarroaDetectorPreview,
   saveVarroaReviewOutcome,
   startDatasetLabellingSession,
   startBenchmarkEvaluation,
@@ -144,6 +145,7 @@ import {
   type TrainingCropEvidence,
   type TrainingCropExclusionReason,
   type VarroaReviewCandidateList,
+  type VarroaDetectorPreview,
   type VarroaReviewOutcomeValue,
   type VarroaReviewSuitability,
   type VisibleBeeStatus,
@@ -183,6 +185,13 @@ type TrainingWorkflowStage =
   | "crop_governance"
   | "varroa_review"
   | "model_governance";
+
+type VarroaReviewMode = "place_marker" | "pan";
+
+type NormalizedPanOffset = {
+  x: number;
+  y: number;
+};
 
 export function App() {
   const trainingCropPanelRef = useRef<HTMLDivElement | null>(null);
@@ -2312,6 +2321,12 @@ function markerAllowedAreaFromPreview(preview: HeadUpNormalizedBeeCropPreview | 
   return { centerX, centerY, radiusX, radiusY };
 }
 
+function varroaReviewTransformStyle(zoom: number, pan: NormalizedPanOffset) {
+  return {
+    transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`
+  };
+}
+
 function ellipseStyle(crop: TrainingCrop, ellipse: OrientedBeeEllipse) {
   return {
     left: `${((ellipse.centerX - crop.cropX - ellipse.radiusX) / crop.cropWidth) * 100}%`,
@@ -2636,11 +2651,15 @@ function TrainingCropAnnotationPanel({
     useState<FrameLevelVarroaResultSummary | null>(null);
   const [varroaPreview, setVarroaPreview] = useState<HeadUpNormalizedBeeCropPreview | null>(null);
   const [varroaPreviewUrl, setVarroaPreviewUrl] = useState<string | null>(null);
+  const [varroaDetectorPreview, setVarroaDetectorPreview] =
+    useState<VarroaDetectorPreview | null>(null);
   const [varroaOutcome, setVarroaOutcome] =
     useState<VarroaReviewOutcomeValue>("no_visible_varroa");
   const [varroaMarkers, setVarroaMarkers] = useState<{ x: number; y: number }[]>([]);
   const [varroaNotes, setVarroaNotes] = useState("");
   const [varroaZoom, setVarroaZoom] = useState(defaultVarroaReviewZoom);
+  const [varroaReviewMode, setVarroaReviewMode] = useState<VarroaReviewMode>("place_marker");
+  const [varroaPan, setVarroaPan] = useState<NormalizedPanOffset>({ x: 0, y: 0 });
   const [includeIneligibleVarroaBees, setIncludeIneligibleVarroaBees] = useState(false);
   const [modelCandidateSelectionMessage, setModelCandidateSelectionMessage] = useState<string | null>(
     null
@@ -2652,6 +2671,13 @@ function TrainingCropAnnotationPanel({
     useState<TrainingWorkflowStage>("setup");
   const selectedCropRef = useRef<TrainingCrop | null>(null);
   const selectedEllipseRef = useRef<OrientedBeeEllipse | null>(null);
+  const varroaPanDragRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    originX: number;
+    originY: number;
+  } | null>(null);
   const ellipseAdjustmentInFlightRef = useRef(false);
   const ellipseAdjustmentRepeatTimeoutRef = useRef<number | null>(null);
   const ellipseAdjustmentRepeatIntervalRef = useRef<number | null>(null);
@@ -2864,6 +2890,7 @@ function TrainingCropAnnotationPanel({
     if (!selectedCropId) {
       setEvidence(null);
       setVarroaReview(null);
+      setVarroaDetectorPreview(null);
       setTrainingCropDatasetItem(null);
       return;
     }
@@ -2873,6 +2900,7 @@ function TrainingCropAnnotationPanel({
     setSelectedProposalId(null);
     setEditedProposalIds(new Set());
     setCandidateProposalMessage(null);
+    setVarroaDetectorPreview(null);
     void refreshEvidence(selectedCropId);
     void refreshVarroaReview(selectedCropId);
   }, [selectedCropId]);
@@ -2887,6 +2915,9 @@ function TrainingCropAnnotationPanel({
     setVarroaOutcome(selectedVarroaCandidate?.reviewOutcome?.outcome ?? "no_visible_varroa");
     setVarroaNotes(selectedVarroaCandidate?.reviewOutcome?.notes ?? "");
     setVarroaZoom(defaultVarroaReviewZoom);
+    setVarroaPan({ x: 0, y: 0 });
+    setVarroaReviewMode("place_marker");
+    setVarroaDetectorPreview(null);
   }, [selectedVarroaCandidate?.beeAnnotation.annotationId]);
 
   useEffect(() => {
@@ -2896,6 +2927,7 @@ function TrainingCropAnnotationPanel({
         if (current) URL.revokeObjectURL(current);
         return null;
       });
+      setVarroaDetectorPreview(null);
       return;
     }
     let cancelled = false;
@@ -3190,7 +3222,11 @@ function TrainingCropAnnotationPanel({
   }
 
   function onVarroaPreviewClick(event: MouseEvent<HTMLDivElement>) {
-    if (!selectedVarroaCandidate || selectedVarroaCandidate.eligibility !== "eligible") {
+    if (
+      varroaReviewMode !== "place_marker" ||
+      !selectedVarroaCandidate ||
+      selectedVarroaCandidate.eligibility !== "eligible"
+    ) {
       return;
     }
     const rect = event.currentTarget.getBoundingClientRect();
@@ -3203,8 +3239,57 @@ function TrainingCropAnnotationPanel({
     setVarroaOutcome("visible_varroa_present");
   }
 
+  function startVarroaPan(event: PointerEvent<HTMLDivElement>) {
+    if (varroaReviewMode !== "pan") {
+      return;
+    }
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    varroaPanDragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: varroaPan.x,
+      originY: varroaPan.y
+    };
+  }
+
+  function moveVarroaPan(event: PointerEvent<HTMLDivElement>) {
+    const drag = varroaPanDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) {
+      return;
+    }
+    setVarroaPan({
+      x: clamp(drag.originX + event.clientX - drag.startX, -260, 260),
+      y: clamp(drag.originY + event.clientY - drag.startY, -260, 260)
+    });
+  }
+
+  function stopVarroaPan(event: PointerEvent<HTMLDivElement>) {
+    const drag = varroaPanDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) {
+      return;
+    }
+    varroaPanDragRef.current = null;
+  }
+
   function removeVarroaMarker(index: number) {
     setVarroaMarkers((current) => current.filter((_, markerIndex) => markerIndex !== index));
+  }
+
+  async function runSelectedVarroaDetectorPreview() {
+    if (!selectedCrop || !selectedVarroaCandidate || selectedVarroaCandidate.eligibility !== "eligible") {
+      return;
+    }
+    await runCropAction("Running Varroa Detector Preview", async () => {
+      const preview = await runVarroaDetectorPreview({
+        devUserId,
+        workspaceId,
+        trainingCropId: selectedCrop.trainingCropId,
+        beeAnnotationId: selectedVarroaCandidate.beeAnnotation.annotationId
+      });
+      setVarroaDetectorPreview(preview);
+    });
   }
 
   async function saveSelectedVarroaOutcome() {
@@ -5359,41 +5444,117 @@ function TrainingCropAnnotationPanel({
                                       <Plus size={18} />
                                     </button>
                                   </div>
-                                  <div
-                                    className="varroa-preview-surface"
-                                    data-testid="head-up-normalized-bee-crop"
-                                  >
-                                    <div
-                                      className="varroa-preview-content"
-                                      style={{
-                                        transform: `scale(${varroaZoom})`
-                                      }}
-                                      onClick={onVarroaPreviewClick}
-                                      data-marker-center-x={varroaMarkerAllowedArea?.centerX ?? ""}
-                                      data-marker-center-y={varroaMarkerAllowedArea?.centerY ?? ""}
-                                      data-testid="head-up-normalized-bee-crop-image-plane"
+                                  <div className="varroa-review-mode-toggle" aria-label="Varroa review mode">
+                                    <button
+                                      type="button"
+                                      className={varroaReviewMode === "place_marker" ? "active" : ""}
+                                      onClick={() => setVarroaReviewMode("place_marker")}
+                                      data-testid="varroa-review-place-marker-mode-button"
                                     >
-                                      {varroaPreviewUrl ? (
-                                        <img
-                                          src={varroaPreviewUrl}
-                                          alt="Head-up bee crop"
-                                          draggable={false}
-                                          data-testid="head-up-normalized-bee-crop-image"
-                                        />
-                                      ) : (
-                                        <span className="varroa-preview-placeholder">Loading preview</span>
-                                      )}
-                                      {varroaMarkers.map((marker, index) => (
-                                        <span
-                                          key={`${marker.x}-${marker.y}-${index}`}
-                                          className="varroa-marker"
-                                          style={{
-                                            left: `${marker.x * 100}%`,
-                                            top: `${marker.y * 100}%`
-                                          }}
-                                          data-testid="varroa-marker"
-                                        />
-                                      ))}
+                                      Place marker
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className={varroaReviewMode === "pan" ? "active" : ""}
+                                      onClick={() => setVarroaReviewMode("pan")}
+                                      data-testid="varroa-review-pan-mode-button"
+                                    >
+                                      Pan
+                                    </button>
+                                  </div>
+                                  <div className="varroa-head-up-pair">
+                                    <div>
+                                      <span className="varroa-preview-label">Clean</span>
+                                      <div
+                                        className={`varroa-preview-surface ${
+                                          varroaReviewMode === "pan" ? "is-panning" : ""
+                                        }`}
+                                        data-testid="head-up-normalized-bee-crop-clean"
+                                        data-pan-x={Math.round(varroaPan.x)}
+                                        data-pan-y={Math.round(varroaPan.y)}
+                                        onPointerDown={startVarroaPan}
+                                        onPointerMove={moveVarroaPan}
+                                        onPointerUp={stopVarroaPan}
+                                        onPointerCancel={stopVarroaPan}
+                                      >
+                                        <div
+                                          className="varroa-preview-content"
+                                          style={varroaReviewTransformStyle(varroaZoom, varroaPan)}
+                                          data-testid="head-up-normalized-bee-crop-clean-image-plane"
+                                        >
+                                          {varroaPreviewUrl ? (
+                                            <img
+                                              src={varroaPreviewUrl}
+                                              alt="Clean head-up bee crop"
+                                              draggable={false}
+                                              data-testid="head-up-normalized-bee-crop-clean-image"
+                                            />
+                                          ) : (
+                                            <span className="varroa-preview-placeholder">Loading preview</span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <span className="varroa-preview-label">Marked</span>
+                                      <div
+                                        className={`varroa-preview-surface ${
+                                          varroaReviewMode === "pan" ? "is-panning" : ""
+                                        }`}
+                                        data-testid="head-up-normalized-bee-crop"
+                                        data-pan-x={Math.round(varroaPan.x)}
+                                        data-pan-y={Math.round(varroaPan.y)}
+                                        onPointerDown={startVarroaPan}
+                                        onPointerMove={moveVarroaPan}
+                                        onPointerUp={stopVarroaPan}
+                                        onPointerCancel={stopVarroaPan}
+                                      >
+                                        <div
+                                          className="varroa-preview-content"
+                                          style={varroaReviewTransformStyle(varroaZoom, varroaPan)}
+                                          onClick={onVarroaPreviewClick}
+                                          data-marker-center-x={varroaMarkerAllowedArea?.centerX ?? ""}
+                                          data-marker-center-y={varroaMarkerAllowedArea?.centerY ?? ""}
+                                          data-testid="head-up-normalized-bee-crop-image-plane"
+                                        >
+                                          {varroaPreviewUrl ? (
+                                            <img
+                                              src={varroaPreviewUrl}
+                                              alt="Annotated head-up bee crop"
+                                              draggable={false}
+                                              data-testid="head-up-normalized-bee-crop-image"
+                                            />
+                                          ) : (
+                                            <span className="varroa-preview-placeholder">Loading preview</span>
+                                          )}
+                                          {varroaDetectorPreview?.status === "completed"
+                                            ? varroaDetectorPreview.detections.map((detection) => (
+                                                <span
+                                                  key={detection.detectionId}
+                                                  className="varroa-detector-box"
+                                                  style={{
+                                                    left: `${(detection.x - detection.width / 2) * 100}%`,
+                                                    top: `${(detection.y - detection.height / 2) * 100}%`,
+                                                    width: `${detection.width * 100}%`,
+                                                    height: `${detection.height * 100}%`
+                                                  }}
+                                                  data-testid="varroa-detector-preview-box"
+                                                />
+                                              ))
+                                            : null}
+                                          {varroaMarkers.map((marker, index) => (
+                                            <span
+                                              key={`${marker.x}-${marker.y}-${index}`}
+                                              className="varroa-marker"
+                                              style={{
+                                                left: `${marker.x * 100}%`,
+                                                top: `${marker.y * 100}%`
+                                              }}
+                                              data-testid="varroa-marker"
+                                            />
+                                          ))}
+                                        </div>
+                                      </div>
                                     </div>
                                   </div>
                                 </div>
@@ -5440,6 +5601,52 @@ function TrainingCropAnnotationPanel({
                                         );
                                       })}
                                     </div>
+                                  </div>
+                                ) : null}
+                              </div>
+                              <div className="detector-preview-panel" data-testid="varroa-detector-preview-panel">
+                                <div>
+                                  <strong>Varroa detector preview</strong>
+                                  <p>
+                                    {varroaDetectorPreview
+                                      ? `${varroaDetectorPreview.status} / ${varroaDetectorPreview.detectionCount} likely detection${
+                                          varroaDetectorPreview.detectionCount === 1 ? "" : "s"
+                                        }`
+                                      : "No model preview run for this bee."}
+                                  </p>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={runSelectedVarroaDetectorPreview}
+                                  disabled={Boolean(workingLabel)}
+                                  data-testid="run-varroa-detector-preview-button"
+                                >
+                                  <Play size={16} />
+                                  Run detector preview
+                                </button>
+                                {varroaDetectorPreview ? (
+                                  <div
+                                    className="export-summary"
+                                    data-testid="varroa-detector-preview-details"
+                                  >
+                                    <span>{varroaDetectorPreview.modelPurpose}</span>
+                                    <span>{varroaDetectorPreview.adapterType}</span>
+                                    <span>{varroaDetectorPreview.adapterVersion}</span>
+                                    <span>{varroaDetectorPreview.modelReference}</span>
+                                    <span>{Math.round(varroaDetectorPreview.elapsedMs)} ms</span>
+                                    {varroaDetectorPreview.failureCode ? (
+                                      <span>{varroaDetectorPreview.failureCode}</span>
+                                    ) : null}
+                                    {varroaDetectorPreview.notAssessedReason ? (
+                                      <span>{varroaDetectorPreview.notAssessedReason}</span>
+                                    ) : null}
+                                    <span>{varroaDetectorPreview.notUserFacingReason}</span>
+                                    <span>{varroaDetectorPreview.caveat}</span>
+                                    {varroaDetectorPreview.detections.map((detection, index) => (
+                                      <span key={detection.detectionId}>
+                                        Detection {index + 1}: {detection.confidence.toFixed(2)} confidence
+                                      </span>
+                                    ))}
                                   </div>
                                 ) : null}
                               </div>

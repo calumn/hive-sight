@@ -130,6 +130,8 @@ from hive_sight_core_api.models import (
     TrainingRunResponse,
     TrainingRunStartRequest,
     UpdateDatasetLabellingSessionRequest,
+    VarroaDetectorPreviewRequest,
+    VarroaDetectorPreviewResponse,
     VarroaReviewCandidateListResponse,
     VarroaReviewOutcomeCreateRequest,
     VarroaReviewOutcomeResponse,
@@ -1317,6 +1319,25 @@ def save_varroa_review_outcome(
         training_crop_id=training_crop_id,
         bee_annotation_id=bee_annotation_id,
         request=request,
+    )
+
+
+@app.post(
+    "/v1/training-crops/{training_crop_id}/varroa-review-candidates/{bee_annotation_id}/detector-preview",
+    response_model=VarroaDetectorPreviewResponse,
+)
+def preview_varroa_detector_detections(
+    training_crop_id: UUID,
+    bee_annotation_id: UUID,
+    request: VarroaDetectorPreviewRequest,
+    user: AuthenticatedUserDep,
+    workflow: VarroaReviewWorkflowDep,
+) -> VarroaDetectorPreviewResponse:
+    return workflow.preview_varroa_detections(
+        user=user,
+        workspace_id=request.workspace_id,
+        training_crop_id=training_crop_id,
+        bee_annotation_id=bee_annotation_id,
     )
 
 
