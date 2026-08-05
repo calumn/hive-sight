@@ -18,6 +18,7 @@
     "db:migrate:qa": "cd services/core-api && HIVESIGHT_DATABASE_PURPOSE=qa CORE_API_DATABASE_URL=postgresql://hive_sight:hive_sight@localhost:5432/hive_sight_core_qa ./.venv/bin/python -m hive_sight_core_api.db migrate",
     "db:migrate:all": "pnpm db:migrate && pnpm db:migrate:test && pnpm db:migrate:qa",
     "db:seed": "cd services/core-api && HIVESIGHT_DATABASE_PURPOSE=dev CORE_API_DATABASE_URL=postgresql://hive_sight:hive_sight@localhost:5432/hive_sight_core_dev ./.venv/bin/python -m hive_sight_core_api.db seed-dev",
+    "db:prune-dev-owner-apiaries": "cd services/core-api && HIVESIGHT_DATABASE_PURPOSE=dev CORE_API_DATABASE_URL=postgresql://hive_sight:hive_sight@localhost:5432/hive_sight_core_dev ./.venv/bin/python -m hive_sight_core_api.db prune-dev-owner-apiaries",
     "db:reset": "cd services/core-api && HIVESIGHT_DATABASE_PURPOSE=test CORE_API_DATABASE_URL=postgresql://hive_sight:hive_sight@localhost:5432/hive_sight_core_test ./.venv/bin/python -m hive_sight_core_api.db reset-test",
     "db:reset:dev": "cd services/core-api && HIVESIGHT_DATABASE_PURPOSE=dev CORE_API_DATABASE_URL=postgresql://hive_sight:hive_sight@localhost:5432/hive_sight_core_dev ./.venv/bin/python -m hive_sight_core_api.db reset-dev",
     "dev:web": "pnpm --filter @hive-sight/web dev",

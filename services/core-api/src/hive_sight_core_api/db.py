@@ -11,6 +11,7 @@ from hive_sight_core_api.dev_users import DEV_USERS, accepted_at
 from hive_sight_core_api.settings import load_settings
 
 MIGRATIONS_DIR = Path(__file__).with_name("migrations")
+DEV_OWNER_CURATOR_KEEP_APIARIES = frozenset(("Dev Owner Curator Apiary", "Pudseys"))
 
 
 class PostgresDependencyError(RuntimeError):
@@ -296,17 +297,233 @@ def seed_dev_data(database_url: str) -> None:
             )
 
 
+def should_prune_dev_owner_curator_apiary(name: str) -> bool:
+    return name not in DEV_OWNER_CURATOR_KEEP_APIARIES
+
+
+def prune_dev_owner_curator_apiaries(database_url: str) -> dict[str, int]:
+    apply_migrations(database_url)
+    workspace_id = str(DEV_USERS[0].workspace_id)
+    with _connect(database_url) as connection, connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT id FROM apiaries WHERE workspace_id = %s AND name <> ALL(%s)",
+            (workspace_id, list(DEV_OWNER_CURATOR_KEEP_APIARIES)),
+        )
+        apiary_ids = [str(row[0]) for row in cursor.fetchall()]
+        if not apiary_ids:
+            return _empty_prune_counts()
+
+        ids = _dev_owner_curator_descendant_ids(cursor, apiary_ids)
+        counts: dict[str, int] = {}
+        counts["varroa_reviews_removed"] = _delete_uuid_values(
+            cursor,
+            "varroa_review_outcomes",
+            "id",
+            ids["varroa_review_outcomes"],
+        )
+        counts["dataset_items_removed"] = _delete_uuid_values(
+            cursor,
+            "dataset_items",
+            "id",
+            ids["dataset_items"],
+        )
+        counts["bee_ellipses_removed"] = _delete_uuid_values(
+            cursor,
+            "oriented_bee_ellipses",
+            "id",
+            ids["oriented_bee_ellipses"],
+        )
+        counts["training_crops_removed"] = _delete_uuid_values(
+            cursor,
+            "training_crops",
+            "id",
+            ids["training_crops"],
+        )
+        counts["inspection_photos_removed"] = _delete_uuid_values(
+            cursor,
+            "inspection_photos",
+            "id",
+            ids["inspection_photos"],
+        )
+        counts["source_images_removed"] = _delete_uuid_values(
+            cursor,
+            "source_images",
+            "id",
+            ids["source_images"],
+        )
+        counts["inspections_removed"] = _delete_uuid_values(
+            cursor,
+            "inspections",
+            "id",
+            ids["inspections"],
+        )
+        _delete_uuid_values(cursor, "hive_configurations", "hive_id", ids["hives"])
+        counts["hives_removed"] = _delete_uuid_values(cursor, "hives", "id", ids["hives"])
+        counts["apiaries_removed"] = _delete_uuid_values(cursor, "apiaries", "id", ids["apiaries"])
+        counts["repository_records_removed"] = _delete_dev_owner_curator_repository_records(
+            cursor,
+            ids,
+        )
+        return counts
+
+
+def _empty_prune_counts() -> dict[str, int]:
+    return {
+        "apiaries_removed": 0,
+        "hives_removed": 0,
+        "inspections_removed": 0,
+        "inspection_photos_removed": 0,
+        "source_images_removed": 0,
+        "training_crops_removed": 0,
+        "bee_ellipses_removed": 0,
+        "dataset_items_removed": 0,
+        "varroa_reviews_removed": 0,
+        "repository_records_removed": 0,
+    }
+
+
+def _dev_owner_curator_descendant_ids(cursor, apiary_ids: list[str]) -> dict[str, list[str]]:
+    ids: dict[str, list[str]] = {"apiaries": apiary_ids}
+    ids["hives"] = _select_uuid_values(cursor, "hives", "apiary_id", apiary_ids)
+    ids["inspections"] = _select_uuid_values(cursor, "inspections", "hive_id", ids["hives"])
+    ids["inspection_photos"] = _select_uuid_values(
+        cursor,
+        "inspection_photos",
+        "inspection_id",
+        ids["inspections"],
+    )
+    ids["source_images"] = _select_uuid_values(
+        cursor,
+        "inspection_photos",
+        "id",
+        ids["inspection_photos"],
+        selected_column="source_image_id",
+    )
+    ids["training_crops"] = sorted(
+        set(_select_uuid_values(cursor, "training_crops", "inspection_photo_id", ids["inspection_photos"]))
+        | set(_select_uuid_values(cursor, "training_crops", "source_image_id", ids["source_images"]))
+    )
+    ids["oriented_bee_ellipses"] = sorted(
+        set(
+            _select_uuid_values(
+                cursor,
+                "oriented_bee_ellipses",
+                "training_crop_id",
+                ids["training_crops"],
+            )
+        )
+        | set(
+            _select_uuid_values(
+                cursor,
+                "oriented_bee_ellipses",
+                "inspection_photo_id",
+                ids["inspection_photos"],
+            )
+        )
+    )
+    ids["dataset_items"] = sorted(
+        set(_select_uuid_values(cursor, "dataset_items", "training_crop_id", ids["training_crops"]))
+        | set(_select_uuid_values(cursor, "dataset_items", "inspection_photo_id", ids["inspection_photos"]))
+        | set(_select_uuid_values(cursor, "dataset_items", "source_image_id", ids["source_images"]))
+    )
+    ids["varroa_review_outcomes"] = sorted(
+        set(
+            _select_uuid_values(
+                cursor,
+                "varroa_review_outcomes",
+                "training_crop_id",
+                ids["training_crops"],
+            )
+        )
+        | set(
+            _select_uuid_values(
+                cursor,
+                "varroa_review_outcomes",
+                "inspection_photo_id",
+                ids["inspection_photos"],
+            )
+        )
+        | set(
+            _select_uuid_values(
+                cursor,
+                "varroa_review_outcomes",
+                "bee_annotation_id",
+                ids["oriented_bee_ellipses"],
+            )
+        )
+    )
+    return ids
+
+
+def _select_uuid_values(
+    cursor,
+    table: str,
+    column: str,
+    values: list[str],
+    *,
+    selected_column: str = "id",
+) -> list[str]:
+    if not values:
+        return []
+    cursor.execute(
+        f"SELECT {selected_column} FROM {table} WHERE {column} = ANY(%s::uuid[])",
+        (values,),
+    )
+    return [str(row[0]) for row in cursor.fetchall()]
+
+
+def _delete_uuid_values(cursor, table: str, column: str, values: list[str]) -> int:
+    if not values:
+        return 0
+    cursor.execute(
+        f"DELETE FROM {table} WHERE {column} = ANY(%s::uuid[])",
+        (values,),
+    )
+    return cursor.rowcount
+
+
+def _delete_dev_owner_curator_repository_records(cursor, ids: dict[str, list[str]]) -> int:
+    record_type_by_key = {
+        "apiaries": "apiary",
+        "hives": "hive",
+        "inspections": "inspection",
+        "inspection_photos": "inspection_photo",
+        "source_images": "source_image",
+        "training_crops": "training_crop",
+        "oriented_bee_ellipses": "training_crop_ellipse",
+        "dataset_items": "dataset_item",
+        "varroa_review_outcomes": "varroa_review_outcome",
+    }
+    removed = 0
+    for key, record_type in record_type_by_key.items():
+        for record_id in ids[key]:
+            cursor.execute(
+                "DELETE FROM repository_records WHERE record_type = %s AND record_id = %s",
+                (record_type, record_id),
+            )
+            removed += cursor.rowcount
+    return removed
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="HiveSight Core API database commands.")
-    parser.add_argument("command", choices=("migrate", "seed-dev", "reset-dev", "reset-test"))
+    parser.add_argument(
+        "command",
+        choices=("migrate", "seed-dev", "reset-dev", "reset-test", "prune-dev-owner-apiaries"),
+    )
     args = parser.parse_args()
-    database_url = load_settings().database_url
+    settings = load_settings()
+    database_url = settings.database_url
     if args.command == "migrate":
         apply_migrations(database_url)
     elif args.command == "seed-dev":
         seed_dev_data(database_url)
     elif args.command in {"reset-dev", "reset-test"}:
         reset_database(database_url)
+    elif args.command == "prune-dev-owner-apiaries":
+        if settings.database_purpose != "dev":
+            raise SystemExit("Dev Owner apiary cleanup is only allowed against the dev database.")
+        print(json.dumps(prune_dev_owner_curator_apiaries(database_url), sort_keys=True))
 
 
 if __name__ == "__main__":

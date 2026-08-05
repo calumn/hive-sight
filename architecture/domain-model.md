@@ -785,6 +785,41 @@ Rules:
 - Normalized coordinates are stored in the inclusive range `0 <= x <= 1` and `0 <= y <= 1`, rounded to a stable precision such as four decimal places.
 - Slice 0025 does not require per-marker notes, marker dragging, tight boxes, segmentation masks, or body-mask containment validation.
 
+### Varroa Corpus Curation Decision
+
+A Dataset Curator's current decision about whether one Varroa Review Outcome may contribute to the first Varroa Detection model-curation corpus.
+
+Essential fields:
+
+- id
+- workspace id
+- Varroa Review id
+- decision
+- target class
+- reason
+- eligibility snapshot
+- source context snapshot
+- created by user id
+- created at
+- updated by user id
+- updated at
+
+Decisions:
+
+- `included`
+- `excluded`
+- `deferred`
+
+Rules:
+
+- Slice 0026 records one current Varroa Corpus Curation Decision per Workspace and Varroa Review Outcome.
+- The curation decision does not mutate the original Varroa Review Outcome or its Varroa Markers.
+- `included` requires a determinate Varroa Review Outcome: `visible_varroa_present` with one or more markers, or `no_visible_varroa` with zero markers.
+- `not_determined` is deferred by default and cannot be included as positive or negative model-curation evidence.
+- A saved Varroa Review whose source Training Crop, Bee Annotation geometry, annotation type, Orientation Reliability, or Head-Up Normalized Bee Crop transform no longer matches the current source evidence is stale and cannot be included until rechecked.
+- Negative outcomes from bees marked `body_occluded_or_hard_to_assess` default to deferred because they are weak negative evidence. A positive outcome from a hard-to-assess bee may be included with the warning preserved.
+- Varroa Corpus Governance is model-curation evidence only. It is not a Dataset Version, benchmark-strength evidence, Gold-Standard Full-Frame Corpus membership, Inspection-Rate Sample, Visible Varroa Rate, Varroa Assessment, or treatment trigger.
+
 ### Varroa Annotation
 
 Structured marker data identifying a likely visible Varroa mite.

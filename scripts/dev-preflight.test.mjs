@@ -56,6 +56,7 @@ describe("dev server Postgres preflight", () => {
     assert.ok(scripts["model:qa:bee:orientation-evaluate"]);
     assert.ok(scripts["dev:all:bee-training"]);
     assert.ok(scripts["dev:lan:bee-training"]);
+    assert.ok(scripts["db:prune-dev-owner-apiaries"]);
     assert.equal(scripts["model:setup:yolo"], undefined);
     assert.equal(scripts["model:train:bee:yolo"], undefined);
     assert.equal(scripts["dev:all:yolo"], undefined);

@@ -37,6 +37,7 @@ erDiagram
     TRAINING_CROP ||--o{ BEE_ANNOTATION : reviewed_with
     BEE_ANNOTATION ||--o| VARROA_REVIEW : may_have_current
     VARROA_REVIEW ||--o{ VARROA_MARKER : contains
+    VARROA_REVIEW ||--o| VARROA_CORPUS_CURATION_DECISION : may_have_current
     TRAINING_CROP ||--o{ CANDIDATE_ANNOTATION : may_have
     TRAINING_CROP ||--o| DATASET_ITEM : becomes
     SOURCE_IMAGE ||--o{ DATASET_ITEM : sources
@@ -180,6 +181,15 @@ erDiagram
         string marker_type
         float normalized_x
         float normalized_y
+    }
+
+    VARROA_CORPUS_CURATION_DECISION {
+        string id
+        string workspace_id
+        string varroa_review_id
+        string decision
+        string target_class
+        string reason
     }
 
     CANDIDATE_ANNOTATION {

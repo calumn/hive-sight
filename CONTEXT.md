@@ -92,6 +92,14 @@ _Avoid_: Crop Governance when the actor is governing cross-crop model evidence r
 The Training Inspection Workflow stage where a Dataset Curator reviews one eligible Head-Up Normalized Bee Crop at a time and records a Varroa Review Outcome with marker evidence when visible Varroa is present. In Slice 0025 this is model-curation evidence only, scoped to the selected Training Crop; it is not a beekeeper-facing Varroa Assessment, Sampling Plan, Dataset Role assignment, or treatment trigger.
 _Avoid_: Varroa Assessment when the work is internal model-curation labelling.
 
+**Varroa Corpus Governance**:
+The Model Governance work where a Dataset Curator reviews saved Varroa Review Outcomes across the Workspace and records whether each outcome is included, excluded, or deferred for the first Varroa Detection model-curation corpus. It operates across Training Crops and keeps positive, active negative, unresolved, stale, and quality-warning evidence separate.
+_Avoid_: Varroa Review when the actor is labelling one bee-relative crop rather than governing corpus membership.
+
+**Varroa Corpus Curation Decision**:
+A Dataset Curator's current decision about whether one Varroa Review Outcome may contribute to the Varroa model-curation corpus: `included`, `excluded`, or `deferred`. It preserves the original Varroa Review Outcome and records the corpus decision separately.
+_Avoid_: Dataset Version when the evidence has not yet been frozen for training, validation, or benchmark use.
+
 **Varroa Assessment**:
 An Inspection Intent for estimating visible Varroa evidence from inspection photos for beekeeper-facing support.
 _Avoid_: Training data collection when the purpose is product analysis.

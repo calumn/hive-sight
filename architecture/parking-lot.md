@@ -1224,7 +1224,7 @@ Varroa assessment, research methodology, dataset/model governance, and statistic
 
 ## PARK-0052: Varroa Review Invalidation After Source Bee Geometry Changes
 
-Status: parked
+Status: promoted
 Date parked: 2026-08-05
 Source: Slice 0025 grilling
 Area: Varroa review, annotation provenance, dataset governance
@@ -1239,7 +1239,7 @@ If the source Training Crop, Bee Annotation geometry, annotation type, or Orient
 
 Revisit trigger:
 
-Before Varroa Dataset Role assignment, Varroa Dataset Versions, benchmark-strength Varroa evidence, Blind Independent Review, Varroa Detector training export, or any report that treats saved Varroa Review Outcomes as stable model evidence.
+Promoted into `architecture/vertical-slice-0026-varroa-corpus-governance.md`. The slice should block stale Varroa Review Outcomes from inclusion in the model-curation corpus until the curator rechecks the review against current source evidence.
 
 Suggested owner or area:
 

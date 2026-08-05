@@ -100,6 +100,12 @@ Reset and seed the local development database only when you explicitly want to w
 pnpm db:reset:dev
 ```
 
+Remove leaked browser-acceptance fixture apiaries from the default development owner while preserving `Dev Owner Curator Apiary` and `Pudseys`:
+
+```sh
+pnpm db:prune-dev-owner-apiaries
+```
+
 Run the Core API against Postgres-backed metadata:
 
 ```sh
@@ -132,34 +138,44 @@ If you want to run just the Web UI in a separate terminal, use:
 pnpm dev:web
 ```
 
-## Local YOLO OBB Bee Detector Training
+## Local Bee Training
 
-The normal verification suite uses a fake training adapter so tests stay fast and deterministic. To try a real local YOLO OBB Bee Detector baseline, first install the optional Core API model dependencies:
+The normal verification suite uses fake training adapters so tests stay fast and deterministic. To try real local Bee Localisation and Bee Orientation training, first install the optional Core API model dependencies:
 
 ```sh
 cd ~/Projects/hive-sight
-pnpm model:setup:yolo
+pnpm model:setup:bee
 ```
 
-Then start the stack with the real training adapter enabled:
+Start Docker Desktop, bring up Postgres, apply migrations, and seed the dev database if needed:
 
 ```sh
-pnpm dev:all:yolo-training
+pnpm db:up
+pnpm db:migrate
+pnpm db:seed
 ```
 
-After you have at least one reviewed Training Crop assigned to `training` and one assigned to `validation`, start a baseline run:
+Then start the stack with the real Bee Training adapters enabled:
 
 ```sh
-pnpm model:train:bee:yolo
+pnpm dev:all:bee-training
+```
+
+This command does not reset or wipe the dev database. Use `pnpm db:reset:dev` only when you explicitly want to wipe and reseed local dev data.
+
+After you have at least one reviewed Training Crop assigned to `training` and one assigned to `validation`, start a combined Bee Training baseline run:
+
+```sh
+pnpm model:train:bee
 ```
 
 For LAN testing:
 
 ```sh
-pnpm dev:lan:yolo-training
+pnpm dev:lan:bee-training
 ```
 
-The real adapter writes model run artifacts under `var/model-runs/`, which is intentionally ignored by git. Model Candidates produced by this slice are not user-facing and are not promoted into inspection analysis.
+The real adapters write model run artifacts under `var/model-runs/`, which is intentionally ignored by git. Model Candidates produced by this local workflow are not user-facing and are not promoted into inspection analysis.
 
 Useful local overrides:
 

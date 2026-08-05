@@ -611,3 +611,23 @@ AI contribution:
 Human judgment still required:
 
 - Review the first real curated Varroa outcomes on weekend photo data.
+
+### 2026-08-05 Slice 0026 Varroa Corpus Governance Planning
+
+Human-confirmed direction:
+
+- Treat the next logical step after Slice 0025 as corpus governance, not Varroa Detector training.
+- Keep Varroa evidence in model-curation space until explicit include, exclude, or defer decisions exist.
+- Preserve the boundary between active negative evidence and unresolved `not_determined` evidence.
+
+AI contribution:
+
+- Designed `architecture/vertical-slice-0026-varroa-corpus-governance.md`.
+- Added Varroa Corpus Governance and Varroa Corpus Curation Decision to the project language and domain model.
+- Promoted the stale-source Varroa review risk from the parking lot into the Slice 0026 design so source geometry changes block corpus inclusion until rechecked.
+- Updated the roadmap to show Varroa Corpus Governance between Varroa Review Outcome labelling and Varroa Detector training.
+
+Human judgment still required:
+
+- Review and sign off the Slice 0026 Gherkin before implementation starts.
+- Decide in Slice 0027 whether included corpus decisions freeze directly into a Varroa Dataset Version or first become a named draft corpus.
