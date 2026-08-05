@@ -9,6 +9,13 @@ from math import cos, radians, sin
 from pathlib import Path
 from uuid import UUID, uuid4
 
+from hive_sight_core_api.dev_users import (
+    DEV_USERS,
+    accepted_at,
+    dev_user_response,
+    seeded_apiary,
+    seeded_hive,
+)
 from hive_sight_core_api.models import (
     AnalysisResultResponse,
     AnalysisRunResponse,
@@ -18,13 +25,15 @@ from hive_sight_core_api.models import (
     AnnotationType,
     AnnotationWorkflowType,
     ApiaryResponse,
+    ArtifactResponse,
+    BenchmarkEvaluationResponse,
     DatasetExclusionReason,
-    DatasetVersionResponse,
     DatasetItemProvenanceResponse,
     DatasetItemResponse,
     DatasetLabellingSessionResponse,
     DatasetLabellingSessionStatus,
     DatasetRole,
+    DatasetVersionResponse,
     DataUseAgreementStatus,
     DevSessionResponse,
     DevUserResponse,
@@ -40,8 +49,6 @@ from hive_sight_core_api.models import (
     InspectionPhotoListResponse,
     InspectionPhotoResponse,
     InspectionResponse,
-    ArtifactResponse,
-    BenchmarkEvaluationResponse,
     ModelCandidateResponse,
     OrientedBeeEllipseCreateRequest,
     OrientedBeeEllipseResponse,
@@ -50,10 +57,10 @@ from hive_sight_core_api.models import (
     PrelabelerRunResponse,
     ReviewDecisionResponse,
     ReviewDecisionValue,
+    ReviewedEllipseSnapshot,
     ReviewQueueItemRecord,
     ReviewQueueItemResponse,
     ReviewQueueOutcomeRecord,
-    ReviewedEllipseSnapshot,
     ReviewSubjectType,
     TrainingCropCreateRequest,
     TrainingCropDatasetItemCreateRequest,
@@ -63,18 +70,12 @@ from hive_sight_core_api.models import (
     TrainingCropUpdateRequest,
     TrainingRunResponse,
     UploadStatus,
+    VarroaReviewOutcomeResponse,
     WorkspaceDataUseAgreementAcceptanceResponse,
     YoloObbExcludedItem,
     YoloObbExportResponse,
     YoloObbImageEntry,
     YoloObbLabelEntry,
-)
-from hive_sight_core_api.dev_users import (
-    DEV_USERS,
-    accepted_at,
-    dev_user_response,
-    seeded_apiary,
-    seeded_hive,
 )
 
 try:
@@ -199,6 +200,7 @@ class InMemoryProductDataStore:
     artifacts: dict[UUID, ArtifactResponse] = field(default_factory=dict)
     training_crops: dict[UUID, TrainingCropResponse] = field(default_factory=dict)
     training_crop_ellipses: dict[UUID, OrientedBeeEllipseResponse] = field(default_factory=dict)
+    varroa_review_outcomes: dict[UUID, VarroaReviewOutcomeResponse] = field(default_factory=dict)
     review_queue_items: dict[UUID, ReviewQueueItemRecord] = field(default_factory=dict)
     review_queue_outcomes: dict[UUID, ReviewQueueOutcomeRecord] = field(default_factory=dict)
     reviewer_user_ids: set[UUID] = field(
@@ -1013,6 +1015,7 @@ class InMemoryProductDataStore:
         )
 
     def delete_training_crop_ellipse_record(self, annotation_id: UUID) -> None:
+        self.delete_varroa_review_outcome_for_bee(annotation_id)
         del self.training_crop_ellipses[annotation_id]
 
     def delete_training_crop_record(self, training_crop_id: UUID) -> None:
@@ -1023,7 +1026,53 @@ class InMemoryProductDataStore:
         ]
         for annotation_id in ellipse_ids:
             self.training_crop_ellipses.pop(annotation_id, None)
+            self.delete_varroa_review_outcome_for_bee(annotation_id)
         self.training_crops.pop(training_crop_id, None)
+
+    def save_varroa_review_outcome(
+        self,
+        outcome: VarroaReviewOutcomeResponse,
+    ) -> VarroaReviewOutcomeResponse:
+        existing = self.get_varroa_review_outcome_for_bee(
+            workspace_id=outcome.workspace_id,
+            bee_annotation_id=outcome.bee_annotation_id,
+        )
+        if existing is not None and existing.varroa_review_outcome_id != outcome.varroa_review_outcome_id:
+            self.varroa_review_outcomes.pop(existing.varroa_review_outcome_id, None)
+        self.varroa_review_outcomes[outcome.varroa_review_outcome_id] = outcome
+        return outcome
+
+    def get_varroa_review_outcome_for_bee(
+        self,
+        workspace_id: UUID,
+        bee_annotation_id: UUID,
+    ) -> VarroaReviewOutcomeResponse | None:
+        for outcome in self.varroa_review_outcomes.values():
+            if outcome.workspace_id == workspace_id and outcome.bee_annotation_id == bee_annotation_id:
+                return outcome
+        return None
+
+    def list_varroa_review_outcomes_for_training_crop(
+        self,
+        workspace_id: UUID,
+        training_crop_id: UUID,
+    ) -> list[VarroaReviewOutcomeResponse]:
+        outcomes = [
+            outcome
+            for outcome in self.varroa_review_outcomes.values()
+            if outcome.workspace_id == workspace_id and outcome.training_crop_id == training_crop_id
+        ]
+        outcomes.sort(key=lambda outcome: outcome.created_at)
+        return outcomes
+
+    def delete_varroa_review_outcome_for_bee(self, bee_annotation_id: UUID) -> None:
+        outcome_ids = [
+            outcome_id
+            for outcome_id, outcome in self.varroa_review_outcomes.items()
+            if outcome.bee_annotation_id == bee_annotation_id
+        ]
+        for outcome_id in outcome_ids:
+            self.varroa_review_outcomes.pop(outcome_id, None)
 
     def get_training_crop_evidence(
         self,
@@ -2118,5 +2167,3 @@ def _dataset_yaml_text(class_map: dict[str, str], dataset_path: str = ".") -> st
         f"{names}\n"
         "# HiveSight: YOLO OBB labels derived from canonical oriented bee ellipses.\n"
     )
-    ModelCandidateResponse,
-    TrainingRunResponse,

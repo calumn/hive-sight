@@ -121,6 +121,18 @@ class OrientationReliability(StrEnum):
     unreliable = "unreliable"
 
 
+class VarroaReviewSuitability(StrEnum):
+    unassessed = "unassessed"
+    appears_assessable = "appears_assessable"
+    body_occluded_or_hard_to_assess = "body_occluded_or_hard_to_assess"
+
+
+class VarroaReviewOutcomeValue(StrEnum):
+    visible_varroa_present = "visible_varroa_present"
+    no_visible_varroa = "no_visible_varroa"
+    not_determined = "not_determined"
+
+
 class TrainingCropExclusionReason(StrEnum):
     poor_image_quality = "poor_image_quality"
     no_visible_bees = "no_visible_bees"
@@ -1251,6 +1263,8 @@ class OrientedBeeEllipseUpdateRequest(BaseModel):
     radius_y: float | None = Field(default=None, gt=0)
     rotation_degrees: float | None = None
     orientation_reliability: OrientationReliability | None = None
+    varroa_review_suitability: VarroaReviewSuitability | None = None
+    suspected_visible_varroa: bool | None = None
 
 
 class OrientedBeeEllipseResponse(BaseModel):
@@ -1276,6 +1290,12 @@ class OrientedBeeEllipseResponse(BaseModel):
     raw_model_class: str | None = None
     raw_yolo_obb: list[float] | None = None
     candidate_review_decision: CandidateAnnotationReviewDecision | None = None
+    varroa_review_suitability: VarroaReviewSuitability = VarroaReviewSuitability.unassessed
+    suspected_visible_varroa: bool = False
+    varroa_review_suitability_updated_by_user_id: UUID | None = None
+    varroa_review_suitability_updated_at: datetime | None = None
+    suspected_visible_varroa_updated_by_user_id: UUID | None = None
+    suspected_visible_varroa_updated_at: datetime | None = None
     created_by_user_id: UUID
     created_at: datetime
     updated_at: datetime
@@ -1322,6 +1342,92 @@ class TrainingCropEvidenceResponse(BaseModel):
     training_crop: TrainingCropResponse
     bee_ellipses: list[OrientedBeeEllipseResponse]
     caveat: str
+
+
+class VarroaMarkerCreateRequest(BaseModel):
+    x: float = Field(ge=0, le=1)
+    y: float = Field(ge=0, le=1)
+
+
+class VarroaMarkerResponse(BaseModel):
+    varroa_marker_id: UUID
+    varroa_review_outcome_id: UUID
+    marker_type: str = "point"
+    x: float = Field(ge=0, le=1)
+    y: float = Field(ge=0, le=1)
+    created_at: datetime
+
+
+class VarroaReviewOutcomeCreateRequest(BaseModel):
+    workspace_id: UUID
+    outcome: VarroaReviewOutcomeValue
+    markers: list[VarroaMarkerCreateRequest] = Field(default_factory=list)
+    notes: str | None = Field(default=None, max_length=500)
+
+
+class VarroaReviewOutcomeResponse(BaseModel):
+    varroa_review_outcome_id: UUID
+    workspace_id: UUID
+    inspection_photo_id: UUID
+    training_crop_id: UUID
+    bee_annotation_id: UUID
+    outcome: VarroaReviewOutcomeValue
+    sampling_purpose: str = "model_curation"
+    dataset_selection_method: str = "human_selected"
+    review_strength: str = "single_curator_review"
+    annotation_source: str = "human_from_scratch"
+    created_by_user_id: UUID
+    created_at: datetime
+    updated_by_user_id: UUID
+    updated_at: datetime
+    notes: str | None = None
+    source_context_snapshot: dict[str, object]
+    bee_annotation_geometry_snapshot: dict[str, object]
+    training_crop_review_status_snapshot: str
+    transform_metadata: dict[str, object]
+    markers: list[VarroaMarkerResponse] = Field(default_factory=list)
+
+
+class VarroaReviewCandidateResponse(BaseModel):
+    bee_annotation: OrientedBeeEllipseResponse
+    eligibility: str
+    ineligibility_reasons: list[str] = Field(default_factory=list)
+    review_outcome: VarroaReviewOutcomeResponse | None = None
+
+
+class VarroaReviewSummaryResponse(BaseModel):
+    eligible_bee_count: int
+    reviewed_bee_count: int
+    visible_varroa_bee_count: int
+    no_visible_varroa_bee_count: int
+    not_determined_bee_count: int
+    total_marker_count: int
+    suspected_visible_varroa_cue_count: int
+    hard_to_assess_cue_count: int
+    ineligible_deferred_bee_count: int
+    caveat: str
+
+
+class VarroaReviewCandidateListResponse(BaseModel):
+    workspace_id: UUID
+    training_crop_id: UUID
+    candidates: list[VarroaReviewCandidateResponse]
+    summary: VarroaReviewSummaryResponse
+
+
+class HeadUpNormalizedBeeCropPreviewResponse(BaseModel):
+    workspace_id: UUID
+    inspection_photo_id: UUID
+    training_crop_id: UUID
+    bee_annotation_id: UUID
+    annotation_type: AnnotationType
+    orientation_reliability: OrientationReliability
+    image_width_px: int
+    image_height_px: int
+    transform_version: str
+    image_url: str
+    transform_metadata: dict[str, object]
+    bee_annotation_geometry_snapshot: dict[str, object]
 
 
 class ReviewQueueEllipseEvidence(BaseModel):

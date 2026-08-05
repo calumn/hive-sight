@@ -1,6 +1,6 @@
 # Vertical Slice 0025: Varroa Review Outcome Labelling
 
-Status: designed; acceptance scenarios signed off on 2026-08-05.
+Status: implemented; API, BDD, Web type-check, focused browser acceptance, full `pnpm verify:slice`, and live Postgres restart verification passed on 2026-08-05.
 
 ## Purpose
 

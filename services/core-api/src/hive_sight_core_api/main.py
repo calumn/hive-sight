@@ -7,16 +7,16 @@ from fastapi.responses import JSONResponse, Response
 
 from hive_sight_core_api.analysis_processing_workflow import AnalysisProcessingWorkflow
 from hive_sight_core_api.analysis_request_workflow import AnalysisRequestWorkflow
-from hive_sight_core_api.bee_detector_candidate_annotation_workflow import (
-    BeeDetectorCandidateAnnotationWorkflow,
-)
 from hive_sight_core_api.bee_detector_benchmark_evaluation_workflow import (
     BeeDetectorBenchmarkEvaluationWorkflow,
 )
+from hive_sight_core_api.bee_detector_candidate_annotation_workflow import (
+    BeeDetectorCandidateAnnotationWorkflow,
+)
+from hive_sight_core_api.bee_detector_training_workflow import BeeDetectorTrainingWorkflow
 from hive_sight_core_api.bee_orientation_benchmark_evaluation_workflow import (
     BeeOrientationBenchmarkEvaluationWorkflow,
 )
-from hive_sight_core_api.bee_detector_training_workflow import BeeDetectorTrainingWorkflow
 from hive_sight_core_api.dataset_labelling_workflow import DatasetLabellingWorkflow
 from hive_sight_core_api.dataset_repository_workflow import DatasetRepositoryWorkflow
 from hive_sight_core_api.dataset_role_assignment_workflow import DatasetRoleAssignmentWorkflow
@@ -38,13 +38,13 @@ from hive_sight_core_api.dependencies import (
     get_settings,
     get_training_crop_dataset_item_workflow,
     get_training_crop_workflow,
+    get_varroa_review_workflow,
 )
 from hive_sight_core_api.dev_store import DomainError, UserContext
 from hive_sight_core_api.dev_users import DEV_USER_IDS
 from hive_sight_core_api.directed_ellipse_cleanup_workflow import DirectedEllipseCleanupWorkflow
 from hive_sight_core_api.hive_configuration_workflow import HiveConfigurationWorkflow
 from hive_sight_core_api.inspection_photo_access import InspectionPhotoAccess
-from hive_sight_core_api.review_queue_workflow import ReviewQueueWorkflow
 from hive_sight_core_api.models import (
     AnalysisEvidenceResponse,
     AnalysisRunDetailListResponse,
@@ -66,6 +66,8 @@ from hive_sight_core_api.models import (
     BenchmarkEvaluationStartRequest,
     DatasetItemCreateRequest,
     DatasetItemResponse,
+    DatasetLabellingEvidenceResponse,
+    DatasetLabellingSessionResponse,
     DatasetRepositoryItemDetail,
     DatasetRepositoryItemListResponse,
     DatasetRepositorySummaryResponse,
@@ -73,14 +75,13 @@ from hive_sight_core_api.models import (
     DatasetVersionCreateRequest,
     DatasetVersionListResponse,
     DatasetVersionResponse,
-    DatasetLabellingEvidenceResponse,
-    DatasetLabellingSessionResponse,
     DevSessionResponse,
     DevUserListResponse,
     DirectedEllipseLocalCleanupRequest,
     DirectedEllipseLocalCleanupResponse,
     ErrorResponse,
     FrameStandardResponse,
+    HeadUpNormalizedBeeCropPreviewResponse,
     HealthResponse,
     HiveConfigurationResponse,
     HiveConfigurationUpsertRequest,
@@ -126,15 +127,20 @@ from hive_sight_core_api.models import (
     TrainingRunResponse,
     TrainingRunStartRequest,
     UpdateDatasetLabellingSessionRequest,
+    VarroaReviewCandidateListResponse,
+    VarroaReviewOutcomeCreateRequest,
+    VarroaReviewOutcomeResponse,
     WorkspaceDataUseAgreementAcceptanceRequest,
     WorkspaceDataUseAgreementAcceptanceResponse,
     YoloObbExportRequest,
     YoloObbExportResponse,
 )
+from hive_sight_core_api.review_queue_workflow import ReviewQueueWorkflow
 from hive_sight_core_api.training_crop_dataset_item_workflow import (
     TrainingCropDatasetItemWorkflow,
 )
 from hive_sight_core_api.training_crop_workflow import TrainingCropWorkflow
+from hive_sight_core_api.varroa_review_workflow import VarroaReviewWorkflow
 
 settings = get_settings()
 
@@ -185,6 +191,10 @@ TrainingCropWorkflowDep = Annotated[
 TrainingCropDatasetItemWorkflowDep = Annotated[
     TrainingCropDatasetItemWorkflow,
     Depends(get_training_crop_dataset_item_workflow),
+]
+VarroaReviewWorkflowDep = Annotated[
+    VarroaReviewWorkflow,
+    Depends(get_varroa_review_workflow),
 ]
 ReviewQueueWorkflowDep = Annotated[
     ReviewQueueWorkflow,
@@ -1226,6 +1236,80 @@ def get_training_crop_evidence(
         user=user,
         workspace_id=workspace_id,
         training_crop_id=training_crop_id,
+    )
+
+
+@app.get(
+    "/v1/training-crops/{training_crop_id}/varroa-review-candidates",
+    response_model=VarroaReviewCandidateListResponse,
+)
+def list_varroa_review_candidates(
+    training_crop_id: UUID,
+    workspace_id: UUID,
+    user: AuthenticatedUserDep,
+    workflow: VarroaReviewWorkflowDep,
+) -> VarroaReviewCandidateListResponse:
+    return workflow.list_candidates(
+        user=user,
+        workspace_id=workspace_id,
+        training_crop_id=training_crop_id,
+    )
+
+
+@app.get(
+    "/v1/training-crops/{training_crop_id}/varroa-review-candidates/{bee_annotation_id}/head-up-normalized-preview",
+    response_model=HeadUpNormalizedBeeCropPreviewResponse,
+)
+def get_head_up_normalized_preview(
+    training_crop_id: UUID,
+    bee_annotation_id: UUID,
+    workspace_id: UUID,
+    user: AuthenticatedUserDep,
+    workflow: VarroaReviewWorkflowDep,
+) -> HeadUpNormalizedBeeCropPreviewResponse:
+    return workflow.get_preview_metadata(
+        user=user,
+        workspace_id=workspace_id,
+        training_crop_id=training_crop_id,
+        bee_annotation_id=bee_annotation_id,
+    )
+
+
+@app.get(
+    "/v1/training-crops/{training_crop_id}/varroa-review-candidates/{bee_annotation_id}/head-up-normalized-image",
+)
+def get_head_up_normalized_image(
+    training_crop_id: UUID,
+    bee_annotation_id: UUID,
+    workspace_id: UUID,
+    user: AuthenticatedUserDep,
+    workflow: VarroaReviewWorkflowDep,
+) -> Response:
+    image = workflow.get_preview_image(
+        user=user,
+        workspace_id=workspace_id,
+        training_crop_id=training_crop_id,
+        bee_annotation_id=bee_annotation_id,
+    )
+    return Response(content=image.body, media_type=image.content_type)
+
+
+@app.put(
+    "/v1/training-crops/{training_crop_id}/varroa-review-candidates/{bee_annotation_id}/outcome",
+    response_model=VarroaReviewOutcomeResponse,
+)
+def save_varroa_review_outcome(
+    training_crop_id: UUID,
+    bee_annotation_id: UUID,
+    request: VarroaReviewOutcomeCreateRequest,
+    user: AuthenticatedUserDep,
+    workflow: VarroaReviewWorkflowDep,
+) -> VarroaReviewOutcomeResponse:
+    return workflow.save_outcome(
+        user=user,
+        training_crop_id=training_crop_id,
+        bee_annotation_id=bee_annotation_id,
+        request=request,
     )
 
 

@@ -978,6 +978,75 @@ label span {
   margin: 4px 0 0;
 }
 
+.varroa-review-stage {
+  gap: 16px;
+}
+
+.varroa-review-layout {
+  align-items: start;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(220px, 320px) minmax(0, 1fr);
+}
+
+.varroa-preview-grid {
+  align-items: start;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(256px, max-content) minmax(220px, 1fr);
+}
+
+.varroa-preview-surface {
+  aspect-ratio: 1 / 1;
+  background: #ffffff;
+  border: 1px solid #dce2d7;
+  max-width: 100%;
+  overflow: auto;
+  position: relative;
+}
+
+.varroa-preview-surface img {
+  display: block;
+  height: 100%;
+  object-fit: contain;
+  user-select: none;
+  width: 100%;
+}
+
+.varroa-preview-surface > span:not(.varroa-marker) {
+  color: #515b4c;
+  display: grid;
+  min-height: 256px;
+  place-items: center;
+}
+
+.varroa-marker {
+  background: rgb(148 39 30 / 0.75);
+  border: 2px solid #ffd94d;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px rgb(255 255 255 / 0.85);
+  height: 14px;
+  pointer-events: none;
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 14px;
+}
+
+.varroa-source-context {
+  aspect-ratio: 1 / 1;
+  background: #ffffff;
+  border: 1px solid #dce2d7;
+  max-width: 280px;
+  overflow: hidden;
+  position: relative;
+}
+
+.varroa-source-context img {
+  display: block;
+  height: 100%;
+  width: 100%;
+}
+
 .model-workflow-stage:last-child {
   border-bottom: 0;
   padding-bottom: 0;

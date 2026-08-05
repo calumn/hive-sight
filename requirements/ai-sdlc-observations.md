@@ -594,3 +594,20 @@ Human judgment still required:
 
 - Decide after real use whether triage cues need richer notes/history or whether the lightweight current-value model is enough.
 - Decide in a later slice how Varroa Review Outcomes graduate into Dataset Items, benchmark evidence, sampling-plan evidence, or treatment-advisor inputs.
+
+### 2026-08-05 Slice 0025 Varroa Review Outcome Labelling Implementation
+
+Human-confirmed direction:
+
+- Build the signed-off Slice 0025 workflow without adding Varroa Detector training, treatment advice, repository queues, or dataset promotion.
+
+AI contribution:
+
+- Added durable Varroa review cues to Training Crop bee ellipses.
+- Added Core API Varroa Review candidate, Head-Up Normalized Bee Crop preview/image, and current outcome endpoints.
+- Added current Varroa Review Outcome persistence with point markers, provenance labels, server-side validation, Postgres migration/projection support, focused API tests, executable BDD scenarios, and browser acceptance.
+- Added the Web `Varroa Review` workflow stage and user-guide instructions.
+
+Human judgment still required:
+
+- Review the first real curated Varroa outcomes on weekend photo data.

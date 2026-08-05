@@ -306,6 +306,16 @@ class TrainingCropWorkflow:
                 if request.orientation_reliability is None
                 else request.orientation_reliability
             ),
+            "varroa_review_suitability": (
+                ellipse.varroa_review_suitability
+                if request.varroa_review_suitability is None
+                else request.varroa_review_suitability
+            ),
+            "suspected_visible_varroa": (
+                ellipse.suspected_visible_varroa
+                if request.suspected_visible_varroa is None
+                else request.suspected_visible_varroa
+            ),
         }
         _validate_ellipse_for_crop(
             crop=crop,
@@ -316,7 +326,25 @@ class TrainingCropWorkflow:
             radius_y=next_values["radius_y"],
             rotation_degrees=next_values["rotation_degrees"],
         )
-        updated = ellipse.model_copy(update={**next_values, "updated_at": self.store.clock()})
+        updated_at = self.store.clock()
+        provenance_updates = {}
+        if request.varroa_review_suitability is not None:
+            provenance_updates.update(
+                {
+                    "varroa_review_suitability_updated_by_user_id": user.user_id,
+                    "varroa_review_suitability_updated_at": updated_at,
+                }
+            )
+        if request.suspected_visible_varroa is not None:
+            provenance_updates.update(
+                {
+                    "suspected_visible_varroa_updated_by_user_id": user.user_id,
+                    "suspected_visible_varroa_updated_at": updated_at,
+                }
+            )
+        updated = ellipse.model_copy(
+            update={**next_values, **provenance_updates, "updated_at": updated_at}
+        )
         self.store.save_training_crop_ellipse(updated)
         return updated
 

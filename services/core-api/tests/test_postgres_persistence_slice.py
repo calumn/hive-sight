@@ -651,6 +651,138 @@ def test_postgres_store_survives_restart_for_model_training_records() -> None:
     )
     assert restarted.get_artifact(weights_artifact_id).relative_path.endswith("weights/best.pt")
 
+
+@pytest.mark.skipif(
+    importlib.util.find_spec("psycopg") is None or not os.getenv("HIVESIGHT_TEST_DATABASE_URL"),
+    reason="Set HIVESIGHT_TEST_DATABASE_URL and install psycopg to run Postgres persistence integration.",
+)
+def test_postgres_store_survives_restart_for_varroa_review_outcome() -> None:
+    database_url = os.environ["HIVESIGHT_TEST_DATABASE_URL"]
+    reset_database(database_url)
+    object_storage_root = Path("/tmp/hive-sight-test-object-storage-varroa-review")
+    state = _build_postgres_state(database_url, object_storage_root=object_storage_root)
+    app.dependency_overrides[get_dev_state] = lambda: state
+    client = TestClient(app)
+
+    try:
+        workspace_id = client.get("/v1/dev/session", headers=_headers()).json()["workspace_id"]
+        client.post(
+            "/v1/workspace-data-use-agreements/acceptances",
+            json={"workspace_id": workspace_id, "terms_version": "2026-08-05"},
+            headers=_headers(),
+        )
+        apiary_id = client.post(
+            "/v1/apiaries",
+            json={"workspace_id": workspace_id, "name": "Varroa persistence apiary"},
+            headers=_headers(),
+        ).json()["apiary_id"]
+        hive_id = client.post(
+            "/v1/hives",
+            json={"apiary_id": apiary_id, "name": "Varroa persistence hive"},
+            headers=_headers(),
+        ).json()["hive_id"]
+        configure_hive(client, workspace_id=workspace_id, hive_id=hive_id, headers=_headers())
+        inspection_id = client.post(
+            "/v1/inspections",
+            json={
+                "hive_id": hive_id,
+                "inspection_date": str(date(2026, 8, 5)),
+                "intent": "training_data_collection",
+            },
+            headers=_headers(),
+        ).json()["inspection_id"]
+        intake = client.post(
+            f"/v1/inspection-photos/intake?workspace_id={workspace_id}&inspection_id={inspection_id}",
+            content=_minimal_png(),
+            headers={
+                **_headers(),
+                "content-type": "image/png",
+                "x-hivesight-filename": "persistent-varroa-review.png",
+            },
+        )
+        crop = client.post(
+            "/v1/training-crops",
+            json={
+                "workspace_id": workspace_id,
+                "inspection_photo_id": intake.json()["inspection_photo"]["inspection_photo_id"],
+                "crop_x": 10,
+                "crop_y": 20,
+                "crop_width": 100,
+                "crop_height": 120,
+                "source_image_width_px": 1600,
+                "source_image_height_px": 1200,
+            },
+            headers=_headers(),
+        ).json()
+        ellipse = client.post(
+            f"/v1/training-crops/{crop['training_crop_id']}/bee-ellipses",
+            json={
+                "workspace_id": workspace_id,
+                "annotation_type": "complete_visible_bee",
+                "center_x": 50,
+                "center_y": 70,
+                "radius_x": 20,
+                "radius_y": 12,
+                "rotation_degrees": 15,
+                "orientation_reliability": "reliable",
+            },
+            headers=_headers(),
+        ).json()
+        cue_update = client.patch(
+            f"/v1/training-crop-bee-ellipses/{ellipse['annotation_id']}",
+            json={
+                "workspace_id": workspace_id,
+                "varroa_review_suitability": "appears_assessable",
+                "suspected_visible_varroa": True,
+            },
+            headers=_headers(),
+        )
+        assert cue_update.status_code == 200
+        completed = client.patch(
+            f"/v1/training-crops/{crop['training_crop_id']}",
+            json={
+                "workspace_id": workspace_id,
+                "visible_bee_status": "has_visible_bees",
+                "review_status": "review_complete",
+            },
+            headers=_headers(),
+        )
+        assert completed.status_code == 200
+        saved = client.put(
+            f"/v1/training-crops/{crop['training_crop_id']}/varroa-review-candidates/"
+            f"{ellipse['annotation_id']}/outcome",
+            json={
+                "workspace_id": workspace_id,
+                "outcome": "no_visible_varroa",
+                "markers": [],
+            },
+            headers=_headers(),
+        )
+        assert saved.status_code == 200
+    finally:
+        app.dependency_overrides.clear()
+
+    restarted_state = _build_postgres_state(
+        database_url,
+        object_storage_root=object_storage_root,
+    )
+    app.dependency_overrides[get_dev_state] = lambda: restarted_state
+    restarted_client = TestClient(app)
+    try:
+        candidates = restarted_client.get(
+            f"/v1/training-crops/{crop['training_crop_id']}/varroa-review-candidates",
+            params={"workspace_id": workspace_id},
+            headers=_headers(),
+        )
+
+        assert candidates.status_code == 200
+        assert candidates.json()["summary"]["reviewed_bee_count"] == 1
+        assert candidates.json()["candidates"][0]["review_outcome"]["outcome"] == "no_visible_varroa"
+        assert candidates.json()["candidates"][0]["bee_annotation"]["suspected_visible_varroa"] is True
+    finally:
+        app.dependency_overrides.clear()
+
+
 def _build_postgres_state(database_url: str, object_storage_root: Path | None = None):
     store = PostgresProductDataStore(
         database_url=database_url,

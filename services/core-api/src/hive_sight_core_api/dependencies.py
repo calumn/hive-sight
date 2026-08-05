@@ -12,18 +12,13 @@ from hive_sight_core_api.analysis_processing_workflow import (
     DeterministicStubAnalysisExecutor,
 )
 from hive_sight_core_api.analysis_request_workflow import AnalysisRequestWorkflow
+from hive_sight_core_api.bee_detector_benchmark_evaluation_workflow import (
+    BeeDetectorBenchmarkEvaluationWorkflow,
+)
 from hive_sight_core_api.bee_detector_candidate_annotation_workflow import (
     BeeDetectorCandidateAnnotationWorkflow,
     FakeBeeDetectorInferenceAdapter,
     UltralyticsYoloObbInferenceAdapter,
-)
-from hive_sight_core_api.bee_detector_benchmark_evaluation_workflow import (
-    BeeDetectorBenchmarkEvaluationWorkflow,
-)
-from hive_sight_core_api.bee_orientation_benchmark_evaluation_workflow import (
-    BeeOrientationBenchmarkEvaluationWorkflow,
-    FakeBeeOrientationBenchmarkAdapter,
-    TorchvisionBeeOrientationBenchmarkAdapter,
 )
 from hive_sight_core_api.bee_detector_training_workflow import (
     BeeDetectorTrainingWorkflow,
@@ -31,6 +26,11 @@ from hive_sight_core_api.bee_detector_training_workflow import (
     FakeBeeOrientationTrainingAdapter,
     TorchvisionBeeOrientationTrainingAdapter,
     UltralyticsYoloObbTrainingAdapter,
+)
+from hive_sight_core_api.bee_orientation_benchmark_evaluation_workflow import (
+    BeeOrientationBenchmarkEvaluationWorkflow,
+    FakeBeeOrientationBenchmarkAdapter,
+    TorchvisionBeeOrientationBenchmarkAdapter,
 )
 from hive_sight_core_api.dataset_labelling_workflow import (
     BeePrelabeler,
@@ -57,6 +57,7 @@ from hive_sight_core_api.training_crop_dataset_item_workflow import (
     TrainingCropDatasetItemWorkflow,
 )
 from hive_sight_core_api.training_crop_workflow import TrainingCropWorkflow
+from hive_sight_core_api.varroa_review_workflow import VarroaReviewWorkflow
 
 DEFAULT_DATASET_EXPORT_ROOT = Path(__file__).resolve().parents[4] / "var" / "exports" / "datasets"
 DEFAULT_MODEL_ARTIFACT_ROOT = Path(__file__).resolve().parents[4] / "var" / "model-runs"
@@ -167,6 +168,13 @@ def get_training_crop_dataset_item_workflow(
     state: DevStateDep,
 ) -> TrainingCropDatasetItemWorkflow:
     return TrainingCropDatasetItemWorkflow(store=state.store)
+
+
+def get_varroa_review_workflow(state: DevStateDep) -> VarroaReviewWorkflow:
+    return VarroaReviewWorkflow(
+        store=state.store,
+        image_loader=state.object_storage.get_object,
+    )
 
 
 def get_review_queue_workflow(state: DevStateDep) -> ReviewQueueWorkflow:

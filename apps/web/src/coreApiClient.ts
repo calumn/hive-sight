@@ -173,6 +173,16 @@ export type VisibleBeeStatus = "unassessed" | "has_visible_bees" | "no_visible_b
 
 export type OrientationReliability = "reliable" | "unreliable";
 
+export type VarroaReviewSuitability =
+  | "unassessed"
+  | "appears_assessable"
+  | "body_occluded_or_hard_to_assess";
+
+export type VarroaReviewOutcomeValue =
+  | "visible_varroa_present"
+  | "no_visible_varroa"
+  | "not_determined";
+
 export type TrainingCropReviewStatus = "review_pending" | "review_complete" | "excluded";
 
 export type TrainingCropExclusionReason =
@@ -477,6 +487,12 @@ export type OrientedBeeEllipse = {
   rawModelClass: string | null;
   rawYoloObb: number[] | null;
   candidateReviewDecision: "accepted" | "accepted_with_edits" | null;
+  varroaReviewSuitability: VarroaReviewSuitability;
+  suspectedVisibleVarroa: boolean;
+  varroaReviewSuitabilityUpdatedByUserId: string | null;
+  varroaReviewSuitabilityUpdatedAt: string | null;
+  suspectedVisibleVarroaUpdatedByUserId: string | null;
+  suspectedVisibleVarroaUpdatedAt: string | null;
   createdByUserId: string;
   createdAt: string;
   updatedAt: string;
@@ -534,6 +550,74 @@ export type TrainingCropEvidence = {
   trainingCrop: TrainingCrop;
   beeEllipses: OrientedBeeEllipse[];
   caveat: string;
+};
+
+export type VarroaMarker = {
+  varroaMarkerId: string;
+  varroaReviewOutcomeId: string;
+  markerType: "point";
+  x: number;
+  y: number;
+  createdAt: string;
+};
+
+export type VarroaReviewOutcome = {
+  varroaReviewOutcomeId: string;
+  workspaceId: string;
+  inspectionPhotoId: string;
+  trainingCropId: string;
+  beeAnnotationId: string;
+  outcome: VarroaReviewOutcomeValue;
+  samplingPurpose: "model_curation";
+  datasetSelectionMethod: "human_selected";
+  reviewStrength: "single_curator_review";
+  annotationSource: "human_from_scratch";
+  createdByUserId: string;
+  createdAt: string;
+  updatedByUserId: string;
+  updatedAt: string;
+  notes: string | null;
+  markers: VarroaMarker[];
+};
+
+export type VarroaReviewCandidate = {
+  beeAnnotation: OrientedBeeEllipse;
+  eligibility: "eligible" | "ineligible";
+  ineligibilityReasons: string[];
+  reviewOutcome: VarroaReviewOutcome | null;
+};
+
+export type VarroaReviewSummary = {
+  eligibleBeeCount: number;
+  reviewedBeeCount: number;
+  visibleVarroaBeeCount: number;
+  noVisibleVarroaBeeCount: number;
+  notDeterminedBeeCount: number;
+  totalMarkerCount: number;
+  suspectedVisibleVarroaCueCount: number;
+  hardToAssessCueCount: number;
+  ineligibleDeferredBeeCount: number;
+  caveat: string;
+};
+
+export type VarroaReviewCandidateList = {
+  workspaceId: string;
+  trainingCropId: string;
+  candidates: VarroaReviewCandidate[];
+  summary: VarroaReviewSummary;
+};
+
+export type HeadUpNormalizedBeeCropPreview = {
+  workspaceId: string;
+  inspectionPhotoId: string;
+  trainingCropId: string;
+  beeAnnotationId: string;
+  annotationType: BeeAnnotationType;
+  orientationReliability: OrientationReliability;
+  imageWidthPx: number;
+  imageHeightPx: number;
+  transformVersion: string;
+  imageUrl: string;
 };
 
 export type ReviewQueueItemStatus = "available" | "completed" | "cancelled";
@@ -2028,6 +2112,93 @@ export async function fetchTrainingCropEvidence({
   return parseTrainingCropEvidence(await response.json());
 }
 
+export async function fetchVarroaReviewCandidates({
+  devUserId,
+  workspaceId,
+  trainingCropId
+}: {
+  devUserId: string;
+  workspaceId: string;
+  trainingCropId: string;
+}): Promise<VarroaReviewCandidateList> {
+  const params = new URLSearchParams({ workspace_id: workspaceId });
+  const response = await fetch(
+    `${coreApiUrl}/v1/training-crops/${trainingCropId}/varroa-review-candidates?${params}`,
+    { headers: devAuthHeaders(devUserId) }
+  );
+  await ensureOk(response);
+  return parseVarroaReviewCandidateList(await response.json());
+}
+
+export async function fetchHeadUpNormalizedBeeCropPreview({
+  devUserId,
+  workspaceId,
+  trainingCropId,
+  beeAnnotationId
+}: {
+  devUserId: string;
+  workspaceId: string;
+  trainingCropId: string;
+  beeAnnotationId: string;
+}): Promise<HeadUpNormalizedBeeCropPreview> {
+  const params = new URLSearchParams({ workspace_id: workspaceId });
+  const response = await fetch(
+    `${coreApiUrl}/v1/training-crops/${trainingCropId}/varroa-review-candidates/${beeAnnotationId}/head-up-normalized-preview?${params}`,
+    { headers: devAuthHeaders(devUserId) }
+  );
+  await ensureOk(response);
+  return parseHeadUpNormalizedBeeCropPreview(await response.json());
+}
+
+export async function fetchHeadUpNormalizedBeeCropImageObjectUrl({
+  devUserId,
+  imageUrl
+}: {
+  devUserId: string;
+  imageUrl: string;
+}): Promise<string> {
+  const response = await fetch(toCoreApiUrl(imageUrl), {
+    headers: devAuthHeaders(devUserId)
+  });
+  await ensureOk(response);
+  const blob = await response.blob();
+  return URL.createObjectURL(blob);
+}
+
+export async function saveVarroaReviewOutcome({
+  devUserId,
+  workspaceId,
+  trainingCropId,
+  beeAnnotationId,
+  outcome,
+  markers,
+  notes
+}: {
+  devUserId: string;
+  workspaceId: string;
+  trainingCropId: string;
+  beeAnnotationId: string;
+  outcome: VarroaReviewOutcomeValue;
+  markers: { x: number; y: number }[];
+  notes: string;
+}): Promise<VarroaReviewOutcome> {
+  const response = await fetch(
+    `${coreApiUrl}/v1/training-crops/${trainingCropId}/varroa-review-candidates/${beeAnnotationId}/outcome`,
+    {
+      method: "PUT",
+      headers: jsonHeaders(devUserId),
+      body: JSON.stringify({
+        workspace_id: workspaceId,
+        outcome,
+        markers,
+        notes: notes.trim().length > 0 ? notes.trim() : null
+      })
+    }
+  );
+  await ensureOk(response);
+  return parseVarroaReviewOutcome(await response.json());
+}
+
 export async function requestTrainingCropReview({
   devUserId,
   workspaceId,
@@ -2268,7 +2439,9 @@ export async function updateTrainingCropEllipse({
   radiusX,
   radiusY,
   rotationDegrees,
-  orientationReliability
+  orientationReliability,
+  varroaReviewSuitability,
+  suspectedVisibleVarroa
 }: {
   devUserId: string;
   workspaceId: string;
@@ -2280,6 +2453,8 @@ export async function updateTrainingCropEllipse({
   radiusY?: number;
   rotationDegrees?: number;
   orientationReliability?: OrientationReliability;
+  varroaReviewSuitability?: VarroaReviewSuitability;
+  suspectedVisibleVarroa?: boolean;
 }): Promise<OrientedBeeEllipse> {
   const body: Record<string, unknown> = { workspace_id: workspaceId };
   if (annotationType !== undefined) body.annotation_type = annotationType;
@@ -2289,6 +2464,8 @@ export async function updateTrainingCropEllipse({
   if (radiusY !== undefined) body.radius_y = radiusY;
   if (rotationDegrees !== undefined) body.rotation_degrees = rotationDegrees;
   if (orientationReliability !== undefined) body.orientation_reliability = orientationReliability;
+  if (varroaReviewSuitability !== undefined) body.varroa_review_suitability = varroaReviewSuitability;
+  if (suspectedVisibleVarroa !== undefined) body.suspected_visible_varroa = suspectedVisibleVarroa;
   const response = await fetch(`${coreApiUrl}/v1/training-crop-bee-ellipses/${annotationId}`, {
     method: "PATCH",
     headers: jsonHeaders(devUserId),
@@ -2802,9 +2979,134 @@ function parseOrientedBeeEllipse(value: unknown): OrientedBeeEllipse {
             requireNumber(point, "raw_yolo_obb point")
           ),
     candidateReviewDecision: requireCandidateReviewDecision(record.candidate_review_decision),
+    varroaReviewSuitability: requireVarroaReviewSuitability(
+      record.varroa_review_suitability ?? "unassessed"
+    ),
+    suspectedVisibleVarroa: requireBoolean(record.suspected_visible_varroa ?? false, "suspected_visible_varroa"),
+    varroaReviewSuitabilityUpdatedByUserId: optionalString(
+      record.varroa_review_suitability_updated_by_user_id,
+      "varroa_review_suitability_updated_by_user_id"
+    ),
+    varroaReviewSuitabilityUpdatedAt: optionalString(
+      record.varroa_review_suitability_updated_at,
+      "varroa_review_suitability_updated_at"
+    ),
+    suspectedVisibleVarroaUpdatedByUserId: optionalString(
+      record.suspected_visible_varroa_updated_by_user_id,
+      "suspected_visible_varroa_updated_by_user_id"
+    ),
+    suspectedVisibleVarroaUpdatedAt: optionalString(
+      record.suspected_visible_varroa_updated_at,
+      "suspected_visible_varroa_updated_at"
+    ),
     createdByUserId: requireString(record.created_by_user_id, "created_by_user_id"),
     createdAt: requireString(record.created_at, "created_at"),
     updatedAt: requireString(record.updated_at, "updated_at")
+  };
+}
+
+function parseVarroaReviewCandidateList(value: unknown): VarroaReviewCandidateList {
+  const record = requireRecord(value, "Varroa Review candidate list response");
+  return {
+    workspaceId: requireString(record.workspace_id, "workspace_id"),
+    trainingCropId: requireString(record.training_crop_id, "training_crop_id"),
+    candidates: requireArray(record.candidates, "candidates").map(parseVarroaReviewCandidate),
+    summary: parseVarroaReviewSummary(record.summary)
+  };
+}
+
+function parseVarroaReviewCandidate(value: unknown): VarroaReviewCandidate {
+  const record = requireRecord(value, "Varroa Review candidate response");
+  return {
+    beeAnnotation: parseOrientedBeeEllipse(record.bee_annotation),
+    eligibility: requireVarroaReviewEligibility(record.eligibility),
+    ineligibilityReasons: requireArray(record.ineligibility_reasons, "ineligibility_reasons").map(
+      (reason) => requireString(reason, "ineligibility_reasons[]")
+    ),
+    reviewOutcome:
+      record.review_outcome === null ? null : parseVarroaReviewOutcome(record.review_outcome)
+  };
+}
+
+function parseVarroaReviewSummary(value: unknown): VarroaReviewSummary {
+  const record = requireRecord(value, "Varroa Review summary response");
+  return {
+    eligibleBeeCount: requireNumber(record.eligible_bee_count, "eligible_bee_count"),
+    reviewedBeeCount: requireNumber(record.reviewed_bee_count, "reviewed_bee_count"),
+    visibleVarroaBeeCount: requireNumber(record.visible_varroa_bee_count, "visible_varroa_bee_count"),
+    noVisibleVarroaBeeCount: requireNumber(
+      record.no_visible_varroa_bee_count,
+      "no_visible_varroa_bee_count"
+    ),
+    notDeterminedBeeCount: requireNumber(record.not_determined_bee_count, "not_determined_bee_count"),
+    totalMarkerCount: requireNumber(record.total_marker_count, "total_marker_count"),
+    suspectedVisibleVarroaCueCount: requireNumber(
+      record.suspected_visible_varroa_cue_count,
+      "suspected_visible_varroa_cue_count"
+    ),
+    hardToAssessCueCount: requireNumber(record.hard_to_assess_cue_count, "hard_to_assess_cue_count"),
+    ineligibleDeferredBeeCount: requireNumber(
+      record.ineligible_deferred_bee_count,
+      "ineligible_deferred_bee_count"
+    ),
+    caveat: requireString(record.caveat, "caveat")
+  };
+}
+
+function parseHeadUpNormalizedBeeCropPreview(value: unknown): HeadUpNormalizedBeeCropPreview {
+  const record = requireRecord(value, "Head-Up Normalized Bee Crop preview response");
+  return {
+    workspaceId: requireString(record.workspace_id, "workspace_id"),
+    inspectionPhotoId: requireString(record.inspection_photo_id, "inspection_photo_id"),
+    trainingCropId: requireString(record.training_crop_id, "training_crop_id"),
+    beeAnnotationId: requireString(record.bee_annotation_id, "bee_annotation_id"),
+    annotationType: requireBeeAnnotationType(record.annotation_type),
+    orientationReliability: requireOrientationReliability(record.orientation_reliability),
+    imageWidthPx: requireNumber(record.image_width_px, "image_width_px"),
+    imageHeightPx: requireNumber(record.image_height_px, "image_height_px"),
+    transformVersion: requireString(record.transform_version, "transform_version"),
+    imageUrl: requireString(record.image_url, "image_url")
+  };
+}
+
+function parseVarroaReviewOutcome(value: unknown): VarroaReviewOutcome {
+  const record = requireRecord(value, "Varroa Review Outcome response");
+  return {
+    varroaReviewOutcomeId: requireString(record.varroa_review_outcome_id, "varroa_review_outcome_id"),
+    workspaceId: requireString(record.workspace_id, "workspace_id"),
+    inspectionPhotoId: requireString(record.inspection_photo_id, "inspection_photo_id"),
+    trainingCropId: requireString(record.training_crop_id, "training_crop_id"),
+    beeAnnotationId: requireString(record.bee_annotation_id, "bee_annotation_id"),
+    outcome: requireVarroaReviewOutcomeValue(record.outcome),
+    samplingPurpose: requireLiteral(record.sampling_purpose, "model_curation", "sampling_purpose"),
+    datasetSelectionMethod: requireLiteral(
+      record.dataset_selection_method,
+      "human_selected",
+      "dataset_selection_method"
+    ),
+    reviewStrength: requireLiteral(record.review_strength, "single_curator_review", "review_strength"),
+    annotationSource: requireLiteral(record.annotation_source, "human_from_scratch", "annotation_source"),
+    createdByUserId: requireString(record.created_by_user_id, "created_by_user_id"),
+    createdAt: requireString(record.created_at, "created_at"),
+    updatedByUserId: requireString(record.updated_by_user_id, "updated_by_user_id"),
+    updatedAt: requireString(record.updated_at, "updated_at"),
+    notes: optionalString(record.notes, "notes"),
+    markers: requireArray(record.markers, "markers").map(parseVarroaMarker)
+  };
+}
+
+function parseVarroaMarker(value: unknown): VarroaMarker {
+  const record = requireRecord(value, "Varroa marker response");
+  return {
+    varroaMarkerId: requireString(record.varroa_marker_id, "varroa_marker_id"),
+    varroaReviewOutcomeId: requireString(
+      record.varroa_review_outcome_id,
+      "varroa_review_outcome_id"
+    ),
+    markerType: requireLiteral(record.marker_type, "point", "marker_type"),
+    x: requireNumber(record.x, "x"),
+    y: requireNumber(record.y, "y"),
+    createdAt: requireString(record.created_at, "created_at")
   };
 }
 
@@ -3871,6 +4173,42 @@ function requireOrientationReliability(value: unknown): OrientationReliability {
     return value;
   }
   throw new Error("Core API response had an unexpected Orientation Reliability");
+}
+
+function requireVarroaReviewSuitability(value: unknown): VarroaReviewSuitability {
+  if (
+    value === "unassessed" ||
+    value === "appears_assessable" ||
+    value === "body_occluded_or_hard_to_assess"
+  ) {
+    return value;
+  }
+  throw new Error("Core API response had an unexpected Varroa Review Suitability");
+}
+
+function requireVarroaReviewOutcomeValue(value: unknown): VarroaReviewOutcomeValue {
+  if (
+    value === "visible_varroa_present" ||
+    value === "no_visible_varroa" ||
+    value === "not_determined"
+  ) {
+    return value;
+  }
+  throw new Error("Core API response had an unexpected Varroa Review Outcome");
+}
+
+function requireVarroaReviewEligibility(value: unknown): "eligible" | "ineligible" {
+  if (value === "eligible" || value === "ineligible") {
+    return value;
+  }
+  throw new Error("Core API response had an unexpected Varroa Review eligibility");
+}
+
+function requireLiteral<T extends string>(value: unknown, expected: T, field: string): T {
+  if (value === expected) {
+    return expected;
+  }
+  throw new Error(`Core API response field ${field} was not ${expected}`);
 }
 
 function requireCoordinateSpace(value: unknown): "normalized" {

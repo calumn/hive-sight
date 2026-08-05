@@ -34,6 +34,7 @@ from hive_sight_core_api.models import (
     ReviewQueueOutcomeRecord,
     TrainingCropResponse,
     TrainingRunResponse,
+    VarroaReviewOutcomeResponse,
 )
 
 MODEL_RECORD_TYPES: dict[str, type] = {
@@ -49,6 +50,7 @@ MODEL_RECORD_TYPES: dict[str, type] = {
     "dataset_labelling_session": DatasetLabellingSessionResponse,
     "training_crop": TrainingCropResponse,
     "training_crop_ellipse": OrientedBeeEllipseResponse,
+    "varroa_review_outcome": VarroaReviewOutcomeResponse,
     "review_queue_item": ReviewQueueItemRecord,
     "review_queue_outcome": ReviewQueueOutcomeRecord,
     "dataset_item": DatasetItemResponse,
@@ -201,6 +203,12 @@ class PostgresProductDataStore(InMemoryProductDataStore):
             response.review_queue_outcome_id,
             response,
         )
+        return response
+
+    def save_varroa_review_outcome(self, outcome: VarroaReviewOutcomeResponse):
+        response = super().save_varroa_review_outcome(outcome)
+        self._persist_model("varroa_review_outcome", response.varroa_review_outcome_id, response)
+        self._upsert_varroa_review_outcome_projection(response)
         return response
 
     def delete_training_crop_ellipse_record(self, annotation_id: UUID) -> None:
@@ -381,6 +389,8 @@ class PostgresProductDataStore(InMemoryProductDataStore):
             self.training_crops[model.training_crop_id] = model
         elif record_type == "training_crop_ellipse":
             self.training_crop_ellipses[model.annotation_id] = model
+        elif record_type == "varroa_review_outcome":
+            self.varroa_review_outcomes[model.varroa_review_outcome_id] = model
         elif record_type == "review_queue_item":
             self.review_queue_items[model.review_queue_item_id] = model
         elif record_type == "review_queue_outcome":
@@ -777,9 +787,14 @@ class PostgresProductDataStore(InMemoryProductDataStore):
                         id, workspace_id, source_image_id, inspection_photo_id, training_crop_id,
                         annotation_type, center_x, center_y, radius_x, radius_y, rotation_degrees,
                         coordinate_space, source_image_width_px, source_image_height_px, source,
+                        orientation_reliability, varroa_review_suitability, suspected_visible_varroa,
+                        varroa_review_suitability_updated_by_user_id,
+                        varroa_review_suitability_updated_at,
+                        suspected_visible_varroa_updated_by_user_id,
+                        suspected_visible_varroa_updated_at,
                         created_by_user_id, created_at, updated_at
                     )
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     ON CONFLICT (id) DO UPDATE SET
                         annotation_type = EXCLUDED.annotation_type,
                         center_x = EXCLUDED.center_x,
@@ -787,6 +802,13 @@ class PostgresProductDataStore(InMemoryProductDataStore):
                         radius_x = EXCLUDED.radius_x,
                         radius_y = EXCLUDED.radius_y,
                         rotation_degrees = EXCLUDED.rotation_degrees,
+                        orientation_reliability = EXCLUDED.orientation_reliability,
+                        varroa_review_suitability = EXCLUDED.varroa_review_suitability,
+                        suspected_visible_varroa = EXCLUDED.suspected_visible_varroa,
+                        varroa_review_suitability_updated_by_user_id = EXCLUDED.varroa_review_suitability_updated_by_user_id,
+                        varroa_review_suitability_updated_at = EXCLUDED.varroa_review_suitability_updated_at,
+                        suspected_visible_varroa_updated_by_user_id = EXCLUDED.suspected_visible_varroa_updated_by_user_id,
+                        suspected_visible_varroa_updated_at = EXCLUDED.suspected_visible_varroa_updated_at,
                         updated_at = EXCLUDED.updated_at
                     """,
                 (
@@ -805,9 +827,67 @@ class PostgresProductDataStore(InMemoryProductDataStore):
                     ellipse.source_image_width_px,
                     ellipse.source_image_height_px,
                     ellipse.source,
+                    ellipse.orientation_reliability,
+                    ellipse.varroa_review_suitability,
+                    ellipse.suspected_visible_varroa,
+                    ellipse.varroa_review_suitability_updated_by_user_id,
+                    ellipse.varroa_review_suitability_updated_at,
+                    ellipse.suspected_visible_varroa_updated_by_user_id,
+                    ellipse.suspected_visible_varroa_updated_at,
                     ellipse.created_by_user_id,
                     ellipse.created_at,
                     ellipse.updated_at,
+                ),
+            )
+
+    def _upsert_varroa_review_outcome_projection(
+        self,
+        outcome: VarroaReviewOutcomeResponse,
+    ) -> None:
+        with self._connect() as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """
+                    INSERT INTO varroa_review_outcomes (
+                        id, workspace_id, inspection_photo_id, training_crop_id, bee_annotation_id,
+                        outcome, sampling_purpose, dataset_selection_method, review_strength,
+                        annotation_source, notes, source_context_snapshot,
+                        bee_annotation_geometry_snapshot, training_crop_review_status_snapshot,
+                        transform_metadata, markers, created_by_user_id, created_at,
+                        updated_by_user_id, updated_at
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s::jsonb, %s, %s::jsonb, %s::jsonb, %s, %s, %s, %s)
+                    ON CONFLICT (workspace_id, bee_annotation_id) DO UPDATE SET
+                        outcome = EXCLUDED.outcome,
+                        notes = EXCLUDED.notes,
+                        source_context_snapshot = EXCLUDED.source_context_snapshot,
+                        bee_annotation_geometry_snapshot = EXCLUDED.bee_annotation_geometry_snapshot,
+                        training_crop_review_status_snapshot = EXCLUDED.training_crop_review_status_snapshot,
+                        transform_metadata = EXCLUDED.transform_metadata,
+                        markers = EXCLUDED.markers,
+                        updated_by_user_id = EXCLUDED.updated_by_user_id,
+                        updated_at = EXCLUDED.updated_at
+                    """,
+                (
+                    outcome.varroa_review_outcome_id,
+                    outcome.workspace_id,
+                    outcome.inspection_photo_id,
+                    outcome.training_crop_id,
+                    outcome.bee_annotation_id,
+                    outcome.outcome,
+                    outcome.sampling_purpose,
+                    outcome.dataset_selection_method,
+                    outcome.review_strength,
+                    outcome.annotation_source,
+                    outcome.notes,
+                    json.dumps(outcome.source_context_snapshot),
+                    json.dumps(outcome.bee_annotation_geometry_snapshot),
+                    outcome.training_crop_review_status_snapshot,
+                    json.dumps(outcome.transform_metadata),
+                    json.dumps([marker.model_dump(mode="json") for marker in outcome.markers]),
+                    outcome.created_by_user_id,
+                    outcome.created_at,
+                    outcome.updated_by_user_id,
+                    outcome.updated_at,
                 ),
             )
 

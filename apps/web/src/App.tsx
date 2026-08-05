@@ -78,11 +78,15 @@ import {
   fetchReviewQueueImageObjectUrl,
   fetchReviewWork,
   fetchReviewWorkItem,
+  fetchHeadUpNormalizedBeeCropImageObjectUrl,
+  fetchHeadUpNormalizedBeeCropPreview,
   fetchTrainingRuns,
   fetchTrainingCropEvidence,
   fetchTrainingCropsForPhoto,
+  fetchVarroaReviewCandidates,
   processAnalysisRun,
   requestTrainingCropReview,
+  saveVarroaReviewOutcome,
   startDatasetLabellingSession,
   startBenchmarkEvaluation,
   startBeeTrainingRun,
@@ -136,6 +140,9 @@ import {
   type TrainingCrop,
   type TrainingCropEvidence,
   type TrainingCropExclusionReason,
+  type VarroaReviewCandidateList,
+  type VarroaReviewOutcomeValue,
+  type VarroaReviewSuitability,
   type VisibleBeeStatus,
   type YoloObbExport
 } from "./coreApiClient";
@@ -170,6 +177,7 @@ type TrainingWorkflowStage =
   | "crop_selection"
   | "bee_annotation"
   | "crop_governance"
+  | "varroa_review"
   | "model_governance";
 
 export function App() {
@@ -2414,6 +2422,10 @@ function clamp(value: number, minimum: number, maximum: number): number {
   return Math.max(minimum, Math.min(maximum, value));
 }
 
+function roundMarkerCoordinate(value: number): number {
+  return Math.round(value * 10000) / 10000;
+}
+
 function CropOverlay({
   crop,
   sourceImageSize
@@ -2571,6 +2583,13 @@ function TrainingCropAnnotationPanel({
   const [selectedProposalId, setSelectedProposalId] = useState<string | null>(null);
   const [editedProposalIds, setEditedProposalIds] = useState<Set<string>>(() => new Set());
   const [candidateProposalMessage, setCandidateProposalMessage] = useState<string | null>(null);
+  const [varroaReview, setVarroaReview] = useState<VarroaReviewCandidateList | null>(null);
+  const [varroaPreviewUrl, setVarroaPreviewUrl] = useState<string | null>(null);
+  const [varroaOutcome, setVarroaOutcome] =
+    useState<VarroaReviewOutcomeValue>("no_visible_varroa");
+  const [varroaMarkers, setVarroaMarkers] = useState<{ x: number; y: number }[]>([]);
+  const [varroaNotes, setVarroaNotes] = useState("");
+  const [varroaZoom, setVarroaZoom] = useState(1);
   const [modelCandidateSelectionMessage, setModelCandidateSelectionMessage] = useState<string | null>(
     null
   );
@@ -2659,6 +2678,12 @@ function TrainingCropAnnotationPanel({
   const selectedEllipse =
     selectedCropEvidence?.beeEllipses.find((ellipse) => ellipse.annotationId === selectedEllipseId) ??
     null;
+  const selectedVarroaCandidate =
+    varroaReview?.trainingCropId === selectedCropId
+      ? (varroaReview.candidates.find(
+          (candidate) => candidate.beeAnnotation.annotationId === selectedEllipseId
+        ) ?? varroaReview.candidates[0] ?? null)
+      : null;
   const selectedProposal =
     candidateProposals.find((proposal) => proposal.proposalId === selectedProposalId) ?? null;
   const cropLocked =
@@ -2731,6 +2756,7 @@ function TrainingCropAnnotationPanel({
       setDraftCrop(null);
       setCrops([]);
       setEvidence(null);
+      setVarroaReview(null);
       setSelectedCropId(null);
       return;
     }
@@ -2738,6 +2764,7 @@ function TrainingCropAnnotationPanel({
     let cancelled = false;
     setCrops([]);
     setEvidence(null);
+    setVarroaReview(null);
     setSelectedCropId(null);
     setSelectedEllipseId(null);
     setTrainingCropDatasetItem(null);
@@ -2769,6 +2796,7 @@ function TrainingCropAnnotationPanel({
   useEffect(() => {
     if (!selectedCropId) {
       setEvidence(null);
+      setVarroaReview(null);
       setTrainingCropDatasetItem(null);
       return;
     }
@@ -2779,7 +2807,57 @@ function TrainingCropAnnotationPanel({
     setEditedProposalIds(new Set());
     setCandidateProposalMessage(null);
     void refreshEvidence(selectedCropId);
+    void refreshVarroaReview(selectedCropId);
   }, [selectedCropId]);
+
+  useEffect(() => {
+    setVarroaMarkers(
+      selectedVarroaCandidate?.reviewOutcome?.markers.map((marker) => ({
+        x: marker.x,
+        y: marker.y
+      })) ?? []
+    );
+    setVarroaOutcome(selectedVarroaCandidate?.reviewOutcome?.outcome ?? "no_visible_varroa");
+    setVarroaNotes(selectedVarroaCandidate?.reviewOutcome?.notes ?? "");
+    setVarroaZoom(1);
+  }, [selectedVarroaCandidate?.beeAnnotation.annotationId]);
+
+  useEffect(() => {
+    if (!selectedCropId || !selectedVarroaCandidate || selectedVarroaCandidate.eligibility !== "eligible") {
+      setVarroaPreviewUrl((current) => {
+        if (current) URL.revokeObjectURL(current);
+        return null;
+      });
+      return;
+    }
+    let cancelled = false;
+    fetchHeadUpNormalizedBeeCropPreview({
+      devUserId,
+      workspaceId,
+      trainingCropId: selectedCropId,
+      beeAnnotationId: selectedVarroaCandidate.beeAnnotation.annotationId
+    })
+      .then((preview) =>
+        fetchHeadUpNormalizedBeeCropImageObjectUrl({
+          devUserId,
+          imageUrl: preview.imageUrl
+        })
+      )
+      .then((nextImageUrl) => {
+        if (cancelled) {
+          URL.revokeObjectURL(nextImageUrl);
+          return;
+        }
+        setVarroaPreviewUrl((current) => {
+          if (current) URL.revokeObjectURL(current);
+          return nextImageUrl;
+        });
+      })
+      .catch((error) => onError(toApiError(error)));
+    return () => {
+      cancelled = true;
+    };
+  }, [devUserId, onError, selectedCropId, selectedVarroaCandidate?.beeAnnotation.annotationId, workspaceId]);
 
   useEffect(() => {
     refreshTrainingRuns().catch((error) => onError(toApiError(error)));
@@ -2873,6 +2951,15 @@ function TrainingCropAnnotationPanel({
         ? current
         : (nextEvidence.beeEllipses.at(-1)?.annotationId ?? null)
     );
+  }
+
+  async function refreshVarroaReview(trainingCropId: string) {
+    const nextReview = await fetchVarroaReviewCandidates({
+      devUserId,
+      workspaceId,
+      trainingCropId
+    });
+    setVarroaReview(nextReview);
   }
 
   function onSourceImageClick(event: MouseEvent<HTMLDivElement>) {
@@ -2972,9 +3059,12 @@ function TrainingCropAnnotationPanel({
         radiusX: values.radiusX,
         radiusY: values.radiusY,
         rotationDegrees: values.rotationDegrees,
-        orientationReliability: values.orientationReliability
+        orientationReliability: values.orientationReliability,
+        varroaReviewSuitability: values.varroaReviewSuitability,
+        suspectedVisibleVarroa: values.suspectedVisibleVarroa
       });
       await refreshEvidence(selectedCrop.trainingCropId);
+      await refreshVarroaReview(selectedCrop.trainingCropId);
     });
   }
 
@@ -3017,6 +3107,39 @@ function TrainingCropAnnotationPanel({
     } finally {
       ellipseAdjustmentInFlightRef.current = false;
     }
+  }
+
+  function onVarroaPreviewClick(event: MouseEvent<HTMLDivElement>) {
+    if (!selectedVarroaCandidate || selectedVarroaCandidate.eligibility !== "eligible") {
+      return;
+    }
+    const rect = event.currentTarget.getBoundingClientRect();
+    const x = clamp((event.clientX - rect.left) / rect.width, 0, 1);
+    const y = clamp((event.clientY - rect.top) / rect.height, 0, 1);
+    setVarroaMarkers((current) => [...current, { x: roundMarkerCoordinate(x), y: roundMarkerCoordinate(y) }]);
+    setVarroaOutcome("visible_varroa_present");
+  }
+
+  function removeVarroaMarker(index: number) {
+    setVarroaMarkers((current) => current.filter((_, markerIndex) => markerIndex !== index));
+  }
+
+  async function saveSelectedVarroaOutcome() {
+    if (!selectedCrop || !selectedVarroaCandidate) {
+      return;
+    }
+    await runCropAction("Saving Varroa Review Outcome", async () => {
+      await saveVarroaReviewOutcome({
+        devUserId,
+        workspaceId,
+        trainingCropId: selectedCrop.trainingCropId,
+        beeAnnotationId: selectedVarroaCandidate.beeAnnotation.annotationId,
+        outcome: varroaOutcome,
+        markers: varroaMarkers,
+        notes: varroaNotes
+      });
+      await refreshVarroaReview(selectedCrop.trainingCropId);
+    });
   }
 
   function startEllipseAdjustmentRepeat(
@@ -3180,6 +3303,7 @@ function TrainingCropAnnotationPanel({
         notes: cropNotes
       });
       await refreshEvidence(selectedCrop.trainingCropId);
+      await refreshVarroaReview(selectedCrop.trainingCropId);
       if (selectedPhoto) await refreshCropsForPhoto(selectedPhoto.inspectionPhotoId);
     });
   }
@@ -3198,6 +3322,7 @@ function TrainingCropAnnotationPanel({
         notes: cropNotes
       });
       await refreshEvidence(selectedCrop.trainingCropId);
+      await refreshVarroaReview(selectedCrop.trainingCropId);
       if (selectedPhoto) await refreshCropsForPhoto(selectedPhoto.inspectionPhotoId);
     });
   }
@@ -3215,6 +3340,7 @@ function TrainingCropAnnotationPanel({
         notes: cropNotes
       });
       await refreshEvidence(selectedCrop.trainingCropId);
+      await refreshVarroaReview(selectedCrop.trainingCropId);
       if (selectedPhoto) await refreshCropsForPhoto(selectedPhoto.inspectionPhotoId);
     });
   }
@@ -3646,6 +3772,13 @@ function TrainingCropAnnotationPanel({
           onClick={() => setActiveWorkflowStage("crop_governance")}
         />
         <TrainingWorkflowStageButton
+          label="Varroa Review"
+          summary={`${varroaReview?.summary.reviewedBeeCount ?? 0} reviewed`}
+          selected={activeWorkflowStage === "varroa_review"}
+          testId="workflow-stage-varroa-review-button"
+          onClick={() => setActiveWorkflowStage("varroa_review")}
+        />
+        <TrainingWorkflowStageButton
           label="Model Governance"
           summary={`${trainingRuns.length + benchmarkEvaluations.length} jobs`}
           selected={activeWorkflowStage === "model_governance"}
@@ -3673,11 +3806,13 @@ function TrainingCropAnnotationPanel({
           data-testid={
             activeWorkflowStage === "crop_selection"
               ? "training-workflow-stage-crop-selection"
-              : activeWorkflowStage === "bee_annotation"
-                ? "training-workflow-stage-bee-annotation"
-                : activeWorkflowStage === "crop_governance"
-                  ? "training-workflow-stage-crop-governance"
-                  : "training-workflow-stage-model-governance"
+                : activeWorkflowStage === "bee_annotation"
+                  ? "training-workflow-stage-bee-annotation"
+                  : activeWorkflowStage === "crop_governance"
+                    ? "training-workflow-stage-crop-governance"
+                    : activeWorkflowStage === "varroa_review"
+                      ? "training-workflow-stage-varroa-review"
+                      : "training-workflow-stage-model-governance"
           }
         >
           <p className="analysis-caveat">Upload a training data photo before creating crops.</p>
@@ -4066,6 +4201,41 @@ function TrainingCropAnnotationPanel({
                       data-testid="training-ellipse-head-direction-reliable-checkbox"
                     />
                     <span>Head direction reliable</span>
+                  </label>
+                  <label>
+                    <span>Varroa review suitability</span>
+                    <select
+                      value={selectedEllipse?.varroaReviewSuitability ?? "unassessed"}
+                      onChange={(event) =>
+                        selectedEllipse &&
+                        void updateSelectedEllipse({
+                          varroaReviewSuitability: event.target.value as VarroaReviewSuitability
+                        })
+                      }
+                      disabled={controlLocked || !selectedEllipse}
+                      data-testid="training-ellipse-varroa-suitability-select"
+                    >
+                      <option value="unassessed">Unassessed</option>
+                      <option value="appears_assessable">Appears assessable</option>
+                      <option value="body_occluded_or_hard_to_assess">
+                        Body occluded or hard to assess
+                      </option>
+                    </select>
+                  </label>
+                  <label className="checkbox-control">
+                    <input
+                      type="checkbox"
+                      checked={selectedEllipse?.suspectedVisibleVarroa ?? false}
+                      onChange={(event) =>
+                        selectedEllipse &&
+                        void updateSelectedEllipse({
+                          suspectedVisibleVarroa: event.target.checked
+                        })
+                      }
+                      disabled={controlLocked || !selectedEllipse}
+                      data-testid="training-ellipse-suspected-varroa-checkbox"
+                    />
+                    <span>Suspected visible Varroa</span>
                   </label>
                   <div className="control-cluster" aria-label="Move selected ellipse">
                     <button
@@ -4904,6 +5074,229 @@ function TrainingCropAnnotationPanel({
                 </div>
                 </div>
               </div>
+            </section>
+          ) : null}
+
+          {activeWorkflowStage === "varroa_review" && selectedCrop ? (
+            <section
+              className="workflow-stage-panel varroa-review-stage"
+              data-testid="training-workflow-stage-varroa-review"
+              aria-label="Varroa Review"
+            >
+              <div className="model-workflow-header">
+                <div>
+                  <strong>Varroa Review</strong>
+                  <p>Model-curation summary only; not a Varroa assessment.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void refreshVarroaReview(selectedCrop.trainingCropId)}
+                  disabled={Boolean(workingLabel)}
+                  data-testid="refresh-varroa-review-button"
+                >
+                  <RefreshCw size={18} />
+                  Refresh
+                </button>
+              </div>
+              {varroaReview ? (
+                <>
+                  <div className="export-summary" data-testid="varroa-review-summary">
+                    <span>Eligible {varroaReview.summary.eligibleBeeCount}</span>
+                    <span>Reviewed {varroaReview.summary.reviewedBeeCount}</span>
+                    <span>Visible Varroa bees {varroaReview.summary.visibleVarroaBeeCount}</span>
+                    <span>No visible Varroa {varroaReview.summary.noVisibleVarroaBeeCount}</span>
+                    <span>Not determined {varroaReview.summary.notDeterminedBeeCount}</span>
+                    <span>Markers {varroaReview.summary.totalMarkerCount}</span>
+                    <span>Suspected cues {varroaReview.summary.suspectedVisibleVarroaCueCount}</span>
+                    <span>Hard to assess {varroaReview.summary.hardToAssessCueCount}</span>
+                    <span>Deferred {varroaReview.summary.ineligibleDeferredBeeCount}</span>
+                  </div>
+                  <div className="varroa-review-layout">
+                    <div className="crop-governance-list-panel">
+                      <strong>Bees in selected crop</strong>
+                      <div
+                        className="crop-governance-list"
+                        role="listbox"
+                        aria-label="Varroa review candidates"
+                        data-testid="varroa-review-candidate-list"
+                      >
+                        {varroaReview.candidates.map((candidate, index) => (
+                          <button
+                            key={candidate.beeAnnotation.annotationId}
+                            type="button"
+                            role="option"
+                            aria-selected={
+                              candidate.beeAnnotation.annotationId ===
+                              selectedVarroaCandidate?.beeAnnotation.annotationId
+                            }
+                            className={
+                              candidate.beeAnnotation.annotationId ===
+                              selectedVarroaCandidate?.beeAnnotation.annotationId
+                                ? "selected-row"
+                                : ""
+                            }
+                            onClick={() => setSelectedEllipseId(candidate.beeAnnotation.annotationId)}
+                            data-testid="varroa-review-candidate"
+                          >
+                            <span>Bee {index + 1}</span>
+                            <small>
+                              {candidate.eligibility}
+                              {candidate.beeAnnotation.suspectedVisibleVarroa ? " / suspected" : ""}
+                              {candidate.reviewOutcome ? ` / ${candidate.reviewOutcome.outcome}` : " / not reviewed"}
+                            </small>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="crop-governance-detail">
+                      {selectedVarroaCandidate ? (
+                        <>
+                          <div className="export-summary" data-testid="varroa-review-provenance">
+                            <span>{selectedVarroaCandidate.eligibility}</span>
+                            <span>{selectedVarroaCandidate.beeAnnotation.annotationType}</span>
+                            <span>Head {selectedVarroaCandidate.beeAnnotation.orientationReliability}</span>
+                            <span>{selectedVarroaCandidate.beeAnnotation.varroaReviewSuitability}</span>
+                            <span>model_curation</span>
+                            <span>human_selected</span>
+                            <span>single_curator_review</span>
+                            <span>human_from_scratch</span>
+                          </div>
+                          {selectedVarroaCandidate.eligibility !== "eligible" ? (
+                            <div className="review-state" data-testid="varroa-review-ineligible-reasons">
+                              Excluded from the first Head-Up Normalized Varroa corpus:{" "}
+                              {selectedVarroaCandidate.ineligibilityReasons.join(", ")}
+                            </div>
+                          ) : (
+                            <>
+                              <div className="varroa-preview-grid">
+                                <div>
+                                  <strong>Head-up bee crop</strong>
+                                  <div className="crop-viewport-toolbar">
+                                    <button
+                                      type="button"
+                                      onClick={() => setVarroaZoom((current) => clamp(current - 0.25, 1, 4))}
+                                      disabled={varroaZoom <= 1}
+                                      title="Zoom out"
+                                    >
+                                      <Minus size={18} />
+                                    </button>
+                                    <span>Zoom {Math.round(varroaZoom * 100)}%</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => setVarroaZoom((current) => clamp(current + 0.25, 1, 4))}
+                                      disabled={varroaZoom >= 4}
+                                      title="Zoom in"
+                                    >
+                                      <Plus size={18} />
+                                    </button>
+                                  </div>
+                                  <div
+                                    className="varroa-preview-surface"
+                                    style={{ width: `${Math.round(256 * varroaZoom)}px` }}
+                                    onClick={onVarroaPreviewClick}
+                                    data-testid="head-up-normalized-bee-crop"
+                                  >
+                                    {varroaPreviewUrl ? (
+                                      <img src={varroaPreviewUrl} alt="Head-up bee crop" draggable={false} />
+                                    ) : (
+                                      <span>Loading preview</span>
+                                    )}
+                                    {varroaMarkers.map((marker, index) => (
+                                      <span
+                                        key={`${marker.x}-${marker.y}-${index}`}
+                                        className="varroa-marker"
+                                        style={{
+                                          left: `${marker.x * 100}%`,
+                                          top: `${marker.y * 100}%`
+                                        }}
+                                        data-testid="varroa-marker"
+                                      />
+                                    ))}
+                                  </div>
+                                </div>
+                                {sourceImageUrl ? (
+                                  <div>
+                                    <strong>Source crop context</strong>
+                                    <div className="varroa-source-context">
+                                      <img
+                                        src={sourceImageUrl}
+                                        alt="Original selected crop context"
+                                        style={cropImageStyle(selectedCrop)}
+                                        draggable={false}
+                                      />
+                                    </div>
+                                  </div>
+                                ) : null}
+                              </div>
+                              <div className="metadata-panel">
+                                <label>
+                                  <span>Outcome</span>
+                                  <select
+                                    value={varroaOutcome}
+                                    onChange={(event) =>
+                                      setVarroaOutcome(event.target.value as VarroaReviewOutcomeValue)
+                                    }
+                                    data-testid="varroa-review-outcome-select"
+                                  >
+                                    <option value="no_visible_varroa">No visible Varroa</option>
+                                    <option value="visible_varroa_present">Visible Varroa</option>
+                                    <option value="not_determined">Not determined</option>
+                                  </select>
+                                </label>
+                                <label>
+                                  <span>Outcome note</span>
+                                  <input
+                                    value={varroaNotes}
+                                    maxLength={500}
+                                    onChange={(event) => setVarroaNotes(event.target.value)}
+                                    data-testid="varroa-review-note-input"
+                                  />
+                                </label>
+                              </div>
+                              <div className="export-summary" data-testid="varroa-marker-list">
+                                {varroaMarkers.length === 0 ? (
+                                  <span>No markers</span>
+                                ) : (
+                                  varroaMarkers.map((marker, index) => (
+                                    <span key={`${marker.x}-${marker.y}-${index}`}>
+                                      Marker {index + 1}: {marker.x.toFixed(4)}, {marker.y.toFixed(4)}
+                                      <button
+                                        type="button"
+                                        onClick={() => removeVarroaMarker(index)}
+                                        data-testid="delete-varroa-marker-button"
+                                      >
+                                        <Trash2 size={14} />
+                                      </button>
+                                    </span>
+                                  ))
+                                )}
+                              </div>
+                              <button
+                                type="button"
+                                disabled={
+                                  Boolean(workingLabel) ||
+                                  (varroaOutcome === "visible_varroa_present" && varroaMarkers.length === 0) ||
+                                  (varroaOutcome !== "visible_varroa_present" && varroaMarkers.length > 0) ||
+                                  (varroaOutcome === "not_determined" && varroaNotes.trim().length === 0)
+                                }
+                                onClick={() => void saveSelectedVarroaOutcome()}
+                                data-testid="save-varroa-review-outcome-button"
+                              >
+                                <Check size={18} />
+                                Save outcome
+                              </button>
+                            </>
+                          )}
+                        </>
+                      ) : (
+                        <p className="analysis-caveat">No bee annotations are available for this crop.</p>
+                      )}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <p className="analysis-caveat">Select a completed Training Crop to review Varroa evidence.</p>
+              )}
             </section>
           ) : null}
 

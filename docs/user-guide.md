@@ -79,7 +79,7 @@ Use this when you want to upload frame photos and create Training Crops for bee 
 4. Pick the Hive from the Hive list. If you need another one, click `Add hive` and record its Frame Standard.
 5. Use the Inspection list to resume earlier Training Data Collection work for the selected Hive.
 6. Create a new Inspection with intent `Training data collection` when no existing Inspection is the right one.
-7. Use the workflow stage buttons to move between `Inspection Setup`, `Crop Selection`, `Bee Annotation`, `Crop Governance`, and `Model Governance`.
+7. Use the workflow stage buttons to move between `Inspection Setup`, `Crop Selection`, `Bee Annotation`, `Crop Governance`, `Varroa Review`, and `Model Governance`.
 
 Training-data collection inspections show the Training Crop workflow. Varroa assessment inspections do not.
 
@@ -111,14 +111,34 @@ Use this when you want to manually create the marked-bee evidence for Bee Locali
 6. Make sure the arrow on the ellipse points toward the bee's head.
 7. If the ellipse shape is correct but points tail-first, click `Flip head/tail`.
 8. Set the bee type to `Complete visible bee` or `Partial visible bee`.
-9. Repeat until the visible bees in the crop are annotated.
-10. Use `Previous crop`, `Next crop`, or `Next incomplete` to move through the crop queue.
-11. Set visible bee status.
-12. Click `Complete crop`.
+9. If the bee body is hard to judge for future mite work, set `Varroa review suitability`.
+10. If you suspect visible Varroa on that bee, tick `Suspected visible Varroa`.
+11. Repeat until the visible bees in the crop are annotated.
+12. Use `Previous crop`, `Next crop`, or `Next incomplete` to move through the crop queue.
+13. Set visible bee status.
+14. Click `Complete crop`.
 
 Complete bees should normally be fully contained by the crop. Partial bees may overlap the crop edge when the bee is only partly visible.
 
-The stored ellipse rotation is the bee head direction. This matters for future Varroa work, where HiveSight may rotate each bee crop consistently before looking for mites.
+The stored ellipse rotation is the bee head direction. This matters for Varroa Review, where HiveSight rotates each eligible bee crop into a Head-up view before you look for mites.
+
+## Review Visible Varroa On Bee Crops
+
+Use this when a completed Training Crop is ready for model-curation Varroa evidence.
+
+1. Open the `Varroa Review` workflow stage.
+2. Select a completed Training Crop.
+3. Pick an eligible bee from the candidate list. Suspected-visible-Varroa cues appear first.
+4. Review the Head-up bee crop and the source crop context.
+5. Click the Head-up bee crop to place point markers for visible mites.
+6. Choose an outcome:
+   - `Visible Varroa` requires one or more markers.
+   - `No visible Varroa` records an active negative judgement and requires zero markers.
+   - `Not determined` requires a note and requires zero markers.
+7. Delete and replace markers if needed.
+8. Click `Save outcome`.
+
+The Varroa Review summary is model-curation progress only. It is not a Varroa assessment, visible mite rate, treatment recommendation, or HiveSight Advisor trigger.
 
 ## Reopen And Continue A Training Crop
 
