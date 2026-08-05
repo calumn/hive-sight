@@ -491,3 +491,24 @@ AI contribution:
 Human judgment still required:
 
 - Approve the pilot's frame strata, review-strength progression, operational thresholds to simulate, field-reference protocol, and the evidence bar for showing a sampled result to a beekeeper.
+
+### 2026-08-05 Slice 0023 Real Bee Training Baseline Planning
+
+Human-confirmed direction:
+
+- Move next to real Bee Orientation training before Varroa Detection work, because Varroa Detection depends on reliable Head-Up Normalized Bee Crop evidence.
+- Treat Bee Training as the operator workflow: Bee Localisation and Bee Orientation are trained in tandem from one shared Marked-Bee Dataset Version.
+- Remove YOLO-named user commands now. Keep internal adapter ids such as `ultralytics_yolo_obb` only where technically accurate.
+- Add a real PyTorch/torchvision Bee Orientation adapter that creates a non-user-facing Model Candidate with training-run validation metrics only.
+- Keep Bee Orientation benchmark evaluation, orientation inference, Head-Up Normalized Bee Crop generation, and Varroa work out of Slice 0023.
+- Require a small but non-trivial real-orientation data gate: at least four eligible reliable complete bees in Training and four in Validation.
+- Make the Bee Training local lane explain Docker/Postgres availability problems without resetting or seeding the database.
+
+AI contribution:
+
+- Converted the agreed decisions into `architecture/vertical-slice-0023-real-bee-training-baseline.md` with signed-off Gherkin scenarios.
+- Proposed the thin implementation boundary: one UI action or command starts Bee Localisation first, then Bee Orientation, with two separate Training Runs tied to one source Dataset Version and no new parent run entity.
+
+Human judgment still required:
+
+- Confirm implementation priority after Slice 0023 design is committed or proceed directly to building the slice.

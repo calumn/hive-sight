@@ -71,7 +71,7 @@ These are the strongest near-term candidates based on the current project state.
 | Orientation Reliability Review | Business / Technical | Promoted into `architecture/vertical-slice-0021-orientation-reliability-review.md` to let a curator mark whether each directed ellipse has reliable head direction. |
 | Shared Marked-Bee Dataset Version Promotion | Technical / Governance | Implemented in Slice 0022 for new Model Governance Dataset Versions: one marked oriented-bee Dataset Version stays in lockstep for Bee Localisation and Bee Orientation source evidence. |
 | Bee Orientation Dataset Builder | Technical / Governance | Implemented in Slice 0022 as a derived package builder that exports reliable complete directed ellipses into reproducible Head Up / Head Down crop packages with source maps and exclusion reasons. |
-| Bee Orientation Model Baseline | Technical | Implemented in Slice 0022 as a fake-adapter package-validation baseline and non-user-facing `bee_orientation` Model Candidate; real predictive classifier training remains future work. |
+| Real Bee Training Baseline | Technical | Planned as Slice 0023: replace YOLO-named user commands with Bee Training commands, train Bee Localisation and Bee Orientation sequentially from one shared Marked-Bee Dataset Version, and create a real non-user-facing Bee Orientation Model Candidate. |
 | Bee Orientation Benchmark Report | Technical | Report directed head/tail accuracy, angular error, unreliable-orientation rate, and performance by image quality and occlusion. |
 | Orientation-Assisted Crop Normalisation | Technical | Produce Head-Up Normalized Bee Crops for Varroa labelling and model input, while excluding unreliable orientation from the first Varroa corpus. |
 
