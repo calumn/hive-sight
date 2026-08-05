@@ -70,6 +70,7 @@ import {
   fetchBenchmarkEvaluationReadiness,
   fetchBenchmarkEvaluations,
   fetchBeeTrainingReadiness,
+  fetchOrientationBenchmarkReadiness,
   fetchModelCandidates,
   fetchModelTrainingReadiness,
   fetchRequestedReviews,
@@ -85,6 +86,7 @@ import {
   startDatasetLabellingSession,
   startBenchmarkEvaluation,
   startBeeTrainingRun,
+  startOrientationBenchmarkEvaluation,
   suggestTrainingCropBeeAnnotations,
   toCoreApiContentUrl,
   updateTrainingCrop,
@@ -101,6 +103,7 @@ import {
   type BeeAnnotationProposal,
   type BenchmarkEvaluation,
   type BenchmarkEvaluationReadiness,
+  type OrientationBenchmarkReadiness,
   type BeeTrainingReadiness,
   type DevSession,
   type HealthResponse,
@@ -2551,7 +2554,11 @@ function TrainingCropAnnotationPanel({
   const [selectedModelCandidateId, setSelectedModelCandidateId] = useState<string | null>(null);
   const [benchmarkReadiness, setBenchmarkReadiness] =
     useState<BenchmarkEvaluationReadiness | null>(null);
+  const [orientationBenchmarkReadiness, setOrientationBenchmarkReadiness] =
+    useState<OrientationBenchmarkReadiness | null>(null);
   const [benchmarkEvaluation, setBenchmarkEvaluation] = useState<BenchmarkEvaluation | null>(null);
+  const [orientationBenchmarkEvaluation, setOrientationBenchmarkEvaluation] =
+    useState<BenchmarkEvaluation | null>(null);
   const [benchmarkEvaluations, setBenchmarkEvaluations] = useState<BenchmarkEvaluation[]>([]);
   const [benchmarkEvaluationsLastCheckedAt, setBenchmarkEvaluationsLastCheckedAt] = useState<
     string | null
@@ -2580,11 +2587,18 @@ function TrainingCropAnnotationPanel({
   const ellipseAdjustmentPointerConsumedRef = useRef(false);
   const hasActiveTrainingRun = trainingRuns.some(isActiveTrainingRun);
   const hasActiveBenchmarkEvaluation = benchmarkEvaluations.some(isActiveBenchmarkEvaluation);
+  const orientationModelCandidateId =
+    [...modelCandidates]
+      .filter((candidate) => candidate.modelPurpose === "bee_orientation")
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt))[0]
+      ?.modelCandidateId ?? null;
   const shouldPollTrainingRuns =
     hasActiveTrainingRun ||
     workingLabel === "Starting Bee Training";
   const shouldPollBenchmarkEvaluations =
-    hasActiveBenchmarkEvaluation || workingLabel === "Starting Benchmark Evaluation";
+    hasActiveBenchmarkEvaluation ||
+    workingLabel === "Starting Benchmark Evaluation" ||
+    workingLabel === "Starting Bee Orientation Benchmark Evaluation";
   const canStartBeeTraining =
     Boolean(datasetVersion) &&
     (beeTrainingReadiness?.eligibleToStartBeeTraining ?? false) &&
@@ -2592,6 +2606,10 @@ function TrainingCropAnnotationPanel({
   const canStartBenchmarkEvaluation =
     Boolean(selectedModelCandidateId) &&
     (benchmarkReadiness?.eligibleToStartEvaluation ?? true) &&
+    !Boolean(workingLabel);
+  const canStartOrientationBenchmarkEvaluation =
+    Boolean(orientationModelCandidateId) &&
+    (orientationBenchmarkReadiness?.eligibleToStartEvaluation ?? true) &&
     !Boolean(workingLabel);
   const cropProgress = useMemo(() => {
     const pending = crops.filter((crop) => crop.reviewStatus === "review_pending").length;
@@ -2779,6 +2797,16 @@ function TrainingCropAnnotationPanel({
       setBenchmarkEvaluationPollError(toApiError(error).message)
     );
   }, [selectedModelCandidateId, workspaceId]);
+
+  useEffect(() => {
+    if (!orientationModelCandidateId) {
+      setOrientationBenchmarkReadiness(null);
+      return;
+    }
+    refreshOrientationBenchmarkReadiness(orientationModelCandidateId).catch((error) =>
+      setBenchmarkEvaluationPollError(toApiError(error).message)
+    );
+  }, [orientationModelCandidateId, workspaceId]);
 
   useEffect(() => {
     if (!shouldPollTrainingRuns) {
@@ -3306,18 +3334,43 @@ function TrainingCropAnnotationPanel({
     return readiness;
   }
 
+  async function refreshOrientationBenchmarkReadiness(modelCandidateId: string) {
+    const readiness = await fetchOrientationBenchmarkReadiness({
+      devUserId,
+      workspaceId,
+      modelCandidateId
+    });
+    setOrientationBenchmarkReadiness(readiness);
+    setBenchmarkEvaluationPollError(null);
+    return readiness;
+  }
+
   async function refreshBenchmarkEvaluations() {
     const listing = await fetchBenchmarkEvaluations({ devUserId, workspaceId });
+    const localisationEvaluations = listing.benchmarkEvaluations.filter(
+      (evaluation) => evaluation.modelPurpose === "bee_detector"
+    );
+    const orientationEvaluations = listing.benchmarkEvaluations.filter(
+      (evaluation) => evaluation.modelPurpose === "bee_orientation"
+    );
     setBenchmarkEvaluations(listing.benchmarkEvaluations);
     setBenchmarkEvaluationsLastCheckedAt(new Date().toISOString());
     setBenchmarkEvaluationPollError(null);
     setBenchmarkEvaluation((current) => {
       const refreshedCurrent = current
-        ? listing.benchmarkEvaluations.find(
+        ? localisationEvaluations.find(
             (evaluation) => evaluation.benchmarkEvaluationId === current.benchmarkEvaluationId
           )
         : null;
-      return refreshedCurrent ?? listing.benchmarkEvaluations.at(0) ?? null;
+      return refreshedCurrent ?? localisationEvaluations.at(0) ?? null;
+    });
+    setOrientationBenchmarkEvaluation((current) => {
+      const refreshedCurrent = current
+        ? orientationEvaluations.find(
+            (evaluation) => evaluation.benchmarkEvaluationId === current.benchmarkEvaluationId
+          )
+        : null;
+      return refreshedCurrent ?? orientationEvaluations.at(0) ?? null;
     });
     return listing.benchmarkEvaluations;
   }
@@ -3434,6 +3487,23 @@ function TrainingCropAnnotationPanel({
     });
   }
 
+  async function startSelectedOrientationBenchmarkEvaluation() {
+    if (!orientationModelCandidateId) {
+      return;
+    }
+    await runCropAction("Starting Bee Orientation Benchmark Evaluation", async () => {
+      const nextEvaluation = await startOrientationBenchmarkEvaluation({
+        devUserId,
+        workspaceId,
+        modelCandidateId: orientationModelCandidateId,
+        acknowledgeHighSeverityWarnings: acknowledgeModelWarnings
+      });
+      setOrientationBenchmarkEvaluation(nextEvaluation);
+      await refreshOrientationBenchmarkReadiness(orientationModelCandidateId);
+      await refreshBenchmarkEvaluations();
+    });
+  }
+
   async function cancelSelectedBenchmarkEvaluation() {
     if (!benchmarkEvaluation) {
       return;
@@ -3448,6 +3518,25 @@ function TrainingCropAnnotationPanel({
       setBenchmarkEvaluation(cancelled);
       if (selectedModelCandidateId) {
         await refreshBenchmarkReadiness(selectedModelCandidateId);
+      }
+      await refreshBenchmarkEvaluations();
+    });
+  }
+
+  async function cancelSelectedOrientationBenchmarkEvaluation() {
+    if (!orientationBenchmarkEvaluation) {
+      return;
+    }
+    await runCropAction("Cancelling Bee Orientation Benchmark Evaluation", async () => {
+      const cancelled = await cancelBenchmarkEvaluation({
+        devUserId,
+        workspaceId,
+        benchmarkEvaluationId: orientationBenchmarkEvaluation.benchmarkEvaluationId,
+        reason: "Cancelled from local Bee Orientation benchmark evaluation UI."
+      });
+      setOrientationBenchmarkEvaluation(cancelled);
+      if (orientationModelCandidateId) {
+        await refreshOrientationBenchmarkReadiness(orientationModelCandidateId);
       }
       await refreshBenchmarkEvaluations();
     });
@@ -5139,7 +5228,7 @@ function TrainingCropAnnotationPanel({
                     data-testid="benchmark-evaluation-panel"
                   >
                     <div className="model-workflow-stage-heading">
-                        <span className="workflow-step-number">5</span>
+                        <span className="workflow-step-number">4</span>
                       <div>
                         <strong>Bee Localisation benchmark evaluation</strong>
                         <p>Evaluate the selected Model Candidate against protected Training Crop benchmark evidence.</p>
@@ -5309,10 +5398,191 @@ function TrainingCropAnnotationPanel({
                     ) : null}
                   </section>
 
+                  <section
+                    className="model-workflow-stage"
+                    aria-label="Bee Orientation Benchmark Evaluation"
+                    data-testid="orientation-benchmark-evaluation-panel"
+                  >
+                    <div className="model-workflow-stage-heading">
+                      <span className="workflow-step-number">5</span>
+                      <div>
+                        <strong>Bee Orientation benchmark evaluation</strong>
+                        <p>Evaluate the tandem Head Up / Head Down candidate against protected reliable bee evidence from the same Marked-Bee Dataset Version.</p>
+                      </div>
+                    </div>
+                    {orientationBenchmarkReadiness ? (
+                      <div
+                        className="model-workflow-summary"
+                        data-testid="orientation-benchmark-readiness-summary"
+                      >
+                        <strong>Candidate {orientationBenchmarkReadiness.modelCandidateHumanReadableId}</strong>
+                        <span>{orientationBenchmarkReadiness.datasetVersionHumanReadableId}</span>
+                        <span>Head Up / Head Down only</span>
+                        <span>Benchmark items {orientationBenchmarkReadiness.benchmarkItemCount}</span>
+                        <span>Eligible bees {orientationBenchmarkReadiness.eligibleBenchmarkBeeCount}</span>
+                        <span>Unreliable excluded {orientationBenchmarkReadiness.excludedUnreliableOrientationCount}</span>
+                        <span>Partial deferred {orientationBenchmarkReadiness.excludedPartialVisibleBeeCount}</span>
+                        <span>{orientationBenchmarkReadiness.evaluationAdapterType}</span>
+                        <span>{orientationBenchmarkReadiness.databasePurpose}</span>
+                        {orientationBenchmarkReadiness.activeModelJobId ? (
+                          <span>
+                            Active {orientationBenchmarkReadiness.activeModelJobType}{" "}
+                            {orientationBenchmarkReadiness.activeModelJobId.slice(0, 8)}
+                          </span>
+                        ) : null}
+                        {orientationBenchmarkReadiness.warnings.map((warning) => (
+                          <span key={warning.code} className={`model-warning ${warning.severity}`}>
+                            {warning.severity}: {warning.code}
+                          </span>
+                        ))}
+                        {!orientationBenchmarkReadiness.eligibleToStartEvaluation ? (
+                          <p data-testid="orientation-benchmark-evaluation-blocker">
+                            Evaluation cannot start until readiness blockers are resolved.
+                          </p>
+                        ) : null}
+                      </div>
+                    ) : (
+                      <p className="setup-copy">
+                        Train a Bee Orientation candidate before checking orientation benchmark readiness.
+                      </p>
+                    )}
+                    <div className="model-workflow-actions">
+                      <button
+                        type="button"
+                        disabled={!orientationModelCandidateId || Boolean(workingLabel)}
+                        onClick={() =>
+                          orientationModelCandidateId
+                            ? void refreshOrientationBenchmarkReadiness(orientationModelCandidateId)
+                            : undefined
+                        }
+                        data-testid="orientation-benchmark-readiness-button"
+                      >
+                        <RefreshCw size={18} />
+                        Check orientation benchmark
+                      </button>
+                      <button
+                        type="button"
+                        disabled={!canStartOrientationBenchmarkEvaluation}
+                        onClick={() => void startSelectedOrientationBenchmarkEvaluation()}
+                        data-testid="start-orientation-benchmark-evaluation-button"
+                      >
+                        <Play size={18} />
+                        Run orientation benchmark
+                      </button>
+                      <button
+                        type="button"
+                        disabled={
+                          !orientationBenchmarkEvaluation ||
+                          !isActiveBenchmarkEvaluation(orientationBenchmarkEvaluation) ||
+                          Boolean(workingLabel)
+                        }
+                        onClick={() => void cancelSelectedOrientationBenchmarkEvaluation()}
+                        data-testid="cancel-orientation-benchmark-evaluation-button"
+                      >
+                        <CircleAlert size={18} />
+                        Cancel benchmark
+                      </button>
+                    </div>
+                    {orientationBenchmarkEvaluation ? (
+                      <div
+                        className="model-run-detail compact"
+                        data-testid="orientation-benchmark-evaluation-summary"
+                      >
+                        <div className="model-run-title">
+                          <strong>{orientationBenchmarkEvaluation.humanReadableId}</strong>
+                          <span>{orientationBenchmarkEvaluation.status}</span>
+                          <span>Phase {orientationBenchmarkEvaluation.phase}</span>
+                          <span>
+                            Progress {formatProgressPercent(orientationBenchmarkEvaluation.progressPercent)}
+                          </span>
+                        </div>
+                        <div className="model-workflow-facts">
+                          <span>
+                            Accuracy {formatMetric(orientationBenchmarkEvaluation.metricsSummary.accuracy)}
+                          </span>
+                          <span>
+                            Bees {String(orientationBenchmarkEvaluation.metricsSummary.evaluated_bee_count ?? "n/a")}
+                          </span>
+                          <span>
+                            Examples {String(orientationBenchmarkEvaluation.metricsSummary.evaluated_example_count ?? "n/a")}
+                          </span>
+                          <span>
+                            Last heartbeat {formatDateTime(orientationBenchmarkEvaluation.lastHeartbeatAt)}
+                          </span>
+                          <span>
+                            Elapsed{" "}
+                            {formatElapsedTime(
+                              orientationBenchmarkEvaluation.startedAt,
+                              orientationBenchmarkEvaluation.completedAt,
+                              trainingRunClockTick
+                            )}
+                          </span>
+                        </div>
+                        {orientationBenchmarkEvaluation.lastActivityMessage ? (
+                          <p data-testid="orientation-benchmark-evaluation-activity">
+                            Activity: {orientationBenchmarkEvaluation.lastActivityMessage}
+                          </p>
+                        ) : null}
+                        {isActiveBenchmarkEvaluation(orientationBenchmarkEvaluation) ? (
+                          <p data-testid="orientation-benchmark-evaluation-active-status">
+                            Evaluation is active. Polling the Core API every 3 seconds for updates.
+                          </p>
+                        ) : null}
+                        {orientationBenchmarkEvaluation.failureCode ||
+                        orientationBenchmarkEvaluation.failureMessage ? (
+                          <p
+                            className="analysis-caveat failed"
+                            data-testid="orientation-benchmark-evaluation-failure"
+                          >
+                            {orientationBenchmarkEvaluation.failureCode ?? "benchmark_evaluation_failed"}:{" "}
+                            {orientationBenchmarkEvaluation.failureMessage ??
+                              "Benchmark Evaluation failed before a report was created."}
+                          </p>
+                        ) : null}
+                        {orientationBenchmarkEvaluation.latestLogExcerpt ? (
+                          <pre
+                            className="training-log-excerpt"
+                            data-testid="orientation-benchmark-evaluation-log-excerpt"
+                          >
+                            {orientationBenchmarkEvaluation.latestLogExcerpt}
+                          </pre>
+                        ) : null}
+                        <div className="model-workflow-actions secondary">
+                          {orientationBenchmarkEvaluation.reportArtifactId ? (
+                            <a
+                              className="text-link"
+                              href={toCoreApiContentUrl(
+                                `/v1/model-training/artifacts/${orientationBenchmarkEvaluation.reportArtifactId}?workspace_id=${workspaceId}`
+                              )}
+                              target="_blank"
+                              rel="noreferrer"
+                              data-testid="orientation-benchmark-evaluation-report-link"
+                            >
+                              Report
+                            </a>
+                          ) : null}
+                          {orientationBenchmarkEvaluation.rawPredictionArtifactId ? (
+                            <a
+                              className="text-link"
+                              href={toCoreApiContentUrl(
+                                `/v1/model-training/artifacts/${orientationBenchmarkEvaluation.rawPredictionArtifactId}?workspace_id=${workspaceId}`
+                              )}
+                              target="_blank"
+                              rel="noreferrer"
+                              data-testid="orientation-benchmark-evaluation-raw-predictions-link"
+                            >
+                              Raw predictions
+                            </a>
+                          ) : null}
+                        </div>
+                      </div>
+                    ) : null}
+                  </section>
+
                   {trainingRuns.length > 0 || benchmarkEvaluations.length > 0 ? (
                     <section className="model-workflow-stage history" aria-label="Model job history">
                       <div className="model-workflow-stage-heading">
-                        <span className="workflow-step-number">4</span>
+                        <span className="workflow-step-number">6</span>
                         <div>
                           <strong>Model job history</strong>
                           <p>Recent Training Runs and Benchmark Evaluations for this Workspace.</p>
@@ -5394,13 +5664,27 @@ function TrainingCropAnnotationPanel({
                               <span>{evaluation.humanReadableId}</span>
                               <span>{evaluation.status}</span>
                               <span>Phase {evaluation.phase}</span>
+                              <span>{formatModelPurpose(evaluation.modelPurpose)}</span>
                               <span>Candidate {evaluation.modelCandidateHumanReadableId}</span>
                               <span>
                                 Benchmark{" "}
                                 {String(evaluation.metricsSummary.benchmark_item_count ?? "n/a")}
                               </span>
-                              <span>Precision {formatMetric(evaluation.metricsSummary.precision)}</span>
-                              <span>Recall {formatMetric(evaluation.metricsSummary.recall)}</span>
+                              {evaluation.modelPurpose === "bee_orientation" ? (
+                                <>
+                                  <span>
+                                    Accuracy {formatMetric(evaluation.metricsSummary.accuracy)}
+                                  </span>
+                                  <span>
+                                    Bees {String(evaluation.metricsSummary.evaluated_bee_count ?? "n/a")}
+                                  </span>
+                                </>
+                              ) : (
+                                <>
+                                  <span>Precision {formatMetric(evaluation.metricsSummary.precision)}</span>
+                                  <span>Recall {formatMetric(evaluation.metricsSummary.recall)}</span>
+                                </>
+                              )}
                               {evaluation.lastActivityMessage ? (
                                 <span>{evaluation.lastActivityMessage}</span>
                               ) : null}

@@ -1,6 +1,6 @@
 # Vertical Slice 0024: Bee Orientation Benchmark Evaluation
 
-Status: planned; acceptance scenarios signed off on 2026-08-05.
+Status: implemented; acceptance scenarios signed off on 2026-08-05; verified on 2026-08-05.
 
 ## Purpose
 
@@ -211,27 +211,33 @@ Minimum additions or generalizations:
 
 ## Acceptance Criteria
 
-- [ ] Model Governance contains a distinct Bee Orientation benchmark section in a clearer Model Benchmarking area.
-- [ ] Readiness accepts completed Bee Orientation Model Candidates and rejects other Model Purposes.
-- [ ] Readiness uses the candidate's source Marked-Bee Dataset Version.
-- [ ] Readiness reports eligible reliable complete benchmark bees.
-- [ ] Readiness reports excluded unreliable-orientation and partial visible bees.
-- [ ] Readiness blocks when no eligible reliable complete benchmark bees exist.
-- [ ] A Bee Orientation Benchmark Evaluation can run against protected Benchmark evidence.
-- [ ] The evaluation records Model Purpose Bee Orientation.
-- [ ] The evaluation records one raw prediction row per evaluated benchmark bee.
-- [ ] The report includes Head Up / Head Down accuracy evidence.
-- [ ] The report includes a Head Up / Head Down confusion matrix.
-- [ ] Confidence distribution is shown only when available; otherwise it is clearly `n/a`.
-- [ ] Fake-adapter results are labelled as workflow evidence only, not real model quality.
-- [ ] The report states that it evaluates head-direction prediction only.
-- [ ] The report does not claim Bee Localisation quality.
-- [ ] The report does not claim Varroa Detection quality.
-- [ ] The benchmark does not make the candidate available for Varroa Assessment.
-- [ ] The existing one-active-model-job guard still applies.
-- [ ] Optional QA command is added if small and does not reset, seed, or migrate the database.
-- [ ] Focused tests, API-level BDD, browser acceptance, and `pnpm verify:slice` pass before closeout.
-- [ ] Relevant docs are updated: `requirements/roadmap.md`, `docs/user-guide.md`, this slice document, `architecture/parking-lot.md`, and `requirements/ai-sdlc-observations.md`.
+- [x] Model Governance contains a distinct Bee Orientation benchmark section in a clearer Model Benchmarking area.
+- [x] Readiness accepts completed Bee Orientation Model Candidates and rejects other Model Purposes.
+- [x] Readiness uses the candidate's source Marked-Bee Dataset Version.
+- [x] Readiness reports eligible reliable complete benchmark bees.
+- [x] Readiness reports excluded unreliable-orientation and partial visible bees.
+- [x] Readiness blocks when no eligible reliable complete benchmark bees exist.
+- [x] A Bee Orientation Benchmark Evaluation can run against protected Benchmark evidence.
+- [x] The evaluation records Model Purpose Bee Orientation.
+- [x] The evaluation records one raw prediction row per evaluated benchmark bee.
+- [x] The report includes Head Up / Head Down accuracy evidence.
+- [x] The report includes a Head Up / Head Down confusion matrix.
+- [x] Confidence distribution is shown only when available; otherwise it is clearly `n/a`.
+- [x] Fake-adapter results are labelled as workflow evidence only, not real model quality.
+- [x] The report states that it evaluates head-direction prediction only.
+- [x] The report does not claim Bee Localisation quality.
+- [x] The report does not claim Varroa Detection quality.
+- [x] The benchmark does not make the candidate available for Varroa Assessment.
+- [x] The existing one-active-model-job guard still applies.
+- [x] Optional QA command is added if small and does not reset, seed, or migrate the database.
+- [x] Focused tests, API-level BDD, browser acceptance, and `pnpm verify:slice` pass before closeout.
+- [x] Relevant docs are updated: `requirements/roadmap.md`, `docs/user-guide.md`, this slice document, `architecture/parking-lot.md`, and `requirements/ai-sdlc-observations.md`.
+
+## Verification Evidence
+
+- Focused Core API and BDD checks: Slice 0024 model-training and Gherkin tests passed.
+- Focused browser acceptance: Slice 0024 Bee Orientation benchmark evaluation passed.
+- Full slice verification: `pnpm verify:slice` passed on 2026-08-05 with Core API, Analysis Service, Web TypeScript, dev script tests, and browser acceptance green. Latest report: `reports/slice-verification/latest.md`.
 
 ## Open Questions
 

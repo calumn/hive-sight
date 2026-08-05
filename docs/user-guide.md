@@ -246,7 +246,28 @@ Use this when you want to train the first real Head Up / Head Down orientation c
 6. Click `Train bee baseline`.
 7. Watch for the Bee Orientation Training Run after Bee Localisation completes, then open the orientation report if needed.
 
-The Bee Orientation report shows training-run validation metrics only. They are not benchmark evidence, and orientation candidates cannot be used for benchmark evaluation, live orientation inference, automatic Head-Up Normalized Bee Crop generation, or Varroa Assessment yet.
+The Bee Orientation training report shows training-run validation metrics only. Use the Bee Orientation benchmark workflow below for protected benchmark evidence. Orientation candidates still cannot be used for live orientation inference, automatic Head-Up Normalized Bee Crop generation, or Varroa Assessment yet.
+
+## Evaluate A Bee Orientation Model Candidate
+
+Use this when you want internal model-governance evidence for a completed Bee Orientation Model Candidate. This is a Dataset Curator task, not normal beekeeper inspection work.
+
+1. Make sure the shared Marked-Bee Dataset Version has protected Benchmark items with reliable complete visible bee ellipses.
+2. Train a Bee baseline so a Bee Orientation Model Candidate exists from that same Dataset Version.
+3. Open the `Model Governance` workflow stage.
+4. In `Bee Orientation benchmark evaluation`, click `Check orientation benchmark`.
+5. Review eligible bees, unreliable-orientation exclusions, partial-visible-bee deferrals, and warnings such as `SMALL_ORIENTATION_BENCHMARK_SET`.
+6. Click `Run orientation benchmark`.
+7. Watch status, phase, heartbeat, progress, accuracy, evaluated bees, evaluated examples, activity, and log excerpt.
+8. Open the `Report` and `Raw predictions` links when the run completes.
+
+The report is Head Up / Head Down benchmark evidence only. It does not evaluate Bee Localisation quality, Varroa Detection quality, live orientation inference, or beekeeper-facing Varroa readiness.
+
+For a command-line real-adapter proof-of-life check against the latest completed real Bee Orientation Model Candidate:
+
+```sh
+pnpm model:qa:bee:orientation-evaluate
+```
 
 ## Evaluate A Bee Localisation Model Candidate
 

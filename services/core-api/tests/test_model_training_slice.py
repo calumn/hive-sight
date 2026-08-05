@@ -722,6 +722,186 @@ def test_dataset_curator_evaluates_model_candidate_against_protected_benchmark(
         app.dependency_overrides.clear()
 
 
+def test_dataset_curator_evaluates_orientation_candidate_against_protected_benchmark(
+    tmp_path: Path,
+) -> None:
+    state = _build_state(tmp_path)
+    app.dependency_overrides[get_dev_state] = lambda: state
+    client = TestClient(app)
+    try:
+        workspace_id = _workspace(client)
+        _create_reviewed_crop_item(client, workspace_id, "training", 10, 10)
+        _create_reviewed_crop_item(client, workspace_id, "validation", 260, 10)
+        _create_reviewed_crop_item(client, workspace_id, "benchmark", 10, 260)
+        _create_reviewed_crop_item(
+            client,
+            workspace_id,
+            "benchmark",
+            260,
+            260,
+            annotation_type="partial_visible_bee",
+        )
+        _create_reviewed_crop_item(
+            client,
+            workspace_id,
+            "benchmark",
+            420,
+            260,
+            orientation_reliability="unreliable",
+        )
+        dataset_version = client.post(
+            "/v1/model-training/dataset-versions",
+            json={"workspace_id": workspace_id},
+            headers=_headers(),
+        ).json()
+        training_response = client.post(
+            "/v1/model-training/bee-training/runs",
+            json={
+                "workspace_id": workspace_id,
+                "dataset_version_id": dataset_version["dataset_version_id"],
+                "acknowledge_high_severity_warnings": True,
+            },
+            headers=_headers(),
+        )
+        assert training_response.status_code == 202
+        orientation_run = _wait_for_training_run_purpose_status(
+            client,
+            workspace_id,
+            "bee_orientation",
+            "completed",
+        )
+
+        readiness = client.get(
+            "/v1/model-training/model-candidates/"
+            f"{orientation_run['model_candidate_id']}/orientation-benchmark-readiness"
+            f"?workspace_id={workspace_id}",
+            headers=_headers(),
+        )
+        assert readiness.status_code == 200
+        readiness_body = readiness.json()
+        assert readiness_body["model_candidate_human_readable_id"] == "HS-MC-000002"
+        assert readiness_body["dataset_version_id"] == dataset_version["dataset_version_id"]
+        assert readiness_body["eligible_benchmark_bee_count"] == 1
+        assert readiness_body["excluded_partial_visible_bee_count"] == 1
+        assert readiness_body["excluded_unreliable_orientation_count"] == 1
+        assert readiness_body["eligible_to_start_benchmark"] is True
+        assert any(warning["code"] == "SMALL_ORIENTATION_BENCHMARK_SET" for warning in readiness_body["warnings"])
+
+        start_response = client.post(
+            "/v1/model-training/orientation-benchmark-evaluations",
+            json={
+                "workspace_id": workspace_id,
+                "model_candidate_id": orientation_run["model_candidate_id"],
+            },
+            headers=_headers(),
+        )
+        assert start_response.status_code == 202
+        evaluation = _wait_for_benchmark_evaluation_status(
+            client,
+            workspace_id,
+            start_response.json()["benchmark_evaluation_id"],
+            "completed",
+        )
+
+        assert evaluation["human_readable_id"] == "HS-OB-000001"
+        assert evaluation["model_purpose"] == "bee_orientation"
+        assert evaluation["benchmark_scope"] == "bee_orientation_head_direction_benchmark_only"
+        assert evaluation["metrics_summary"]["metric_scope"] == "bee_orientation_benchmark_only"
+        assert evaluation["metrics_summary"]["evaluated_bee_count"] == 1
+        assert evaluation["metrics_summary"]["evaluated_example_count"] == 2
+        assert evaluation["metrics_summary"]["accuracy"] == 1
+        assert evaluation["metrics_summary"]["confusion_matrix"] == {
+            "head_up": {"head_up": 1, "head_down": 0},
+            "head_down": {"head_up": 0, "head_down": 1},
+        }
+        assert len(evaluation["item_results"]) == 1
+        assert evaluation["raw_prediction_artifact_id"] is not None
+        assert evaluation["report_artifact_id"] is not None
+
+        report = client.get(
+            f"/v1/model-training/artifacts/{evaluation['report_artifact_id']}?workspace_id={workspace_id}",
+            headers=_headers(),
+        )
+        raw_predictions = client.get(
+            "/v1/model-training/artifacts/"
+            f"{evaluation['raw_prediction_artifact_id']}?workspace_id={workspace_id}",
+            headers=_headers(),
+        )
+        assert report.status_code == 200
+        assert "head-direction prediction only" in report.text
+        assert "does not evaluate Bee Localisation quality" in report.text
+        assert "does not evaluate Varroa Detection quality" in report.text
+        assert "Fake-adapter results are workflow evidence only" in report.text
+        assert raw_predictions.status_code == 200
+        raw_body = raw_predictions.json()
+        assert raw_body["model_purpose"] == "bee_orientation"
+        assert len(raw_body["predictions"]) == 1
+        assert len(raw_body["predictions"][0]["examples"]) == 2
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_orientation_benchmark_readiness_blocks_when_no_eligible_benchmark_bees(
+    tmp_path: Path,
+) -> None:
+    state = _build_state(tmp_path)
+    app.dependency_overrides[get_dev_state] = lambda: state
+    client = TestClient(app)
+    try:
+        workspace_id = _workspace(client)
+        _create_reviewed_crop_item(client, workspace_id, "training", 10, 10)
+        _create_reviewed_crop_item(client, workspace_id, "validation", 260, 10)
+        _create_reviewed_crop_item(
+            client,
+            workspace_id,
+            "benchmark",
+            10,
+            260,
+            orientation_reliability="unreliable",
+        )
+        dataset_version = client.post(
+            "/v1/model-training/dataset-versions",
+            json={"workspace_id": workspace_id},
+            headers=_headers(),
+        ).json()
+        training_response = client.post(
+            "/v1/model-training/bee-training/runs",
+            json={
+                "workspace_id": workspace_id,
+                "dataset_version_id": dataset_version["dataset_version_id"],
+                "acknowledge_high_severity_warnings": True,
+            },
+            headers=_headers(),
+        )
+        assert training_response.status_code == 202
+        orientation_run = _wait_for_training_run_purpose_status(
+            client,
+            workspace_id,
+            "bee_orientation",
+            "completed",
+        )
+
+        readiness = client.get(
+            "/v1/model-training/model-candidates/"
+            f"{orientation_run['model_candidate_id']}/orientation-benchmark-readiness"
+            f"?workspace_id={workspace_id}",
+            headers=_headers(),
+        )
+
+        assert readiness.status_code == 200
+        body = readiness.json()
+        assert body["benchmark_item_count"] == 1
+        assert body["eligible_benchmark_bee_count"] == 0
+        assert body["excluded_unreliable_orientation_count"] == 1
+        assert body["eligible_to_start_benchmark"] is False
+        assert any(
+            warning["code"] == "NO_ELIGIBLE_ORIENTATION_BENCHMARK_BEES"
+            for warning in body["warnings"]
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+
 def test_benchmark_evaluation_requires_dataset_curator_capability(tmp_path: Path) -> None:
     state = _build_state(tmp_path)
     state.store.dataset_curator_user_ids.clear()

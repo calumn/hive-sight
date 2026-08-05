@@ -870,6 +870,15 @@ export type BenchmarkEvaluationReadiness = {
   warnings: BenchmarkEvaluationWarning[];
 };
 
+export type OrientationBenchmarkReadiness = BenchmarkEvaluationReadiness & {
+  datasetVersionId: string;
+  datasetVersionHumanReadableId: string;
+  benchmarkItemCount: number;
+  eligibleBenchmarkBeeCount: number;
+  excludedUnreliableOrientationCount: number;
+  excludedPartialVisibleBeeCount: number;
+};
+
 export type BenchmarkEvaluationItemResult = {
   datasetItemId: string;
   humanReadableId: string;
@@ -891,6 +900,7 @@ export type BenchmarkEvaluation = {
   modelCandidateHumanReadableId: string;
   trainingRunId: string;
   datasetVersionId: string;
+  modelPurpose: ModelPurpose;
   status: "queued" | "running" | "cancelling" | "completed" | "failed" | "cancelled";
   phase: string;
   adapterType: TrainingAdapterType;
@@ -1697,6 +1707,26 @@ export async function fetchBenchmarkEvaluationReadiness({
   return parseBenchmarkEvaluationReadiness(await response.json());
 }
 
+export async function fetchOrientationBenchmarkReadiness({
+  devUserId,
+  workspaceId,
+  modelCandidateId
+}: {
+  devUserId: string;
+  workspaceId: string;
+  modelCandidateId: string;
+}): Promise<OrientationBenchmarkReadiness> {
+  const params = new URLSearchParams({ workspace_id: workspaceId });
+  const response = await fetch(
+    `${coreApiUrl}/v1/model-training/model-candidates/${modelCandidateId}/orientation-benchmark-readiness?${params}`,
+    {
+      headers: devAuthHeaders(devUserId)
+    }
+  );
+  await ensureOk(response);
+  return parseOrientationBenchmarkReadiness(await response.json());
+}
+
 export async function startBenchmarkEvaluation({
   devUserId,
   workspaceId,
@@ -1715,6 +1745,30 @@ export async function startBenchmarkEvaluation({
       workspace_id: workspaceId,
       model_candidate_id: modelCandidateId,
       confidence_threshold: 0.1,
+      acknowledge_high_severity_warnings: acknowledgeHighSeverityWarnings
+    })
+  });
+  await ensureOk(response);
+  return parseBenchmarkEvaluation(await response.json());
+}
+
+export async function startOrientationBenchmarkEvaluation({
+  devUserId,
+  workspaceId,
+  modelCandidateId,
+  acknowledgeHighSeverityWarnings
+}: {
+  devUserId: string;
+  workspaceId: string;
+  modelCandidateId: string;
+  acknowledgeHighSeverityWarnings: boolean;
+}): Promise<BenchmarkEvaluation> {
+  const response = await fetch(`${coreApiUrl}/v1/model-training/orientation-benchmark-evaluations`, {
+    method: "POST",
+    headers: jsonHeaders(devUserId),
+    body: JSON.stringify({
+      workspace_id: workspaceId,
+      model_candidate_id: modelCandidateId,
       acknowledge_high_severity_warnings: acknowledgeHighSeverityWarnings
     })
   });
@@ -3413,6 +3467,31 @@ function parseBenchmarkEvaluationReadiness(value: unknown): BenchmarkEvaluationR
   };
 }
 
+function parseOrientationBenchmarkReadiness(value: unknown): OrientationBenchmarkReadiness {
+  const readiness = parseBenchmarkEvaluationReadiness(value);
+  const record = requireRecord(value, "Bee Orientation Benchmark readiness response");
+  return {
+    ...readiness,
+    datasetVersionId: requireString(record.dataset_version_id, "dataset_version_id"),
+    datasetVersionHumanReadableId: requireString(
+      record.dataset_version_human_readable_id,
+      "dataset_version_human_readable_id"
+    ),
+    eligibleBenchmarkBeeCount: requireNumber(
+      record.eligible_benchmark_bee_count,
+      "eligible_benchmark_bee_count"
+    ),
+    excludedUnreliableOrientationCount: requireNumber(
+      record.excluded_unreliable_orientation_count,
+      "excluded_unreliable_orientation_count"
+    ),
+    excludedPartialVisibleBeeCount: requireNumber(
+      record.excluded_partial_visible_bee_count,
+      "excluded_partial_visible_bee_count"
+    )
+  };
+}
+
 function parseBenchmarkEvaluationItemResult(value: unknown): BenchmarkEvaluationItemResult {
   const record = requireRecord(value, "Benchmark Evaluation item result");
   return {
@@ -3445,6 +3524,7 @@ function parseBenchmarkEvaluation(value: unknown): BenchmarkEvaluation {
     ),
     trainingRunId: requireString(record.training_run_id, "training_run_id"),
     datasetVersionId: requireString(record.dataset_version_id, "dataset_version_id"),
+    modelPurpose: requireModelPurpose(record.model_purpose),
     status: requireBenchmarkEvaluationStatus(record.status),
     phase: requireString(record.phase, "phase"),
     adapterType: requireTrainingAdapterType(record.adapter_type),

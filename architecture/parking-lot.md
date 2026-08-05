@@ -671,7 +671,7 @@ For future real hive inspections, HiveSight needs a model pipeline that can iden
 
 Why parked:
 
-Slice 0022 creates shared Marked-Bee Dataset Versions and validates the first Bee Orientation Head Up / Head Down package with a fake-adapter baseline candidate. Slice 0023 adds real predictive Bee Orientation training from the same shared source Dataset Version. Slice 0024 is planned to add protected Bee Orientation benchmark evidence. Inference, automated crop normalization, and the decision about whether the binary classifier is sufficient or should be replaced by a keypoint/pose or multi-head model remain parked.
+Slice 0022 creates shared Marked-Bee Dataset Versions and validates the first Bee Orientation Head Up / Head Down package with a fake-adapter baseline candidate. Slice 0023 adds real predictive Bee Orientation training from the same shared source Dataset Version. Slice 0024 adds protected Bee Orientation benchmark evidence for completed orientation candidates. Inference, automated crop normalization, and the decision about whether the binary classifier is sufficient or should be replaced by a keypoint/pose or multi-head model remain parked.
 
 Revisit trigger:
 

@@ -20,6 +20,11 @@ from hive_sight_core_api.bee_detector_candidate_annotation_workflow import (
 from hive_sight_core_api.bee_detector_benchmark_evaluation_workflow import (
     BeeDetectorBenchmarkEvaluationWorkflow,
 )
+from hive_sight_core_api.bee_orientation_benchmark_evaluation_workflow import (
+    BeeOrientationBenchmarkEvaluationWorkflow,
+    FakeBeeOrientationBenchmarkAdapter,
+    TorchvisionBeeOrientationBenchmarkAdapter,
+)
 from hive_sight_core_api.bee_detector_training_workflow import (
     BeeDetectorTrainingWorkflow,
     FakeBeeDetectorTrainingAdapter,
@@ -246,6 +251,28 @@ def get_bee_detector_benchmark_evaluation_workflow(
         else FakeBeeDetectorInferenceAdapter()
     )
     return BeeDetectorBenchmarkEvaluationWorkflow(
+        store=state.store,
+        image_loader=state.object_storage.get_object,
+        artifact_root=state.model_artifact_root,
+        adapter=adapter,
+        persistence_backend=settings.persistence_backend,
+        database_purpose=settings.database_purpose,
+        clock=state.store.clock,
+        stale_after_seconds=settings.training_run_stale_after_seconds,
+        heartbeat_interval_seconds=settings.training_run_heartbeat_interval_seconds,
+    )
+
+
+def get_bee_orientation_benchmark_evaluation_workflow(
+    state: DevStateDep,
+) -> BeeOrientationBenchmarkEvaluationWorkflow:
+    settings = get_settings()
+    adapter = (
+        TorchvisionBeeOrientationBenchmarkAdapter(device=settings.bee_orientation_device)
+        if settings.bee_orientation_training_adapter == "torchvision_orientation_classifier"
+        else FakeBeeOrientationBenchmarkAdapter()
+    )
+    return BeeOrientationBenchmarkEvaluationWorkflow(
         store=state.store,
         image_loader=state.object_storage.get_object,
         artifact_root=state.model_artifact_root,

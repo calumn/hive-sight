@@ -13,6 +13,9 @@ from hive_sight_core_api.bee_detector_candidate_annotation_workflow import (
 from hive_sight_core_api.bee_detector_benchmark_evaluation_workflow import (
     BeeDetectorBenchmarkEvaluationWorkflow,
 )
+from hive_sight_core_api.bee_orientation_benchmark_evaluation_workflow import (
+    BeeOrientationBenchmarkEvaluationWorkflow,
+)
 from hive_sight_core_api.bee_detector_training_workflow import BeeDetectorTrainingWorkflow
 from hive_sight_core_api.dataset_labelling_workflow import DatasetLabellingWorkflow
 from hive_sight_core_api.dataset_repository_workflow import DatasetRepositoryWorkflow
@@ -24,6 +27,7 @@ from hive_sight_core_api.dependencies import (
     get_bee_detector_benchmark_evaluation_workflow,
     get_bee_detector_candidate_annotation_workflow,
     get_bee_detector_training_workflow,
+    get_bee_orientation_benchmark_evaluation_workflow,
     get_dataset_labelling_workflow,
     get_dataset_repository_workflow,
     get_dataset_role_assignment_workflow,
@@ -92,6 +96,7 @@ from hive_sight_core_api.models import (
     ModelCandidateListResponse,
     ModelCandidateResponse,
     ModelTrainingReadinessResponse,
+    OrientationBenchmarkReadinessResponse,
     OrientedBeeEllipseCreateRequest,
     OrientedBeeEllipseResponse,
     OrientedBeeEllipseUpdateRequest,
@@ -192,6 +197,10 @@ BeeDetectorTrainingWorkflowDep = Annotated[
 BeeDetectorBenchmarkEvaluationWorkflowDep = Annotated[
     BeeDetectorBenchmarkEvaluationWorkflow,
     Depends(get_bee_detector_benchmark_evaluation_workflow),
+]
+BeeOrientationBenchmarkEvaluationWorkflowDep = Annotated[
+    BeeOrientationBenchmarkEvaluationWorkflow,
+    Depends(get_bee_orientation_benchmark_evaluation_workflow),
 ]
 BeeDetectorCandidateAnnotationWorkflowDep = Annotated[
     BeeDetectorCandidateAnnotationWorkflow,
@@ -1103,6 +1112,36 @@ def start_model_candidate_benchmark_evaluation(
     request: BenchmarkEvaluationStartRequest,
     user: AuthenticatedUserDep,
     workflow: BeeDetectorBenchmarkEvaluationWorkflowDep,
+) -> BenchmarkEvaluationResponse:
+    return workflow.start_evaluation(user=user, request=request)
+
+
+@app.get(
+    "/v1/model-training/model-candidates/{model_candidate_id}/orientation-benchmark-readiness",
+    response_model=OrientationBenchmarkReadinessResponse,
+)
+def get_orientation_model_candidate_benchmark_readiness(
+    model_candidate_id: UUID,
+    workspace_id: UUID,
+    user: AuthenticatedUserDep,
+    workflow: BeeOrientationBenchmarkEvaluationWorkflowDep,
+) -> OrientationBenchmarkReadinessResponse:
+    return workflow.readiness(
+        user=user,
+        workspace_id=workspace_id,
+        model_candidate_id=model_candidate_id,
+    )
+
+
+@app.post(
+    "/v1/model-training/orientation-benchmark-evaluations",
+    response_model=BenchmarkEvaluationResponse,
+    status_code=202,
+)
+def start_orientation_model_candidate_benchmark_evaluation(
+    request: BenchmarkEvaluationStartRequest,
+    user: AuthenticatedUserDep,
+    workflow: BeeOrientationBenchmarkEvaluationWorkflowDep,
 ) -> BenchmarkEvaluationResponse:
     return workflow.start_evaluation(user=user, request=request)
 

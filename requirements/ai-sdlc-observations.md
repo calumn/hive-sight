@@ -552,3 +552,21 @@ Human judgment still required:
 
 - Review real Bee Orientation benchmark reports once real protected benchmark evidence exists.
 - Later decide whether the binary classifier is sufficient for Varroa work or whether a keypoint/pose or multi-head model is justified.
+
+### 2026-08-05 Slice 0024 Bee Orientation Benchmark Evaluation Implementation
+
+Human-confirmed direction:
+
+- Proceed with the signed-off Slice 0024 scenarios.
+- Keep Bee Orientation benchmark evidence purpose-limited: Head Up / Head Down only, no Bee Localisation claim, no Varroa claim, and no user-facing promotion.
+
+AI contribution:
+
+- Added Bee Orientation benchmark readiness and start paths for completed Bee Orientation Model Candidates from the same shared Marked-Bee Dataset Version.
+- Recorded eligible reliable complete benchmark bees, excluded unreliable-orientation bees, excluded partial visible bees, accuracy, Head Up / Head Down confusion matrix, raw prediction artifacts, and report artifacts.
+- Added the Web UI section, browser acceptance coverage, and `pnpm model:qa:bee:orientation-evaluate` as an append-only real-adapter QA command.
+
+Human judgment still required:
+
+- Review real Bee Orientation benchmark reports once real protected benchmark evidence exists.
+- Decide later whether benchmark evidence supports the binary classifier or whether a keypoint/pose or multi-head model is needed before Varroa crop normalization.

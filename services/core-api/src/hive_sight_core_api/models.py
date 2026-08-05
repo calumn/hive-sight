@@ -1069,6 +1069,27 @@ class BenchmarkEvaluationReadinessResponse(BaseModel):
     warnings: list[BenchmarkEvaluationWarningResponse]
 
 
+class OrientationBenchmarkReadinessResponse(BaseModel):
+    workspace_id: UUID
+    model_candidate_id: UUID
+    model_candidate_human_readable_id: str
+    dataset_version_id: UUID
+    dataset_version_human_readable_id: str
+    adapter_type: str
+    training_adapter_type: str
+    evaluation_adapter_type: str
+    database_purpose: str
+    benchmark_item_count: int
+    eligible_benchmark_bee_count: int
+    excluded_unreliable_orientation_count: int
+    excluded_partial_visible_bee_count: int
+    eligible_to_start_evaluation: bool
+    eligible_to_start_benchmark: bool
+    active_model_job_id: UUID | None = None
+    active_model_job_type: str | None = None
+    warnings: list[BenchmarkEvaluationWarningResponse]
+
+
 class BenchmarkEvaluationItemResultResponse(BaseModel):
     dataset_item_id: UUID
     human_readable_id: str
@@ -1090,6 +1111,7 @@ class BenchmarkEvaluationResponse(BaseModel):
     model_candidate_human_readable_id: str
     training_run_id: UUID
     dataset_version_id: UUID
+    model_purpose: str = "bee_detector"
     status: str
     phase: str
     adapter_type: str

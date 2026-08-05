@@ -4,7 +4,9 @@ import { createApiaryAndHive } from "./support/setup-workflow";
 
 const fixtureImagePath = fileURLToPath(new URL("../fixtures/bee-frame-test.png", import.meta.url));
 
-test("Dataset Curator runs a fake Model Candidate benchmark evaluation", async ({ page }) => {
+test("Dataset Curator evaluates a Bee Orientation candidate against protected benchmark bees", async ({
+  page
+}) => {
   await page.goto("/");
   await expect(page.getByText("core-api online")).toBeVisible();
 
@@ -15,9 +17,9 @@ test("Dataset Curator runs a fake Model Candidate benchmark evaluation", async (
   await expect(acceptTerms).toContainText("Terms accepted");
 
   const suffix = Date.now().toString();
-  await createApiaryAndHive(page, `Slice 15.4 apiary ${suffix}`, `Slice 15.4 hive ${suffix}`);
+  await createApiaryAndHive(page, `Slice 24 apiary ${suffix}`, `Slice 24 hive ${suffix}`);
 
-  await page.getByTestId("inspection-date-input").fill("2026-07-31");
+  await page.getByTestId("inspection-date-input").fill("2026-08-05");
   await page.getByTestId("inspection-intent-select").selectOption("training_data_collection");
   await page.getByTestId("create-inspection-button").click();
 
@@ -35,13 +37,14 @@ test("Dataset Curator runs a fake Model Candidate benchmark evaluation", async (
   await createCompletedDatasetCrop(page, { x: 420, y: 220 }, "benchmark");
 
   await page.getByTestId("workflow-stage-model-governance-button").click();
-  await expect(page.getByTestId("training-workflow-stage-model-governance")).toBeVisible();
   await page.getByTestId("create-dataset-version-button").click();
-  await expect(page.getByTestId("dataset-version-summary")).toContainText("Benchmark protected 1");
+  await expect(page.getByTestId("dataset-version-summary")).toContainText(
+    /Benchmark protected [1-9]/
+  );
   await page.getByTestId("acknowledge-model-training-warnings-checkbox").check();
   const trainingRunCountBefore = await page.getByTestId("model-training-run-list-item").count();
   await page.getByTestId("start-model-training-run-button").click();
-  await expect(page.getByTestId("model-training-run-summary")).toContainText("completed");
+  await expect(page.getByTestId("model-training-run-list")).toContainText("Bee Localisation");
   await expect
     .poll(
       async () => {
@@ -52,26 +55,37 @@ test("Dataset Curator runs a fake Model Candidate benchmark evaluation", async (
     )
     .toBeGreaterThanOrEqual(trainingRunCountBefore + 2);
   await expect(page.getByTestId("model-training-run-list")).toContainText("Bee Orientation");
-  await page.getByTestId("use-model-candidate-for-bee-prelabels-button").click();
+  await expect(page.getByTestId("model-training-run-list")).toContainText("completed");
 
-  await page.getByTestId("benchmark-evaluation-readiness-button").click();
-  await expect(page.getByTestId("benchmark-evaluation-panel")).toContainText("Benchmark 1");
-  await expect(page.getByTestId("benchmark-evaluation-panel")).toContainText(
-    "SMALL_BENCHMARK_SET"
+  await page.getByTestId("orientation-benchmark-readiness-button").click();
+  await expect(page.getByTestId("orientation-benchmark-readiness-summary")).toContainText(
+    /Eligible bees [1-9]/
   );
-  await page.getByTestId("start-benchmark-evaluation-button").click();
-  await expect(page.getByTestId("benchmark-evaluation-summary")).toContainText("HS-BE-");
-  await expect(page.getByTestId("benchmark-evaluation-summary")).toContainText("completed");
-  await expect(page.getByTestId("benchmark-evaluation-summary")).toContainText("Precision");
-  await expect(page.getByTestId("benchmark-evaluation-summary")).toContainText("Recall");
-  await expect(page.getByTestId("benchmark-evaluation-activity")).toContainText(
-    "Benchmark Evaluation completed."
+  await expect(page.getByTestId("orientation-benchmark-readiness-summary")).toContainText(
+    "SMALL_ORIENTATION_BENCHMARK_SET"
   );
-  await expect(page.getByTestId("benchmark-evaluation-report-link")).toBeVisible();
-  await expect(page.getByTestId("benchmark-evaluation-raw-predictions-link")).toBeVisible();
-  await expect(page.getByTestId("benchmark-evaluation-list")).toContainText(
-    "Benchmark evaluations"
+  await page.getByTestId("start-orientation-benchmark-evaluation-button").click();
+  await expect(page.getByTestId("orientation-benchmark-evaluation-summary")).toContainText(
+    "HS-OB-"
   );
+  await expect(page.getByTestId("orientation-benchmark-evaluation-summary")).toContainText(
+    "completed"
+  );
+  await expect(page.getByTestId("orientation-benchmark-evaluation-summary")).toContainText(
+    "Accuracy"
+  );
+  await expect(page.getByTestId("orientation-benchmark-evaluation-summary")).toContainText(
+    /Examples [1-9]/
+  );
+  await expect(page.getByTestId("orientation-benchmark-evaluation-activity")).toContainText(
+    "Bee Orientation Benchmark Evaluation completed."
+  );
+  await expect(page.getByTestId("orientation-benchmark-evaluation-report-link")).toBeVisible();
+  await expect(
+    page.getByTestId("orientation-benchmark-evaluation-raw-predictions-link")
+  ).toBeVisible();
+  await expect(page.getByTestId("benchmark-evaluation-list")).toContainText("Bee Orientation");
+  await expect(page.getByTestId("benchmark-evaluation-list")).not.toContainText("Varroa");
 });
 
 async function createCompletedDatasetCrop(
@@ -87,27 +101,18 @@ async function createCompletedDatasetCrop(
   await page.getByTestId("training-crop-surface").click({ position: { x: 180, y: 120 } });
   await expect(page.getByTestId("training-crop-ellipse")).toHaveCount(1);
   await page.getByTestId("complete-training-crop-button").click();
-  await expect(page.getByTestId("training-crop-list-item").nth(latestCropIndex)).toContainText(
-    "review_complete"
-  );
   await page.getByTestId("workflow-stage-crop-governance-button").click();
   await page.getByTestId("training-crop-dataset-role-select").selectOption(datasetRole);
   if (datasetRole === "benchmark") {
     await page
       .getByTestId("training-crop-dataset-source-group-key-input")
-      .fill("slice-0015-4-benchmark");
+      .fill("slice-0024-orientation-benchmark");
   }
   await page
     .getByTestId("training-crop-dataset-assignment-note-input")
-    .fill(`Accepted as ${datasetRole} benchmark evaluation crop.`);
+    .fill(`Accepted as ${datasetRole} orientation benchmark crop.`);
   await expect(page.getByTestId("assign-training-crop-dataset-role-button")).toBeEnabled();
-  const assignmentResponsePromise = page.waitForResponse((response) =>
-    response.url().includes("/dataset-item")
-  );
   await page.getByTestId("assign-training-crop-dataset-role-button").click();
-  const assignmentResponse = await assignmentResponsePromise;
-  const assignmentBody = await assignmentResponse.json();
-  expect(assignmentResponse.status(), JSON.stringify(assignmentBody)).toBe(201);
   await expect(page.getByTestId("training-crop-dataset-item-state")).toContainText(
     `Dataset item: ${formatDatasetRole(datasetRole)}`
   );
