@@ -33,7 +33,7 @@ Recent slices have established:
 
 Important current limitation:
 
-HiveSight can now build, train, and benchmark an early crop-level Bee Localisation candidate. It cannot yet make a user-facing Varroa assessment, predict bee head direction automatically, evaluate full-frame bee localisation, label Varroa evidence, or produce a statistically defensible infestation estimate.
+HiveSight can now build, train, and benchmark an early crop-level Bee Localisation candidate and build a non-predictive Bee Orientation package baseline. It cannot yet make a user-facing Varroa assessment, predict bee head direction automatically, evaluate full-frame bee localisation, label Varroa evidence, or produce a statistically defensible photo-visible estimate.
 
 ## Immediate Candidate Slices
 
@@ -46,6 +46,7 @@ These are the strongest near-term candidates based on the current project state.
 | Orientation Reliability Review | Business / Technical | Add explicit `reliable` / `unreliable` orientation review for directed bee ellipses. | Promoted into `architecture/vertical-slice-0021-orientation-reliability-review.md`. |
 | Bee Orientation Model Baseline | Technical | Build and validate the first Head Up / Head Down orientation package from the shared Bee Detection and Bee Orientation marked-bee Dataset Version, and record the first non-user-facing orientation candidate. | Implemented by Slice 0022 as `architecture/vertical-slice-0022-bee-orientation-training-baseline.md`; real predictive orientation training and benchmark evaluation remain later work. |
 | Varroa Review Outcome Labelling | Business | Add the CAPTCHA-like workflow for `visible_varroa_present`, `no_visible_varroa`, and `not_determined`. | Varroa training needs active positives and active negatives, not silent absence. |
+| Varroa Evidence Methodology And Gold-Standard Design | Research / Governance | Establish the full-depth annotation, review, split, sampling-experiment, and field-calibration protocol before Varroa corpus construction begins. | This is documented in `requirements/varroa-evidence-methodology.md`; the protocol prevents training convenience from becoming an unsupported beekeeper-facing statistical claim. |
 | Public Dataset Candidate Import | Technical / Governance | Import public USDA-ARS image/XML evidence as Candidate Annotations requiring human review. | This could accelerate dataset growth, but only if provenance and source rights are handled correctly. |
 
 ## Bee Localisation And Dataset Quality
@@ -79,6 +80,7 @@ These are the strongest near-term candidates based on the current project state.
 | Candidate Slice | Type | Outcome |
 | --- | --- | --- |
 | Varroa Review Outcome Labelling | Business | Let a reviewer actively mark a bee crop as `visible_varroa_present`, `no_visible_varroa`, or `not_determined`, with mite point or tight-box markers for positives. |
+| Gold-Standard Full-Frame Annotation Pilot | Research / Technical | Demonstrate the methodology on a small, fully reconciled set of complete frame images and measure annotation/review workload and agreement. |
 | Varroa Model-Curation Sampling Plan | Business / Technical | Select Varroa labelling tasks using `stratified_random`, `curator_targeted`, and explicit `human_selected` versus `upstream_model_selected` metadata. |
 | Varroa Dataset Repository Browser | Business / Technical | Show positive, active negative, and not-determined Varroa evidence by dataset role, source, orientation reliability, and selection method. |
 | Varroa Detector Baseline | Technical | Train the first Varroa Detection model on Head-Up Normalized Bee Crops using active positives and active negatives. |
@@ -90,6 +92,7 @@ These are the strongest near-term candidates based on the current project state.
 | Candidate Slice | Type | Outcome |
 | --- | --- | --- |
 | Inspection-Rate Sampling Policy | Business / Technical | Define how sampled bees support a stated visible Varroa rate and confidence interval. |
+| Sampling-Strategy Simulation And Calibration | Research / Technical | Use protected full-depth frames to select an initial spatial/quality-stratified and possibly sequential inspection-rate plan; separately study paired field-reference measurements without conflating their targets. |
 | End-To-End Pipeline Evaluation | Technical / Governance | Evaluate Bee Localisation, Bee Orientation, and Varroa Detection together on protected full-frame evidence. |
 | Varroa Coverage And Suppression Rules | Business / Governance | Show coverage warnings and suppress headline estimates when evidence coverage is too weak. |
 | First Model-Only Varroa Assessment Result | Business | Produce a clearly caveated, non-promoted inspection result from the staged pipeline. |

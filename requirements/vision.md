@@ -2,7 +2,7 @@
 
 HiveSight is a Varroa-focused inspection support system for beekeepers.
 
-The primary product goal is to help a hobbyist or small-scale beekeeper assess possible Varroa mite presence from photos of brood frames, super frames, or other inspected hive material. The system should support uploading one or more photos from an inspection, estimating the number of visible bees, detecting likely Varroa mites on bees, and producing an understandable photo-visible infection-rate estimate for that inspection context.
+The primary product goal is to help a hobbyist or small-scale beekeeper assess possible Varroa mite presence from photos of brood frames, super frames, or other inspected hive material. The system should support uploading one or more photos from an inspection, estimating the number of visible bees, detecting likely Varroa mites on bees, and eventually producing an understandable, caveated photo-visible estimate for declared frame evidence.
 
 The system is not intended to diagnose hive health, prescribe treatment, or produce an official infestation measurement in its first version. It should present AI-assisted visual estimates and supporting evidence so the beekeeper can use them alongside normal inspection methods.
 
@@ -18,7 +18,7 @@ The first useful version should focus on:
 - Running image analysis on submitted photos.
 - Estimating complete visible bee count and tracking partial visible bees separately where possible.
 - Detecting likely Varroa mites on visible bees.
-- Presenting a Varroa estimate as mites per 100 complete visible bees in uploaded photos.
+- Presenting, once validated, a Varroa estimate as mites per 100 eligible complete visible bees in declared reconciled frame evidence, with visible coverage and uncertainty.
 - Presenting tagged-up photos that show likely infected bees and, optionally, other detected bees.
 - Allowing lightweight human correction of false positives and missed Varroa markers.
 - Keeping original photos and reusable annotation data so tagged images can be re-rendered and reviewed later.

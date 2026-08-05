@@ -14,7 +14,7 @@ The project also needs to document how AI affects the software development lifec
 
 Build a web-first inspection support system for hobbyist and small-scale beekeepers.
 
-The User registers, receives a default Workspace, and receives an owner Workspace Membership. Acting as the primary Beekeeper, that User creates an apiary, creates hives within that apiary, creates an inspection for a hive, uploads one or more inspection photos, and reviews analysis results. The system estimates complete visible bees, tracks partial visible bees separately, detects likely Varroa mites on or near bees, calculates likely mites per 100 complete visible bees, and presents tagged photos showing the evidence behind the estimate.
+The User registers, receives a default Workspace, and receives an owner Workspace Membership. Acting as the primary Beekeeper, that User creates an apiary, creates hives within that apiary, creates an inspection for a hive, uploads one or more inspection photos, and reviews analysis results. The system estimates complete visible bees, tracks partial visible bees separately, detects likely Varroa mites on or near bees, and, only after the required model and methodology gates are met, calculates a caveated photo-visible estimate for declared reconciled frame evidence. It presents tagged photos showing the evidence behind the estimate.
 
 The Beekeeper can optionally view all detected bees and can lightly correct results by marking false Varroa detections or missed likely Varroa locations. The system stores the original inspection photo, structured annotation data, analysis results, and user corrections so tagged photos can be re-rendered and model accuracy can be evaluated later.
 
@@ -109,12 +109,14 @@ Feature: Varroa image analysis
     And the likely Varroa count is stored with the photo analysis result
 
   Scenario: System calculates mites per 100 complete visible bees
-    Given an inspection has analysed photos
-    And the system has estimated complete visible bees
+    Given a declared reconciled photographed frame population has analysed evidence
+    And the system has estimated eligible complete visible bees
     And the system has counted likely Varroa detections
+    And the applicable Varroa Sampling Plan and coverage gates are satisfied
     When the system presents the inspection result
-    Then the system shows likely Varroa detections associated with complete visible bees per 100 estimated complete visible bees
-    And the system states that the estimate is based only on bees visible in the uploaded photos
+    Then the system shows likely Varroa detections associated with eligible complete visible bees per 100 eligible complete visible bees
+    And the system states the declared photographed frame evidence, sampling plan, coverage, and uncertainty
+    And the system states that the estimate is not a colony-wide infestation measurement
 
 Feature: Tagged photo review
 
@@ -334,7 +336,7 @@ Feature: Deferred guest trial analysis
 - The core domain model should include User, Workspace, Workspace Membership, apiary, hive, inspection, inspection photo, analysis result, annotation, user correction, Workspace Data Use Agreement, Data Deletion Request, model version, dataset version, and benchmark evaluation.
 - Frame-level handling should be light in version one. Photos may have optional frame labels, but the system should not require full frame inventory management.
 - Inspections must support multiple photos so a beekeeper can capture several frames and both sides of a frame within one inspection.
-- The analysis output should include estimated complete visible bee count, partial visible bee count where possible, likely Varroa count, Varroa association state, and likely mites per 100 complete visible bees.
+- The analysis output should include estimated complete visible bee count, partial visible bee count where possible, likely Varroa count, Varroa association state, and, when promotion gates are met, a caveated photo-visible rate for reconciled frame evidence with sampling-plan and coverage provenance.
 - The system should store original photos and structured annotation data rather than relying only on flattened annotated images.
 - Tagged-up photos should be rendered from original photos plus annotation data.
 - AI-assisted annotation is the intended bootstrap path for the first reviewed datasets, but Candidate Annotations require human review before they become Reviewed Annotations.
@@ -356,7 +358,7 @@ Feature: Deferred guest trial analysis
 
 - Tests should focus on externally visible behaviour rather than implementation details.
 - The primary product test seam is the full inspection workflow: create apiary, create hive, create inspection, upload photos, process analysis, view results, correct annotations.
-- Domain-level tests should cover infection-rate calculation as likely Varroa detections associated with complete visible bees per 100 estimated complete visible bees.
+- Domain-level tests should cover photo-visible rate calculation, sampling-plan provenance, non-response/coverage handling, and prevention of un-reconciled same-frame photo aggregation.
 - Data tests should verify that apiaries, hives, inspections, photos, annotations, analysis results, and corrections remain correctly associated.
 - Data tests should verify that user corrections do not become training or benchmark data without review and explicit dataset role assignment.
 - Data tests should verify that Workspace-owned apiaries, hives, inspections, photos, analysis results, annotations, corrections, data-use agreements, and deletion requests cannot be accessed across Workspace boundaries.

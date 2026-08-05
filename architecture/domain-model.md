@@ -1308,6 +1308,62 @@ Rules:
 - It breaks coverage and errors down by Hive Configuration, bee-density, lighting, and image-quality strata, with sparse-group warnings.
 - Fixed numeric promotion thresholds are deferred until baseline data exists.
 
+### Varroa Sampling Plan
+
+A versioned, predeclared protocol for selecting and interpreting bee-relative Varroa evidence.
+
+Essential fields:
+
+- id and methodology version
+- purpose: `model_curation` or `inspection_rate_estimation`
+- declared photographed-frame target population and sampling unit
+- strata and allocation rule
+- selection method and randomization seed or source
+- inclusion and exclusion rules
+- planned and achieved sample sizes
+- stopping rule, if sequential
+- estimator and uncertainty method
+- operational decision thresholds, if any
+- created or approved by and timestamps
+
+Rules:
+
+- A Model-Curation Sample may include both representative probability-selected and curator-targeted positive-enrichment streams; it must preserve which stream selected each item and is not an inspection prevalence sample.
+- An Inspection-Rate Sample must retain every selected eligible bee, non-response or exclusion reason, and selection probability needed to reproduce its stated estimate.
+- A Sampling Plan cannot be changed after its associated Dataset Version, End-to-End Pipeline Evaluation, or inspection result is frozen; a changed policy creates a new version.
+- A sampling plan is scoped to photo-visible evidence and does not make a whole-hive or colony-level claim.
+
+### Gold-Standard Full-Frame Corpus
+
+A protected, methodology-versioned collection of whole-frame source images with full-depth source-frame annotation and review.
+
+Essential fields:
+
+- id and methodology version
+- source-image and source-group membership
+- source-frame identity and duplicate/overlap disposition
+- full in-scope bee reconciliation record
+- Orientation Reliability and Varroa Review Outcome coverage
+- review and adjudication provenance
+- stratum values and exclusions
+- protected use designation
+
+Rules:
+
+- Every in-scope visible bee in a corpus frame is reconciled at source-frame level; crop-edge fragments must not be treated as independent physical bees.
+- Every eligible complete bee has an explicit Varroa Review Outcome; `not_determined` remains visible and is not treated as a negative.
+- The corpus supports end-to-end pipeline evaluation and sampling-plan experiments. It must be source-group disjoint from model development evidence whenever it supports user-facing promotion or estimator calibration.
+- It is not a substitute name for a positive-enriched training dataset.
+
+### Field Reference Measurement
+
+An independently recorded hive or colony measurement, such as an alcohol-wash mite count, associated with an inspection for calibration research.
+
+Rules:
+
+- It records collection method, population, timing, sample size, units, and provenance.
+- It is related calibration evidence, not the ground truth for photo-visible annotations or a direct replacement for a Visible Varroa Rate.
+
 ## Relationship Summary
 
 - Workspace owns many apiaries.

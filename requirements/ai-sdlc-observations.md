@@ -474,3 +474,20 @@ AI contribution:
 Human judgment still required:
 
 - Decide whether Google is the first real provider and whether Apple is needed for the first external-user release.
+
+### 2026-08-05 Varroa Evidence Methodology
+
+Human-confirmed direction:
+
+- Keep model-corpus construction, full-depth model validation, and production inspection-rate sampling as distinct activities even when they reuse the same Varroa Review Outcome interface.
+- Construct a small Gold-Standard Full-Frame Corpus to measure both compounded pipeline error and sampling error before choosing a user-facing sample size or sequential stopping rule.
+- Treat paired alcohol-wash or other field measurements as calibration research against a related but different target, not as photo-annotation ground truth or permission to claim colony-level prevalence.
+
+AI contribution:
+
+- Turned the distinction into `requirements/varroa-evidence-methodology.md`, including full-depth annotation/review protocol, representative and positive-enriched curation streams, protected development/locked evaluation sets, repeatable sampling simulations, and reproducibility records.
+- Refined product, model, domain, roadmap, decision-log, and parking-lot wording so an eventual rate is frame-scoped, caveated, and never inferred from positive-enriched training balance.
+
+Human judgment still required:
+
+- Approve the pilot's frame strata, review-strength progression, operational thresholds to simulate, field-reference protocol, and the evidence bar for showing a sampled result to a beekeeper.

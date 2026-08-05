@@ -68,9 +68,9 @@ Rationale: Varroa detection is the core purpose of the system.
 
 ### FR-008 Infection-Rate Estimate
 
-The system shall calculate an estimated visible Varroa rate as likely Varroa detections associated with complete visible bees per 100 estimated complete visible bees in the submitted photo set.
+When the required model, coverage, and sampling evidence exists, the system shall calculate a stated photo-visible Varroa estimate as likely Varroa detections associated with eligible complete visible bees per 100 eligible complete visible bees in a declared, reconciled photographed-frame population. A sampled result shall identify its Varroa Sampling Plan and uncertainty; the system shall not aggregate potentially overlapping photos of the same frame into one rate without reconciliation.
 
-Rationale: The user needs a summary measure that can support decision-making without implying a whole-hive infestation rate.
+Rationale: The user needs a summary measure that can support decision-making without implying a whole-hive rate or hiding the uncertainty introduced by partial visual evidence and sampling.
 
 ### FR-009 Result Review
 

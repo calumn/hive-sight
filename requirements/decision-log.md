@@ -128,6 +128,19 @@ Implications:
 - Multiple photos of the same frame require careful caveats or grouping to avoid misleading aggregation.
 - Partial visible bees and unassociated visible Varroa should be reported as additional evidence rather than silently included in the headline metric.
 
+## 2026-08-05 Photo-Visible Metric Requires A Sampling Methodology
+
+Decision: The first possible beekeeper-facing Varroa metric remains likely Varroa detections associated with eligible complete visible bees per 100 eligible complete visible bees, but it is scoped to declared reconciled photographed-frame evidence. A sampled result requires a versioned Varroa Sampling Plan, recorded coverage and uncertainty, and validation against protected full-depth frame evidence.
+
+Rationale: The project can train a detector efficiently with enriched labelled crops, but that evidence cannot by itself support a statistical claim about a photographed frame or a colony. Full-depth frames are needed to quantify the sampling and pipeline error before a production sample size or stopping rule is chosen.
+
+Implications:
+
+- The result is not a colony-wide mite prevalence, diagnosis, or alcohol-wash equivalent.
+- Potentially overlapping photos of the same frame cannot be aggregated until source-frame reconciliation exists.
+- Gold-Standard Full-Frame Corpus work, model-corpus curation, and inspection-rate sampling have distinct protected roles and source-group splits.
+- `requirements/varroa-evidence-methodology.md` governs the research protocol and future implementation gates.
+
 ## 2026-07-28 Model Requirements Are Separate From Product Requirements
 
 Decision: AI model training, dataset, evaluation, privacy, consent, and release-gate requirements will live in a separate `model-requirements.md` document.

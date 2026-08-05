@@ -1198,3 +1198,26 @@ When review wait states span multiple inspections or users need to chase, cancel
 Suggested owner or area:
 
 Review workflow, curator UX, and queue operations.
+
+## PARK-0051: Production Inspection-Rate Sampling And Field Calibration Implementation
+
+Status: parked
+Date parked: 2026-08-05
+Source: Varroa evidence methodology
+Area: Varroa assessment, statistical inference, model governance, research operations
+
+Context:
+
+`requirements/varroa-evidence-methodology.md` now defines the protocol work needed before HiveSight makes a sampled Visible Varroa Rate claim: a protected Gold-Standard Full-Frame Corpus, reproducible sampling-plan experiments, and optional paired Field Reference Measurements. The methodology deliberately distinguishes representative/probability inspection sampling from positive-enriched model curation and treats an alcohol wash as a related but different measurement.
+
+Why parked:
+
+The current product has not yet implemented Varroa Review Outcome labelling, full-frame reconciliation, real Bee Orientation inference, or Varroa Detection. Building production sampling controls, estimators, sequential stopping, uncertainty displays, and external field-reference capture now would create unsupported UI and policy before the necessary evidence exists.
+
+Revisit trigger:
+
+After the Gold-Standard Full-Frame Annotation Pilot has produced reviewed full-depth frames and the staged model pipeline can produce Varroa Review Outcomes, before a user-facing sampled Visible Varroa Rate or any claim calibrated against a field assay.
+
+Suggested owner or area:
+
+Varroa assessment, research methodology, dataset/model governance, and statistical inference.

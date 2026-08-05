@@ -316,7 +316,7 @@ Rationale: If all mite-training crops come only from bees found or successfully 
 
 ### MR-018C Separate Varroa Sampling Policies
 
-HiveSight shall distinguish `model_curation` sampling from `inspection_rate_estimation` sampling, even when both use the same Varroa Review Outcome UI. Model-curation sampling optimizes representative training and benchmark evidence; inspection-rate sampling supports a future statistically stated estimate and must retain its own sampling-plan metadata.
+HiveSight shall distinguish `model_curation` sampling from `inspection_rate_estimation` sampling, even when both use the same Varroa Review Outcome UI. Model-curation sampling optimizes informative training and benchmark evidence; inspection-rate sampling supports a future statistically stated photo-visible estimate and must retain its own versioned Varroa Sampling Plan, target population, sampling unit, strata, selection probability, inclusion and exclusion counts, stopping rule, estimator, and uncertainty method.
 
 Rationale: A dataset chosen to improve detection quality is not automatically a probability sample suitable for estimating a beekeeper-facing Varroa rate.
 
@@ -343,6 +343,24 @@ Rationale: Model metrics cannot be interpreted honestly without showing the cons
 HiveSight shall periodically select a stratified-random sample of training and validation Varroa Reviews for Blind Independent Review as a non-blocking quality audit. The audit shall preserve its selection and review provenance and report agreement, disagreement, and unresolved-outcome measures separately from protected benchmark evidence and separately by Annotation Source, including human-from-scratch and AI-assisted-reviewed evidence. A concerning audit result requires a documented Dataset Curator Audit Disposition and a warning on every affected Dataset Version; it does not automatically block dataset use while numerical escalation thresholds remain deferred.
 
 Rationale: One-review training data is practical for growth, but must remain observable for reviewer drift and automation bias.
+
+### MR-018H Gold-Standard Full-Frame Corpus
+
+The project shall construct and maintain a protected Gold-Standard Full-Frame Corpus under a predeclared methodology. Each included whole-frame source image shall reconcile every in-scope visible bee at source-frame level, retain each bee's Orientation Reliability, and record an explicit Varroa Review Outcome for every eligible complete bee, with marker evidence for every visible Varroa outcome. The corpus shall preserve frame identity, source-group identity, capture and Hive Configuration context, image-quality and density strata, annotation/review provenance, exclusions, and methodology version. Its source groups shall be disjoint from model training, validation, and routine component benchmarks when used for end-to-end evaluation or sampling calibration.
+
+Rationale: Only full-depth evidence can quantify the error introduced by sampling and compounded pipeline losses; sampled labels alone cannot establish either.
+
+### MR-018I Varroa Sampling-Strategy Evaluation
+
+Before HiveSight makes a user-facing sampled Visible Varroa Rate claim, the project shall use the Gold-Standard Full-Frame Corpus to compare predeclared candidate sampling plans against each frame's full-depth result. The comparison shall measure absolute and relative estimation error, probability of missing all positive bees, uncertainty-interval coverage, threshold-decision disagreement, unusable-crop rate, stage coverage, and processing cost. It shall report simple random, spatially stratified, and any proposed sequential strategy separately, using repeatable simulated draws and preserved random seeds.
+
+Rationale: The production sample size and stopping rule must be selected from evidence about this visual task rather than inherited uncritically from a different field assay.
+
+### MR-018J External Field Calibration
+
+The project may pair selected Gold-Standard Full-Frame Corpus inspections with an independently recorded Field Reference Measurement, such as an alcohol-wash result, to study calibration and operational usefulness. The report shall identify the distinct population and timing of each measurement and shall not treat the field reference as annotation ground truth or silently convert a photo-visible estimate into a colony-level estimate.
+
+Rationale: A photo and an alcohol wash observe related but non-identical phenomena; keeping their targets distinct protects both scientific honesty and beekeeper safety.
 
 ## Privacy And Consent
 
@@ -451,6 +469,18 @@ Suggested Varroa metrics:
 - performance by image-quality bucket
 - performance by orientation-confidence bucket
 
+### Sampling And Estimation Metrics
+
+Suggested sampling metrics:
+
+- full-depth visible marker burden and mite-positive-bee rate per eligible complete bee;
+- sampled estimate bias and absolute error against the full-depth result;
+- probability of a zero-positive sample at each apparent burden;
+- confidence-interval coverage and width;
+- operational-threshold decision disagreement;
+- sample eligibility, image-quality, and pipeline-stage exclusions;
+- processing time and review cost per completed estimate.
+
 ### Product Review Metrics
 
 Suggested product-review metrics:
@@ -497,7 +527,7 @@ Rationale: No model should silently move into product use without evidence.
 
 ### MR-030A End-To-End Pipeline Evaluation Before Promotion
 
-A user-facing Varroa assessment pipeline shall also pass a documented End-to-End Pipeline Evaluation on a separate protected full-frame selection snapshot. This evaluation is additional to, not a replacement for, each constituent Model Purpose's Benchmark Evaluation. Its predeclared selection plan and source groups shall be frozen before candidate selection or tuning. Its `source_group_key` values shall be disjoint from training, validation, and component benchmark evidence. Its full-frame evidence shall contain complete human-reviewed labels for all visible bees, their Orientation Reliability, and the relevant Varroa Review Outcomes. It shall report the count and proportion of localised bees that reached Varroa Assessment, the count and proportion recorded as `not_assessed_orientation_unreliable`, and the count and proportion lost at each stage, separately for complete and partial visible bees, and broken down by Hive Configuration, bee-density, lighting, and image-quality strata with sparse-group warnings. The initial user-facing Varroa estimate continues to use complete visible bees only and shall display a coverage warning whenever any complete visible bee was not assessed for Varroa. Once an evidence-based coverage threshold is established, coverage below that threshold shall suppress the headline estimate.
+A user-facing Varroa assessment pipeline shall also pass a documented End-to-End Pipeline Evaluation on a separate protected Gold-Standard Full-Frame Corpus selection snapshot. This evaluation is additional to, not a replacement for, each constituent Model Purpose's Benchmark Evaluation. Its predeclared selection plan and source groups shall be frozen before candidate selection or tuning. Its `source_group_key` values shall be disjoint from training, validation, and component benchmark evidence. Its full-frame evidence shall contain complete human-reviewed labels for all visible bees, their Orientation Reliability, and the relevant Varroa Review Outcomes. It shall report the count and proportion of localised bees that reached Varroa Assessment, the count and proportion recorded as `not_assessed_orientation_unreliable`, and the count and proportion lost at each stage, separately for complete and partial visible bees, and broken down by Hive Configuration, bee-density, lighting, and image-quality strata with sparse-group warnings. The initial user-facing Varroa estimate continues to use complete visible bees only and shall display a coverage warning whenever any complete visible bee was not assessed for Varroa. Once an evidence-based coverage threshold is established, coverage below that threshold shall suppress the headline estimate.
 
 Rationale: Separate model scores do not reveal compounded failures across localisation, orientation, and Varroa detection in the actual inspection workflow.
 

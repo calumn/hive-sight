@@ -48,9 +48,10 @@ Implementation traceability note: the Varroa Detection and Infection-Rate Estima
 
 ## Infection-Rate Estimate
 
-- The system calculates a visible Varroa estimate as likely Varroa detections associated with complete visible bees per 100 estimated complete visible bees.
+- When model and methodology promotion gates are met, the system calculates a photo-visible Varroa estimate as likely Varroa detections associated with eligible complete visible bees per 100 eligible complete visible bees in a declared reconciled frame population.
 - The system reports likely Varroa detections associated with partial bees or unassociated visible Varroa as additional evidence.
-- The system presents an inspection-level estimate when multiple photos are associated with the inspection.
+- A sampled estimate identifies its Varroa Sampling Plan, achieved coverage, and uncertainty; an inadequate result is suppressed rather than shown as a precise rate.
+- The system does not aggregate potentially overlapping photos of the same frame into an inspection-level rate without source-frame reconciliation.
 - The system clearly indicates when the estimate is based on limited or low-confidence image data.
 - The system clearly states that the estimate is based only on bees visible in uploaded photos.
 

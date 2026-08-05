@@ -183,8 +183,28 @@ A Dataset Curator's recorded decision about a quality-audit concern and its effe
 _Avoid_: An unrecorded acknowledgement of a warning.
 
 **Visible Varroa Rate**:
-The photo-visible estimate of likely Varroa detections associated with complete visible bees per 100 estimated complete visible bees. A user-facing result warns when any complete visible bee was not assessed for Varroa.
+The stated photo-visible estimate of likely Varroa markers associated with eligible complete visible bees per 100 eligible complete visible bees in the photographed frame evidence. It records whether the evidence was full-depth or sampled, the sampling-plan version, assessment coverage, and uncertainty. It is not a diagnosis, colony-level rate, or alcohol-wash result.
 _Avoid_: Infestation rate, diagnosis, colony-level rate.
+
+**Varroa Sampling Plan**:
+A versioned, predeclared protocol that defines the target population, sampling unit, strata, selection method, inclusion and exclusion rules, randomization, stopping rule, estimator, and uncertainty method for either model curation or inspection-rate estimation.
+_Avoid_: A generic dataset filter when probability selection or a reported rate is meant.
+
+**Model-Curation Sample**:
+Bee-relative evidence selected to make Varroa Detector training, validation, or benchmark data informative. It may combine representative probability-selected evidence with deliberately enriched positive or difficult evidence, and is not by itself a prevalence sample.
+_Avoid_: Inspection-Rate Sample when the sample is used to state a beekeeper-facing rate.
+
+**Inspection-Rate Sample**:
+A probability-selected set of eligible complete bees from one declared photographed frame population, used with its Varroa Sampling Plan to estimate a Visible Varroa Rate. It is not a claim about the whole colony.
+_Avoid_: Model-Curation Sample, alcohol wash sample.
+
+**Gold-Standard Full-Frame Corpus**:
+A protected collection of whole-frame source images in which every in-scope visible bee is reconciled, orientation-reviewed, and given an explicit Varroa Review Outcome with marker evidence where present. It supports end-to-end evaluation, sampling-strategy experiments, and calibration; it is separate from model development and routine tuning.
+_Avoid_: A large positive-enriched training set.
+
+**Field Reference Measurement**:
+An independently recorded colony or hive measurement, such as an alcohol-wash mite count, retained for calibration research. It measures a related but different target from photo-visible Varroa evidence and must not be treated as photo-label ground truth.
+_Avoid_: Gold-standard photo annotation.
 
 **Human-Reviewed Inspection Result**:
 A separately provenanced inspection result calculated after a human recovery review. The reviewer may resolve previously unassessed bees and correct any model-produced bee, orientation, or Varroa decision. The latest completed revision is the inspection's current result by default. It carries its own assessment coverage and is suppressed when that coverage remains inadequate. It is shown alongside, not instead of, the immutable original model-only result.
