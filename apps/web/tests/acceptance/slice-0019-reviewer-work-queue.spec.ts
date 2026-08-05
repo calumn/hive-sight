@@ -3,7 +3,10 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const fixtureImagePath = fileURLToPath(new URL("../fixtures/bee-frame-test.png", import.meta.url));
-const coreApiUrl = process.env.VITE_CORE_API_URL ?? "http://127.0.0.1:8000";
+const coreApiUrl =
+  process.env.HIVESIGHT_PLAYWRIGHT_CORE_API_URL ??
+  process.env.VITE_CORE_API_URL ??
+  "http://127.0.0.1:8000";
 const curatorUserId = "00000000-0000-0000-0000-000000000104";
 const reviewerOneUserId = "00000000-0000-0000-0000-000000000105";
 const reviewerTwoUserId = "00000000-0000-0000-0000-000000000106";

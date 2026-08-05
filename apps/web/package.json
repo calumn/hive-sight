@@ -9,6 +9,7 @@
     "check": "tsc --noEmit",
     "preview": "vite preview",
     "test:acceptance": "playwright test",
+    "test:acceptance:live-api": "HIVESIGHT_PLAYWRIGHT_PROFILE=live-api playwright test",
     "test:acceptance:headed": "playwright test --headed"
   },
   "dependencies": {

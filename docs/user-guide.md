@@ -325,3 +325,23 @@ This runs Core API tests, API-level BDD scenarios, Analysis Service tests, Web T
 ```text
 reports/slice-verification/latest.md
 ```
+
+The browser acceptance harness uses isolated ports so it does not collide with the normal local dev stack:
+
+| Purpose | API port | Web port | Database |
+| --- | --- | --- | --- |
+| Dev local app | 8000 | 5173 | dev database when started with Postgres |
+| Stub Playwright acceptance suite | 8020 | 5193 | in-memory, reseeded per run |
+| Live-API Playwright acceptance suite | 8030 | 5203 | real dev database |
+
+Use the normal stub lane for slice verification:
+
+```sh
+pnpm verify:slice
+```
+
+Use the live-API lane only when you deliberately want browser acceptance to exercise the dev database:
+
+```sh
+pnpm test:acceptance:web:live-api
+```

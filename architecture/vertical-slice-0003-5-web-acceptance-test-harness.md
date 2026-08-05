@@ -108,13 +108,16 @@ Minimum test/support data:
 Candidate command shape:
 
 - `pnpm --filter @hive-sight/web test:acceptance`
+- `pnpm --filter @hive-sight/web test:acceptance:live-api`
 - `pnpm --filter @hive-sight/web test:acceptance:headed`
 - `pnpm test:acceptance:web`
+- `pnpm test:acceptance:web:live-api`
 - `pnpm verify:slice`
-- Core API startup command managed by Playwright config: `cd services/core-api && ./.venv/bin/python -m uvicorn hive_sight_core_api.main:app --host 127.0.0.1 --port 8000`
-- Web UI startup command managed by Playwright config: `pnpm --filter @hive-sight/web dev --host 127.0.0.1 --port 5173`
-- Web UI base URL default: `http://127.0.0.1:5173`
-- Core API base URL default: `http://127.0.0.1:8000`
+- Stub Core API startup command managed by Playwright config: `cd services/core-api && ./.venv/bin/python -m uvicorn hive_sight_core_api.main:app --host 127.0.0.1 --port 8020`
+- Stub Web UI startup command managed by Playwright config: `pnpm --filter @hive-sight/web dev --host 127.0.0.1 --port 5193`
+- Stub Web UI base URL default: `http://127.0.0.1:5193`
+- Stub Core API base URL default: `http://127.0.0.1:8020`
+- Live-API acceptance profile: Core API `8030`, Web UI `5203`, Postgres dev database.
 - Report output default: `reports/slice-verification/latest.md`
 
 ## Out Of Scope

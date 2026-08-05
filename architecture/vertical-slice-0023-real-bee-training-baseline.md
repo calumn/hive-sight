@@ -234,7 +234,7 @@ Minimum additions or generalizations:
 - [x] Local dependency preflight explains unavailable Docker/Postgres without resetting or seeding the database.
 - [x] Append-only QA fixture/helper path exists for local proof-of-life without requiring real weekend photos.
 - [x] Focused Core API tests, adapter tests, command/script checks, and Playwright acceptance pass before closeout.
-- [ ] `pnpm verify:slice` passes before closeout.
+- [x] `pnpm verify:slice` passes before closeout.
 - [x] Live Postgres verification is run or explicitly recorded as pending if Docker/Postgres is unavailable.
 - [x] Implementation updates relevant docs: `requirements/roadmap.md`, `docs/user-guide.md`, this slice document, command examples, `architecture/parking-lot.md`, and `requirements/ai-sdlc-observations.md`.
 
@@ -243,7 +243,7 @@ Minimum additions or generalizations:
 - Focused Core API and API-level BDD: passed on 2026-08-05.
 - Web TypeScript and dev preflight command checks: passed on 2026-08-05.
 - Focused Playwright acceptance for the combined Bee Training workflow: passed on 2026-08-05 against the running Postgres-backed dev stack.
-- `pnpm verify:slice`: Core API, Analysis Service, Web TypeScript, and dev script checks passed on 2026-08-05. The default browser phase first could not start because the user's existing Core API was already running on port 8000. The reuse-existing-server rerun passed the Slice 0023 scenario but the overall browser suite failed in older state-sensitive scenarios against the already-populated dev database and real-adapter lane. This is recorded in `reports/slice-verification/latest.md`.
+- `pnpm verify:slice`: passed on 2026-08-05 after the Playwright acceptance harness was moved to isolated stub ports `8020` and `5193`, separate from the normal local dev stack on `8000` and `5173`. This is recorded in `reports/slice-verification/latest.md`.
 
 ## Open Questions
 

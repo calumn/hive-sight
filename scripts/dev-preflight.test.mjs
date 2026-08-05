@@ -60,4 +60,29 @@ describe("dev server Postgres preflight", () => {
     assert.equal(scripts["dev:all:yolo"], undefined);
     assert.equal(scripts["dev:all:yolo-training"], undefined);
   });
+
+  it("keeps browser acceptance commands separate for stub and live API lanes", () => {
+    const rootPackageJson = JSON.parse(
+      readFileSync(new URL("../package.json", import.meta.url), "utf-8")
+    );
+    const webPackageJson = JSON.parse(
+      readFileSync(new URL("../apps/web/package.json", import.meta.url), "utf-8")
+    );
+    const playwrightConfig = readFileSync(
+      new URL("../apps/web/playwright.config.ts", import.meta.url),
+      "utf-8"
+    );
+
+    assert.equal(
+      rootPackageJson.scripts["test:acceptance:web"],
+      "pnpm --filter @hive-sight/web test:acceptance"
+    );
+    assert.equal(
+      rootPackageJson.scripts["test:acceptance:web:live-api"],
+      "pnpm --filter @hive-sight/web test:acceptance:live-api"
+    );
+    assert.match(webPackageJson.scripts["test:acceptance:live-api"], /HIVESIGHT_PLAYWRIGHT_PROFILE=live-api/);
+    assert.match(playwrightConfig, /profile === "live-api" \? "8030" : "8020"/);
+    assert.match(playwrightConfig, /profile === "live-api" \? "5203" : "5193"/);
+  });
 });

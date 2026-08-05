@@ -24,6 +24,7 @@
     "build:web": "pnpm --filter @hive-sight/web build",
     "check:web": "pnpm --filter @hive-sight/web check",
     "test:acceptance:web": "pnpm --filter @hive-sight/web test:acceptance",
+    "test:acceptance:web:live-api": "pnpm --filter @hive-sight/web test:acceptance:live-api",
     "model:setup:bee": "node scripts/model-setup-bee.mjs",
     "model:train:bee": "node scripts/model-train-bee.mjs",
     "model:qa:bee:evaluate": "node scripts/model-qa-bee-evaluate.mjs",
