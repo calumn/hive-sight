@@ -74,6 +74,7 @@ test("Dataset Curator records Varroa review cues and a visible Varroa outcome", 
     "data-marker-center-x",
     /^0\.\d+/
   );
+  await expect(page.getByText("Zoom 300%")).toBeVisible();
   await expect(page.getByTestId("varroa-source-crop-context")).toBeVisible();
   await expect(page.getByTestId("varroa-source-context-selected-bee")).toBeVisible();
   await expect(page.getByTestId("varroa-source-context-bee")).toHaveCount(1);

@@ -153,6 +153,7 @@ const devUserStorageKey = "hivesight.developmentUserId";
 const currentTermsVersion = "2026-07-29";
 const ellipseAdjustmentRepeatDelayMs = 350;
 const ellipseAdjustmentRepeatIntervalMs = 220;
+const defaultVarroaReviewZoom = 3;
 
 type LoadState =
   | { kind: "loading" }
@@ -2635,7 +2636,7 @@ function TrainingCropAnnotationPanel({
     useState<VarroaReviewOutcomeValue>("no_visible_varroa");
   const [varroaMarkers, setVarroaMarkers] = useState<{ x: number; y: number }[]>([]);
   const [varroaNotes, setVarroaNotes] = useState("");
-  const [varroaZoom, setVarroaZoom] = useState(1);
+  const [varroaZoom, setVarroaZoom] = useState(defaultVarroaReviewZoom);
   const [includeIneligibleVarroaBees, setIncludeIneligibleVarroaBees] = useState(false);
   const [modelCandidateSelectionMessage, setModelCandidateSelectionMessage] = useState<string | null>(
     null
@@ -2878,7 +2879,7 @@ function TrainingCropAnnotationPanel({
     );
     setVarroaOutcome(selectedVarroaCandidate?.reviewOutcome?.outcome ?? "no_visible_varroa");
     setVarroaNotes(selectedVarroaCandidate?.reviewOutcome?.notes ?? "");
-    setVarroaZoom(1);
+    setVarroaZoom(defaultVarroaReviewZoom);
   }, [selectedVarroaCandidate?.beeAnnotation.annotationId]);
 
   useEffect(() => {
