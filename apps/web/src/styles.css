@@ -1029,6 +1029,28 @@ label span {
   width: 100%;
 }
 
+.varroa-ineligible-toggle {
+  align-items: center;
+  color: #515b4c;
+  display: flex;
+  font-size: 0.88rem;
+  font-weight: 800;
+  gap: 8px;
+}
+
+.varroa-ineligible-toggle input {
+  height: 16px;
+  margin: 0;
+  width: 16px;
+}
+
+.list-context-note {
+  color: #64705f;
+  font-size: 0.86rem;
+  font-weight: 700;
+  margin: 4px 0 8px;
+}
+
 .varroa-preview-grid {
   align-items: start;
   display: grid;
@@ -1103,12 +1125,31 @@ label span {
   border: 3px solid #4f9cff;
   border-radius: 50%;
   box-shadow: 0 0 0 2px rgb(255 255 255 / 0.8);
+  cursor: pointer;
+  min-height: 0;
+  overflow: visible;
+  padding: 0;
   position: absolute;
   transform-origin: center;
 }
 
+.source-context-ellipse.partial {
+  border-color: #d9822b;
+  border-style: dashed;
+}
+
 .source-context-ellipse.selected {
-  background: rgb(79 156 255 / 0.12);
+  background: linear-gradient(90deg, rgba(47, 128, 237, 0.06) 0 55%, rgba(255, 215, 64, 0.72) 56% 100%);
+  border-color: #2f80ed;
+  box-shadow:
+    0 0 0 3px rgba(255, 255, 255, 0.9),
+    0 0 0 6px rgba(242, 201, 76, 0.72),
+    0 4px 14px rgba(0, 0, 0, 0.3);
+  z-index: 2;
+}
+
+.source-context-ellipse .ellipse-head-arrow {
+  display: none;
 }
 
 .model-workflow-stage:last-child {

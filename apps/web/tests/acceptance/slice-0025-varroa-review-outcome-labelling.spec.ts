@@ -39,11 +39,22 @@ test("Dataset Curator records Varroa review cues and a visible Varroa outcome", 
     .getByTestId("training-ellipse-varroa-suitability-select")
     .selectOption("body_occluded_or_hard_to_assess");
   await page.getByTestId("training-ellipse-suspected-varroa-checkbox").check();
+  await page.getByTestId("training-crop-surface").click({ position: { x: 320, y: 220 } });
+  await expect(page.getByTestId("training-crop-ellipse")).toHaveCount(2);
+  await page.getByTestId("training-crop-surface").click({ position: { x: 80, y: 80 } });
+  await expect(page.getByTestId("training-crop-ellipse")).toHaveCount(3);
+  await page.getByTestId("training-ellipse-type-select").selectOption("partial_visible_bee");
   await page.getByTestId("complete-training-crop-button").click();
 
   await page.getByTestId("workflow-stage-varroa-review-button").click();
   await expect(page.getByTestId("training-workflow-stage-varroa-review")).toBeVisible();
   await expect(page.getByTestId("varroa-review-summary")).toContainText("Suspected cues 1");
+  await expect(page.getByTestId("varroa-review-candidate")).toHaveCount(2);
+  await expect(page.getByTestId("varroa-review-hidden-ineligible-count")).toContainText(
+    "1 ineligible bee is hidden"
+  );
+  await expect(page.getByTestId("include-ineligible-varroa-bees-checkbox")).not.toBeChecked();
+  await page.getByRole("option", { name: /suspected/ }).click();
   await expect(page.getByTestId("varroa-review-provenance")).toContainText("human_selected");
   await expect(page.getByTestId("varroa-review-provenance")).toContainText(
     "body_occluded_or_hard_to_assess"
@@ -65,6 +76,13 @@ test("Dataset Curator records Varroa review cues and a visible Varroa outcome", 
   );
   await expect(page.getByTestId("varroa-source-crop-context")).toBeVisible();
   await expect(page.getByTestId("varroa-source-context-selected-bee")).toBeVisible();
+  await expect(page.getByTestId("varroa-source-context-bee")).toHaveCount(1);
+  await page.getByTestId("include-ineligible-varroa-bees-checkbox").check();
+  await expect(page.getByTestId("varroa-review-candidate")).toHaveCount(3);
+  await expect(page.getByRole("option", { name: /ineligible/ })).toBeVisible();
+  await expect(page.getByTestId("varroa-source-context-bee")).toHaveCount(2);
+  await page.getByTestId("varroa-source-context-bee").first().click();
+  await expect(page.getByTestId("varroa-source-context-selected-bee")).toHaveCount(1);
   const previewBoxBeforeZoom = await page.getByTestId("head-up-normalized-bee-crop").boundingBox();
   const previewPlaneBeforeZoom = await page
     .getByTestId("head-up-normalized-bee-crop-image-plane")

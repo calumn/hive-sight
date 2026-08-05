@@ -2636,6 +2636,7 @@ function TrainingCropAnnotationPanel({
   const [varroaMarkers, setVarroaMarkers] = useState<{ x: number; y: number }[]>([]);
   const [varroaNotes, setVarroaNotes] = useState("");
   const [varroaZoom, setVarroaZoom] = useState(1);
+  const [includeIneligibleVarroaBees, setIncludeIneligibleVarroaBees] = useState(false);
   const [modelCandidateSelectionMessage, setModelCandidateSelectionMessage] = useState<string | null>(
     null
   );
@@ -2724,13 +2725,24 @@ function TrainingCropAnnotationPanel({
   const selectedEllipse =
     selectedCropEvidence?.beeEllipses.find((ellipse) => ellipse.annotationId === selectedEllipseId) ??
     null;
-  const selectedVarroaCandidate =
+  const varroaReviewCandidateRows =
     varroaReview?.trainingCropId === selectedCropId
-      ? (varroaReview.candidates.find(
-          (candidate) => candidate.beeAnnotation.annotationId === selectedEllipseId
-        ) ?? varroaReview.candidates[0] ?? null)
-      : null;
+      ? varroaReview.candidates
+          .map((candidate, index) => ({ candidate, index }))
+          .filter(({ candidate }) => includeIneligibleVarroaBees || candidate.eligibility === "eligible")
+      : [];
+  const hiddenIneligibleVarroaCandidateCount =
+    varroaReview?.trainingCropId === selectedCropId && !includeIneligibleVarroaBees
+      ? varroaReview.candidates.filter((candidate) => candidate.eligibility !== "eligible").length
+      : 0;
+  const selectedVarroaCandidate =
+    varroaReviewCandidateRows.find(
+      ({ candidate }) => candidate.beeAnnotation.annotationId === selectedEllipseId
+    )?.candidate ??
+    varroaReviewCandidateRows[0]?.candidate ??
+    null;
   const varroaMarkerAllowedArea = markerAllowedAreaFromPreview(varroaPreview);
+  const sourceContextBeeEllipses = varroaReviewCandidateRows.map(({ candidate }) => candidate.beeAnnotation);
   const selectedProposal =
     candidateProposals.find((proposal) => proposal.proposalId === selectedProposalId) ?? null;
   const cropLocked =
@@ -5171,7 +5183,10 @@ function TrainingCropAnnotationPanel({
                         <div>
                           <strong>{cropReviewPickerLabel(crops, selectedCrop)}</strong>
                           <small>
-                            {varroaReview.candidates.length} bees in this crop
+                            {varroaReviewCandidateRows.length} reviewable bees
+                            {hiddenIneligibleVarroaCandidateCount > 0
+                              ? ` / ${hiddenIneligibleVarroaCandidateCount} hidden ineligible`
+                              : ""}
                           </small>
                         </div>
                         <label className="varroa-crop-picker">
@@ -5188,17 +5203,32 @@ function TrainingCropAnnotationPanel({
                             ))}
                           </select>
                         </label>
+                        <label className="varroa-ineligible-toggle">
+                          <input
+                            type="checkbox"
+                            checked={includeIneligibleVarroaBees}
+                            onChange={(event) => setIncludeIneligibleVarroaBees(event.target.checked)}
+                            data-testid="include-ineligible-varroa-bees-checkbox"
+                          />
+                          <span>Include ineligible bees</span>
+                        </label>
                       </div>
                       <strong>
                         Bees in Crop {cropOrdinal(crops, selectedCrop.trainingCropId)}
                       </strong>
+                      {hiddenIneligibleVarroaCandidateCount > 0 ? (
+                        <p className="list-context-note" data-testid="varroa-review-hidden-ineligible-count">
+                          {hiddenIneligibleVarroaCandidateCount} ineligible{" "}
+                          {hiddenIneligibleVarroaCandidateCount === 1 ? "bee is" : "bees are"} hidden.
+                        </p>
+                      ) : null}
                       <div
                         className="crop-governance-list"
                         role="listbox"
                         aria-label="Varroa review candidates"
                         data-testid="varroa-review-candidate-list"
                       >
-                        {varroaReview.candidates.map((candidate, index) => (
+                        {varroaReviewCandidateRows.map(({ candidate, index }) => (
                           <button
                             key={candidate.beeAnnotation.annotationId}
                             type="button"
@@ -5215,6 +5245,7 @@ function TrainingCropAnnotationPanel({
                             }
                             onClick={() => setSelectedEllipseId(candidate.beeAnnotation.annotationId)}
                             data-testid="varroa-review-candidate"
+                            data-eligibility={candidate.eligibility}
                           >
                             <span>Bee {index + 1}</span>
                             <small>
@@ -5320,13 +5351,34 @@ function TrainingCropAnnotationPanel({
                                         style={cropImageStyle(selectedCrop)}
                                         draggable={false}
                                       />
-                                      <span
-                                        className="source-context-ellipse selected"
-                                        style={ellipseStyle(selectedCrop, selectedVarroaCandidate.beeAnnotation)}
-                                        data-testid="varroa-source-context-selected-bee"
-                                      >
-                                        <span className="ellipse-head-arrow" />
-                                      </span>
+                                      {sourceContextBeeEllipses.map((ellipse) => {
+                                        const isSelected =
+                                          ellipse.annotationId === selectedVarroaCandidate.beeAnnotation.annotationId;
+                                        return (
+                                          <button
+                                            key={ellipse.annotationId}
+                                            type="button"
+                                            className={`source-context-ellipse ${
+                                              ellipse.annotationType === "partial_visible_bee" ? "partial" : "complete"
+                                            } ${isSelected ? "selected" : ""}`}
+                                            style={ellipseStyle(selectedCrop, ellipse)}
+                                            onClick={(event) => {
+                                              event.stopPropagation();
+                                              setSelectedEllipseId(ellipse.annotationId);
+                                            }}
+                                            data-testid={
+                                              isSelected
+                                                ? "varroa-source-context-selected-bee"
+                                                : "varroa-source-context-bee"
+                                            }
+                                            aria-label={`${ellipse.annotationType} head direction ${formatGeometryValue(
+                                              normalizeRotation(ellipse.rotationDegrees)
+                                            )} degrees`}
+                                          >
+                                            <span className="ellipse-head-arrow" />
+                                          </button>
+                                        );
+                                      })}
                                     </div>
                                   </div>
                                 ) : null}
