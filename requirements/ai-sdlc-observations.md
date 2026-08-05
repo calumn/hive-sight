@@ -612,22 +612,43 @@ Human judgment still required:
 
 - Review the first real curated Varroa outcomes on weekend photo data.
 
-### 2026-08-05 Slice 0026 Varroa Corpus Governance Planning
+### 2026-08-05 Varroa Corpus Governance Planning, Renumbered To Slice 0030
 
 Human-confirmed direction:
 
-- Treat the next logical step after Slice 0025 as corpus governance, not Varroa Detector training.
+- Preserve corpus governance before Varroa Detector training datasets are frozen.
 - Keep Varroa evidence in model-curation space until explicit include, exclude, or defer decisions exist.
 - Preserve the boundary between active negative evidence and unresolved `not_determined` evidence.
 
 AI contribution:
 
-- Designed `architecture/vertical-slice-0026-varroa-corpus-governance.md`.
+- Designed `architecture/vertical-slice-0030-varroa-corpus-governance.md`, renumbered from the original Slice 0026 design after the Varroa-to-Advisor tranche was replanned.
 - Added Varroa Corpus Governance and Varroa Corpus Curation Decision to the project language and domain model.
-- Promoted the stale-source Varroa review risk from the parking lot into the Slice 0026 design so source geometry changes block corpus inclusion until rechecked.
-- Updated the roadmap to show Varroa Corpus Governance between Varroa Review Outcome labelling and Varroa Detector training.
+- Promoted the stale-source Varroa review risk from the parking lot into the corpus governance design so source geometry changes block corpus inclusion until rechecked.
+- Updated the roadmap to preserve Varroa Corpus Governance as Slice 0030 after frame-level counting and Advisor-context groundwork.
+
+Human judgment still required:
+
+- Review and sign off the Slice 0030 Gherkin before implementation starts.
+- Decide in the later corpus-to-dataset slice whether included corpus decisions freeze directly into a Varroa Dataset Version or first become a named draft corpus.
+
+### 2026-08-05 Slice 0026 Frame-Level Varroa Result Summary Planning
+
+Human-confirmed direction:
+
+- The next target is getting HiveSight to the point where it can count mites on a photographed frame, using either a stubbed or real adapter.
+- The near-term integration goal is to reach the point where HiveSight can expose treatment-relevant Varroa context to HiveSight Advisor.
+- Corpus governance remains important, but it should not block the first frame-counting path.
+
+AI contribution:
+
+- Replanned the Varroa-to-Advisor tranche as Slice 0026 Frame-Level Varroa Result Summary, Slice 0027 Varroa Detector Adapter Seam, Slice 0028 Frame Mite Counting Workflow, and Slice 0029 Advisor Varroa Context API.
+- Preserved Varroa Corpus Governance as Slice 0030.
+- Designed `architecture/vertical-slice-0026-frame-level-varroa-result-summary.md`.
+- Updated `requirements/roadmap.md`, `CONTEXT.md`, and `architecture/domain-model.md` to align the new slice numbering and domain language.
 
 Human judgment still required:
 
 - Review and sign off the Slice 0026 Gherkin before implementation starts.
-- Decide in Slice 0027 whether included corpus decisions freeze directly into a Varroa Dataset Version or first become a named draft corpus.
+- Decide whether Slice 0026 summaries are scoped to one Inspection Photo only or also need an Inspection-level roll-up.
+- Decide whether Advisor context availability requires complete determinate coverage or can be partial with caveats.

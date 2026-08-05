@@ -812,7 +812,7 @@ Decisions:
 
 Rules:
 
-- Slice 0026 records one current Varroa Corpus Curation Decision per Workspace and Varroa Review Outcome.
+- Slice 0030 records one current Varroa Corpus Curation Decision per Workspace and Varroa Review Outcome.
 - The curation decision does not mutate the original Varroa Review Outcome or its Varroa Markers.
 - `included` requires a determinate Varroa Review Outcome: `visible_varroa_present` with one or more markers, or `no_visible_varroa` with zero markers.
 - `not_determined` is deferred by default and cannot be included as positive or negative model-curation evidence.

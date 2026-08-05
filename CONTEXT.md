@@ -100,6 +100,10 @@ _Avoid_: Varroa Review when the actor is labelling one bee-relative crop rather 
 A Dataset Curator's current decision about whether one Varroa Review Outcome may contribute to the Varroa model-curation corpus: `included`, `excluded`, or `deferred`. It preserves the original Varroa Review Outcome and records the corpus decision separately.
 _Avoid_: Dataset Version when the evidence has not yet been frozen for training, validation, or benchmark use.
 
+**Frame-Level Varroa Result Summary**:
+A derived, current summary of visible Varroa evidence for one Inspection Photo or photographed frame, based on reviewed bee-level Varroa Review Outcomes. It separates eligible bees, reviewed bees, determinate positives, active negatives, unresolved evidence, marker count, coverage, and caveats so the system can count mites on a frame before making any statistical or treatment claim.
+_Avoid_: Visible Varroa Rate when there is no sampling estimator or confidence model, and Treatment Recommendation when no Advisor or beekeeper treatment decision has occurred.
+
 **Varroa Assessment**:
 An Inspection Intent for estimating visible Varroa evidence from inspection photos for beekeeper-facing support.
 _Avoid_: Training data collection when the purpose is product analysis.

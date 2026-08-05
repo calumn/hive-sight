@@ -1239,7 +1239,7 @@ If the source Training Crop, Bee Annotation geometry, annotation type, or Orient
 
 Revisit trigger:
 
-Promoted into `architecture/vertical-slice-0026-varroa-corpus-governance.md`. The slice should block stale Varroa Review Outcomes from inclusion in the model-curation corpus until the curator rechecks the review against current source evidence.
+Promoted into `architecture/vertical-slice-0030-varroa-corpus-governance.md`. The slice should block stale Varroa Review Outcomes from inclusion in the model-curation corpus until the curator rechecks the review against current source evidence.
 
 Suggested owner or area:
 
