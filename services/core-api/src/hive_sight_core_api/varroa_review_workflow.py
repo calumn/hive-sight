@@ -421,6 +421,7 @@ def _transform_metadata(
         "margin_ratio": HEAD_UP_NORMALIZED_MARGIN_RATIO,
         "rotation_applied_degrees": round(_head_up_rotation_degrees(ellipse.rotation_degrees), 4),
         "source_crop_bounds": list(_source_crop_bounds(crop=crop, ellipse=ellipse)),
+        "mite_marker_allowed_area": _mite_marker_allowed_area(crop=crop, ellipse=ellipse),
         "resize_pad_policy": "fit_with_white_padding",
     }
 
@@ -459,6 +460,68 @@ def _source_crop_bounds(
             409,
         )
     return left, top, right, bottom
+
+
+def _mite_marker_allowed_area(
+    crop: TrainingCropResponse,
+    ellipse: OrientedBeeEllipseResponse,
+) -> dict[str, float]:
+    left, top, right, bottom = _source_crop_bounds(crop=crop, ellipse=ellipse)
+    crop_width = right - left
+    crop_height = bottom - top
+    rotated_width = _rotated_extent(crop_width, crop_height, _head_up_rotation_degrees(ellipse.rotation_degrees), "x")
+    rotated_height = _rotated_extent(crop_width, crop_height, _head_up_rotation_degrees(ellipse.rotation_degrees), "y")
+    scale = min(
+        1.0,
+        HEAD_UP_NORMALIZED_IMAGE_SIZE_PX / rotated_width,
+        HEAD_UP_NORMALIZED_IMAGE_SIZE_PX / rotated_height,
+    )
+    canvas_offset_x = (HEAD_UP_NORMALIZED_IMAGE_SIZE_PX - rotated_width * scale) / 2
+    canvas_offset_y = (HEAD_UP_NORMALIZED_IMAGE_SIZE_PX - rotated_height * scale) / 2
+    rotated_center_x, rotated_center_y = _rotate_point_in_expanded_canvas(
+        x=ellipse.center_x - left,
+        y=ellipse.center_y - top,
+        width=crop_width,
+        height=crop_height,
+        angle_degrees=_head_up_rotation_degrees(ellipse.rotation_degrees),
+        rotated_width=rotated_width,
+        rotated_height=rotated_height,
+    )
+    marker_radius_x = max(8.0, min(ellipse.radius_x, ellipse.radius_y) * scale * 1.25)
+    marker_radius_y = max(8.0, max(ellipse.radius_x, ellipse.radius_y) * scale * 1.1)
+    return {
+        "center_x": round((canvas_offset_x + rotated_center_x * scale) / HEAD_UP_NORMALIZED_IMAGE_SIZE_PX, 6),
+        "center_y": round((canvas_offset_y + rotated_center_y * scale) / HEAD_UP_NORMALIZED_IMAGE_SIZE_PX, 6),
+        "radius_x": round(marker_radius_x / HEAD_UP_NORMALIZED_IMAGE_SIZE_PX, 6),
+        "radius_y": round(marker_radius_y / HEAD_UP_NORMALIZED_IMAGE_SIZE_PX, 6),
+    }
+
+
+def _rotated_extent(width: int, height: int, angle_degrees: float, axis: str) -> float:
+    angle = radians(angle_degrees)
+    if axis == "x":
+        return abs(width * cos(angle)) + abs(height * sin(angle))
+    return abs(width * sin(angle)) + abs(height * cos(angle))
+
+
+def _rotate_point_in_expanded_canvas(
+    *,
+    x: float,
+    y: float,
+    width: int,
+    height: int,
+    angle_degrees: float,
+    rotated_width: float,
+    rotated_height: float,
+) -> tuple[float, float]:
+    angle = radians(angle_degrees)
+    source_center_x = width / 2
+    source_center_y = height / 2
+    translated_x = x - source_center_x
+    translated_y = y - source_center_y
+    rotated_x = translated_x * cos(angle) - translated_y * sin(angle)
+    rotated_y = translated_x * sin(angle) + translated_y * cos(angle)
+    return rotated_x + rotated_width / 2, rotated_y + rotated_height / 2
 
 
 def _head_up_rotation_degrees(rotation_degrees: float) -> float:

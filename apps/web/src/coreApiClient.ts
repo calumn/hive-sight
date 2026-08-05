@@ -618,6 +618,7 @@ export type HeadUpNormalizedBeeCropPreview = {
   imageHeightPx: number;
   transformVersion: string;
   imageUrl: string;
+  transformMetadata: Record<string, unknown>;
 };
 
 export type ReviewQueueItemStatus = "available" | "completed" | "cancelled";
@@ -3065,7 +3066,11 @@ function parseHeadUpNormalizedBeeCropPreview(value: unknown): HeadUpNormalizedBe
     imageWidthPx: requireNumber(record.image_width_px, "image_width_px"),
     imageHeightPx: requireNumber(record.image_height_px, "image_height_px"),
     transformVersion: requireString(record.transform_version, "transform_version"),
-    imageUrl: requireString(record.image_url, "image_url")
+    imageUrl: requireString(record.image_url, "image_url"),
+    transformMetadata:
+      record.transform_metadata === undefined
+        ? {}
+        : requireRecord(record.transform_metadata, "transform_metadata")
   };
 }
 

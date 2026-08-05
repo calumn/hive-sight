@@ -57,9 +57,12 @@ test("Dataset Curator records Varroa review cues and a visible Varroa outcome", 
   await expect(cropSelect).toHaveValue(/.+/);
   await cropSelect.selectOption(await cropSelect.inputValue());
   await expect(page.getByTestId("training-workflow-stage-varroa-review")).toBeVisible();
-  await expect(page.getByTestId("head-up-normalized-bee-head-end")).toBeVisible();
-  const headEndBox = await page.getByTestId("head-up-normalized-bee-head-end").boundingBox();
-  expect(headEndBox).not.toBeNull();
+  await expect(page.getByTestId("head-up-normalized-bee-head-end")).toHaveCount(0);
+  await expect(page.getByTestId("head-up-normalized-bee-crop-image")).toBeVisible();
+  await expect(page.getByTestId("head-up-normalized-bee-crop-image-plane")).toHaveAttribute(
+    "data-marker-center-x",
+    /^0\.\d+/
+  );
   await expect(page.getByTestId("varroa-source-crop-context")).toBeVisible();
   await expect(page.getByTestId("varroa-source-context-selected-bee")).toBeVisible();
   const previewBoxBeforeZoom = await page.getByTestId("head-up-normalized-bee-crop").boundingBox();
@@ -77,12 +80,20 @@ test("Dataset Curator records Varroa review cues and a visible Varroa outcome", 
   expect(previewPlaneAfterZoom).not.toBeNull();
   expect(Math.round(previewBoxAfterZoom!.width)).toBe(Math.round(previewBoxBeforeZoom!.width));
   expect(Math.round(previewBoxAfterZoom!.height)).toBe(Math.round(previewBoxBeforeZoom!.height));
-  expect(headEndBox!.height).toBeLessThan(previewBoxBeforeZoom!.height / 4);
   expect(Math.abs(previewPlaneAfterZoom!.x - previewPlaneBeforeZoom!.x)).toBeLessThan(80);
   expect(previewPlaneAfterZoom!.width).toBeGreaterThan(previewPlaneBeforeZoom!.width);
   await page.getByTestId("head-up-normalized-bee-crop").click({ position: { x: 24, y: 24 } });
   await expect(page.getByTestId("varroa-marker")).toHaveCount(0);
-  await page.getByTestId("head-up-normalized-bee-crop").click({ position: { x: 240, y: 240 } });
+  const markerCenterX = Number(
+    await page.getByTestId("head-up-normalized-bee-crop-image-plane").getAttribute("data-marker-center-x")
+  );
+  const markerCenterY = Number(
+    await page.getByTestId("head-up-normalized-bee-crop-image-plane").getAttribute("data-marker-center-y")
+  );
+  await page.mouse.click(
+    previewPlaneAfterZoom!.x + previewPlaneAfterZoom!.width * markerCenterX,
+    previewPlaneAfterZoom!.y + previewPlaneAfterZoom!.height * markerCenterY
+  );
   await expect(page.getByTestId("varroa-marker")).toHaveCount(1);
   await expect(page.getByTestId("varroa-review-outcome-select")).toHaveValue(
     "visible_varroa_present"

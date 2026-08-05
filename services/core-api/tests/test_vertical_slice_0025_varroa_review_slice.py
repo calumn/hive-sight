@@ -86,6 +86,11 @@ def test_dataset_curator_saves_positive_varroa_review_with_marker_and_preview(tm
         assert preview.status_code == 200
         assert preview.json()["transform_version"] == "head_up_normalized_bee_crop_v1"
         assert preview.json()["image_width_px"] == 512
+        allowed_area = preview.json()["transform_metadata"]["mite_marker_allowed_area"]
+        assert 0 < allowed_area["center_x"] < 1
+        assert 0 < allowed_area["center_y"] < 1
+        assert 0 < allowed_area["radius_x"] < 0.5
+        assert 0 < allowed_area["radius_y"] < 0.5
         assert image.status_code == 200
         assert image.headers["content-type"] == "image/png"
         assert saved.status_code == 200

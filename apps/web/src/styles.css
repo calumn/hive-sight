@@ -1081,15 +1081,6 @@ label span {
   width: 14px;
 }
 
-.normalized-head-end-marker {
-  background: rgb(255 215 64 / 0.55);
-  border: 2px solid rgb(255 215 64 / 0.95);
-  border-radius: 50% 50% 42% 42%;
-  box-shadow: 0 0 0 2px rgb(255 255 255 / 0.65);
-  pointer-events: none;
-  position: absolute;
-}
-
 .varroa-source-context {
   background: #ffffff;
   border: 1px solid #dce2d7;

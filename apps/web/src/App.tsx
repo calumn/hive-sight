@@ -136,6 +136,7 @@ import {
   type ReviewQueueOutcomeValue,
   type ModelTrainingReadiness,
   type ModelCandidate,
+  type HeadUpNormalizedBeeCropPreview,
   type TrainingRun,
   type TrainingCrop,
   type TrainingCropEvidence,
@@ -2279,17 +2280,33 @@ function cropReviewPickerLabel(crops: TrainingCrop[], crop: TrainingCrop) {
   return `Crop ${cropOrdinal(crops, crop.trainingCropId)} / ${crop.cropWidth} x ${crop.cropHeight}`;
 }
 
-const NORMALIZED_BEE_REVIEW_AREA = {
-  centerX: 0.5,
-  centerY: 0.5,
-  radiusX: 0.22,
-  radiusY: 0.42
+type NormalizedBeeReviewArea = {
+  centerX: number;
+  centerY: number;
+  radiusX: number;
+  radiusY: number;
 };
 
-function pointIsInsideNormalizedBeeReviewArea(x: number, y: number) {
-  const horizontal = (x - NORMALIZED_BEE_REVIEW_AREA.centerX) / NORMALIZED_BEE_REVIEW_AREA.radiusX;
-  const vertical = (y - NORMALIZED_BEE_REVIEW_AREA.centerY) / NORMALIZED_BEE_REVIEW_AREA.radiusY;
+function pointIsInsideNormalizedBeeReviewArea(x: number, y: number, area: NormalizedBeeReviewArea) {
+  const horizontal = (x - area.centerX) / area.radiusX;
+  const vertical = (y - area.centerY) / area.radiusY;
   return horizontal * horizontal + vertical * vertical <= 1;
+}
+
+function markerAllowedAreaFromPreview(preview: HeadUpNormalizedBeeCropPreview | null): NormalizedBeeReviewArea | null {
+  const rawArea = preview?.transformMetadata.mite_marker_allowed_area;
+  if (!rawArea || typeof rawArea !== "object") {
+    return null;
+  }
+  const area = rawArea as Record<string, unknown>;
+  const centerX = typeof area.center_x === "number" ? area.center_x : null;
+  const centerY = typeof area.center_y === "number" ? area.center_y : null;
+  const radiusX = typeof area.radius_x === "number" ? area.radius_x : null;
+  const radiusY = typeof area.radius_y === "number" ? area.radius_y : null;
+  if (centerX === null || centerY === null || radiusX === null || radiusY === null) {
+    return null;
+  }
+  return { centerX, centerY, radiusX, radiusY };
 }
 
 function ellipseStyle(crop: TrainingCrop, ellipse: OrientedBeeEllipse) {
@@ -2305,16 +2322,6 @@ function ellipseStyle(crop: TrainingCrop, ellipse: OrientedBeeEllipse) {
 function sourceContextStyle(crop: TrainingCrop) {
   return {
     aspectRatio: `${crop.cropWidth} / ${crop.cropHeight}`
-  };
-}
-
-function normalizedHeadEndStyle() {
-  const { centerX, centerY, radiusX, radiusY } = NORMALIZED_BEE_REVIEW_AREA;
-  return {
-    left: `${(centerX - radiusX * 0.55) * 100}%`,
-    top: `${(centerY - radiusY) * 100}%`,
-    width: `${radiusX * 1.1 * 100}%`,
-    height: `${radiusY * 0.28 * 100}%`
   };
 }
 
@@ -2622,6 +2629,7 @@ function TrainingCropAnnotationPanel({
   const [editedProposalIds, setEditedProposalIds] = useState<Set<string>>(() => new Set());
   const [candidateProposalMessage, setCandidateProposalMessage] = useState<string | null>(null);
   const [varroaReview, setVarroaReview] = useState<VarroaReviewCandidateList | null>(null);
+  const [varroaPreview, setVarroaPreview] = useState<HeadUpNormalizedBeeCropPreview | null>(null);
   const [varroaPreviewUrl, setVarroaPreviewUrl] = useState<string | null>(null);
   const [varroaOutcome, setVarroaOutcome] =
     useState<VarroaReviewOutcomeValue>("no_visible_varroa");
@@ -2722,6 +2730,7 @@ function TrainingCropAnnotationPanel({
           (candidate) => candidate.beeAnnotation.annotationId === selectedEllipseId
         ) ?? varroaReview.candidates[0] ?? null)
       : null;
+  const varroaMarkerAllowedArea = markerAllowedAreaFromPreview(varroaPreview);
   const selectedProposal =
     candidateProposals.find((proposal) => proposal.proposalId === selectedProposalId) ?? null;
   const cropLocked =
@@ -2862,6 +2871,7 @@ function TrainingCropAnnotationPanel({
 
   useEffect(() => {
     if (!selectedCropId || !selectedVarroaCandidate || selectedVarroaCandidate.eligibility !== "eligible") {
+      setVarroaPreview(null);
       setVarroaPreviewUrl((current) => {
         if (current) URL.revokeObjectURL(current);
         return null;
@@ -2875,27 +2885,30 @@ function TrainingCropAnnotationPanel({
       trainingCropId: selectedCropId,
       beeAnnotationId: selectedVarroaCandidate.beeAnnotation.annotationId
     })
-      .then((preview) =>
-        fetchHeadUpNormalizedBeeCropImageObjectUrl({
+      .then(async (preview) => ({
+        preview,
+        imageObjectUrl: await fetchHeadUpNormalizedBeeCropImageObjectUrl({
           devUserId,
           imageUrl: preview.imageUrl
         })
-      )
-      .then((nextImageUrl) => {
+      }))
+      .then(({ preview, imageObjectUrl }) => {
         if (cancelled) {
-          URL.revokeObjectURL(nextImageUrl);
+          URL.revokeObjectURL(imageObjectUrl);
           return;
         }
+        setVarroaPreview(preview);
         setVarroaPreviewUrl((current) => {
           if (current) URL.revokeObjectURL(current);
-          return nextImageUrl;
+          return imageObjectUrl;
         });
       })
       .catch((error) => onError(toApiError(error)));
     return () => {
       cancelled = true;
+      setVarroaPreview(null);
     };
-  }, [devUserId, onError, selectedCropId, selectedVarroaCandidate?.beeAnnotation.annotationId, workspaceId]);
+  }, [devUserId, onError, selectedCropId, selectedVarroaCandidate, workspaceId]);
 
   useEffect(() => {
     refreshTrainingRuns().catch((error) => onError(toApiError(error)));
@@ -3154,7 +3167,7 @@ function TrainingCropAnnotationPanel({
     const rect = event.currentTarget.getBoundingClientRect();
     const x = clamp((event.clientX - rect.left) / rect.width, 0, 1);
     const y = clamp((event.clientY - rect.top) / rect.height, 0, 1);
-    if (!pointIsInsideNormalizedBeeReviewArea(x, y)) {
+    if (!varroaMarkerAllowedArea || !pointIsInsideNormalizedBeeReviewArea(x, y, varroaMarkerAllowedArea)) {
       return;
     }
     setVarroaMarkers((current) => [...current, { x: roundMarkerCoordinate(x), y: roundMarkerCoordinate(y) }]);
@@ -5265,18 +5278,20 @@ function TrainingCropAnnotationPanel({
                                         transform: `scale(${varroaZoom})`
                                       }}
                                       onClick={onVarroaPreviewClick}
+                                      data-marker-center-x={varroaMarkerAllowedArea?.centerX ?? ""}
+                                      data-marker-center-y={varroaMarkerAllowedArea?.centerY ?? ""}
                                       data-testid="head-up-normalized-bee-crop-image-plane"
                                     >
                                       {varroaPreviewUrl ? (
-                                        <img src={varroaPreviewUrl} alt="Head-up bee crop" draggable={false} />
+                                        <img
+                                          src={varroaPreviewUrl}
+                                          alt="Head-up bee crop"
+                                          draggable={false}
+                                          data-testid="head-up-normalized-bee-crop-image"
+                                        />
                                       ) : (
                                         <span className="varroa-preview-placeholder">Loading preview</span>
                                       )}
-                                      <span
-                                        className="normalized-head-end-marker"
-                                        style={normalizedHeadEndStyle()}
-                                        data-testid="head-up-normalized-bee-head-end"
-                                      />
                                       {varroaMarkers.map((marker, index) => (
                                         <span
                                           key={`${marker.x}-${marker.y}-${index}`}
