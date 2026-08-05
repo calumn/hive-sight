@@ -71,6 +71,7 @@ import {
   fetchBenchmarkEvaluations,
   fetchBeeTrainingReadiness,
   fetchOrientationBenchmarkReadiness,
+  fetchPhotoVisibleVarroaSummary,
   fetchModelCandidates,
   fetchModelTrainingReadiness,
   fetchRequestedReviews,
@@ -128,6 +129,7 @@ import {
   type InspectionIntent,
   type InspectionPhoto,
   type FrameStandard,
+  type FrameLevelVarroaResultSummary,
   type OrientedBeeEllipse,
   type PhysicalYoloObbExport,
   type PhotoIntake,
@@ -2630,6 +2632,8 @@ function TrainingCropAnnotationPanel({
   const [editedProposalIds, setEditedProposalIds] = useState<Set<string>>(() => new Set());
   const [candidateProposalMessage, setCandidateProposalMessage] = useState<string | null>(null);
   const [varroaReview, setVarroaReview] = useState<VarroaReviewCandidateList | null>(null);
+  const [photoVisibleVarroaSummary, setPhotoVisibleVarroaSummary] =
+    useState<FrameLevelVarroaResultSummary | null>(null);
   const [varroaPreview, setVarroaPreview] = useState<HeadUpNormalizedBeeCropPreview | null>(null);
   const [varroaPreviewUrl, setVarroaPreviewUrl] = useState<string | null>(null);
   const [varroaOutcome, setVarroaOutcome] =
@@ -2817,6 +2821,7 @@ function TrainingCropAnnotationPanel({
       setCrops([]);
       setEvidence(null);
       setVarroaReview(null);
+      setPhotoVisibleVarroaSummary(null);
       setSelectedCropId(null);
       return;
     }
@@ -2825,10 +2830,12 @@ function TrainingCropAnnotationPanel({
     setCrops([]);
     setEvidence(null);
     setVarroaReview(null);
+    setPhotoVisibleVarroaSummary(null);
     setSelectedCropId(null);
     setSelectedEllipseId(null);
     setTrainingCropDatasetItem(null);
     void refreshCropsForPhoto(selectedPhoto.inspectionPhotoId);
+    void refreshPhotoVisibleVarroaSummary(selectedPhoto.inspectionPhotoId);
     fetchInspectionPhotoObjectUrl({
       devUserId,
       viewUrl: `/v1/inspection-photos/${selectedPhoto.inspectionPhotoId}/content?workspace_id=${workspaceId}`
@@ -3026,6 +3033,15 @@ function TrainingCropAnnotationPanel({
     setVarroaReview(nextReview);
   }
 
+  async function refreshPhotoVisibleVarroaSummary(inspectionPhotoId: string) {
+    const nextSummary = await fetchPhotoVisibleVarroaSummary({
+      devUserId,
+      workspaceId,
+      inspectionPhotoId
+    });
+    setPhotoVisibleVarroaSummary(nextSummary);
+  }
+
   function onSourceImageClick(event: MouseEvent<HTMLDivElement>) {
     if (!sourceImageSize) {
       return;
@@ -3206,6 +3222,7 @@ function TrainingCropAnnotationPanel({
         notes: varroaNotes
       });
       await refreshVarroaReview(selectedCrop.trainingCropId);
+      await refreshPhotoVisibleVarroaSummary(selectedCrop.inspectionPhotoId);
     });
   }
 
@@ -5157,7 +5174,10 @@ function TrainingCropAnnotationPanel({
                 </div>
                 <button
                   type="button"
-                  onClick={() => void refreshVarroaReview(selectedCrop.trainingCropId)}
+                  onClick={() => {
+                    void refreshVarroaReview(selectedCrop.trainingCropId);
+                    void refreshPhotoVisibleVarroaSummary(selectedCrop.inspectionPhotoId);
+                  }}
                   disabled={Boolean(workingLabel)}
                   data-testid="refresh-varroa-review-button"
                 >
@@ -5167,6 +5187,45 @@ function TrainingCropAnnotationPanel({
               </div>
               {varroaReview ? (
                 <>
+                  {photoVisibleVarroaSummary ? (
+                    <section
+                      className="photo-visible-varroa-summary"
+                      data-testid="photo-visible-varroa-summary"
+                      aria-label="Photo-visible Varroa evidence"
+                    >
+                      <div className="model-workflow-header">
+                        <div>
+                          <strong>Photo-visible Varroa evidence</strong>
+                          <p>{photoVisibleVarroaSummary.sourceImageFilename}</p>
+                        </div>
+                        <span data-testid="photo-visible-varroa-readiness">
+                          {photoVisibleVarroaSummary.advisorContextAvailable
+                            ? "Advisor context available with caveats"
+                            : "Advisor context not available"}
+                        </span>
+                      </div>
+                      <div className="export-summary">
+                        <span>Visible Varroa bees {photoVisibleVarroaSummary.visibleVarroaBeeCount}</span>
+                        <span>Visible mite markers {photoVisibleVarroaSummary.visibleMiteMarkerCount}</span>
+                        <span>Active negatives {photoVisibleVarroaSummary.activeNegativeBeeCount}</span>
+                        <span>Not determined {photoVisibleVarroaSummary.notDeterminedBeeCount}</span>
+                        <span>Unreviewed {photoVisibleVarroaSummary.unreviewedEligibleBeeCount}</span>
+                        <span>Ineligible {photoVisibleVarroaSummary.ineligibleOrNotAssessedBeeCount}</span>
+                        <span>Completed crops {photoVisibleVarroaSummary.completedTrainingCropCount}</span>
+                        <span>Unfinished crops {photoVisibleVarroaSummary.unfinishedTrainingCropCount}</span>
+                        <span>
+                          Review completion {formatGeometryValue(photoVisibleVarroaSummary.reviewCompletionPercent)}%
+                        </span>
+                        <span>
+                          Determinate coverage{" "}
+                          {formatGeometryValue(photoVisibleVarroaSummary.determinateVarroaCoveragePercent)}%
+                        </span>
+                      </div>
+                      <p className="list-context-note" data-testid="photo-visible-varroa-caveats">
+                        {photoVisibleVarroaSummary.caveats}
+                      </p>
+                    </section>
+                  ) : null}
                   <div className="export-summary" data-testid="varroa-review-summary">
                     <span>Eligible {varroaReview.summary.eligibleBeeCount}</span>
                     <span>Reviewed {varroaReview.summary.reviewedBeeCount}</span>

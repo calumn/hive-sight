@@ -49,6 +49,7 @@ from hive_sight_core_api.dev_store import (
     deterministic_id_factory,
 )
 from hive_sight_core_api.directed_ellipse_cleanup_workflow import DirectedEllipseCleanupWorkflow
+from hive_sight_core_api.frame_level_varroa_result_workflow import FrameLevelVarroaResultWorkflow
 from hive_sight_core_api.hive_configuration_workflow import HiveConfigurationWorkflow
 from hive_sight_core_api.inspection_photo_access import InspectionPhotoAccess
 from hive_sight_core_api.review_queue_workflow import ReviewQueueWorkflow
@@ -175,6 +176,10 @@ def get_varroa_review_workflow(state: DevStateDep) -> VarroaReviewWorkflow:
         store=state.store,
         image_loader=state.object_storage.get_object,
     )
+
+
+def get_frame_level_varroa_result_workflow(state: DevStateDep) -> FrameLevelVarroaResultWorkflow:
+    return FrameLevelVarroaResultWorkflow(store=state.store)
 
 
 def get_review_queue_workflow(state: DevStateDep) -> ReviewQueueWorkflow:

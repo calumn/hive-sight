@@ -32,6 +32,7 @@ from hive_sight_core_api.dependencies import (
     get_dataset_repository_workflow,
     get_dataset_role_assignment_workflow,
     get_directed_ellipse_cleanup_workflow,
+    get_frame_level_varroa_result_workflow,
     get_hive_configuration_workflow,
     get_inspection_photo_access,
     get_review_queue_workflow,
@@ -43,6 +44,7 @@ from hive_sight_core_api.dependencies import (
 from hive_sight_core_api.dev_store import DomainError, UserContext
 from hive_sight_core_api.dev_users import DEV_USER_IDS
 from hive_sight_core_api.directed_ellipse_cleanup_workflow import DirectedEllipseCleanupWorkflow
+from hive_sight_core_api.frame_level_varroa_result_workflow import FrameLevelVarroaResultWorkflow
 from hive_sight_core_api.hive_configuration_workflow import HiveConfigurationWorkflow
 from hive_sight_core_api.inspection_photo_access import InspectionPhotoAccess
 from hive_sight_core_api.models import (
@@ -80,6 +82,7 @@ from hive_sight_core_api.models import (
     DirectedEllipseLocalCleanupRequest,
     DirectedEllipseLocalCleanupResponse,
     ErrorResponse,
+    FrameLevelVarroaResultSummaryResponse,
     FrameStandardResponse,
     HeadUpNormalizedBeeCropPreviewResponse,
     HealthResponse,
@@ -195,6 +198,10 @@ TrainingCropDatasetItemWorkflowDep = Annotated[
 VarroaReviewWorkflowDep = Annotated[
     VarroaReviewWorkflow,
     Depends(get_varroa_review_workflow),
+]
+FrameLevelVarroaResultWorkflowDep = Annotated[
+    FrameLevelVarroaResultWorkflow,
+    Depends(get_frame_level_varroa_result_workflow),
 ]
 ReviewQueueWorkflowDep = Annotated[
     ReviewQueueWorkflow,
@@ -1310,6 +1317,23 @@ def save_varroa_review_outcome(
         training_crop_id=training_crop_id,
         bee_annotation_id=bee_annotation_id,
         request=request,
+    )
+
+
+@app.get(
+    "/v1/inspection-photos/{inspection_photo_id}/photo-visible-varroa-summary",
+    response_model=FrameLevelVarroaResultSummaryResponse,
+)
+def get_photo_visible_varroa_summary(
+    inspection_photo_id: UUID,
+    workspace_id: UUID,
+    user: AuthenticatedUserDep,
+    workflow: FrameLevelVarroaResultWorkflowDep,
+) -> FrameLevelVarroaResultSummaryResponse:
+    return workflow.get_photo_visible_summary(
+        user=user,
+        workspace_id=workspace_id,
+        inspection_photo_id=inspection_photo_id,
     )
 
 

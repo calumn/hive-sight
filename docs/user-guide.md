@@ -138,6 +138,8 @@ Use this when a completed Training Crop is ready for model-curation Varroa evide
 7. Delete and replace markers if needed.
 8. Click `Save outcome`.
 
+The `Photo-visible Varroa evidence` summary rolls the reviewed bee outcomes for the selected Inspection Photo into one current frame/photo-level view. It separates visible-Varroa bees from visible mite markers, active negatives, unresolved bees, unreviewed eligible bees, hidden or ineligible bees, completed crops, unfinished crops, review completion, and determinate coverage.
+
 The Varroa Review summary is model-curation progress only. It is not a Varroa assessment, visible mite rate, treatment recommendation, or HiveSight Advisor trigger.
 
 ## Reopen And Continue A Training Crop

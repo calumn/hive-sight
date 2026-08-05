@@ -1,6 +1,6 @@
 # Vertical Slice 0026: Frame-Level Varroa Result Summary
 
-Status: designed; acceptance scenarios signed off on 2026-08-05.
+Status: implemented; verified on 2026-08-05.
 
 ## Purpose
 
@@ -197,17 +197,17 @@ Derived rules:
 
 ## Acceptance Criteria
 
-- [ ] The Core API can calculate a photo-visible Varroa evidence summary from existing Varroa Review Outcomes for one Inspection Photo.
-- [ ] The summary aggregates all completed Training Crops for the selected Inspection Photo and no crops from other photos.
-- [ ] Unfinished Training Crops from the same photo are disclosed as excluded caveats but do not affect bee, marker, positive, negative, or coverage counts.
-- [ ] The summary separates visible-Varroa bee count from visible mite marker count.
-- [ ] The summary reports active negatives, `not_determined`, unreviewed eligible bees, and ineligible/not-assessed bees separately.
-- [ ] The summary reports Review Completion and Determinate Varroa Coverage.
-- [ ] The Web UI shows the summary and caveat inside the Varroa Review stage for the selected Training Inspection photo.
-- [ ] HiveSight exposes whether the summary is Advisor-context available with caveats when at least one determinate eligible bee exists, without calling HiveSight Advisor.
-- [ ] The UI and API state that this is photo-visible evidence, not treatment advice, and do not use treatment-threshold language.
-- [ ] Focused Core API tests, API-level BDD, browser acceptance, Web type-check, and `pnpm verify:slice` pass before implementation closeout.
+- [x] The Core API can calculate a photo-visible Varroa evidence summary from existing Varroa Review Outcomes for one Inspection Photo.
+- [x] The summary aggregates all completed Training Crops for the selected Inspection Photo and no crops from other photos.
+- [x] Unfinished Training Crops from the same photo are disclosed as excluded caveats but do not affect bee, marker, positive, negative, or coverage counts.
+- [x] The summary separates visible-Varroa bee count from visible mite marker count.
+- [x] The summary reports active negatives, `not_determined`, unreviewed eligible bees, and ineligible/not-assessed bees separately.
+- [x] The summary reports Review Completion and Determinate Varroa Coverage.
+- [x] The Web UI shows the summary and caveat inside the Varroa Review stage for the selected Training Inspection photo.
+- [x] HiveSight exposes whether the summary is Advisor-context available with caveats when at least one determinate eligible bee exists, without calling HiveSight Advisor.
+- [x] The UI and API state that this is photo-visible evidence, not treatment advice, and do not use treatment-threshold language.
+- [x] Focused Core API tests, API-level BDD, browser acceptance, Web type-check, and `pnpm verify:slice` pass before implementation closeout.
 
 ## Open Questions
 
-- None after Slice 0026 grilling. Acceptance scenarios still require explicit signoff before implementation.
+- None after Slice 0026 grilling and acceptance signoff.

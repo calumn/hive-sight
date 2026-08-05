@@ -121,5 +121,26 @@ test("Dataset Curator records Varroa review cues and a visible Varroa outcome", 
 
   await expect(page.getByTestId("varroa-review-summary")).toContainText("Visible Varroa bees 1");
   await expect(page.getByTestId("varroa-review-summary")).toContainText("Markers 1");
+  await expect(page.getByTestId("photo-visible-varroa-summary")).toContainText(
+    "Photo-visible Varroa evidence"
+  );
+  await expect(page.getByTestId("photo-visible-varroa-summary")).toContainText(
+    "Visible Varroa bees 1"
+  );
+  await expect(page.getByTestId("photo-visible-varroa-summary")).toContainText(
+    "Visible mite markers 1"
+  );
+  await expect(page.getByTestId("photo-visible-varroa-summary")).toContainText(
+    "Active negatives 0"
+  );
+  await expect(page.getByTestId("photo-visible-varroa-summary")).toContainText(
+    "Determinate coverage"
+  );
+  await expect(page.getByTestId("photo-visible-varroa-readiness")).toContainText(
+    "Advisor context available with caveats"
+  );
+  await expect(page.getByTestId("photo-visible-varroa-caveats")).toContainText(
+    "Photo-visible evidence only; not treatment advice."
+  );
   await expect(page.getByTestId("workflow-stage-varroa-review-button")).toContainText("1 reviewed");
 });

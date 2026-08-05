@@ -607,6 +607,31 @@ export type VarroaReviewCandidateList = {
   summary: VarroaReviewSummary;
 };
 
+export type FrameLevelVarroaResultSummary = {
+  workspaceId: string;
+  inspectionId: string;
+  inspectionPhotoId: string;
+  sourceImageFilename: string;
+  sourceIntent: InspectionIntent;
+  completedTrainingCropCount: number;
+  unfinishedTrainingCropCount: number;
+  eligibleCompleteBeeCount: number;
+  reviewedEligibleBeeCount: number;
+  determinateEligibleBeeCount: number;
+  visibleVarroaBeeCount: number;
+  activeNegativeBeeCount: number;
+  notDeterminedBeeCount: number;
+  unreviewedEligibleBeeCount: number;
+  ineligibleOrNotAssessedBeeCount: number;
+  visibleMiteMarkerCount: number;
+  reviewCompletionPercent: number;
+  determinateVarroaCoveragePercent: number;
+  evidenceSource: string;
+  readinessState: "not_available" | "partial_evidence" | "complete_reviewed_evidence";
+  advisorContextAvailable: boolean;
+  caveats: string;
+};
+
 export type HeadUpNormalizedBeeCropPreview = {
   workspaceId: string;
   inspectionPhotoId: string;
@@ -2131,6 +2156,24 @@ export async function fetchVarroaReviewCandidates({
   return parseVarroaReviewCandidateList(await response.json());
 }
 
+export async function fetchPhotoVisibleVarroaSummary({
+  devUserId,
+  workspaceId,
+  inspectionPhotoId
+}: {
+  devUserId: string;
+  workspaceId: string;
+  inspectionPhotoId: string;
+}): Promise<FrameLevelVarroaResultSummary> {
+  const params = new URLSearchParams({ workspace_id: workspaceId });
+  const response = await fetch(
+    `${coreApiUrl}/v1/inspection-photos/${inspectionPhotoId}/photo-visible-varroa-summary?${params}`,
+    { headers: devAuthHeaders(devUserId) }
+  );
+  await ensureOk(response);
+  return parseFrameLevelVarroaResultSummary(await response.json());
+}
+
 export async function fetchHeadUpNormalizedBeeCropPreview({
   devUserId,
   workspaceId,
@@ -3051,6 +3094,67 @@ function parseVarroaReviewSummary(value: unknown): VarroaReviewSummary {
       "ineligible_deferred_bee_count"
     ),
     caveat: requireString(record.caveat, "caveat")
+  };
+}
+
+function parseFrameLevelVarroaResultSummary(value: unknown): FrameLevelVarroaResultSummary {
+  const record = requireRecord(value, "Photo-visible Varroa evidence summary response");
+  return {
+    workspaceId: requireString(record.workspace_id, "workspace_id"),
+    inspectionId: requireString(record.inspection_id, "inspection_id"),
+    inspectionPhotoId: requireString(record.inspection_photo_id, "inspection_photo_id"),
+    sourceImageFilename: requireString(record.source_image_filename, "source_image_filename"),
+    sourceIntent: requireInspectionIntent(record.source_intent),
+    completedTrainingCropCount: requireNumber(
+      record.completed_training_crop_count,
+      "completed_training_crop_count"
+    ),
+    unfinishedTrainingCropCount: requireNumber(
+      record.unfinished_training_crop_count,
+      "unfinished_training_crop_count"
+    ),
+    eligibleCompleteBeeCount: requireNumber(
+      record.eligible_complete_bee_count,
+      "eligible_complete_bee_count"
+    ),
+    reviewedEligibleBeeCount: requireNumber(
+      record.reviewed_eligible_bee_count,
+      "reviewed_eligible_bee_count"
+    ),
+    determinateEligibleBeeCount: requireNumber(
+      record.determinate_eligible_bee_count,
+      "determinate_eligible_bee_count"
+    ),
+    visibleVarroaBeeCount: requireNumber(record.visible_varroa_bee_count, "visible_varroa_bee_count"),
+    activeNegativeBeeCount: requireNumber(record.active_negative_bee_count, "active_negative_bee_count"),
+    notDeterminedBeeCount: requireNumber(record.not_determined_bee_count, "not_determined_bee_count"),
+    unreviewedEligibleBeeCount: requireNumber(
+      record.unreviewed_eligible_bee_count,
+      "unreviewed_eligible_bee_count"
+    ),
+    ineligibleOrNotAssessedBeeCount: requireNumber(
+      record.ineligible_or_not_assessed_bee_count,
+      "ineligible_or_not_assessed_bee_count"
+    ),
+    visibleMiteMarkerCount: requireNumber(
+      record.visible_mite_marker_count,
+      "visible_mite_marker_count"
+    ),
+    reviewCompletionPercent: requireNumber(
+      record.review_completion_percent,
+      "review_completion_percent"
+    ),
+    determinateVarroaCoveragePercent: requireNumber(
+      record.determinate_varroa_coverage_percent,
+      "determinate_varroa_coverage_percent"
+    ),
+    evidenceSource: requireString(record.evidence_source, "evidence_source"),
+    readinessState: requireFrameLevelVarroaReadinessState(record.readiness_state),
+    advisorContextAvailable: requireBoolean(
+      record.advisor_context_available,
+      "advisor_context_available"
+    ),
+    caveats: requireString(record.caveats, "caveats")
   };
 }
 
@@ -4207,6 +4311,19 @@ function requireVarroaReviewEligibility(value: unknown): "eligible" | "ineligibl
     return value;
   }
   throw new Error("Core API response had an unexpected Varroa Review eligibility");
+}
+
+function requireFrameLevelVarroaReadinessState(
+  value: unknown
+): "not_available" | "partial_evidence" | "complete_reviewed_evidence" {
+  if (
+    value === "not_available" ||
+    value === "partial_evidence" ||
+    value === "complete_reviewed_evidence"
+  ) {
+    return value;
+  }
+  throw new Error("Core API response had an unexpected photo-visible Varroa readiness state");
 }
 
 function requireLiteral<T extends string>(value: unknown, expected: T, field: string): T {

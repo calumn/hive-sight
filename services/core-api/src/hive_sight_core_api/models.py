@@ -1415,6 +1415,31 @@ class VarroaReviewCandidateListResponse(BaseModel):
     summary: VarroaReviewSummaryResponse
 
 
+class FrameLevelVarroaResultSummaryResponse(BaseModel):
+    workspace_id: UUID
+    inspection_id: UUID
+    inspection_photo_id: UUID
+    source_image_filename: str
+    source_intent: InspectionIntent
+    completed_training_crop_count: int
+    unfinished_training_crop_count: int
+    eligible_complete_bee_count: int
+    reviewed_eligible_bee_count: int
+    determinate_eligible_bee_count: int
+    visible_varroa_bee_count: int
+    active_negative_bee_count: int
+    not_determined_bee_count: int
+    unreviewed_eligible_bee_count: int
+    ineligible_or_not_assessed_bee_count: int
+    visible_mite_marker_count: int
+    review_completion_percent: float
+    determinate_varroa_coverage_percent: float
+    evidence_source: str
+    readiness_state: str
+    advisor_context_available: bool
+    caveats: str
+
+
 class HeadUpNormalizedBeeCropPreviewResponse(BaseModel):
     workspace_id: UUID
     inspection_photo_id: UUID
