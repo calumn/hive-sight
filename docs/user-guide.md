@@ -44,21 +44,21 @@ Switching User behaves like logging out and logging in as someone else: the curr
 
 Product actions that the selected User can never perform are hidden. For example, a User without Dataset Curator capability will not see the Repository page button.
 
-## Start HiveSight With Real YOLO Training
+## Start HiveSight With Real Bee Training
 
-Use this when you want to train or test a local YOLO OBB Bee Detector Model Candidate.
+Use this when you want to train or test local Bee Localisation and Bee Orientation Model Candidates from one shared Marked-Bee Dataset Version.
 
-First install optional YOLO dependencies once:
+First install optional Bee Training dependencies once:
 
 ```sh
 cd ~/Projects/hive-sight
-pnpm model:setup:yolo
+pnpm model:setup:bee
 ```
 
-Then start the stack with Postgres-backed metadata and the real YOLO adapter:
+Then start the stack with Postgres-backed metadata and the real Bee Training adapters:
 
 ```sh
-pnpm dev:all:yolo
+pnpm dev:all:bee-training
 ```
 
 If Docker Desktop is not running or local Postgres is stopped, the dev launcher stops early and tells you to start Docker Desktop and run `pnpm db:up`. That check does not reset or wipe the dev database.
@@ -101,7 +101,7 @@ If a saved crop was created by mistake, select it and click `Delete crop`. Delet
 
 ## Annotate Bees In A Training Crop
 
-Use this when you want to manually create the training evidence for the Bee Detector.
+Use this when you want to manually create the marked-bee evidence for Bee Localisation and Bee Orientation.
 
 1. Open the `Bee Annotation` workflow stage.
 2. Select an editable Training Crop from the crop queue.
@@ -200,59 +200,60 @@ The queue is shared. Once one eligible Reviewer completes an item, it disappears
 Use this when you have at least one Training item and one Validation item.
 
 1. Open the `Model Governance` workflow stage.
-2. In `Bee Detector model workflow`, click `Check readiness`.
+2. In `Bee Training baseline`, click `Check readiness`.
 3. Review any warnings.
 4. Click `Marked-Bee Version`.
 5. Confirm the summary shows the expected Training, Validation, and Benchmark counts.
 
-Marked-Bee Dataset Versions are frozen model-training evidence shared by Bee Detector and Bee Orientation baselines. Benchmark items are protected from training export.
+Marked-Bee Dataset Versions are frozen model-training evidence shared by Bee Localisation and Bee Orientation baselines. Benchmark items are protected from training export.
 
-## Train A Bee Detector Baseline
+## Train A Bee Baseline
 
-Use this when you want to train a local YOLO OBB Model Candidate from the current Marked-Bee Dataset Version.
+Use this when you want to train Bee Localisation and Bee Orientation sequentially from the current Marked-Bee Dataset Version.
 
 1. Start HiveSight with:
 
 ```sh
-pnpm dev:all:yolo
+pnpm dev:all:bee-training
 ```
 
 2. Open the `Model Governance` workflow stage.
 3. Create or select a Marked-Bee Dataset Version.
-4. Acknowledge high-severity warnings if you deliberately want to continue with a small or incomplete dataset.
-5. Click `Train baseline`.
-6. Watch the Training Run summary for status, phase, heartbeat, elapsed time, log excerpt, and candidate creation.
-7. When the run completes, click `Use candidate for crop YOLO` if you want that candidate to power crop pre-labelling.
-8. Confirm the Training Run summary says `Now using HS-MC-... for crop YOLO`.
+4. Confirm Bee Localisation and Bee Orientation readiness are both satisfied.
+5. Acknowledge high-severity warnings if you deliberately want to continue with a small or incomplete dataset.
+6. Click `Train bee baseline`.
+7. Watch the job history: Bee Localisation runs first, then Bee Orientation starts from the same Dataset Version.
+8. When the Bee Localisation run completes, click `Use candidate for bee pre-labels` if you want that candidate to power crop pre-labelling.
+9. Confirm the panel says `Now using HS-MC-... for Bee Localisation pre-labels`.
 
-A completed run creates a Model Candidate. These baseline candidates are not user-facing production models.
+Completed runs create separate non-user-facing Model Candidates for each Model Purpose. The current Bee Localisation implementation uses Ultralytics YOLO OBB internally, but the operator workflow is Bee Training.
 
 You can also start a run from the command line:
 
 ```sh
-pnpm model:train:bee:yolo
+pnpm model:train:bee
 ```
 
 ## Train A Bee Orientation Baseline
 
-Use this when you want to validate the first Head Up / Head Down orientation training package from the same Marked-Bee Dataset Version.
+Use this when you want to train the first real Head Up / Head Down orientation candidate from the same Marked-Bee Dataset Version used for Bee Localisation.
 
 1. Open the `Model Governance` workflow stage.
 2. Create a Marked-Bee Dataset Version if one is not already available.
 3. Click `Check orientation`.
-4. Confirm Training and Validation each have reliable complete marked bees.
+4. Confirm Training and Validation each have enough reliable complete marked bees. The real adapter requires at least four eligible source bees in Training and four in Validation.
 5. Acknowledge high-severity warnings if you deliberately want to continue with a small or incomplete dataset.
-6. Click `Train orientation`.
-7. Watch the Bee Orientation Training Run summary for completion and open the orientation report if needed.
+6. Click `Train bee baseline`.
+7. Watch for the Bee Orientation Training Run after Bee Localisation completes, then open the orientation report if needed.
 
-This slice validates the package and records a non-user-facing Bee Orientation Model Candidate. It does not train a predictive orientation model yet, and orientation candidates cannot be used for crop YOLO, benchmark evaluation, live orientation inference, or Varroa Assessment.
+The Bee Orientation report shows training-run validation metrics only. They are not benchmark evidence, and orientation candidates cannot be used for benchmark evaluation, live orientation inference, automatic Head-Up Normalized Bee Crop generation, or Varroa Assessment yet.
 
 ## Evaluate A Bee Localisation Model Candidate
 
-Use this when you want internal model-governance evidence for a completed Bee Detector Model Candidate. This is a Dataset Curator task, not normal beekeeper inspection work.
+Use this when you want internal model-governance evidence for a completed Bee Localisation Model Candidate. This is a Dataset Curator task, not normal beekeeper inspection work.
 
 1. Make sure your Dataset Version has protected Benchmark items from source images that were not used for Training or Validation.
-2. Train a Bee Detector baseline and select the completed Model Candidate.
+2. Train a Bee baseline and select the completed Bee Localisation Model Candidate.
 3. Open the `Model Governance` workflow stage.
 4. In the benchmark evaluation section, click `Check benchmark`.
 5. Review warnings such as `SMALL_BENCHMARK_SET`.
@@ -270,20 +271,20 @@ pnpm model:qa:bee:evaluate
 
 ## Use A Model Candidate To Suggest Bees In A Crop
 
-Use this when you want the trained Bee Detector to propose candidate ellipses for a crop, while keeping human review in control.
+Use this when you want the trained Bee Localisation candidate to propose candidate ellipses for a crop, while keeping human review in control.
 
 1. Start HiveSight with:
 
 ```sh
-pnpm dev:all:yolo
+pnpm dev:all:bee-training
 ```
 
 2. Make sure at least one completed Model Candidate exists.
 3. Open `Bee Annotation` and select an editable Training Crop that was not included in that Model Candidate's frozen Dataset Version.
-4. Either click `Use candidate for crop YOLO` on the completed Training Run, or choose the Model Candidate in `YOLO crop pre-labels`.
-5. Check that the panel says which Model Candidate is being used for crop YOLO.
+4. Either click `Use candidate for bee pre-labels` on the completed Training Run, or choose the Model Candidate in `Bee Localisation pre-labels`.
+5. Check that the panel says which Model Candidate is being used for Bee Localisation pre-labels.
 6. Set the confidence threshold. The current default is 10%.
-7. Click `YOLO this crop`.
+7. Click `Suggest bees`.
 8. Review the dashed candidate ellipses.
 9. Select a candidate ellipse and nudge, rotate, or resize it if needed.
 10. Click `Accept complete` or `Accept partial`.

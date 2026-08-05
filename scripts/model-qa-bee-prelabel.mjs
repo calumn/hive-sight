@@ -49,7 +49,7 @@ try {
 } catch (error) {
   process.stderr.write(`${error.message}\n`);
   process.stderr.write(
-    "Start the real model stack with: pnpm dev:all:yolo-training, then make sure at least one completed Model Candidate and one editable Training Crop exist.\n"
+    "Start the real model stack with: pnpm dev:all:bee-training, then make sure at least one completed Model Candidate and one editable Training Crop exist.\n"
   );
   process.exitCode = 1;
 }

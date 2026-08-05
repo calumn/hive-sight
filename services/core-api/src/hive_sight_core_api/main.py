@@ -52,6 +52,9 @@ from hive_sight_core_api.models import (
     ApiaryResponse,
     BeeAnnotationProposalListResponse,
     BeeAnnotationProposalRequest,
+    BeeTrainingReadinessResponse,
+    BeeTrainingStartRequest,
+    BeeTrainingStartResponse,
     BenchmarkEvaluationCancelRequest,
     BenchmarkEvaluationListResponse,
     BenchmarkEvaluationReadinessResponse,
@@ -855,6 +858,23 @@ def get_model_training_readiness(
     )
 
 
+@app.get(
+    "/v1/model-training/bee-training/readiness",
+    response_model=BeeTrainingReadinessResponse,
+)
+def get_bee_training_readiness(
+    workspace_id: UUID,
+    user: AuthenticatedUserDep,
+    workflow: BeeDetectorTrainingWorkflowDep,
+    dataset_version_id: UUID | None = None,
+) -> BeeTrainingReadinessResponse:
+    return workflow.bee_training_readiness(
+        user=user,
+        workspace_id=workspace_id,
+        dataset_version_id=dataset_version_id,
+    )
+
+
 @app.post(
     "/v1/model-training/dataset-versions",
     response_model=DatasetVersionResponse,
@@ -917,6 +937,19 @@ def start_model_training_run(
     workflow: BeeDetectorTrainingWorkflowDep,
 ) -> TrainingRunResponse:
     return workflow.start_training_run(user=user, request=request)
+
+
+@app.post(
+    "/v1/model-training/bee-training/runs",
+    response_model=BeeTrainingStartResponse,
+    status_code=202,
+)
+def start_bee_training_run(
+    request: BeeTrainingStartRequest,
+    user: AuthenticatedUserDep,
+    workflow: BeeDetectorTrainingWorkflowDep,
+) -> BeeTrainingStartResponse:
+    return workflow.start_bee_training(user=user, request=request)
 
 
 @app.get(

@@ -4,7 +4,7 @@ import { createApiaryAndHive } from "./support/setup-workflow";
 
 const fixtureImagePath = fileURLToPath(new URL("../fixtures/bee-frame-test.png", import.meta.url));
 
-test("Dataset Curator runs a fake Bee Orientation baseline from a shared Marked-Bee Dataset Version", async ({
+test("Dataset Curator runs Bee Training from a shared Marked-Bee Dataset Version", async ({
   page
 }) => {
   await page.goto("/");
@@ -38,7 +38,6 @@ test("Dataset Curator runs a fake Bee Orientation baseline from a shared Marked-
     "marked_bee_dataset_v1"
   );
 
-  await page.getByTestId("bee-orientation-readiness-button").click();
   await expect(page.getByTestId("bee-orientation-readiness-summary")).toContainText(
     /Training bees [1-9]/
   );
@@ -50,22 +49,14 @@ test("Dataset Curator runs a fake Bee Orientation baseline from a shared Marked-
   );
 
   await page.getByTestId("acknowledge-model-training-warnings-checkbox").check();
-  await page.getByTestId("start-bee-orientation-training-run-button").click();
-  await expect(page.getByTestId("bee-orientation-training-run-summary")).toContainText("HS-TR-");
-  await expect(page.getByTestId("bee-orientation-training-run-summary")).toContainText(
-    "completed"
+  await expect(page.getByTestId("start-model-training-run-button")).toContainText(
+    "Train bee baseline"
   );
-  await expect(page.getByTestId("bee-orientation-training-run-summary")).toContainText(
-    "Bee Orientation"
-  );
-  await expect(page.getByTestId("bee-orientation-training-run-summary")).toContainText(
-    /Train examples [1-9]/
-  );
-  await expect(page.getByTestId("bee-orientation-training-activity")).toContainText(
-    "Bee Orientation package validated"
-  );
-  await expect(page.getByTestId("bee-orientation-training-report-link")).toBeVisible();
+  await expect(page.getByTestId("start-model-training-run-button")).toBeEnabled();
+  await page.getByTestId("start-model-training-run-button").click();
+  await expect(page.getByTestId("model-training-run-list")).toContainText("Bee Localisation");
   await expect(page.getByTestId("model-training-run-list")).toContainText("Bee Orientation");
+  await expect(page.getByTestId("model-training-run-list")).not.toContainText("YOLO");
 });
 
 async function createCompletedDatasetCrop(

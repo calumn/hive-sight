@@ -34,6 +34,9 @@ from hive_sight_core_api.dev_store import (
 from hive_sight_core_api.models import (
     AnnotationType,
     ArtifactResponse,
+    BeeTrainingReadinessResponse,
+    BeeTrainingStartRequest,
+    BeeTrainingStartResponse,
     DatasetRole,
     DatasetVersionResponse,
     ModelCandidateResponse,
@@ -82,6 +85,23 @@ class BeeDetectorTrainingAdapter(Protocol):
         ...
 
 
+class BeeOrientationTrainingAdapter(Protocol):
+    adapter_type: str
+
+    def check_available(self) -> bool:
+        ...
+
+    def run_training(
+        self,
+        *,
+        training_run: TrainingRunResponse,
+        run_dir: Path,
+        dataset_package_dir: Path,
+        package_result: dict[str, object],
+    ) -> TrainingAdapterResult:
+        ...
+
+
 @dataclass(frozen=True)
 class TrainingAdapterResult:
     metrics: dict[str, object]
@@ -107,13 +127,13 @@ class FakeBeeDetectorTrainingAdapter:
         weights_path = run_dir / "weights" / "best.pt"
         weights_path.parent.mkdir(parents=True, exist_ok=True)
         weights_path.write_text(
-            f"fake HiveSight Bee Detector weights for {training_run.human_readable_id}\n",
+            f"fake HiveSight Bee Localisation weights for {training_run.human_readable_id}\n",
             encoding="utf-8",
         )
         log_path = run_dir / "training.log"
         with log_path.open("a", encoding="utf-8") as log_file:
             log_file.write(
-                "Fake adapter completed deterministic Bee Detector smoke training.\n"
+                "Fake adapter completed deterministic Bee Localisation smoke training.\n"
             )
         return TrainingAdapterResult(
             metrics={
@@ -154,7 +174,7 @@ class UltralyticsYoloObbTrainingAdapter:
         except ImportError as exc:
             raise DomainError(
                 "real_adapter_unavailable",
-                "Run pnpm model:setup:yolo before using the real YOLO training adapter.",
+                "Run pnpm model:setup:bee before using the real Bee Localisation training adapter.",
                 409,
             ) from exc
 
@@ -192,6 +212,212 @@ class UltralyticsYoloObbTrainingAdapter:
         )
 
 
+class FakeBeeOrientationTrainingAdapter:
+    adapter_type = "fake"
+
+    def check_available(self) -> bool:
+        return True
+
+    def run_training(
+        self,
+        *,
+        training_run: TrainingRunResponse,
+        run_dir: Path,
+        dataset_package_dir: Path,
+        package_result: dict[str, object],
+    ) -> TrainingAdapterResult:
+        _ = dataset_package_dir
+        manifest_path = run_dir / "fake-orientation-candidate.json"
+        manifest_path.write_text(
+            json.dumps(
+                {
+                    "model_purpose": "bee_orientation",
+                    "model_family": "bee_orientation_binary_classifier",
+                    "adapter_type": "fake",
+                    "predictive_training_performed": False,
+                    "source_dataset_version_id": str(training_run.dataset_version_id),
+                    "package_hash": package_result["package_hash"],
+                    "class_map": ORIENTATION_CLASS_MAP,
+                },
+                indent=2,
+                sort_keys=True,
+            ),
+            encoding="utf-8",
+        )
+        log_path = run_dir / "training.log"
+        with log_path.open("a", encoding="utf-8") as log_file:
+            log_file.write("Fake Bee Orientation adapter validated package shape only.\n")
+        return TrainingAdapterResult(
+            metrics={
+                "predictive_training_performed": False,
+                "metric_scope": "fake_adapter_package_validation",
+            },
+            model_artifact_path=manifest_path,
+            log_path=log_path,
+            base_weights_source="fake_adapter_manifest",
+        )
+
+
+class TorchvisionBeeOrientationTrainingAdapter:
+    adapter_type = "torchvision_orientation_classifier"
+
+    def __init__(self, device: str = "cpu", architecture: str = "mobilenet_v3_small") -> None:
+        self.device = device
+        self.architecture = architecture
+
+    def check_available(self) -> bool:
+        try:
+            import torch  # noqa: F401
+            import torchvision  # noqa: F401
+        except ImportError:
+            return False
+        return True
+
+    def run_training(
+        self,
+        *,
+        training_run: TrainingRunResponse,
+        run_dir: Path,
+        dataset_package_dir: Path,
+        package_result: dict[str, object],
+    ) -> TrainingAdapterResult:
+        try:
+            import torch
+            from torch import nn
+            from torch.utils.data import DataLoader, Dataset
+            from torchvision import models, transforms
+        except ImportError as exc:
+            raise DomainError(
+                "real_orientation_adapter_unavailable",
+                "Run pnpm model:setup:bee before using the real Bee Orientation adapter.",
+                409,
+            ) from exc
+
+        log_path = run_dir / "training.log"
+        labels_path = dataset_package_dir / "labels.jsonl"
+        labels = [
+            json.loads(line)
+            for line in labels_path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        train_rows = [row for row in labels if str(row["split"]) == str(DatasetRole.training)]
+        val_rows = [row for row in labels if str(row["split"]) == str(DatasetRole.validation)]
+        if not train_rows or not val_rows:
+            raise DomainError(
+                "orientation_training_and_validation_required",
+                "Bee Orientation real training requires Training and Validation examples.",
+                409,
+            )
+
+        torch.manual_seed(training_run.random_seed)
+        device = torch.device(self.device)
+        transform = transforms.Compose(
+            [
+                transforms.ToTensor(),
+                transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+            ]
+        )
+
+        class OrientationDataset(Dataset):
+            def __init__(self, rows: list[dict[str, object]]) -> None:
+                self.rows = rows
+
+            def __len__(self) -> int:
+                return len(self.rows)
+
+            def __getitem__(self, index: int):
+                row = self.rows[index]
+                image = Image.open(dataset_package_dir / str(row["image_path"])).convert("RGB")
+                return transform(image), int(row["class_id"])
+
+        model = models.mobilenet_v3_small(weights=None, num_classes=2)
+        model.to(device)
+        optimiser = torch.optim.Adam(model.parameters(), lr=0.001)
+        criterion = nn.CrossEntropyLoss()
+        train_loader = DataLoader(
+            OrientationDataset(train_rows),
+            batch_size=max(1, int(training_run.training_settings["batch_size"])),
+            shuffle=False,
+        )
+        val_loader = DataLoader(OrientationDataset(val_rows), batch_size=1, shuffle=False)
+        epochs = int(training_run.training_settings["epochs"])
+        epoch_metrics: list[dict[str, float]] = []
+        model.train()
+        for epoch in range(epochs):
+            total_loss = 0.0
+            correct = 0
+            seen = 0
+            for images, labels_tensor in train_loader:
+                images = images.to(device)
+                labels_tensor = labels_tensor.to(device)
+                optimiser.zero_grad()
+                outputs = model(images)
+                loss = criterion(outputs, labels_tensor)
+                loss.backward()
+                optimiser.step()
+                total_loss += float(loss.detach().cpu())
+                predictions = outputs.argmax(dim=1)
+                correct += int((predictions == labels_tensor).sum().item())
+                seen += int(labels_tensor.numel())
+            epoch_metrics.append(
+                {
+                    "epoch": float(epoch + 1),
+                    "training_loss": total_loss / max(len(train_loader), 1),
+                    "training_accuracy": correct / max(seen, 1),
+                }
+            )
+
+        confusion = {
+            "head_up": {"head_up": 0, "head_down": 0},
+            "head_down": {"head_up": 0, "head_down": 0},
+        }
+        class_names = ["head_up", "head_down"]
+        correct = 0
+        seen = 0
+        model.eval()
+        with torch.no_grad():
+            for images, labels_tensor in val_loader:
+                images = images.to(device)
+                labels_tensor = labels_tensor.to(device)
+                prediction = int(model(images).argmax(dim=1).cpu().item())
+                truth = int(labels_tensor.cpu().item())
+                confusion[class_names[truth]][class_names[prediction]] += 1
+                correct += int(prediction == truth)
+                seen += 1
+        validation_accuracy = correct / max(seen, 1)
+        weights_path = run_dir / "weights" / "orientation-classifier.pt"
+        weights_path.parent.mkdir(parents=True, exist_ok=True)
+        torch.save(
+            {
+                "state_dict": model.state_dict(),
+                "class_map": ORIENTATION_CLASS_MAP,
+                "architecture": self.architecture,
+                "package_hash": package_result["package_hash"],
+            },
+            weights_path,
+        )
+        with log_path.open("a", encoding="utf-8") as log_file:
+            log_file.write(
+                "Torchvision Bee Orientation training completed. "
+                "Metrics are training-run validation only, not benchmark evidence.\n"
+            )
+        return TrainingAdapterResult(
+            metrics={
+                "predictive_training_performed": True,
+                "metric_scope": "training_run_validation_not_benchmark",
+                "architecture": self.architecture,
+                "device": str(device),
+                "validation_accuracy": validation_accuracy,
+                "confusion_matrix": confusion,
+                "epoch_metrics": epoch_metrics,
+                "package_hash": package_result["package_hash"],
+            },
+            model_artifact_path=weights_path,
+            log_path=log_path,
+            base_weights_source="torchvision_random_initialisation",
+        )
+
+
 class BeeDetectorTrainingWorkflow:
     def __init__(
         self,
@@ -200,6 +426,7 @@ class BeeDetectorTrainingWorkflow:
         image_loader: Callable[[str], bytes | None],
         artifact_root: Path,
         adapter: BeeDetectorTrainingAdapter,
+        orientation_adapter: BeeOrientationTrainingAdapter | None = None,
         persistence_backend: str,
         database_purpose: str,
         clock: Callable[[], datetime],
@@ -210,6 +437,7 @@ class BeeDetectorTrainingWorkflow:
         self.image_loader = image_loader
         self.artifact_root = artifact_root
         self.adapter = adapter
+        self.orientation_adapter = orientation_adapter or FakeBeeOrientationTrainingAdapter()
         self.persistence_backend = persistence_backend
         self.database_purpose = database_purpose
         self.clock = clock
@@ -276,7 +504,11 @@ class BeeDetectorTrainingWorkflow:
         workspace_id: UUID,
         dataset_version_id: UUID | None,
     ) -> ModelTrainingReadinessResponse:
-        real_adapter_available = False
+        real_adapter_available = (
+            self.orientation_adapter.check_available()
+            if self.orientation_adapter.adapter_type != "fake"
+            else False
+        )
         active = self.store.active_training_run(workspace_id)
         dataset_version = None
         if dataset_version_id is not None:
@@ -310,7 +542,7 @@ class BeeDetectorTrainingWorkflow:
             workspace_id=workspace_id,
             persistence_backend=self.persistence_backend,
             database_purpose=self.database_purpose,
-            adapter_type="fake",
+            adapter_type=self.orientation_adapter.adapter_type,
             real_adapter_available=real_adapter_available,
             model_purpose="bee_orientation",
             dataset_version_id=dataset_version.dataset_version_id if dataset_version else None,
@@ -339,10 +571,56 @@ class BeeDetectorTrainingWorkflow:
             eligible_to_start_training=(
                 dataset_version is not None
                 and active is None
-                and counts["eligible_training"] >= 1
-                and counts["eligible_validation"] >= 1
+                and counts["eligible_training"] >= self._minimum_orientation_source_bees()
+                and counts["eligible_validation"] >= self._minimum_orientation_source_bees()
                 and not has_blocker
                 and dataset_version.purpose == MARKED_BEE_DATASET_PURPOSE
+                and (self.orientation_adapter.adapter_type == "fake" or real_adapter_available)
+            ),
+            warnings=warnings,
+        )
+
+    def bee_training_readiness(
+        self,
+        *,
+        user: UserContext,
+        workspace_id: UUID,
+        dataset_version_id: UUID | None = None,
+    ) -> BeeTrainingReadinessResponse:
+        localisation = self.readiness(
+            user=user,
+            workspace_id=workspace_id,
+            model_purpose="bee_detector",
+            dataset_version_id=dataset_version_id,
+        )
+        orientation = self.readiness(
+            user=user,
+            workspace_id=workspace_id,
+            model_purpose="bee_orientation",
+            dataset_version_id=dataset_version_id,
+        )
+        warnings = [
+            *[
+                warning.model_copy(update={"code": f"BEE_LOCALISATION_{warning.code}"})
+                for warning in localisation.warnings
+            ],
+            *[
+                warning.model_copy(update={"code": f"BEE_ORIENTATION_{warning.code}"})
+                for warning in orientation.warnings
+            ],
+        ]
+        return BeeTrainingReadinessResponse(
+            workspace_id=workspace_id,
+            dataset_version_id=orientation.dataset_version_id,
+            dataset_version_human_readable_id=orientation.dataset_version_human_readable_id,
+            active_training_run_id=localisation.active_training_run_id
+            or orientation.active_training_run_id,
+            bee_localisation=localisation,
+            bee_orientation=orientation,
+            eligible_to_start_bee_training=(
+                localisation.eligible_to_start_training
+                and orientation.eligible_to_start_training
+                and orientation.dataset_version_id is not None
             ),
             warnings=warnings,
         )
@@ -553,23 +831,29 @@ class BeeDetectorTrainingWorkflow:
                 "Only Bee Detection and Bee Orientation Training Runs are supported.",
                 422,
             )
-        if self.adapter.adapter_type != "fake" and self.database_purpose == "test":
+        adapter = self._adapter_for_model_purpose(request.model_purpose)
+        adapter_label = (
+            "Bee Orientation" if request.model_purpose == "bee_orientation" else "Bee Localisation"
+        )
+        if adapter.adapter_type != "fake" and self.database_purpose == "test":
             raise DomainError(
                 "real_adapter_refuses_test_database",
-                "Real YOLO training must target the dev or QA database, not the resettable test database.",
+                f"Real {adapter_label} training must target the dev or QA database, not the resettable test database.",
                 409,
             )
-        if self.adapter.adapter_type != "fake" and not self.adapter.check_available():
+        if adapter.adapter_type != "fake" and not adapter.check_available():
             raise DomainError(
-                "real_adapter_unavailable",
-                "Run pnpm model:setup:yolo before using the real YOLO training adapter.",
+                "real_adapter_unavailable"
+                if request.model_purpose == "bee_detector"
+                else "real_orientation_adapter_unavailable",
+                f"Run pnpm model:setup:bee before using the real {adapter_label} adapter.",
                 409,
             )
         active_run = self.store.active_training_run(request.workspace_id)
         if active_run is not None:
             raise DomainError(
                 "training_run_already_active",
-                "Another Bee Detector Training Run is already queued or running.",
+                "Another Bee Training Run is already queued or running.",
                 409,
             )
         if self.store.active_benchmark_evaluation(request.workspace_id) is not None:
@@ -602,12 +886,13 @@ class BeeDetectorTrainingWorkflow:
                 ]
             )
             if (
-                orientation_counts["eligible_training"] < 1
-                or orientation_counts["eligible_validation"] < 1
+                orientation_counts["eligible_training"] < self._minimum_orientation_source_bees()
+                or orientation_counts["eligible_validation"] < self._minimum_orientation_source_bees()
             ):
+                minimum_source_bees = self._minimum_orientation_source_bees()
                 raise DomainError(
                     "orientation_training_and_validation_required",
-                    "Create at least one reliable complete visible bee in Training and Validation before starting Bee Orientation training.",
+                    f"Create at least {minimum_source_bees} reliable complete visible bees in Training and {minimum_source_bees} in Validation before starting Bee Orientation training.",
                     409,
                 )
         high_warnings = [
@@ -637,14 +922,18 @@ class BeeDetectorTrainingWorkflow:
             ),
             model_size=request.model_size,
             base_weights=(
-                "fake_orientation_adapter_manifest"
+                (
+                    "fake_orientation_adapter_manifest"
+                    if self.orientation_adapter.adapter_type == "fake"
+                    else "torchvision_random_initialisation"
+                )
                 if request.model_purpose == "bee_orientation"
                 else "yolo11n-obb.pt"
             ),
             base_weights_source="pending",
             status="queued",
             phase="queued",
-            adapter_type=self.adapter.adapter_type,
+            adapter_type=adapter.adapter_type,
             database_purpose=self.database_purpose,
             training_settings={
                 "model_purpose": request.model_purpose,
@@ -712,6 +1001,53 @@ class BeeDetectorTrainingWorkflow:
             },
         )
         return self._with_runtime_state(training_run)
+
+    def start_bee_training(
+        self,
+        *,
+        user: UserContext,
+        request: BeeTrainingStartRequest,
+    ) -> BeeTrainingStartResponse:
+        readiness = self.bee_training_readiness(
+            user=user,
+            workspace_id=request.workspace_id,
+            dataset_version_id=request.dataset_version_id,
+        )
+        if not readiness.eligible_to_start_bee_training:
+            raise DomainError(
+                "bee_training_not_ready",
+                "Bee Training cannot start until Bee Localisation and Bee Orientation readiness blockers are resolved.",
+                409,
+            )
+        localisation_run = self.start_training_run(
+            user=user,
+            request=TrainingRunStartRequest(
+                workspace_id=request.workspace_id,
+                dataset_version_id=request.dataset_version_id,
+                model_purpose="bee_detector",
+                model_size=request.model_size,
+                epochs=request.epochs,
+                image_size=request.image_size,
+                batch_size=request.batch_size,
+                random_seed=request.random_seed,
+                purpose_notes=request.purpose_notes,
+                acknowledge_high_severity_warnings=request.acknowledge_high_severity_warnings,
+            ),
+        )
+        thread = threading.Thread(
+            target=self._start_orientation_after_localisation,
+            args=(user, request, localisation_run.training_run_id),
+            daemon=True,
+            name=f"hivesight-bee-training-sequence-{localisation_run.training_run_id}",
+        )
+        thread.start()
+        return BeeTrainingStartResponse(
+            workspace_id=request.workspace_id,
+            dataset_version_id=request.dataset_version_id,
+            bee_localisation_training_run=localisation_run,
+            bee_orientation_training_run=None,
+            message="Bee Localisation training started. Bee Orientation will start after it completes.",
+        )
 
     def list_training_runs(
         self,
@@ -1111,27 +1447,16 @@ class BeeDetectorTrainingWorkflow:
             )
             running = self._mark_training_run_phase(
                 running,
-                phase="validating_package",
-                message="Validating Bee Orientation package with fake adapter.",
+                phase="training",
+                message="Bee Orientation training adapter is running.",
                 progress_percent=75,
                 log_path=log_path,
             )
-            fake_manifest_path = run_dir / "fake-orientation-candidate.json"
-            fake_manifest_path.write_text(
-                json.dumps(
-                    {
-                        "model_purpose": "bee_orientation",
-                        "model_family": "bee_orientation_binary_classifier",
-                        "adapter_type": "fake",
-                        "predictive_training_performed": False,
-                        "source_dataset_version_id": str(dataset_version.dataset_version_id),
-                        "package_hash": package_result["package_hash"],
-                        "class_map": ORIENTATION_CLASS_MAP,
-                    },
-                    indent=2,
-                    sort_keys=True,
-                ),
-                encoding="utf-8",
+            adapter_result = self.orientation_adapter.run_training(
+                training_run=running,
+                run_dir=run_dir,
+                dataset_package_dir=package_dir,
+                package_result=package_result,
             )
             package_manifest_artifact = self._record_artifact(
                 owner_type="training_run",
@@ -1160,9 +1485,17 @@ class BeeDetectorTrainingWorkflow:
             candidate_artifact = self._record_artifact(
                 owner_type="training_run",
                 owner_id=running.training_run_id,
-                artifact_type="fake_orientation_candidate_manifest",
-                path=fake_manifest_path,
-                content_type="application/json",
+                artifact_type=(
+                    "fake_orientation_candidate_manifest"
+                    if self.orientation_adapter.adapter_type == "fake"
+                    else "orientation_model_weights"
+                ),
+                path=adapter_result.model_artifact_path,
+                content_type=(
+                    "application/json"
+                    if self.orientation_adapter.adapter_type == "fake"
+                    else "application/octet-stream"
+                ),
                 required_or_diagnostic="required",
             )
             contact_sheet_artifact = self._record_artifact(
@@ -1191,7 +1524,7 @@ class BeeDetectorTrainingWorkflow:
                 training_run_id=running.training_run_id,
                 model_purpose="bee_orientation",
                 model_family="bee_orientation_binary_classifier",
-                adapter_type="fake",
+                adapter_type=running.adapter_type,
                 artifact_id=candidate_artifact.artifact_id,
                 status="created",
                 promotion_status="not_evaluated",
@@ -1200,8 +1533,7 @@ class BeeDetectorTrainingWorkflow:
             )
             self.store.save_model_candidate(candidate)
             metrics = {
-                "predictive_training_performed": False,
-                "metric_scope": "fake_adapter_package_validation",
+                **adapter_result.metrics,
                 "eligible_training_source_bee_count": package_result[
                     "eligible_training_source_bee_count"
                 ],
@@ -1232,11 +1564,11 @@ class BeeDetectorTrainingWorkflow:
                     "completed_at": self.clock(),
                     "last_heartbeat_at": self.clock(),
                     "last_activity_message": (
-                        "Bee Orientation package validated and fake Model Candidate created."
+                        "Bee Orientation training completed and Model Candidate created."
                     ),
                     "progress_percent": 100,
                     "latest_log_excerpt": self._latest_log_excerpt(log_path),
-                    "base_weights_source": "fake_adapter_manifest",
+                    "base_weights_source": adapter_result.base_weights_source,
                     "artifact_ids": [
                         package_manifest_artifact.artifact_id,
                         labels_artifact.artifact_id,
@@ -1312,6 +1644,59 @@ class BeeDetectorTrainingWorkflow:
             name=f"hivesight-training-run-{training_run.training_run_id}",
         )
         thread.start()
+
+    def _start_orientation_after_localisation(
+        self,
+        user: UserContext,
+        request: BeeTrainingStartRequest,
+        localisation_training_run_id: UUID,
+    ) -> None:
+        while True:
+            current = self.store.get_training_run(
+                request.workspace_id,
+                localisation_training_run_id,
+            )
+            if current is None:
+                return
+            if current.status == "completed":
+                break
+            if current.status in TERMINAL_TRAINING_RUN_STATUSES:
+                LOGGER.info(
+                    "bee_orientation_training_skipped_after_localisation_failure",
+                    extra={
+                        "workspace_id": str(request.workspace_id),
+                        "bee_localisation_training_run_id": str(localisation_training_run_id),
+                        "status": current.status,
+                    },
+                )
+                return
+            threading.Event().wait(0.2)
+        self.start_training_run(
+            user=user,
+            request=TrainingRunStartRequest(
+                workspace_id=request.workspace_id,
+                dataset_version_id=request.dataset_version_id,
+                model_purpose="bee_orientation",
+                model_size=request.model_size,
+                epochs=request.epochs,
+                image_size=ORIENTATION_IMAGE_SIZE,
+                batch_size=request.batch_size,
+                random_seed=request.random_seed,
+                purpose_notes=request.purpose_notes,
+                acknowledge_high_severity_warnings=request.acknowledge_high_severity_warnings,
+            ),
+        )
+
+    def _adapter_for_model_purpose(
+        self,
+        model_purpose: str,
+    ) -> BeeDetectorTrainingAdapter | BeeOrientationTrainingAdapter:
+        if model_purpose == "bee_orientation":
+            return self.orientation_adapter
+        return self.adapter
+
+    def _minimum_orientation_source_bees(self) -> int:
+        return 1 if self.orientation_adapter.adapter_type == "fake" else 4
 
     def _heartbeat_while_active(
         self,
@@ -1453,20 +1838,21 @@ class BeeDetectorTrainingWorkflow:
                     "Bee Orientation training requires a Marked-Bee Dataset Version.",
                 )
             )
-        if counts["eligible_training"] < 1:
+        minimum_source_bees = self._minimum_orientation_source_bees()
+        if counts["eligible_training"] < minimum_source_bees:
             warnings.append(
                 _warning(
                     "NO_RELIABLE_TRAINING_HEAD_ORIENTATION",
                     "high",
-                    "No reliable complete visible bees exist in Training evidence.",
+                    f"Bee Orientation training needs at least {minimum_source_bees} reliable complete visible bees in Training evidence.",
                 )
             )
-        if counts["eligible_validation"] < 1:
+        if counts["eligible_validation"] < minimum_source_bees:
             warnings.append(
                 _warning(
                     "NO_RELIABLE_VALIDATION_HEAD_ORIENTATION",
                     "high",
-                    "No reliable complete visible bees exist in Validation evidence.",
+                    f"Bee Orientation training needs at least {minimum_source_bees} reliable complete visible bees in Validation evidence.",
                 )
             )
         if missing_source_image_count > 0:
@@ -1640,12 +2026,13 @@ class BeeDetectorTrainingWorkflow:
             ),
         }
         if (
-            counts["eligible_training_source_bee_count"] < 1
-            or counts["eligible_validation_source_bee_count"] < 1
+            counts["eligible_training_source_bee_count"] < self._minimum_orientation_source_bees()
+            or counts["eligible_validation_source_bee_count"] < self._minimum_orientation_source_bees()
         ):
+            minimum_source_bees = self._minimum_orientation_source_bees()
             raise DomainError(
                 "orientation_training_and_validation_required",
-                "Bee Orientation training requires at least one reliable complete bee in Training and Validation.",
+                f"Bee Orientation training requires at least {minimum_source_bees} reliable complete bees in Training and {minimum_source_bees} in Validation.",
                 409,
             )
         hash_payload = {
@@ -1920,6 +2307,15 @@ class BeeDetectorTrainingWorkflow:
         run_dir = self.artifact_root / "training-runs" / f"training-run-{training_run.training_run_id}"
         report_path = run_dir / "training-run-report.md"
         if training_run.model_purpose == "bee_orientation":
+            training_note = (
+                "No predictive model training was performed; this fake adapter validates the Bee Orientation package only."
+                if not training_run.metrics_summary.get("predictive_training_performed")
+                else (
+                    "Predictive Bee Orientation training was performed. Validation metrics "
+                    "are training-run validation only, not benchmark evidence, not user-facing "
+                    "orientation readiness, and not Varroa Assessment readiness."
+                )
+            )
             body = [
                 f"# Training Run {training_run.human_readable_id}",
                 "",
@@ -1929,7 +2325,7 @@ class BeeDetectorTrainingWorkflow:
                 f"Model Candidate: {candidate.human_readable_id}",
                 f"Promotion status: {candidate.promotion_status}",
                 "",
-                "No predictive model training was performed; this fake adapter validates the Bee Orientation package only.",
+                training_note,
                 "",
                 "Classes: head_up, head_down",
                 "",
@@ -1946,7 +2342,7 @@ class BeeDetectorTrainingWorkflow:
                 f"Model Candidate: {candidate.human_readable_id}",
                 f"Promotion status: {candidate.promotion_status}",
                 "",
-                "This run trains Bee Detector localisation only. It is not Varroa assessment, not production suitable, and not a user-facing Model Version.",
+                "This run trains Bee Localisation only. It is not Varroa assessment, not production suitable, and not a user-facing Model Version.",
                 "",
                 "## Metrics",
                 json.dumps(training_run.metrics_summary, indent=2, sort_keys=True),

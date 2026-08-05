@@ -120,7 +120,7 @@ It lets the Dataset Curator:
 - see the cropped image large enough for careful work;
 - zoom and pan within the crop;
 - add, select, move, resize, rotate, flip, and delete Oriented Bee Ellipses;
-- use crop YOLO candidate suggestions when a Model Candidate is selected, as a secondary annotation aid near the crop editor;
+- use Bee Localisation candidate suggestions when a Model Candidate is selected, as a secondary annotation aid near the crop editor;
 - mark the crop as `review_complete` or `excluded`;
 - reopen a completed crop when allowed by existing rules;
 - see immediate saved state and crop/ellipse counts;
@@ -187,11 +187,11 @@ Dataset Item export remains near Crop Governance because Dataset Role assignment
 
 Model Governance shows workspace-level model evidence and jobs derived from Dataset Items. It owns:
 
-- checking Bee Detector training readiness;
+- checking Bee Training readiness;
 - creating Dataset Versions;
 - acknowledging high-severity dataset warnings for baseline training;
 - starting, cancelling, abandoning, and deleting Training Runs;
-- selecting a completed Model Candidate for crop YOLO pre-labelling;
+- selecting a completed Bee Localisation Model Candidate for bee pre-labelling;
 - checking Benchmark Evaluation readiness;
 - starting and cancelling Benchmark Evaluations;
 - showing recent Training Run and Benchmark Evaluation history.
@@ -354,7 +354,7 @@ Feature: Training Inspection workflow separation
 - Keep stage counts inspection-wide.
 - Keep the Development User switcher outside the workflow.
 - Keep Photo Upload and crop drawing in Crop Selection.
-- Keep YOLO crop pre-labelling in Bee Annotation as a secondary annotation aid.
+- Keep Bee Localisation pre-labelling in Bee Annotation as a secondary annotation aid.
 - Keep Dataset export, Dataset Version, Training Run, Model Candidate, and Benchmark Evaluation controls out of the Bee Annotation stage. The implementation keeps Dataset Item export in Crop Governance and moves Dataset Version, Training Run, Model Candidate, and Benchmark Evaluation controls into the Model Governance stage. A top-level Model Governance page remains parked.
 - Make Crop Governance a selected-Inspection worklist with selected-crop detail/actions.
 - Keep independent review and Dataset Role assignment separate, visible governance concepts.

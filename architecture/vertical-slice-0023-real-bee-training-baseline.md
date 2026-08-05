@@ -1,6 +1,6 @@
 # Vertical Slice 0023: Real Bee Training Baseline
 
-Status: planned; acceptance scenarios signed off on 2026-08-05.
+Status: implemented; acceptance scenarios signed off on 2026-08-05; focused verification passed on 2026-08-05.
 
 ## Purpose
 
@@ -214,28 +214,36 @@ Minimum additions or generalizations:
 
 ## Acceptance Criteria
 
-- [ ] Model Governance shows one Bee Training workflow using a shared Marked-Bee Dataset Version.
-- [ ] Model Governance shows Bee Localisation and Bee Orientation readiness from the same selected Dataset Version.
-- [ ] Model Governance offers one primary **Train bee baseline** action and does not describe the workflow as YOLO training.
-- [ ] Supported user commands are renamed to Bee Training command language.
-- [ ] YOLO-named user commands are removed from the supported command surface.
-- [ ] Internal adapter metadata may still identify `ultralytics_yolo_obb` where technically accurate.
-- [ ] Combined readiness reports adapter availability and data blockers separately for Bee Localisation and Bee Orientation.
-- [ ] Combined training is blocked if either purpose is not ready.
-- [ ] Real Bee Orientation training requires at least four eligible reliable complete bees in Training and four in Validation.
-- [ ] `Train bee baseline` starts Bee Localisation first and Bee Orientation second.
-- [ ] Both Training Runs reference the same Marked-Bee Dataset Version.
-- [ ] If Bee Localisation fails, Bee Orientation is not started in this slice.
-- [ ] Real Bee Orientation adapter trains a small PyTorch/torchvision classifier on the existing orientation package.
-- [ ] Real Bee Orientation Training Run records package hash, architecture, device, settings, logs, validation accuracy, and confusion matrix.
-- [ ] Bee Orientation validation metrics are labelled as training-run validation only, not benchmark evidence.
-- [ ] Bee Orientation Model Candidate remains non-user-facing and unavailable for benchmark evaluation, orientation inference, Head-Up Normalized Bee Crop generation, or Varroa Assessment.
-- [ ] Bee Localisation pre-label UI wording no longer says crop YOLO.
-- [ ] Local dependency preflight explains unavailable Docker/Postgres without resetting or seeding the database.
-- [ ] Append-only QA fixture/helper path exists for local proof-of-life without requiring real weekend photos.
-- [ ] Focused Core API tests, adapter tests, command/script checks, Playwright acceptance, and `pnpm verify:slice` pass before closeout.
-- [ ] Live Postgres verification is run or explicitly recorded as pending if Docker/Postgres is unavailable.
-- [ ] Implementation updates relevant docs: `requirements/roadmap.md`, `docs/user-guide.md`, this slice document, command examples, `architecture/parking-lot.md`, and `requirements/ai-sdlc-observations.md`.
+- [x] Model Governance shows one Bee Training workflow using a shared Marked-Bee Dataset Version.
+- [x] Model Governance shows Bee Localisation and Bee Orientation readiness from the same selected Dataset Version.
+- [x] Model Governance offers one primary **Train bee baseline** action and does not describe the workflow as YOLO training.
+- [x] Supported user commands are renamed to Bee Training command language.
+- [x] YOLO-named user commands are removed from the supported command surface.
+- [x] Internal adapter metadata may still identify `ultralytics_yolo_obb` where technically accurate.
+- [x] Combined readiness reports adapter availability and data blockers separately for Bee Localisation and Bee Orientation.
+- [x] Combined training is blocked if either purpose is not ready.
+- [x] Real Bee Orientation training requires at least four eligible reliable complete bees in Training and four in Validation.
+- [x] `Train bee baseline` starts Bee Localisation first and Bee Orientation second.
+- [x] Both Training Runs reference the same Marked-Bee Dataset Version.
+- [x] If Bee Localisation fails, Bee Orientation is not started in this slice.
+- [x] Real Bee Orientation adapter trains a small PyTorch/torchvision classifier on the existing orientation package.
+- [x] Real Bee Orientation Training Run records package hash, architecture, device, settings, logs, validation accuracy, and confusion matrix.
+- [x] Bee Orientation validation metrics are labelled as training-run validation only, not benchmark evidence.
+- [x] Bee Orientation Model Candidate remains non-user-facing and unavailable for benchmark evaluation, orientation inference, Head-Up Normalized Bee Crop generation, or Varroa Assessment.
+- [x] Bee Localisation pre-label UI wording uses product language instead of implementation-adapter language.
+- [x] Local dependency preflight explains unavailable Docker/Postgres without resetting or seeding the database.
+- [x] Append-only QA fixture/helper path exists for local proof-of-life without requiring real weekend photos.
+- [x] Focused Core API tests, adapter tests, command/script checks, and Playwright acceptance pass before closeout.
+- [ ] `pnpm verify:slice` passes before closeout.
+- [x] Live Postgres verification is run or explicitly recorded as pending if Docker/Postgres is unavailable.
+- [x] Implementation updates relevant docs: `requirements/roadmap.md`, `docs/user-guide.md`, this slice document, command examples, `architecture/parking-lot.md`, and `requirements/ai-sdlc-observations.md`.
+
+## Verification Notes
+
+- Focused Core API and API-level BDD: passed on 2026-08-05.
+- Web TypeScript and dev preflight command checks: passed on 2026-08-05.
+- Focused Playwright acceptance for the combined Bee Training workflow: passed on 2026-08-05 against the running Postgres-backed dev stack.
+- `pnpm verify:slice`: Core API, Analysis Service, Web TypeScript, and dev script checks passed on 2026-08-05. The default browser phase first could not start because the user's existing Core API was already running on port 8000. The reuse-existing-server rerun passed the Slice 0023 scenario but the overall browser suite failed in older state-sensitive scenarios against the already-populated dev database and real-adapter lane. This is recorded in `reports/slice-verification/latest.md`.
 
 ## Open Questions
 

@@ -856,6 +856,17 @@ class ModelTrainingReadinessResponse(BaseModel):
     warnings: list[ModelTrainingWarningResponse]
 
 
+class BeeTrainingReadinessResponse(BaseModel):
+    workspace_id: UUID
+    dataset_version_id: UUID | None = None
+    dataset_version_human_readable_id: str | None = None
+    active_training_run_id: UUID | None = None
+    bee_localisation: ModelTrainingReadinessResponse
+    bee_orientation: ModelTrainingReadinessResponse
+    eligible_to_start_bee_training: bool
+    warnings: list[ModelTrainingWarningResponse]
+
+
 class DatasetVersionCreateRequest(BaseModel):
     workspace_id: UUID
     purpose: str = "marked_bee_detection_orientation"
@@ -898,6 +909,18 @@ class TrainingRunStartRequest(BaseModel):
     workspace_id: UUID
     dataset_version_id: UUID
     model_purpose: str = "bee_detector"
+    model_size: str = "nano"
+    epochs: int = Field(default=1, ge=1, le=100)
+    image_size: int = Field(default=640, ge=128, le=2048)
+    batch_size: int = Field(default=1, ge=1, le=64)
+    random_seed: int = Field(default=42, ge=0)
+    purpose_notes: str | None = Field(default=None, max_length=500)
+    acknowledge_high_severity_warnings: bool = False
+
+
+class BeeTrainingStartRequest(BaseModel):
+    workspace_id: UUID
+    dataset_version_id: UUID
     model_size: str = "nano"
     epochs: int = Field(default=1, ge=1, le=100)
     image_size: int = Field(default=640, ge=128, le=2048)
@@ -995,6 +1018,14 @@ class ModelCandidateResponse(BaseModel):
 
 class TrainingRunListResponse(BaseModel):
     training_runs: list[TrainingRunResponse]
+
+
+class BeeTrainingStartResponse(BaseModel):
+    workspace_id: UUID
+    dataset_version_id: UUID
+    bee_localisation_training_run: TrainingRunResponse
+    bee_orientation_training_run: TrainingRunResponse | None = None
+    message: str
 
 
 class DatasetVersionListResponse(BaseModel):

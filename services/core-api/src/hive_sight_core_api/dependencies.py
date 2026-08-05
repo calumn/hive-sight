@@ -23,6 +23,8 @@ from hive_sight_core_api.bee_detector_benchmark_evaluation_workflow import (
 from hive_sight_core_api.bee_detector_training_workflow import (
     BeeDetectorTrainingWorkflow,
     FakeBeeDetectorTrainingAdapter,
+    FakeBeeOrientationTrainingAdapter,
+    TorchvisionBeeOrientationTrainingAdapter,
     UltralyticsYoloObbTrainingAdapter,
 )
 from hive_sight_core_api.dataset_labelling_workflow import (
@@ -215,11 +217,17 @@ def get_bee_detector_training_workflow(state: DevStateDep) -> BeeDetectorTrainin
         if settings.bee_detector_training_adapter == "ultralytics_yolo_obb"
         else FakeBeeDetectorTrainingAdapter()
     )
+    orientation_adapter = (
+        TorchvisionBeeOrientationTrainingAdapter(device=settings.bee_orientation_device)
+        if settings.bee_orientation_training_adapter == "torchvision_orientation_classifier"
+        else FakeBeeOrientationTrainingAdapter()
+    )
     return BeeDetectorTrainingWorkflow(
         store=state.store,
         image_loader=state.object_storage.get_object,
         artifact_root=state.model_artifact_root,
         adapter=adapter,
+        orientation_adapter=orientation_adapter,
         persistence_backend=settings.persistence_backend,
         database_purpose=settings.database_purpose,
         clock=state.store.clock,

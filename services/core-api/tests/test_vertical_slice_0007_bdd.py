@@ -45,10 +45,12 @@ def _settings() -> Settings:
         object_storage_bucket="hive-sight-local",
         prelabeler="deterministic",
         bee_detector_training_adapter="fake",
+        bee_orientation_training_adapter="fake",
         model_artifact_root="var/model-runs",
         database_purpose="dev",
         yolo_base_weights="yolo11n-obb.pt",
         yolo_device="cpu",
+        bee_orientation_device="cpu",
         training_run_stale_after_seconds=300,
         training_run_heartbeat_interval_seconds=5,
     )

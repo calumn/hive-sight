@@ -685,10 +685,12 @@ export type ModelTrainingWarning = {
   message: string;
 };
 
+export type TrainingAdapterType = "fake" | "ultralytics_yolo_obb" | "torchvision_orientation_classifier";
+
 export type ModelTrainingReadiness = {
   workspaceId: string;
   persistenceBackend: string;
-  adapterType: "fake" | "ultralytics_yolo_obb";
+  adapterType: TrainingAdapterType;
   databasePurpose: string;
   realAdapterAvailable: boolean;
   modelPurpose: ModelPurpose;
@@ -708,6 +710,17 @@ export type ModelTrainingReadiness = {
   protectedBenchmarkSourceBeeCount: number;
   excludedUnreliableOrientationCount: number;
   excludedPartialVisibleBeeCount: number;
+  warnings: ModelTrainingWarning[];
+};
+
+export type BeeTrainingReadiness = {
+  workspaceId: string;
+  datasetVersionId: string | null;
+  datasetVersionHumanReadableId: string | null;
+  activeTrainingRunId: string | null;
+  beeLocalisation: ModelTrainingReadiness;
+  beeOrientation: ModelTrainingReadiness;
+  eligibleToStartBeeTraining: boolean;
   warnings: ModelTrainingWarning[];
 };
 
@@ -765,7 +778,7 @@ export type TrainingRun = {
   modelSize: string;
   baseWeights: string;
   baseWeightsSource: string;
-  adapterType: "fake" | "ultralytics_yolo_obb";
+  adapterType: TrainingAdapterType;
   status: "queued" | "running" | "cancelling" | "completed" | "failed" | "cancelled" | "abandoned";
   phase: string;
   databasePurpose: string;
@@ -806,6 +819,14 @@ export type TrainingRunList = {
   trainingRuns: TrainingRun[];
 };
 
+export type BeeTrainingStart = {
+  workspaceId: string;
+  datasetVersionId: string;
+  beeLocalisationTrainingRun: TrainingRun;
+  beeOrientationTrainingRun: TrainingRun | null;
+  message: string;
+};
+
 export type TrainingRunDeleteResponse = {
   trainingRunId: string;
   deleted: boolean;
@@ -820,7 +841,7 @@ export type ModelCandidate = {
   trainingRunId: string;
   modelPurpose: ModelPurpose;
   modelFamily: string;
-  adapterType: "fake" | "ultralytics_yolo_obb";
+  adapterType: TrainingAdapterType;
   artifactId: string;
   status: string;
   promotionStatus: string;
@@ -838,9 +859,9 @@ export type BenchmarkEvaluationReadiness = {
   workspaceId: string;
   modelCandidateId: string;
   modelCandidateHumanReadableId: string;
-  adapterType: "fake" | "ultralytics_yolo_obb";
-  trainingAdapterType: "fake" | "ultralytics_yolo_obb";
-  evaluationAdapterType: "fake" | "ultralytics_yolo_obb";
+  adapterType: TrainingAdapterType;
+  trainingAdapterType: TrainingAdapterType;
+  evaluationAdapterType: TrainingAdapterType;
   databasePurpose: string;
   benchmarkItemCount: number;
   eligibleToStartEvaluation: boolean;
@@ -872,9 +893,9 @@ export type BenchmarkEvaluation = {
   datasetVersionId: string;
   status: "queued" | "running" | "cancelling" | "completed" | "failed" | "cancelled";
   phase: string;
-  adapterType: "fake" | "ultralytics_yolo_obb";
-  trainingAdapterType: "fake" | "ultralytics_yolo_obb";
-  evaluationAdapterType: "fake" | "ultralytics_yolo_obb";
+  adapterType: TrainingAdapterType;
+  trainingAdapterType: TrainingAdapterType;
+  evaluationAdapterType: TrainingAdapterType;
   databasePurpose: string;
   confidenceThreshold: number;
   matchStrategy: string;
@@ -1534,6 +1555,26 @@ export async function fetchModelTrainingReadiness({
   return parseModelTrainingReadiness(await response.json());
 }
 
+export async function fetchBeeTrainingReadiness({
+  devUserId,
+  workspaceId,
+  datasetVersionId
+}: {
+  devUserId: string;
+  workspaceId: string;
+  datasetVersionId?: string | null;
+}): Promise<BeeTrainingReadiness> {
+  const params = new URLSearchParams({ workspace_id: workspaceId });
+  if (datasetVersionId) {
+    params.set("dataset_version_id", datasetVersionId);
+  }
+  const response = await fetch(`${coreApiUrl}/v1/model-training/bee-training/readiness?${params}`, {
+    headers: devAuthHeaders(devUserId)
+  });
+  await ensureOk(response);
+  return parseBeeTrainingReadiness(await response.json());
+}
+
 export async function createDatasetVersion({
   devUserId,
   workspaceId,
@@ -1580,6 +1621,30 @@ export async function startModelTrainingRun({
   });
   await ensureOk(response);
   return parseTrainingRun(await response.json());
+}
+
+export async function startBeeTrainingRun({
+  devUserId,
+  workspaceId,
+  datasetVersionId,
+  acknowledgeHighSeverityWarnings
+}: {
+  devUserId: string;
+  workspaceId: string;
+  datasetVersionId: string;
+  acknowledgeHighSeverityWarnings: boolean;
+}): Promise<BeeTrainingStart> {
+  const response = await fetch(`${coreApiUrl}/v1/model-training/bee-training/runs`, {
+    method: "POST",
+    headers: jsonHeaders(devUserId),
+    body: JSON.stringify({
+      workspace_id: workspaceId,
+      dataset_version_id: datasetVersionId,
+      acknowledge_high_severity_warnings: acknowledgeHighSeverityWarnings
+    })
+  });
+  await ensureOk(response);
+  return parseBeeTrainingStart(await response.json());
 }
 
 export async function fetchTrainingRuns({
@@ -3118,6 +3183,26 @@ function parseModelTrainingReadiness(value: unknown): ModelTrainingReadiness {
   };
 }
 
+function parseBeeTrainingReadiness(value: unknown): BeeTrainingReadiness {
+  const record = requireRecord(value, "Bee Training readiness response");
+  return {
+    workspaceId: requireString(record.workspace_id, "workspace_id"),
+    datasetVersionId: optionalString(record.dataset_version_id, "dataset_version_id"),
+    datasetVersionHumanReadableId: optionalString(
+      record.dataset_version_human_readable_id,
+      "dataset_version_human_readable_id"
+    ),
+    activeTrainingRunId: optionalString(record.active_training_run_id, "active_training_run_id"),
+    beeLocalisation: parseModelTrainingReadiness(record.bee_localisation),
+    beeOrientation: parseModelTrainingReadiness(record.bee_orientation),
+    eligibleToStartBeeTraining: requireBoolean(
+      record.eligible_to_start_bee_training,
+      "eligible_to_start_bee_training"
+    ),
+    warnings: requireArray(record.warnings, "warnings").map(parseModelTrainingWarning)
+  };
+}
+
 function parseDatasetVersion(value: unknown): DatasetVersion {
   const record = requireRecord(value, "Dataset Version response");
   return {
@@ -3241,6 +3326,19 @@ function parseTrainingRun(value: unknown): TrainingRun {
     createdByUserId: requireString(record.created_by_user_id, "created_by_user_id"),
     createdAt: requireString(record.created_at, "created_at"),
     purposeNotes: optionalString(record.purpose_notes, "purpose_notes")
+  };
+}
+
+function parseBeeTrainingStart(value: unknown): BeeTrainingStart {
+  const record = requireRecord(value, "Bee Training start response");
+  const orientationRun = record.bee_orientation_training_run;
+  return {
+    workspaceId: requireString(record.workspace_id, "workspace_id"),
+    datasetVersionId: requireString(record.dataset_version_id, "dataset_version_id"),
+    beeLocalisationTrainingRun: parseTrainingRun(record.bee_localisation_training_run),
+    beeOrientationTrainingRun:
+      orientationRun === null || orientationRun === undefined ? null : parseTrainingRun(orientationRun),
+    message: requireString(record.message, "message")
   };
 }
 
@@ -3806,8 +3904,12 @@ function requireModelPurpose(value: unknown): ModelPurpose {
   throw new Error("Core API response had an unexpected model purpose");
 }
 
-function requireTrainingAdapterType(value: unknown): "fake" | "ultralytics_yolo_obb" {
-  if (value === "fake" || value === "ultralytics_yolo_obb") {
+function requireTrainingAdapterType(value: unknown): TrainingAdapterType {
+  if (
+    value === "fake" ||
+    value === "ultralytics_yolo_obb" ||
+    value === "torchvision_orientation_classifier"
+  ) {
     return value;
   }
   throw new Error("Core API response had an unexpected training adapter type");

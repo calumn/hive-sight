@@ -1,5 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
+const reuseExistingServer = process.env.HIVESIGHT_PLAYWRIGHT_REUSE_SERVERS === "true";
+
 export default defineConfig({
   testDir: "./tests/acceptance",
   fullyParallel: false,
@@ -25,7 +27,7 @@ export default defineConfig({
         HIVESIGHT_DEV_USERS_ENABLED: "true",
         HIVESIGHT_PRELABELER: "deterministic"
       },
-      reuseExistingServer: false,
+      reuseExistingServer,
       timeout: 30_000,
       url: "http://127.0.0.1:8000/healthz"
     },
@@ -34,7 +36,7 @@ export default defineConfig({
       env: {
         VITE_CORE_API_URL: "http://127.0.0.1:8000"
       },
-      reuseExistingServer: false,
+      reuseExistingServer,
       timeout: 30_000,
       url: "http://127.0.0.1:5173"
     }

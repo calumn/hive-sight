@@ -548,7 +548,7 @@ Area: developer experience, data safety
 
 Context:
 
-Real annotation work should use the Postgres-backed stack (`pnpm dev:all:yolo-training`). The in-memory stack can only resume while the process stays alive. Slice 0017 requires clear closeout/docs reminders, but does not add an in-app persistence-mode warning.
+Real annotation work should use the Postgres-backed stack (`pnpm dev:all:bee-training` when local model training is needed, or `pnpm dev:all` for ordinary app work). The in-memory stack can only resume while the process stays alive. Slice 0017 requires clear closeout/docs reminders, but does not add an in-app persistence-mode warning.
 
 Why parked:
 
@@ -671,7 +671,7 @@ For future real hive inspections, HiveSight needs a model pipeline that can iden
 
 Why parked:
 
-Slice 0022 now creates shared Marked-Bee Dataset Versions and validates the first Bee Orientation Head Up / Head Down package with a fake-adapter baseline candidate. Slice 0023 is planned to promote real predictive Bee Orientation training into active work while keeping benchmark evaluation, inference, and the decision about whether the binary classifier is sufficient or should be replaced by a keypoint/pose or multi-head model parked.
+Slice 0022 creates shared Marked-Bee Dataset Versions and validates the first Bee Orientation Head Up / Head Down package with a fake-adapter baseline candidate. Slice 0023 adds real predictive Bee Orientation training from the same shared source Dataset Version. Benchmark evaluation, inference, automated crop normalization, and the decision about whether the binary classifier is sufficient or should be replaced by a keypoint/pose or multi-head model remain parked.
 
 Revisit trigger:
 

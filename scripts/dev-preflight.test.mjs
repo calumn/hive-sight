@@ -1,5 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 import { databaseTargetFromEnv, renderPostgresUnavailableMessage } from "./dev-preflight.mjs";
 
@@ -31,6 +32,7 @@ describe("dev server Postgres preflight", () => {
 
     assert.match(message, /Docker Desktop does not appear to be running/);
     assert.match(message, /pnpm db:up/);
+    assert.match(message, /pnpm dev:all:bee-training/);
     assert.match(message, /does not reset or wipe your database/);
   });
 
@@ -43,5 +45,19 @@ describe("dev server Postgres preflight", () => {
     assert.match(message, /Postgres container is probably stopped/);
     assert.match(message, /pnpm db:up/);
     assert.doesNotMatch(message, /Start Docker Desktop/);
+  });
+
+  it("exposes Bee Training commands without YOLO-named command aliases", () => {
+    const packageJson = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf-8"));
+    const scripts = packageJson.scripts;
+
+    assert.ok(scripts["model:setup:bee"]);
+    assert.ok(scripts["model:train:bee"]);
+    assert.ok(scripts["dev:all:bee-training"]);
+    assert.ok(scripts["dev:lan:bee-training"]);
+    assert.equal(scripts["model:setup:yolo"], undefined);
+    assert.equal(scripts["model:train:bee:yolo"], undefined);
+    assert.equal(scripts["dev:all:yolo"], undefined);
+    assert.equal(scripts["dev:all:yolo-training"], undefined);
   });
 });

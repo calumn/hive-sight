@@ -13,13 +13,6 @@ try {
     },
     [200]
   );
-  const readiness = await requestJson(
-    `/v1/model-training/readiness?workspace_id=${encodeURIComponent(workspaceId)}`,
-    { headers: devHeaders() }
-  );
-  process.stdout.write(
-    `Readiness: ${readiness.adapter_type} / ${readiness.database_purpose}; training ${readiness.dataset_item_counts.training ?? 0}, validation ${readiness.dataset_item_counts.validation ?? 0}\n`
-  );
   const datasetVersion = await requestJson(
     "/v1/model-training/dataset-versions",
     {
@@ -29,9 +22,16 @@ try {
     },
     [201]
   );
-  process.stdout.write(`Dataset Version: ${datasetVersion.human_readable_id}\n`);
-  const trainingRun = await requestJson(
-    "/v1/model-training/training-runs",
+  process.stdout.write(`Marked-Bee Dataset Version: ${datasetVersion.human_readable_id}\n`);
+  const readiness = await requestJson(
+    `/v1/model-training/bee-training/readiness?workspace_id=${encodeURIComponent(workspaceId)}&dataset_version_id=${encodeURIComponent(datasetVersion.dataset_version_id)}`,
+    { headers: devHeaders() }
+  );
+  process.stdout.write(
+    `Bee Training readiness: localisation ${readiness.bee_localisation.adapter_type} ${readiness.bee_localisation.real_adapter_available ? "available" : "unavailable"}; orientation ${readiness.bee_orientation.adapter_type} ${readiness.bee_orientation.real_adapter_available ? "available" : "unavailable"}\n`
+  );
+  const trainingStart = await requestJson(
+    "/v1/model-training/bee-training/runs",
     {
       method: "POST",
       headers: jsonHeaders(),
@@ -44,11 +44,12 @@ try {
     [202]
   );
   process.stdout.write(
-    `Training Run: ${trainingRun.human_readable_id} ${trainingRun.status}; candidate ${trainingRun.model_candidate_id ?? "not created"}\n`
+    `Bee Localisation Training Run: ${trainingStart.bee_localisation_training_run.human_readable_id} ${trainingStart.bee_localisation_training_run.status}\n`
   );
+  process.stdout.write(`${trainingStart.message}\n`);
 } catch (error) {
   process.stderr.write(`${error.message}\n`);
-  process.stderr.write("Start the stack first with: pnpm dev:all:yolo-training\n");
+  process.stderr.write("Start the stack first with: pnpm dev:all:bee-training\n");
   process.exitCode = 1;
 }
 

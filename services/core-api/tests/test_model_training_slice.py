@@ -135,7 +135,7 @@ def test_dataset_curator_creates_dataset_version_and_fake_training_run(
             headers=_headers(),
         )
         assert report.status_code == 200
-        assert "Bee Detector localisation only" in report.text
+        assert "Bee Localisation only" in report.text
     finally:
         app.dependency_overrides.clear()
 
@@ -329,6 +329,121 @@ def test_orientation_readiness_blocks_missing_source_image_bytes(tmp_path: Path)
         assert any(
             warning["code"] == "SOURCE_IMAGE_BYTES_MISSING"
             for warning in body["warnings"]
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_bee_training_readiness_and_start_use_one_shared_dataset_version(
+    tmp_path: Path,
+) -> None:
+    state = _build_state(tmp_path)
+    app.dependency_overrides[get_dev_state] = lambda: state
+    app.dependency_overrides[get_bee_detector_training_workflow] = lambda: BeeDetectorTrainingWorkflow(
+        store=state.store,
+        image_loader=state.object_storage.get_object,
+        artifact_root=state.model_artifact_root,
+        adapter=AvailableRealishTrainingAdapter(),
+        orientation_adapter=AvailableRealishOrientationAdapter(),
+        persistence_backend="postgres",
+        database_purpose="dev",
+        clock=state.store.clock,
+    )
+    client = TestClient(app)
+    try:
+        workspace_id = _workspace(client)
+        for offset in range(4):
+            _create_reviewed_crop_item(client, workspace_id, "training", 10 + offset, 10)
+            _create_reviewed_crop_item(client, workspace_id, "validation", 260 + offset, 10)
+        dataset_version = client.post(
+            "/v1/model-training/dataset-versions",
+            json={"workspace_id": workspace_id},
+            headers=_headers(),
+        ).json()
+
+        readiness = client.get(
+            "/v1/model-training/bee-training/readiness"
+            f"?workspace_id={workspace_id}&dataset_version_id={dataset_version['dataset_version_id']}",
+            headers=_headers(),
+        )
+        assert readiness.status_code == 200
+        assert readiness.json()["eligible_to_start_bee_training"] is True
+        assert readiness.json()["bee_localisation"]["adapter_type"] == "ultralytics_yolo_obb"
+        assert readiness.json()["bee_orientation"]["adapter_type"] == "torchvision_orientation_classifier"
+
+        start_response = client.post(
+            "/v1/model-training/bee-training/runs",
+            json={
+                "workspace_id": workspace_id,
+                "dataset_version_id": dataset_version["dataset_version_id"],
+                "acknowledge_high_severity_warnings": True,
+            },
+            headers=_headers(),
+        )
+        assert start_response.status_code == 202
+        localisation_run_id = start_response.json()["bee_localisation_training_run"][
+            "training_run_id"
+        ]
+        localisation_run = _wait_for_training_run_status(
+            client,
+            workspace_id,
+            localisation_run_id,
+            "completed",
+        )
+        assert localisation_run["dataset_version_id"] == dataset_version["dataset_version_id"]
+        orientation_run = _wait_for_training_run_purpose_status(
+            client,
+            workspace_id,
+            "bee_orientation",
+            "completed",
+        )
+        assert orientation_run["dataset_version_id"] == dataset_version["dataset_version_id"]
+        assert orientation_run["adapter_type"] == "torchvision_orientation_classifier"
+        assert orientation_run["metrics_summary"]["predictive_training_performed"] is True
+        assert orientation_run["metrics_summary"]["metric_scope"] == "training_run_validation_not_benchmark"
+        assert "validation_accuracy" in orientation_run["metrics_summary"]
+        assert "confusion_matrix" in orientation_run["metrics_summary"]
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_real_orientation_training_requires_four_reliable_bees_per_split(
+    tmp_path: Path,
+) -> None:
+    state = _build_state(tmp_path)
+    app.dependency_overrides[get_dev_state] = lambda: state
+    app.dependency_overrides[get_bee_detector_training_workflow] = lambda: BeeDetectorTrainingWorkflow(
+        store=state.store,
+        image_loader=state.object_storage.get_object,
+        artifact_root=state.model_artifact_root,
+        adapter=AvailableRealishTrainingAdapter(),
+        orientation_adapter=AvailableRealishOrientationAdapter(),
+        persistence_backend="postgres",
+        database_purpose="dev",
+        clock=state.store.clock,
+    )
+    client = TestClient(app)
+    try:
+        workspace_id = _workspace(client)
+        _create_reviewed_crop_item(client, workspace_id, "training", 10, 10)
+        _create_reviewed_crop_item(client, workspace_id, "validation", 260, 10)
+        dataset_version = client.post(
+            "/v1/model-training/dataset-versions",
+            json={"workspace_id": workspace_id},
+            headers=_headers(),
+        ).json()
+
+        readiness = client.get(
+            "/v1/model-training/bee-training/readiness"
+            f"?workspace_id={workspace_id}&dataset_version_id={dataset_version['dataset_version_id']}",
+            headers=_headers(),
+        )
+        assert readiness.status_code == 200
+        assert readiness.json()["eligible_to_start_bee_training"] is False
+        assert readiness.json()["bee_orientation"]["eligible_to_start_training"] is False
+        assert any(
+            "at least 4 reliable complete visible bees" in warning["message"]
+            for warning in readiness.json()["bee_orientation"]["warnings"]
         )
     finally:
         app.dependency_overrides.clear()
@@ -862,6 +977,74 @@ class UnavailableRealTrainingAdapter:
         raise AssertionError("Unavailable adapter should not be asked to run training.")
 
 
+class AvailableRealishTrainingAdapter:
+    adapter_type = "ultralytics_yolo_obb"
+
+    def check_available(self) -> bool:
+        return True
+
+    def run_training(
+        self,
+        *,
+        training_run,
+        run_dir: Path,
+        dataset_package_dir: Path,
+    ) -> TrainingAdapterResult:
+        _ = dataset_package_dir
+        weights_path = run_dir / "weights" / "best.pt"
+        weights_path.parent.mkdir(parents=True, exist_ok=True)
+        weights_path.write_text("realish Bee Localisation weights\n", encoding="utf-8")
+        log_path = run_dir / "training.log"
+        with log_path.open("a", encoding="utf-8") as log_file:
+            log_file.write("Realish Bee Localisation adapter completed.\n")
+        return TrainingAdapterResult(
+            metrics={"metric_scope": "realish_localisation"},
+            model_artifact_path=weights_path,
+            log_path=log_path,
+            base_weights_source="realish_test",
+        )
+
+
+class AvailableRealishOrientationAdapter:
+    adapter_type = "torchvision_orientation_classifier"
+
+    def check_available(self) -> bool:
+        return True
+
+    def run_training(
+        self,
+        *,
+        training_run,
+        run_dir: Path,
+        dataset_package_dir: Path,
+        package_result: dict[str, object],
+    ) -> TrainingAdapterResult:
+        assert (dataset_package_dir / "labels.jsonl").exists()
+        weights_path = run_dir / "weights" / "orientation-classifier.pt"
+        weights_path.parent.mkdir(parents=True, exist_ok=True)
+        weights_path.write_text("realish Bee Orientation weights\n", encoding="utf-8")
+        log_path = run_dir / "training.log"
+        with log_path.open("a", encoding="utf-8") as log_file:
+            log_file.write("Realish Bee Orientation adapter completed.\n")
+        return TrainingAdapterResult(
+            metrics={
+                "predictive_training_performed": True,
+                "metric_scope": "training_run_validation_not_benchmark",
+                "architecture": "mobilenet_v3_small",
+                "device": "cpu",
+                "validation_accuracy": 1.0,
+                "confusion_matrix": {
+                    "head_up": {"head_up": 4, "head_down": 0},
+                    "head_down": {"head_up": 0, "head_down": 4},
+                },
+                "package_hash": package_result["package_hash"],
+            },
+            model_artifact_path=weights_path,
+            log_path=log_path,
+            base_weights_source="torchvision_random_initialisation",
+        )
+
+
 class BlockingTrainingAdapter:
     adapter_type = "fake"
 
@@ -1054,6 +1237,25 @@ def _wait_for_training_run_status(
             return body
         time.sleep(0.02)
     raise AssertionError(f"Training Run did not reach {expected_status}.")
+
+
+def _wait_for_training_run_purpose_status(
+    client: TestClient,
+    workspace_id: str,
+    model_purpose: str,
+    expected_status: str,
+) -> dict:
+    for _ in range(100):
+        response = client.get(
+            f"/v1/model-training/training-runs?workspace_id={workspace_id}",
+            headers=_headers(),
+        )
+        assert response.status_code == 200
+        for run in response.json()["training_runs"]:
+            if run["model_purpose"] == model_purpose and run["status"] == expected_status:
+                return run
+        time.sleep(0.03)
+    raise AssertionError(f"{model_purpose} Training Run did not reach {expected_status}.")
 
 
 def _wait_for_benchmark_evaluation_status(

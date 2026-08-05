@@ -512,3 +512,21 @@ AI contribution:
 Human judgment still required:
 
 - Confirm implementation priority after Slice 0023 design is committed or proceed directly to building the slice.
+
+### 2026-08-05 Slice 0023 Real Bee Training Baseline Implementation
+
+Human-confirmed direction:
+
+- Proceed with the signed-off Slice 0023 scenarios.
+- Keep Bee Training as the operator workflow and remove YOLO-named user commands instead of keeping aliases.
+
+AI contribution:
+
+- Implemented combined Bee Training readiness and start behaviour so Bee Localisation runs first and Bee Orientation follows from the same Marked-Bee Dataset Version.
+- Added a real PyTorch/torchvision Bee Orientation adapter that records non-user-facing candidate artifacts, package hash, architecture, device, validation accuracy, and a Head Up / Head Down confusion matrix.
+- Updated the Web UI, command surface, docs, roadmap, parking lot, and regression tests to use Bee Training / Bee Localisation product language while retaining internal adapter ids where technically accurate.
+
+Human judgment still required:
+
+- Review the first real orientation training reports once real weekend photos are available.
+- Decide later whether benchmark evidence supports the binary orientation classifier or whether a keypoint/pose or multi-head model is needed.

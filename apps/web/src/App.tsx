@@ -69,6 +69,7 @@ import {
   fetchInspectionPhotoObjectUrl,
   fetchBenchmarkEvaluationReadiness,
   fetchBenchmarkEvaluations,
+  fetchBeeTrainingReadiness,
   fetchModelCandidates,
   fetchModelTrainingReadiness,
   fetchRequestedReviews,
@@ -83,7 +84,7 @@ import {
   requestTrainingCropReview,
   startDatasetLabellingSession,
   startBenchmarkEvaluation,
-  startModelTrainingRun,
+  startBeeTrainingRun,
   suggestTrainingCropBeeAnnotations,
   toCoreApiContentUrl,
   updateTrainingCrop,
@@ -100,6 +101,7 @@ import {
   type BeeAnnotationProposal,
   type BenchmarkEvaluation,
   type BenchmarkEvaluationReadiness,
+  type BeeTrainingReadiness,
   type DevSession,
   type HealthResponse,
   type Hive,
@@ -2138,7 +2140,7 @@ function formatDatasetRoleLabel(role: DatasetRole | null) {
 }
 
 function formatModelPurpose(purpose: TrainingRun["modelPurpose"]) {
-  if (purpose === "bee_detector") return "Bee Detector";
+  if (purpose === "bee_detector") return "Bee Localisation";
   if (purpose === "bee_orientation") return "Bee Orientation";
   if (purpose === "marked_bee") return "Marked-Bee";
   return purpose;
@@ -2537,6 +2539,8 @@ function TrainingCropAnnotationPanel({
     useState<ModelTrainingReadiness | null>(null);
   const [orientationTrainingReadiness, setOrientationTrainingReadiness] =
     useState<ModelTrainingReadiness | null>(null);
+  const [beeTrainingReadiness, setBeeTrainingReadiness] =
+    useState<BeeTrainingReadiness | null>(null);
   const [datasetVersion, setDatasetVersion] = useState<DatasetVersion | null>(null);
   const [trainingRun, setTrainingRun] = useState<TrainingRun | null>(null);
   const [trainingRuns, setTrainingRuns] = useState<TrainingRun[]>([]);
@@ -2578,17 +2582,12 @@ function TrainingCropAnnotationPanel({
   const hasActiveBenchmarkEvaluation = benchmarkEvaluations.some(isActiveBenchmarkEvaluation);
   const shouldPollTrainingRuns =
     hasActiveTrainingRun ||
-    workingLabel === "Starting Bee Detector training" ||
-    workingLabel === "Starting Bee Orientation training";
+    workingLabel === "Starting Bee Training";
   const shouldPollBenchmarkEvaluations =
     hasActiveBenchmarkEvaluation || workingLabel === "Starting Benchmark Evaluation";
-  const canStartModelTraining =
+  const canStartBeeTraining =
     Boolean(datasetVersion) &&
-    (modelTrainingReadiness?.eligibleToStartTraining ?? true) &&
-    !Boolean(workingLabel);
-  const canStartOrientationTraining =
-    Boolean(datasetVersion) &&
-    (orientationTrainingReadiness?.eligibleToStartTraining ?? false) &&
+    (beeTrainingReadiness?.eligibleToStartBeeTraining ?? false) &&
     !Boolean(workingLabel);
   const canStartBenchmarkEvaluation =
     Boolean(selectedModelCandidateId) &&
@@ -2633,7 +2632,7 @@ function TrainingCropAnnotationPanel({
         : selectedCrop.reviewStatus === "review_pending"
           ? "Complete or exclude the Training Crop before assigning a Dataset Item."
           : datasetRole !== "excluded" && selectedCrop.visibleBeeStatus !== "has_visible_bees"
-            ? "Only completed crops with visible bees can enter the positive Bee Detector dataset."
+            ? "Only completed crops with visible bees can enter the positive Bee Localisation dataset."
             : datasetRole !== "excluded" && selectedCropEllipseCount === 0
               ? "Add at least one reviewed bee ellipse before assigning this crop."
               : datasetRole === "benchmark" && datasetSourceGroupKey.trim().length === 0
@@ -3248,16 +3247,18 @@ function TrainingCropAnnotationPanel({
 
   async function refreshModelTrainingReadiness() {
     await runCropAction("Checking model training readiness", async () => {
-      const readiness = await fetchModelTrainingReadiness({ devUserId, workspaceId });
-      setModelTrainingReadiness(readiness);
       if (datasetVersion) {
-        const orientationReadiness = await fetchModelTrainingReadiness({
+        const beeReadiness = await fetchBeeTrainingReadiness({
           devUserId,
           workspaceId,
-          modelPurpose: "bee_orientation",
           datasetVersionId: datasetVersion.datasetVersionId
         });
-        setOrientationTrainingReadiness(orientationReadiness);
+        setBeeTrainingReadiness(beeReadiness);
+        setModelTrainingReadiness(beeReadiness.beeLocalisation);
+        setOrientationTrainingReadiness(beeReadiness.beeOrientation);
+      } else {
+        const readiness = await fetchModelTrainingReadiness({ devUserId, workspaceId });
+        setModelTrainingReadiness(readiness);
       }
       await refreshTrainingRuns();
     });
@@ -3358,17 +3359,17 @@ function TrainingCropAnnotationPanel({
     });
   }
 
-  async function useTrainingRunCandidateForCropYolo(candidateId: string) {
+  async function useTrainingRunCandidateForBeePrelabels(candidateId: string) {
     const candidates = await refreshModelCandidates();
     const matchingCandidate =
       candidates.find((candidate) => candidate.modelCandidateId === candidateId) ?? null;
     if (matchingCandidate?.modelPurpose !== "bee_detector") {
-      setModelCandidateSelectionMessage("Only Bee Detector candidates can be used for crop YOLO.");
+      setModelCandidateSelectionMessage("Only Bee Localisation candidates can be used for bee pre-labels.");
       return;
     }
     setSelectedModelCandidateId(candidateId);
     const candidateLabel = matchingCandidate?.humanReadableId ?? candidateId;
-    const message = `Now using ${candidateLabel} for crop YOLO.`;
+    const message = `Now using ${candidateLabel} for Bee Localisation pre-labels.`;
     setModelCandidateSelectionMessage(message);
     setCandidateProposalMessage(message);
     await refreshBenchmarkReadiness(candidateId);
@@ -3379,59 +3380,39 @@ function TrainingCropAnnotationPanel({
       const nextDatasetVersion = await createDatasetVersion({ devUserId, workspaceId });
       setDatasetVersion(nextDatasetVersion);
       setTrainingRun(null);
-      const readiness = await fetchModelTrainingReadiness({ devUserId, workspaceId });
-      setModelTrainingReadiness(readiness);
-      const orientationReadiness = await fetchModelTrainingReadiness({
+      const beeReadiness = await fetchBeeTrainingReadiness({
         devUserId,
         workspaceId,
-        modelPurpose: "bee_orientation",
         datasetVersionId: nextDatasetVersion.datasetVersionId
       });
-      setOrientationTrainingReadiness(orientationReadiness);
+      setBeeTrainingReadiness(beeReadiness);
+      setModelTrainingReadiness(beeReadiness.beeLocalisation);
+      setOrientationTrainingReadiness(beeReadiness.beeOrientation);
       await refreshTrainingRuns();
       await refreshModelCandidates();
     });
   }
 
-  async function startBeeDetectorTrainingRun() {
+  async function startBeeBaselineTrainingRun() {
     if (!datasetVersion) {
       return;
     }
-    await runCropAction("Starting Bee Detector training", async () => {
-      const nextTrainingRun = await startModelTrainingRun({
+    await runCropAction("Starting Bee Training", async () => {
+      const nextStart = await startBeeTrainingRun({
         devUserId,
         workspaceId,
         datasetVersionId: datasetVersion.datasetVersionId,
-        modelPurpose: "bee_detector",
         acknowledgeHighSeverityWarnings: acknowledgeModelWarnings
       });
-      setTrainingRun(nextTrainingRun);
-      const readiness = await fetchModelTrainingReadiness({ devUserId, workspaceId });
-      setModelTrainingReadiness(readiness);
-      await refreshTrainingRuns();
-    });
-  }
-
-  async function startBeeOrientationTrainingRun() {
-    if (!datasetVersion) {
-      return;
-    }
-    await runCropAction("Starting Bee Orientation training", async () => {
-      const nextTrainingRun = await startModelTrainingRun({
+      setTrainingRun(nextStart.beeLocalisationTrainingRun);
+      const beeReadiness = await fetchBeeTrainingReadiness({
         devUserId,
         workspaceId,
-        datasetVersionId: datasetVersion.datasetVersionId,
-        modelPurpose: "bee_orientation",
-        acknowledgeHighSeverityWarnings: acknowledgeModelWarnings
-      });
-      setTrainingRun(nextTrainingRun);
-      const orientationReadiness = await fetchModelTrainingReadiness({
-        devUserId,
-        workspaceId,
-        modelPurpose: "bee_orientation",
         datasetVersionId: datasetVersion.datasetVersionId
       });
-      setOrientationTrainingReadiness(orientationReadiness);
+      setBeeTrainingReadiness(beeReadiness);
+      setModelTrainingReadiness(beeReadiness.beeLocalisation);
+      setOrientationTrainingReadiness(beeReadiness.beeOrientation);
       await refreshTrainingRuns();
     });
   }
@@ -3476,7 +3457,7 @@ function TrainingCropAnnotationPanel({
     if (!trainingRun) {
       return;
     }
-    await runCropAction("Cancelling Bee Detector training", async () => {
+    await runCropAction("Cancelling Bee Localisation training", async () => {
       const cancelled = await cancelTrainingRun({
         devUserId,
         workspaceId,
@@ -3494,7 +3475,7 @@ function TrainingCropAnnotationPanel({
     if (!trainingRun) {
       return;
     }
-    await runCropAction("Abandoning stale Bee Detector training", async () => {
+    await runCropAction("Abandoning stale Bee Localisation training", async () => {
       const abandoned = await abandonTrainingRun({
         devUserId,
         workspaceId,
@@ -3516,7 +3497,7 @@ function TrainingCropAnnotationPanel({
     if (!trainingRun) {
       return;
     }
-    await runCropAction("Deleting unevidenced Bee Detector training run", async () => {
+    await runCropAction("Deleting unevidenced Bee Localisation training run", async () => {
       await deleteTrainingRun({
         devUserId,
         workspaceId,
@@ -4239,10 +4220,10 @@ function TrainingCropAnnotationPanel({
                 >
                   <div className="candidate-control-header">
                     <div>
-                      <strong>YOLO crop pre-labels</strong>
+                        <strong>Bee Localisation pre-labels</strong>
                       <p data-testid="candidate-prelabel-message">
                         {candidateProposalMessage ??
-                          "Run the selected Bee Detector Model Candidate on this crop."}
+                          "Run the selected Bee Localisation Model Candidate on this crop."}
                       </p>
                     </div>
                     <button
@@ -4252,7 +4233,7 @@ function TrainingCropAnnotationPanel({
                       data-testid="suggest-bees-button"
                     >
                       <Play size={18} />
-                      YOLO this crop
+                      Suggest bees
                     </button>
                   </div>
                   <div className="review-state" data-testid="selected-crop-yolo-candidate-state">
@@ -4261,7 +4242,7 @@ function TrainingCropAnnotationPanel({
                           modelCandidates.find(
                             (candidate) => candidate.modelCandidateId === selectedModelCandidateId
                           )?.humanReadableId ?? selectedModelCandidateId
-                        } for crop YOLO.`
+                        } for Bee Localisation pre-labels.`
                       : "No Model Candidate selected. Train a baseline or refresh candidates first."}
                   </div>
                   <label>
@@ -4846,7 +4827,7 @@ function TrainingCropAnnotationPanel({
                 <div className="model-training-panel" data-testid="model-training-panel">
                   <header className="model-workflow-header">
                     <div>
-                      <strong>Bee Detector model workflow</strong>
+                      <strong>Bee Training workflow</strong>
                       <p>Prepare shared marked-bee evidence, train a detector baseline candidate, then benchmark it against protected evidence.</p>
                     </div>
                     <span>Baseline only; not user-facing.</span>
@@ -4917,23 +4898,23 @@ function TrainingCropAnnotationPanel({
                     ) : null}
                   </section>
 
-                  <section className="model-workflow-stage" aria-label="Train Bee Detector baseline">
+                  <section className="model-workflow-stage" aria-label="Train bee baseline">
                     <div className="model-workflow-stage-heading">
                       <span className="workflow-step-number">2</span>
                       <div>
-                        <strong>Train Bee Detector baseline</strong>
-                        <p>Run the local adapter against the locked Dataset Version and record the resulting Model Candidate.</p>
+                        <strong>Bee Training baseline</strong>
+                        <p>Train Bee Localisation and Bee Orientation sequentially from the same Marked-Bee Dataset Version.</p>
                       </div>
                     </div>
                     <div className="model-workflow-actions">
                       <button
                         type="button"
-                        disabled={!canStartModelTraining}
-                        onClick={() => void startBeeDetectorTrainingRun()}
+                        disabled={!canStartBeeTraining}
+                        onClick={() => void startBeeBaselineTrainingRun()}
                         data-testid="start-model-training-run-button"
                       >
                         <Play size={18} />
-                        Train baseline
+                        Train bee baseline
                       </button>
                       <label className="checkbox-row">
                         <input
@@ -5013,12 +4994,12 @@ function TrainingCropAnnotationPanel({
                               type="button"
                               disabled={Boolean(workingLabel)}
                               onClick={() =>
-                                void useTrainingRunCandidateForCropYolo(trainingRun.modelCandidateId!)
+                                void useTrainingRunCandidateForBeePrelabels(trainingRun.modelCandidateId!)
                               }
-                              data-testid="use-model-candidate-for-crop-yolo-button"
+                              data-testid="use-model-candidate-for-bee-prelabels-button"
                             >
                               <Check size={18} />
-                              Use candidate for crop YOLO
+                              Use candidate for bee pre-labels
                             </button>
                           ) : null}
                           <button
@@ -5071,7 +5052,7 @@ function TrainingCropAnnotationPanel({
                       <span className="workflow-step-number">3</span>
                       <div>
                         <strong>Train Bee Orientation baseline</strong>
-                        <p>Build the Head Up / Head Down package from the same Marked-Bee Dataset Version and validate it with the fake adapter.</p>
+                        <p>Build the Head Up / Head Down package from the same Marked-Bee Dataset Version and train the orientation candidate after Bee Localisation completes.</p>
                       </div>
                     </div>
                     <div className="model-workflow-actions">
@@ -5083,15 +5064,6 @@ function TrainingCropAnnotationPanel({
                       >
                         <RefreshCw size={18} />
                         Check orientation
-                      </button>
-                      <button
-                        type="button"
-                        disabled={!canStartOrientationTraining}
-                        onClick={() => void startBeeOrientationTrainingRun()}
-                        data-testid="start-bee-orientation-training-run-button"
-                      >
-                        <Play size={18} />
-                        Train orientation
                       </button>
                     </div>
                     {orientationTrainingReadiness ? (
@@ -5169,7 +5141,7 @@ function TrainingCropAnnotationPanel({
                     <div className="model-workflow-stage-heading">
                         <span className="workflow-step-number">5</span>
                       <div>
-                        <strong>Bee Detector benchmark evaluation</strong>
+                        <strong>Bee Localisation benchmark evaluation</strong>
                         <p>Evaluate the selected Model Candidate against protected Training Crop benchmark evidence.</p>
                       </div>
                     </div>

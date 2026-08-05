@@ -11,10 +11,12 @@ class Settings:
     object_storage_bucket: str
     prelabeler: str
     bee_detector_training_adapter: str
+    bee_orientation_training_adapter: str
     model_artifact_root: str
     database_purpose: str
     yolo_base_weights: str
     yolo_device: str
+    bee_orientation_device: str
     training_run_stale_after_seconds: int
     training_run_heartbeat_interval_seconds: int
     object_storage_root: str = "var/object-storage"
@@ -42,10 +44,15 @@ def load_settings() -> Settings:
         object_storage_root=os.getenv("HIVESIGHT_OBJECT_STORAGE_ROOT", "var/object-storage"),
         prelabeler=os.getenv("HIVESIGHT_PRELABELER", "deterministic"),
         bee_detector_training_adapter=os.getenv("HIVESIGHT_BEE_TRAINING_ADAPTER", "fake"),
+        bee_orientation_training_adapter=os.getenv(
+            "HIVESIGHT_BEE_ORIENTATION_TRAINING_ADAPTER",
+            "fake",
+        ),
         model_artifact_root=os.getenv("HIVESIGHT_MODEL_ARTIFACT_ROOT", "var/model-runs"),
         database_purpose=os.getenv("HIVESIGHT_DATABASE_PURPOSE", "dev"),
         yolo_base_weights=os.getenv("HIVESIGHT_YOLO_BASE_WEIGHTS", "yolo11n-obb.pt"),
         yolo_device=os.getenv("HIVESIGHT_YOLO_DEVICE", "cpu"),
+        bee_orientation_device=os.getenv("HIVESIGHT_BEE_ORIENTATION_DEVICE", "cpu"),
         training_run_stale_after_seconds=int(
             os.getenv("HIVESIGHT_TRAINING_RUN_STALE_AFTER_SECONDS", "300")
         ),

@@ -137,7 +137,7 @@ class UltralyticsYoloObbInferenceAdapter:
         except ImportError as exc:
             raise DomainError(
                 "real_adapter_unavailable",
-                "Run pnpm model:setup:yolo before using the real YOLO inference adapter.",
+                "Run pnpm model:setup:bee before using the real Bee Localisation inference adapter.",
                 409,
             ) from exc
         if not model_artifact_path.exists():

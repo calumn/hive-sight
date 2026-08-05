@@ -543,7 +543,7 @@ class BeeDetectorBenchmarkEvaluationWorkflow:
         if self.adapter.adapter_type != "fake" and not self.adapter.check_available():
             return DomainError(
                 "real_adapter_unavailable",
-                "Run pnpm model:setup:yolo before using the real YOLO evaluation adapter.",
+                "Run pnpm model:setup:bee before using the real Bee Localisation evaluation adapter.",
                 409,
             )
         for dataset_item_id in benchmark_item_ids:

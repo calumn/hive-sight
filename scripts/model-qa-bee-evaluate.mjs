@@ -81,7 +81,7 @@ try {
     }
   }
   process.stderr.write(
-    "Start the real model stack with: pnpm dev:all:yolo, then make sure at least one real completed Model Candidate and protected benchmark Dataset Item exist.\n"
+    "Start the real model stack with: pnpm dev:all:bee-training, then make sure at least one real completed Model Candidate and protected benchmark Dataset Item exist.\n"
   );
   process.exitCode = 1;
 }

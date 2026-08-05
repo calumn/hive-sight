@@ -43,7 +43,7 @@ export function renderPostgresUnavailableMessage({ dockerAvailable, target }) {
     lines.push("Start Docker Desktop, then run: pnpm db:up");
   }
 
-  lines.push("Then start HiveSight again: pnpm dev:all:yolo-training");
+  lines.push("Then start HiveSight again: pnpm dev:all:bee-training");
   lines.push("This check does not reset or wipe your database.");
   lines.push("");
   return `${lines.join("\n")}\n`;

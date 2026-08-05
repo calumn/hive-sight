@@ -36,7 +36,7 @@ test("Dataset Curator previews Model Candidate bee suggestions before accepting 
   await page.getByTestId("acknowledge-model-training-warnings-checkbox").check();
   await page.getByTestId("start-model-training-run-button").click();
   await expect(page.getByTestId("model-training-run-summary")).toContainText("completed");
-  await page.getByTestId("use-model-candidate-for-crop-yolo-button").click();
+  await page.getByTestId("use-model-candidate-for-bee-prelabels-button").click();
   await expect(page.getByTestId("model-candidate-selection-confirmation")).toContainText(
     "Now using HS-MC-"
   );
