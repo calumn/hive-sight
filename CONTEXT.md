@@ -77,7 +77,7 @@ An Inspection Intent for gathering reviewed image and annotation evidence to imp
 _Avoid_: Real inspection when the purpose is dataset creation rather than beekeeper assessment.
 
 **Training Inspection Workflow**:
-The staged Web UI workflow used for a Training Data Collection Inspection. Its current stages are Inspection Setup, Crop Selection, Bee Annotation, Crop Governance, and Model Governance. Stage changes are navigation only; saved photos, crops, ellipses, review requests, Dataset Items, Dataset Versions, Training Runs, Model Candidates, and Benchmark Evaluations remain the durable state.
+The staged Web UI workflow used for a Training Data Collection Inspection. Its current stages are Inspection Setup, Crop Selection, Bee Annotation, Crop Governance, Varroa Review, and Model Governance. Stage changes are navigation only; saved photos, crops, ellipses, Varroa review cues, Varroa Review Outcomes, review requests, Dataset Items, Dataset Versions, Training Runs, Model Candidates, and Benchmark Evaluations remain the durable state.
 _Avoid_: Treating the selected UI stage as domain state or persisted inspection status.
 
 **Crop Governance**:
@@ -87,6 +87,10 @@ _Avoid_: Bee Annotation when the actor is governing completed crop evidence rath
 **Model Governance**:
 The Training Inspection Workflow stage where a Dataset Curator checks workspace-level dataset readiness, creates shared Marked-Bee Dataset Versions, starts Bee Detector and Bee Orientation Training Runs, selects Bee Detector Model Candidates for crop pre-labelling, and runs Benchmark Evaluations. It operates across Dataset Items rather than one selected Training Crop.
 _Avoid_: Crop Governance when the actor is governing cross-crop model evidence rather than one crop's review or Dataset Role assignment.
+
+**Varroa Review**:
+The Training Inspection Workflow stage where a Dataset Curator reviews one eligible Head-Up Normalized Bee Crop at a time and records a Varroa Review Outcome with marker evidence when visible Varroa is present. In Slice 0025 this is model-curation evidence only, scoped to the selected Training Crop; it is not a beekeeper-facing Varroa Assessment, Sampling Plan, Dataset Role assignment, or treatment trigger.
+_Avoid_: Varroa Assessment when the work is internal model-curation labelling.
 
 **Varroa Assessment**:
 An Inspection Intent for estimating visible Varroa evidence from inspection photos for beekeeper-facing support.
@@ -165,6 +169,10 @@ _Avoid_: No Varroa, negative result.
 **Varroa Review Outcome**:
 A human judgement about one bee-relative crop: `visible_varroa_present`, `no_visible_varroa`, or `not_determined`. `no_visible_varroa` is an active negative judgement; `not_determined` is not a negative result.
 _Avoid_: No annotation when the absence of a marker has not been reviewed.
+
+**Varroa Marker**:
+A human-placed point marker identifying a visible Varroa mite location within a Head-Up Normalized Bee Crop. In Slice 0025 markers use normalized 0-1 crop coordinates and belong to a Varroa Review Outcome.
+_Avoid_: Bee-level positive when the exact visible mite location is required.
 
 **Blind Independent Review**:
 A second review performed without showing the first reviewer's outcome or Varroa marker positions. Disagreement is resolved through a documented adjudication outcome.
@@ -257,6 +265,14 @@ _Avoid_: Bounding box when the human-reviewed bee shape and orientation are mean
 **Orientation Reliability**:
 The reviewed assessment of whether a Bee Annotation's directed head/tail orientation is trustworthy: `reliable` or `unreliable`.
 _Avoid_: Confidence when the value is about head/tail direction rather than whether a bee is present.
+
+**Varroa Review Suitability**:
+A lightweight Bee Annotation triage cue recorded during bee annotation to say whether the bee appears assessable for visible Varroa review: `unassessed`, `appears_assessable`, or `body_occluded_or_hard_to_assess`. It helps prioritise and warn during Varroa Review; it is not itself a Varroa Review Outcome and does not override Slice 0025 eligibility rules.
+_Avoid_: Varroa Review Outcome when no active mite review has been saved.
+
+**Suspected Visible Varroa Cue**:
+A lightweight Bee Annotation triage flag set when the annotator notices possible visible Varroa while annotating bees. It helps pull the bee forward in Varroa Review, but it is not ground truth, not a positive Varroa Review Outcome, and does not make an ineligible bee eligible for the first Varroa corpus.
+_Avoid_: visible_varroa_present when the bee-relative crop has not been actively reviewed and marked.
 
 **Candidate Annotation**:
 A proposed Annotation awaiting human review. It may come from a model candidate, imported public dataset, previous draft, or future helper.
@@ -368,7 +384,7 @@ The model purpose that determines the head/tail direction of a localised bee. Th
 _Avoid_: Oriented bounding-box rotation when biological head direction is meant.
 
 **Head-Up Normalized Bee Crop**:
-A bee-relative image crop rotated so the bee's head is at the top of the crop. It is the intended input convention for Varroa Detection when Bee Orientation is reliable.
+A bee-relative image crop rotated so the bee's head is at the top of the crop. It is the intended input convention for Varroa Detection when Bee Orientation is reliable. In Slice 0025 it is generated on demand as a review image and coordinate frame from source image bytes, Training Crop geometry, a reliable complete Bee Annotation, and transform metadata; it is not yet stored as a standalone derived image artifact.
 _Avoid_: Oriented crop when the direction of the bee's head is the important convention.
 
 **Varroa Detector**:

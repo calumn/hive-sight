@@ -1221,3 +1221,26 @@ After the Gold-Standard Full-Frame Annotation Pilot has produced reviewed full-d
 Suggested owner or area:
 
 Varroa assessment, research methodology, dataset/model governance, and statistical inference.
+
+## PARK-0052: Varroa Review Invalidation After Source Bee Geometry Changes
+
+Status: parked
+Date parked: 2026-08-05
+Source: Slice 0025 grilling
+Area: Varroa review, annotation provenance, dataset governance
+
+Context:
+
+Slice 0025 is planned to generate Head-Up Normalized Bee Crops on demand from source image bytes, Training Crop geometry, and a reliable complete Bee Annotation. Varroa marker coordinates are saved relative to that normalized crop coordinate frame. The saved Varroa Review Outcome also keeps a compact bee-geometry and transform snapshot.
+
+Why parked:
+
+If the source Training Crop, Bee Annotation geometry, annotation type, or Orientation Reliability changes after a Varroa Review Outcome is saved, the saved transform and marker coordinates may no longer match the current bee evidence. Slice 0025 keeps the first curation loop editable and lightweight: existing reviews remain visible, source bee edits are not blocked, and no deterministic transform checksum or immutable review-revision model is introduced yet.
+
+Revisit trigger:
+
+Before Varroa Dataset Role assignment, Varroa Dataset Versions, benchmark-strength Varroa evidence, Blind Independent Review, Varroa Detector training export, or any report that treats saved Varroa Review Outcomes as stable model evidence.
+
+Suggested owner or area:
+
+Varroa review workflow, annotation UI, persistence, and dataset governance.

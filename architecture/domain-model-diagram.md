@@ -35,6 +35,8 @@ erDiagram
     WORKSPACE ||--o{ DATA_DELETION_REQUEST : may_request
 
     TRAINING_CROP ||--o{ BEE_ANNOTATION : reviewed_with
+    BEE_ANNOTATION ||--o| VARROA_REVIEW : may_have_current
+    VARROA_REVIEW ||--o{ VARROA_MARKER : contains
     TRAINING_CROP ||--o{ CANDIDATE_ANNOTATION : may_have
     TRAINING_CROP ||--o| DATASET_ITEM : becomes
     SOURCE_IMAGE ||--o{ DATASET_ITEM : sources
@@ -152,9 +154,32 @@ erDiagram
         string analysis_result_id
         string training_crop_id
         string visibility_class
+        string orientation_reliability
+        string varroa_review_suitability
+        boolean suspected_visible_varroa
         string source
         string review_method
         string review_status
+    }
+
+    VARROA_REVIEW {
+        string id
+        string workspace_id
+        string training_crop_id
+        string bee_annotation_id
+        string review_outcome
+        string sampling_purpose
+        string dataset_selection_method
+        string review_strength
+        string annotation_source
+    }
+
+    VARROA_MARKER {
+        string id
+        string varroa_review_id
+        string marker_type
+        float normalized_x
+        float normalized_y
     }
 
     CANDIDATE_ANNOTATION {

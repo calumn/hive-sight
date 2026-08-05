@@ -609,6 +609,8 @@ Essential fields:
 - geometry
 - visibility class
 - orientation reliability
+- Varroa review suitability
+- suspected visible Varroa cue
 - confidence
 - review status
 
@@ -639,6 +641,9 @@ Rules:
 - Oriented Bee Ellipse rotation is directed: `rotation_degrees` points from the ellipse center toward the bee's head along the major axis; the opposite end is the tail.
 - Reviewed Bee Annotations record Orientation Reliability as `reliable` or `unreliable`, independently of their visibility class, bee-presence confidence, and review status. New Oriented Bee Ellipses default to `reliable`; the annotator changes them to `unreliable` when head/tail direction is doubtful.
 - Existing local test Bee Annotations without Orientation Reliability may be normalized to `reliable` without a separate defaulted-provenance flag. Future annotation evidence missing Orientation Reliability is excluded from Bee Orientation or Head-Up Normalized Varroa exports until normalized or corrected.
+- Bee Annotations may carry lightweight Varroa review triage cues set during bee annotation: Varroa Review Suitability (`unassessed`, `appears_assessable`, or `body_occluded_or_hard_to_assess`) and a boolean Suspected Visible Varroa Cue. These cues are not Varroa Review Outcomes, do not create positive or negative Varroa evidence, and do not override first-corpus eligibility rules.
+- New Bee Annotations default Varroa Review Suitability to `unassessed` and Suspected Visible Varroa Cue to false. Existing local test Bee Annotations may be normalized to those defaults without a separate defaulted-provenance flag.
+- Varroa review triage cues retain last-updated provenance, such as the user and timestamp that set the cue. Full cue history is not required.
 - Candidate Annotations are not ground truth until human reviewed.
 - Reviewed Annotations still require Dataset Role assignment before dataset use.
 - Model-specific exports may project oriented ellipses into other shapes such as YOLO OBB labels.
@@ -679,6 +684,26 @@ Rules:
 - Imported public dataset annotations may enter as Candidate Annotations only; they become reviewed evidence only after HiveSight review.
 - Candidate Annotation is independent of any one model run or model family.
 
+### Head-Up Normalized Bee Crop
+
+A derived bee-relative image and coordinate frame rotated so the bee's head is at the top.
+
+Essential source inputs:
+
+- source image bytes
+- inspection photo id
+- training crop id
+- bee annotation id
+- bee annotation geometry snapshot
+- transform version
+
+Rules:
+
+- It is derived from the source image, Training Crop, and a Bee Annotation; it is not a standalone persisted entity in Slice 0025.
+- It may be generated on demand for Varroa Review and later materialized inside a Varroa Dataset Version export artifact.
+- Marker coordinates recorded during Varroa Review are relative to this normalized coordinate frame, not the browser display pixels.
+- The transform metadata must be sufficient to regenerate the review image and understand the marker coordinate frame.
+
 ### Varroa Review
 
 A human review of visible Varroa evidence on one bee-relative crop.
@@ -686,15 +711,24 @@ A human review of visible Varroa evidence on one bee-relative crop.
 Essential fields:
 
 - id
+- workspace id
+- inspection photo id
+- training crop id
 - bee annotation id
+- transform metadata
+- bee annotation geometry snapshot used for the transform
 - sampling purpose
-- sampling method
+- dataset selection method
 - sampling stratum summary
 - review outcome
 - source
 - review method
-- reviewer id
-- reviewed at
+- review strength
+- created by user id
+- created at
+- updated by user id
+- updated at
+- optional notes
 - optional independent second reviewer id
 - optional adjudicator id, distinct from both original reviewer ids
 - optional adjudication reference
@@ -708,16 +742,48 @@ Review outcomes:
 
 Rules:
 
-- `visible_varroa_present` requires one or more reviewed Varroa Annotations.
+- Slice 0025 creates one current editable Varroa Review per Workspace and Bee Annotation. Later immutable revision/history records are a separate design.
+- A Varroa Review is created only when the curator saves an actual outcome. `Not reviewed` is derived from the absence of a current Varroa Review row, not stored as an outcome.
+- `visible_varroa_present` requires one or more Varroa Markers.
 - `no_visible_varroa` is an active human negative judgement, not merely the absence of a Varroa Annotation.
-- `not_determined` must not be exported as a negative Varroa training or benchmark example.
+- `not_determined` requires a note in Slice 0025 and must not be exported as a negative Varroa training or benchmark example.
+- `no_visible_varroa` and `not_determined` require zero Varroa Markers.
+- Slice 0025 Varroa Reviews are Dataset Curator-only, Training Data Collection-only, and limited to completed non-excluded Training Crops.
+- Slice 0025 eligible bees must be `complete_visible_bee` with reliable Orientation Reliability and available source image bytes. Partial visible bees and unreliable-orientation bees may be shown as ineligible/deferred but cannot receive a Slice 0025 Varroa Review Outcome.
+- Varroa Review Suitability and Suspected Visible Varroa Cue may prioritise or warn in the UI, but they do not preselect or save a Varroa Review Outcome.
+- Slice 0025 review provenance is `model_curation`, `human_selected`, `single_curator_review`, and `human_from_scratch`. This describes the Varroa review itself; the source Bee Annotation's own provenance remains separately visible.
+- A Varroa Review is potential future model-curation evidence. It is not automatically a Dataset Item, Dataset Role assignment, benchmark label, Gold-Standard Full-Frame Corpus item, inspection-rate sample, or user-facing Varroa Assessment result.
 - `model_curation` and `inspection_rate_estimation` are distinct Sampling Purposes even when they share the same review UI; only the former is eligible for a model Dataset Item by default.
-- Default model-curation reviews use `stratified_random` selection across available Hive, frame, bee-density, lighting, and image-quality strata. Deliberately added difficult examples use `curator_targeted`; Dataset Versions and benchmark reports preserve their distributions.
+- Slice 0025 uses manual human selection from the selected Training Crop and records `human_selected`. Later sampling-plan slices may add `stratified_random`, `curator_targeted`, or upstream-model-selected queues.
 - An early baseline benchmark may use one active curator review only when its report states that limitation. A Model Candidate cannot be considered for user-facing Varroa Assessment until benchmark Varroa Review Outcomes have Blind Independent Review: the second reviewer cannot see the first outcome or Varroa marker positions. Disagreements require Third-Party Adjudication by a reviewer distinct from both originals, who first records a fresh blind review and only then sees anonymised prior reviews to document the final outcome.
 - A disagreement that remains unresolved, including a three-way conflict, has the canonical outcome `not_determined` and is excluded from Varroa training and benchmark evidence.
 - Training and validation Varroa evidence may use one active reviewed outcome when its review provenance remains available; the stronger Blind Independent Review and Third-Party Adjudication path is the user-facing benchmark promotion gate.
 - A non-blocking quality audit periodically selects a stratified-random sample of training and validation Varroa Reviews for Blind Independent Review. Its selection and review provenance, agreement, disagreement, and unresolved outcomes remain distinct from protected benchmark evidence and are reported by Annotation Source, including human-from-scratch and AI-assisted-reviewed evidence.
 - A concerning quality-audit result requires a documented Dataset Curator Audit Disposition and a warning on every affected Dataset Version. It does not automatically block dataset use while numerical escalation thresholds remain deferred.
+
+### Varroa Marker
+
+Structured marker data identifying a visible Varroa mite in one Head-Up Normalized Bee Crop.
+
+Essential fields:
+
+- id
+- Varroa Review id
+- marker type
+- normalized x coordinate
+- normalized y coordinate
+- created at
+
+Marker types:
+
+- `point`
+
+Rules:
+
+- Varroa Markers belong to a Varroa Review, not directly to a Bee Annotation.
+- Slice 0025 supports multiple point markers per positive Varroa Review.
+- Normalized coordinates are stored in the inclusive range `0 <= x <= 1` and `0 <= y <= 1`, rounded to a stable precision such as four decimal places.
+- Slice 0025 does not require per-marker notes, marker dragging, tight boxes, segmentation masks, or body-mask containment validation.
 
 ### Varroa Annotation
 
@@ -747,7 +813,7 @@ Rules:
 - Partial or unassociated Varroa detections are additional evidence.
 - Candidate Annotations are not ground truth until human reviewed.
 - Reviewed Annotations still require Dataset Role assignment before dataset use.
-- A Varroa Annotation is evidence of a positive marker; a Varroa Review carries the explicit positive, negative, or not-determined judgement for the bee-relative crop.
+- A legacy or model-produced Varroa Annotation is evidence of a positive marker candidate. A Varroa Review carries the explicit positive, negative, or not-determined judgement for the bee-relative crop, and its Varroa Markers carry human-reviewed point evidence in normalized bee-crop coordinates.
 
 ### User Correction
 

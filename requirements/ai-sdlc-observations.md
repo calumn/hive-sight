@@ -570,3 +570,27 @@ Human judgment still required:
 
 - Review real Bee Orientation benchmark reports once real protected benchmark evidence exists.
 - Decide later whether benchmark evidence supports the binary classifier or whether a keypoint/pose or multi-head model is needed before Varroa crop normalization.
+
+### 2026-08-05 Slice 0025 Varroa Review Outcome Labelling Planning
+
+Human-confirmed direction:
+
+- Move from Bee Orientation evidence into the first Varroa curation workflow before training a Varroa Detector.
+- Acceptance signoff given for Slice 0025 scenarios.
+- Preserve the active-label rule: `no_visible_varroa` is an explicit human judgement, not the absence of marker clicks.
+- Name the workflow stage `Varroa Review` and place it after Crop Governance and before Model Governance.
+- Scope the slice to Dataset Curators, Training Data Collection inspections, completed Training Crops, and reliable complete visible bees.
+- Treat Varroa review suitability and suspected-visible-Varroa as fast annotation-time triage cues, not final Varroa evidence.
+- Use on-demand Head-Up Normalized Bee Crop previews as the primary review surface, with source crop context and point markers in normalized coordinates.
+- Keep review evidence conservative: `model_curation`, `human_selected`, `single_curator_review`, and `human_from_scratch`.
+
+AI contribution:
+
+- Proposed Slice 0025 as a combined thin slice: generate a Head-Up Normalized Bee Crop preview from reliable complete human-reviewed bee ellipses, then let a Dataset Curator record `visible_varroa_present`, `no_visible_varroa`, or `not_determined` with point-marker evidence for positives.
+- Kept automated orientation inference, Varroa Detector training, sampling-plan queues, blind independent review, repository-level queues, Dataset Item promotion, HiveSight Advisor, treatment recommendation, and user-facing Varroa Assessment out of the slice.
+- Drafted and revised `architecture/vertical-slice-0025-varroa-review-outcome-labelling.md`, updated the roadmap, and aligned the context/domain-model documents with the new Varroa Review concepts.
+
+Human judgment still required:
+
+- Decide after real use whether triage cues need richer notes/history or whether the lightweight current-value model is enough.
+- Decide in a later slice how Varroa Review Outcomes graduate into Dataset Items, benchmark evidence, sampling-plan evidence, or treatment-advisor inputs.
