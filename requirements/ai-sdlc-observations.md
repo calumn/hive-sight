@@ -530,3 +530,25 @@ Human judgment still required:
 
 - Review the first real orientation training reports once real weekend photos are available.
 - Decide later whether benchmark evidence supports the binary orientation classifier or whether a keypoint/pose or multi-head model is needed.
+
+### 2026-08-05 Slice 0024 Bee Orientation Benchmark Evaluation Planning
+
+Human-confirmed direction:
+
+- Make Slice 0024 the Bee Orientation Benchmark Evaluation slice after real Bee Orientation training.
+- Evaluate only reliable complete visible bees from protected Benchmark items inside the candidate's own shared Marked-Bee Dataset Version.
+- Report excluded unreliable-orientation and partial visible bees, but do not score them in the first orientation benchmark.
+- Produce Head Up / Head Down accuracy and confusion matrix evidence only; defer angular error, promotion thresholds, and classifier-sufficiency decisions.
+- Allow fake candidates for fast workflow evidence while labelling fake-adapter benchmark output as not real model quality.
+- Add a separate Bee Orientation benchmark section inside Model Governance, with modest structure around Model Benchmarking.
+- Keep the one-active-model-job guard and avoid adding a reusable Benchmark Dataset Version lifecycle in this slice.
+
+AI contribution:
+
+- Converted the grilling decisions and accepted scenarios into `architecture/vertical-slice-0024-bee-orientation-benchmark-evaluation.md`.
+- Updated the roadmap and PARK-0028 so benchmark evaluation is the next planned orientation step while automated inference and Head-Up Normalized Bee Crop generation remain parked.
+
+Human judgment still required:
+
+- Review real Bee Orientation benchmark reports once real protected benchmark evidence exists.
+- Later decide whether the binary classifier is sufficient for Varroa work or whether a keypoint/pose or multi-head model is justified.
