@@ -1,42 +1,58 @@
-# Vertical Slice 0029: Advisor Varroa Context API
+# Vertical Slice 0029: Advisor Varroa Context Assembly API
 
-Status: designed; grilling decisions incorporated; acceptance scenarios formally accepted on 2026-08-06.
+Status: designed; HiveSight Advisor review incorporated; revised acceptance scenarios formally accepted on 2026-08-06.
 
 ## Purpose
 
-Expose the minimum HiveSight-owned Varroa context that HiveSight Advisor needs to decide whether treatment guidance can be requested, without moving treatment advice, treatment acceptance, or treatment history lifecycle into this slice.
+Assemble the minimum HiveSight-owned Varroa context that HiveSight will later use when it calls HiveSight Advisor's existing treatment-plan endpoint, without making HiveSight Advisor an outbound caller into HiveSight.
 
-This slice turns the transient Slice 0028 Frame Mite Count into a narrowly scoped integration contract. It proves that HiveSight can assemble hive identity, inspection-photo evidence, model-assisted frame mite count evidence, caveats, and current treatment-history availability into one machine-readable context response.
+This slice turns the transient Slice 0028 Frame Mite Count into a narrowly scoped HiveSight context assembler. It proves that HiveSight can gather hive identity, inspection-photo evidence, model-assisted frame mite count evidence, human-reviewed photo-visible Varroa evidence, caveats, and treatment-history modelling status into one machine-readable context response.
 
 This is not a HiveSight Advisor call, Treatment Recommendation, Hive Treatment Course, visible Varroa rate, statistical confidence estimate, user-facing Varroa Assessment, or durable frame-count history.
 
+## Advisor Review Outcome
+
+HiveSight Advisor reviewed the first Slice 0029 design on 2026-08-06 and agreed with several contract boundaries:
+
+- aggregate Varroa evidence is useful context, but not enough on its own to ground a treatment-plan request;
+- per-bee detections, detector boxes, image URLs, and detector geometry should stay inside HiveSight;
+- blocking reason names such as `jurisdiction_not_provided`, `source_intent_not_varroa_assessment`, and `treatment_history_not_modelled` are acceptable and must be covered by contract-version discipline;
+- `treatment_history.status = not_modelled` with `recent_treatment_count = null` correctly distinguishes missing domain modelling from confirmed no recent treatment.
+
+Advisor also pushed back on the original call direction. The revised design accepts that feedback:
+
+- HiveSight remains the sole caller into HiveSight Advisor.
+- HiveSight Advisor does not call a HiveSight context endpoint.
+- Slice 0029 is a HiveSight-owned context assembly API/service for testability and later use by HiveSight's outbound Advisor caller.
+- The shared `hivesight-advisor-integration-contract` skill should not be updated until HiveSight implements and verifies the actual outbound call or a settled cross-app endpoint change.
+- The inbound service-auth header decision is removed from this slice. The `X-HiveSight-Service-Key` header remains Advisor's existing inbound auth for calls from HiveSight to Advisor.
+
+Advisor noted that its treatment guidance also needs situational/treatment-method context, such as jurisdiction, temperature, brood presence, honey-super status, organic-certification standing, and treatment history. Slice 0029 does not invent those domains. It makes their absence explicit in request-readiness blockers.
+
 ## Grilling Decisions
 
-- Slice 0029 is context API only. It does not add a HiveSight-side outbound caller for HiveSight Advisor's treatment-plan endpoint.
-- `jurisdiction_id` is optional in the context request. Missing jurisdiction does not prevent `status = available`, but it blocks `advisor_request_readiness.can_request_advice`.
+- Slice 0029 is context assembly only. It does not add a HiveSight-side outbound caller for HiveSight Advisor's treatment-plan endpoint.
+- Slice 0029 does not expose an endpoint for HiveSight Advisor to call.
+- Slice 0029 is API-only with no visible HiveSight UI.
+- `jurisdiction_id` is optional in the request. Missing jurisdiction does not prevent `status = available`, but it blocks `advisor_request_readiness.can_request_advice`.
 - `completed_with_warnings` Frame Mite Count evidence may be included in available context with explicit warning and caveat detail.
-- In Slice 0029, `advisor_request_readiness.can_request_advice` remains `false` because treatment history is not modelled yet and Training Data Collection evidence is not a user-facing Varroa Assessment.
+- In Slice 0029, `advisor_request_readiness.can_request_advice` remains `false` because treatment history is not modelled yet, Training Data Collection evidence is not a user-facing Varroa Assessment, and required Advisor situational fields are not modelled.
 - Training Data Collection evidence is acceptable for integration-context testing, but it is labelled as model-curation or integration-test evidence and blocks actual advice readiness.
-- HiveSight uses `X-HiveSight-Service-Key` as the integration header name for symmetry with HiveSight Advisor. HiveSight's expected value is its own configured Advisor integration secret.
 - A valid request with no processable evidence returns HTTP `200` with `status = not_available`. Invalid identity, auth, or entity relationships use HTTP errors.
 - The context includes both model-assisted `frame_mite_count` evidence and human-reviewed `photo_visible_varroa_evidence`, kept as separate sections.
-- Advisor receives aggregate frame evidence only. Per-bee detector results, detection boxes, image URLs, Head-Up transform metadata, and Bee Annotation ids stay inside HiveSight.
+- The context exposes aggregate evidence only. Per-bee detector results, detection boxes, image URLs, Head-Up transform metadata, and Bee Annotation ids stay inside HiveSight.
 - The response includes `workspace_id`, `apiary_id`, `hive_id`, `inspection_id`, and `inspection_photo_id` as opaque HiveSight provenance ids, but no User or membership details.
-- Slice 0029 is API-only. It adds no visible HiveSight UI.
-- No Treatment History domain model is introduced. The response uses `treatment_history.status = not_modelled` and `recent_treatment_count = null` so Advisor does not mistake absence of modelling for no recent treatment.
+- No Treatment History domain model is introduced. The response uses `treatment_history.status = not_modelled` and `recent_treatment_count = null`.
 - Caveats are machine/provenance-oriented constraints, not polished beekeeper-facing advice copy.
-- The shared `hivesight-advisor-integration-contract` skill is not updated until Slice 0029 is implemented and verified. This design can be shared with the Advisor side for agreement first.
 - The response uses `advisor_request_readiness`, not `advisor_suitability`.
-- Endpoint path is `POST /v1/integrations/hivesight-advisor/varroa-context`.
+- Endpoint path is `POST /v1/hives/{hive_id}/advisor-varroa-context`.
 - The response includes `contract_version = advisor_varroa_context_v1`.
-- The request does not include `workspace_id`; HiveSight derives Workspace from the requested Hive.
+- The request does not include `workspace_id`; HiveSight derives Workspace from the requested Hive and enforces ordinary HiveSight user/workspace access.
 - Valid-but-`not_available` responses still include HiveSight identity/provenance fields.
 - The main evidence wrapper is `varroa_evidence`, with separate `frame_mite_count` and `photo_visible_varroa_evidence` children.
 - The slice doc includes an example request/response payload for HiveSight Advisor review.
 - Example evidence uses realistic-looking counts but explicitly marks them as deterministic/stub/model-curation evidence.
-- No Slice 0029-specific browser acceptance is required because the slice is service-to-service API only.
-- Local tests use an explicit configured dev/test service key and still exercise the service-auth dependency.
-- The Advisor service key belongs in Core API settings.
+- No Slice 0029-specific browser acceptance is required because the slice is API-only.
 
 ## Source Inputs
 
@@ -45,18 +61,19 @@ This is not a HiveSight Advisor call, Treatment Recommendation, Hive Treatment C
 - `architecture/domain-model.md`: Frame Mite Count and its non-claims around Advisor, treatment, rate, and whole-colony measurement.
 - `architecture/vertical-slice-0026-frame-level-varroa-result-summary.md`: human-reviewed photo-visible evidence summary and Advisor-context availability caveats.
 - `architecture/vertical-slice-0028-frame-mite-counting-workflow.md`: model-assisted frame mite count shape and transient result rules.
-- `hivesight-advisor-integration-contract` skill: Advisor already exposes `POST /integrations/hivesight/treatment-plans` with `{hive_id, jurisdiction_id, situational_context}`; HiveSight has not yet built a real caller or recommendation intake.
+- HiveSight Advisor review response, 2026-08-06: HiveSight should assemble context and later call Advisor's existing `POST /integrations/hivesight/treatment-plans` with `hive_id`, `jurisdiction_id`, and `situational_context`; Advisor should not call HiveSight.
+- `hivesight-advisor-integration-contract` skill: Advisor already exposes `POST /integrations/hivesight/treatment-plans`; HiveSight has not yet built a real caller or recommendation intake.
 - `architecture/parking-lot.md`: revisit any parked treatment-history, sampling, and Advisor integration follow-ons.
 
 ## User Path
 
-Given a service-authenticated HiveSight Advisor integration client has a HiveSight Hive id and a selected Inspection Photo id,
-When it requests Varroa context for that photo,
-Then HiveSight returns the current Advisor-ready Varroa context if eligible frame evidence can be counted, including hive, apiary, inspection, frame-count, caveat, and treatment-history availability fields.
+Given a HiveSight operator or future HiveSight Advisor-caller workflow has a Hive id and a selected Inspection Photo id,
+When HiveSight assembles Advisor Varroa context for that photo,
+Then HiveSight returns the current context payload if valid evidence can be counted, including hive, apiary, inspection, Varroa evidence, request-readiness blockers, and treatment-history modelling status.
 
 ## Preconditions
 
-- The integration request uses HiveSight's dedicated Advisor service credential in `X-HiveSight-Service-Key`, not the development user header and not beekeeper UI auth.
+- The request uses normal HiveSight Core API authentication and Workspace access rules.
 - The requested Hive exists in HiveSight.
 - The requested Inspection Photo belongs to an Inspection for the same Hive.
 - The Inspection has intent `training_data_collection` for this first slice, because the evidence source is still the model-curation training workflow.
@@ -65,15 +82,15 @@ Then HiveSight returns the current Advisor-ready Varroa context if eligible fram
 
 ## End-To-End Behaviour
 
-HiveSight adds a dedicated integration endpoint for Advisor context:
+HiveSight adds a protected context assembly endpoint:
 
-- route prefix is scoped to Advisor integration only;
-- service auth is checked by a dedicated dependency;
-- no normal Core API user routes accept the service credential;
-- no development user capability is required for the service endpoint, and development user auth alone is rejected;
-- request references a Hive and selected Inspection Photo;
+- route is a HiveSight Core API route, not a HiveSight Advisor inbound integration route;
+- no service-to-service auth is introduced in HiveSight in this slice;
+- request references a Hive path id and a selected Inspection Photo body id;
+- HiveSight derives Workspace and Apiary from the requested Hive and enforces ordinary Workspace access;
 - HiveSight verifies the photo belongs to an Inspection for that Hive;
 - HiveSight runs or reuses the same logic as Slice 0028 to build a current model-assisted Frame Mite Count;
+- HiveSight also gathers Slice 0026 human-reviewed Photo-visible Varroa Evidence Summary for the same photo;
 - HiveSight returns an Advisor context response with contract version, availability, evidence, request-readiness, treatment-history modelling status, and caveats;
 - HiveSight does not call HiveSight Advisor in this slice.
 
@@ -83,7 +100,8 @@ The endpoint returns `available` when at least one eligible bee was processed by
 
 - `jurisdiction_id` may be missing;
 - source evidence is Training Data Collection evidence, not a beekeeper-facing Varroa Assessment;
-- Hive Treatment History is not modelled.
+- Hive Treatment History is not modelled;
+- Advisor-required situational fields are not modelled yet.
 
 The context is intentionally evidence-shaped, not advice-shaped. It can say:
 
@@ -95,7 +113,8 @@ The context is intentionally evidence-shaped, not advice-shaped. It can say:
 - what human-reviewed and model-assisted evidence sources apply;
 - what model provenance applies;
 - that the count is over bee annotations, not deduplicated physical bees;
-- that treatment history is `not_modelled` if Hive Treatment History has not been implemented.
+- that treatment history is `not_modelled` if Hive Treatment History has not been implemented;
+- that required Advisor situational inputs are not modelled yet.
 
 The context must not say:
 
@@ -104,23 +123,23 @@ The context must not say:
 - high, medium, low, safe, dangerous, or threshold crossed;
 - official infestation rate;
 - whole-colony mite rate;
-- Advisor recommendation accepted or pending.
+- Advisor recommendation accepted or pending;
 - human-readable treatment caveats for Advisor to quote back to the beekeeper.
 
 ## Layers Touched
 
-- Web UI: Not touched in the core slice. A later slice may add a button from the frame mite count card to request Advisor advice.
-- Core API: Add Advisor context request/response models, integration auth setting/dependency, and a service-scoped endpoint that builds context from Hive, Inspection Photo, Frame Mite Count evidence, and Photo-visible Varroa evidence.
+- Web UI: Not touched. A later slice may add a button from a beekeeper-facing Varroa Assessment flow to request Advisor advice.
+- Core API: Add Advisor context request/response models and a protected HiveSight context assembly endpoint that builds context from Hive, Inspection Photo, Frame Mite Count evidence, and Photo-visible Varroa evidence.
 - Analysis Service: Not touched.
-- Storage: No new durable table in the base slice. Treatment history is represented as `not_modelled` unless a prior slice creates durable treatment records.
+- Storage: No new durable table. Treatment history is represented as `not_modelled` unless a prior slice creates durable treatment records.
 - Queue or async boundary: Not touched; context building is synchronous and uses the current deterministic/stub detector path.
-- Contracts: Add a HiveSight-side Advisor Varroa Context API contract. Do not update the shared HiveSight Advisor integration contract until implementation has passed.
-- Observability: Log one Advisor-context request with route, hive id, inspection photo id, availability, frame-count status, processed bee count, detection count, and no treatment-advice flag.
+- Contracts: Add a HiveSight-side context assembly contract. Do not update the shared HiveSight Advisor integration contract until implementation of an actual cross-app call or settled cross-app endpoint has passed.
+- Observability: Log one context assembly request with hive id, inspection photo id, availability, frame-count status, processed bee count, detection count, and no treatment-advice flag.
 
 ## Test Seams
 
-- Seam: Advisor service-auth gate
-- Behaviour verified: the Advisor context endpoint accepts only the dedicated service credential and does not accept ordinary dev-user auth as a substitute.
+- Seam: HiveSight auth and Workspace access
+- Behaviour verified: ordinary HiveSight access controls are enforced; no HiveSight Advisor inbound service credential is accepted or required.
 - Test style: Core API route tests.
 
 - Seam: Hive/photo ownership validation
@@ -132,26 +151,21 @@ The context must not say:
 - Test style: focused Core API/service tests.
 
 - Seam: Not-available context
-- Behaviour verified: no processable frame evidence returns a domain `not_available` payload with reasons, not a treatment recommendation or HTTP-level failure.
+- Behaviour verified: no processable frame evidence returns a domain `not_available` payload with identity/provenance and blocking reasons, not a treatment recommendation or HTTP-level failure.
 - Test style: focused Core API tests.
 
-- Seam: Treatment-history absence
-- Behaviour verified: until Hive Treatment History exists, the response explicitly reports treatment history as not modelled and uses `recent_treatment_count = null` rather than silently sending an empty history as fact.
+- Seam: Treatment-history and situational-field absence
+- Behaviour verified: until Hive Treatment History and Advisor-required situational fields exist, the response explicitly reports them as not modelled and uses blocking reasons rather than silently sending empty facts.
 - Test style: focused Core API tests.
 
 ## Data Shape
 
 Minimum endpoint:
 
-- `POST /v1/integrations/hivesight-advisor/varroa-context`
-
-Headers:
-
-- dedicated shared-secret header: `X-HiveSight-Service-Key`
+- `POST /v1/hives/{hive_id}/advisor-varroa-context`
 
 Minimum request body:
 
-- `hive_id`
 - `inspection_photo_id`
 - `jurisdiction_id`, optional
 
@@ -203,6 +217,9 @@ Minimum response body:
   - `status`: `not_modelled` initially
   - `recent_treatment_count`: null
   - `courses`: `[]`
+- `advisor_required_situational_inputs`
+  - `status`: `not_modelled` initially
+  - `missing_inputs`: list such as `brood_presence`, `honey_super_status`, `ambient_temperature`, `organic_certification_status`
 - `advisor_request_readiness`
   - `can_request_advice`: boolean
   - `blocking_reasons`: list of machine-readable strings
@@ -217,7 +234,6 @@ Example request:
 
 ```json
 {
-  "hive_id": "00000000-0000-0000-0000-000000000302",
   "inspection_photo_id": "00000000-0000-0000-0000-000000000702",
   "jurisdiction_id": null
 }
@@ -287,12 +303,22 @@ Example available response:
     "recent_treatment_count": null,
     "courses": []
   },
+  "advisor_required_situational_inputs": {
+    "status": "not_modelled",
+    "missing_inputs": [
+      "brood_presence",
+      "honey_super_status",
+      "ambient_temperature",
+      "organic_certification_status"
+    ]
+  },
   "advisor_request_readiness": {
     "can_request_advice": false,
     "blocking_reasons": [
       "jurisdiction_not_provided",
       "source_intent_not_varroa_assessment",
-      "treatment_history_not_modelled"
+      "treatment_history_not_modelled",
+      "advisor_required_situational_inputs_not_modelled"
     ],
     "caveats": [
       "context_available_for_integration_testing_only",
@@ -307,12 +333,12 @@ Example available response:
 ## Proposed Gherkin
 
 ```gherkin
-Feature: Advisor Varroa context API
+Feature: Advisor Varroa context assembly API
 
-  Scenario: HiveSight Advisor retrieves available Varroa context for one photographed frame
+  Scenario: HiveSight assembles available Advisor Varroa context for one photographed frame
     Given a Hive has a Training Data Collection Inspection Photo with completed Training Crops and eligible bees
     And HiveSight is using the deterministic stub Varroa Detector adapter
-    When HiveSight Advisor requests Varroa context for that Hive and Inspection Photo with the service credential
+    When HiveSight assembles Advisor Varroa context for that Hive and Inspection Photo
     Then HiveSight returns an available Advisor Varroa context
     And the context includes contract version, Workspace, Apiary, Hive, Inspection, Inspection Photo, and inspection date
     And the Varroa evidence keeps model-assisted frame mite count separate from human-reviewed photo-visible Varroa evidence
@@ -323,7 +349,7 @@ Feature: Advisor Varroa context API
 
   Scenario: Advisor context is blocked when no frame evidence can be counted
     Given a Hive has a Training Data Collection Inspection Photo with no eligible processable bees
-    When HiveSight Advisor requests Varroa context for that Hive and Inspection Photo with the service credential
+    When HiveSight assembles Advisor Varroa context for that Hive and Inspection Photo
     Then HiveSight returns a not_available Advisor Varroa context
     And the response still includes valid HiveSight identity and provenance fields
     And the context includes blocking reasons from the frame mite count
@@ -332,69 +358,73 @@ Feature: Advisor Varroa context API
   Scenario: Advisor context rejects a photo from a different Hive
     Given one Hive has a Training Data Collection Inspection Photo
     And another Hive exists in the same Workspace
-    When HiveSight Advisor requests Varroa context for the second Hive using the first Hive's Inspection Photo
+    When HiveSight assembles Advisor Varroa context for the second Hive using the first Hive's Inspection Photo
     Then HiveSight rejects the request as photo_hive_mismatch
     And HiveSight does not disclose frame mite count details for the mismatched photo
 
-  Scenario: Advisor context requires scoped service authentication
-    Given a Hive has a Training Data Collection Inspection Photo with eligible frame evidence
-    When a caller requests Advisor Varroa context without the Advisor service credential
-    Then HiveSight rejects the request
-    And normal development user authentication alone is not enough for the integration endpoint
-
   Scenario: Jurisdiction is optional for context but required for advice readiness
     Given a Hive has available frame mite count evidence
-    When HiveSight Advisor requests Varroa context without a jurisdiction id
+    When HiveSight assembles Advisor Varroa context without a jurisdiction id
     Then HiveSight returns an available Advisor Varroa context
     And advisor request readiness is false
     And advisor request readiness includes jurisdiction_not_provided as a blocking reason
 
   Scenario: Training Data Collection evidence is integration-test context only
     Given a Hive has available frame mite count evidence from a Training Data Collection Inspection
-    When HiveSight Advisor retrieves Advisor Varroa context
+    When HiveSight assembles Advisor Varroa context
     Then the context reports evidence readiness as integration_test_only
     And advisor request readiness includes source_intent_not_varroa_assessment as a blocking reason
     And HiveSight does not describe the evidence as a user-facing Varroa Assessment
 
   Scenario: Treatment history absence is explicit
     Given HiveSight has not yet implemented Hive Treatment History
-    When HiveSight Advisor retrieves available Varroa context
+    When HiveSight assembles available Advisor Varroa context
     Then the context reports treatment history status as not_modelled
     And recent treatment count is null
     And the context does not imply that the Hive has had no recent treatment
+
+  Scenario: Advisor-required situational inputs are not invented
+    Given HiveSight has not yet modelled Advisor-required treatment conditions
+    When HiveSight assembles available Advisor Varroa context
+    Then the context reports Advisor-required situational inputs as not_modelled
+    And advisor request readiness includes advisor_required_situational_inputs_not_modelled as a blocking reason
+    And HiveSight does not invent brood, super, temperature, or organic-certification facts
 ```
 
 ## Acceptance Criteria
 
-- [ ] HiveSight exposes a dedicated Advisor Varroa context endpoint under a service-authenticated integration route.
-- [ ] The service credential is scoped to the Advisor integration endpoint and is not accepted as normal user auth.
+- [ ] HiveSight exposes a protected Advisor Varroa context assembly endpoint for HiveSight-owned use.
+- [ ] The endpoint uses ordinary HiveSight Core API authentication and Workspace access, not an inbound HiveSight Advisor service credential.
 - [ ] Context requests validate that the selected Inspection Photo belongs to the requested Hive.
-- [ ] Available context includes contract version, Workspace, Apiary, Hive, Inspection, Inspection Photo, inspection date, Varroa evidence, treatment-history modelling status, request readiness, and no-advice reason.
+- [ ] Available context includes contract version, Workspace, Apiary, Hive, Inspection, Inspection Photo, inspection date, Varroa evidence, treatment-history modelling status, Advisor-required situational-input status, request readiness, and no-advice reason.
 - [ ] Varroa evidence keeps model-assisted Frame Mite Count separate from human-reviewed Photo-visible Varroa Evidence.
 - [ ] Advisor context exposes aggregate evidence only and excludes per-bee detector rows, detection boxes, image URLs, Head-Up transform metadata, and Bee Annotation ids.
 - [ ] `completed_with_warnings` frame-count evidence remains available only with explicit warning/caveat detail.
-- [ ] No processable frame evidence returns a domain `not_available` context with blocking reasons.
+- [ ] No processable frame evidence returns a domain `not_available` context with identity/provenance and blocking reasons.
 - [ ] Jurisdiction is optional for context but missing jurisdiction blocks `advisor_request_readiness.can_request_advice`.
 - [ ] Training Data Collection evidence can be returned as integration-test context but blocks request readiness because it is not a user-facing Varroa Assessment.
 - [ ] Treatment history is explicitly marked `not_modelled` until Hive Treatment History exists; `recent_treatment_count` is `null`, not `0`.
+- [ ] Advisor-required situational inputs are explicitly marked `not_modelled` until HiveSight models them; HiveSight does not invent brood, super, temperature, or organic-certification facts.
 - [ ] The endpoint does not call HiveSight Advisor, create a Treatment Recommendation, create a Hive Treatment Course, or import treatment advice.
 - [ ] Focused Core API tests and `pnpm verify:slice` pass before implementation closeout.
-- [ ] The shared HiveSight Advisor integration contract is updated only after this slice is implemented and verified.
+- [ ] The shared HiveSight Advisor integration contract is not updated by this design-only revision.
 
 ## Out Of Scope
 
 - Calling `POST /integrations/hivesight/treatment-plans` on HiveSight Advisor.
+- HiveSight Advisor calling HiveSight for context.
+- Inbound HiveSight service-auth route for Advisor.
 - UI button to request Advisor guidance.
 - Receiving, displaying, accepting, rejecting, or completing Advisor Treatment Recommendations.
 - Hive Treatment Course, Treatment Application, or Treatment Outcome persistence.
+- Jurisdiction, brood, honey-super, temperature, organic-certification, or treatment-method condition modelling.
 - Treatment thresholds, risk bands, action language, or beekeeper-facing recommendation text.
 - Statistical visible Varroa rate, confidence interval, sampling plan, or colony-level estimate.
 - Durable Frame Mite Count history.
 - Real Varroa Detector model implementation.
 
-## Open Questions For Advisor Review
+## Open Questions Before Re-Acceptance
 
-- Does HiveSight Advisor agree that `advisor_varroa_context_v1` carries enough aggregate Varroa evidence to decide whether a treatment-plan request could later be grounded?
-- Does HiveSight Advisor agree that per-bee detections, image URLs, and detector boxes should stay inside HiveSight for this contract?
-- Does HiveSight Advisor agree with `jurisdiction_not_provided`, `source_intent_not_varroa_assessment`, and `treatment_history_not_modelled` as blocking reason names?
-- Does HiveSight Advisor agree that `treatment_history.status = not_modelled` and `recent_treatment_count = null` correctly distinguish missing domain modelling from no recent treatment?
+- Does HiveSight accept the Advisor review recommendation that Advisor should not call HiveSight for context, and that HiveSight should later call Advisor with assembled `situational_context`?
+- Is `POST /v1/hives/{hive_id}/advisor-varroa-context` acceptable as a HiveSight-owned protected context assembly route?
+- Are the new blocking reason names acceptable: `advisor_required_situational_inputs_not_modelled` and the situational missing-input names?
