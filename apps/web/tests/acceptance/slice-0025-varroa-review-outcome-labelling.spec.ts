@@ -54,6 +54,18 @@ test("Dataset Curator records Varroa review cues and a visible Varroa outcome", 
     "1 ineligible bee is hidden"
   );
   await expect(page.getByTestId("include-ineligible-varroa-bees-checkbox")).not.toBeChecked();
+  await expect(page.getByTestId("frame-mite-count-panel")).toContainText("Frame mite count");
+  await page.getByTestId("run-frame-mite-count-button").click();
+  await expect(page.getByTestId("frame-mite-count-result")).toContainText(
+    "Likely visible Varroa detections"
+  );
+  await expect(page.getByTestId("frame-mite-count-result")).toContainText("2");
+  await expect(page.getByTestId("frame-mite-count-result")).toContainText("Processed bees");
+  await expect(page.getByTestId("frame-mite-count-result")).toContainText("2 / 2");
+  await expect(page.getByTestId("frame-mite-count-bee-result")).toHaveCount(3);
+  await expect(page.getByTestId("frame-mite-count-caveat")).toContainText("not treatment advice");
+  await page.getByTestId("frame-mite-count-bee-result").first().click();
+  await expect(page.getByTestId("training-workflow-stage-varroa-review")).toBeVisible();
   await page.getByRole("option", { name: /suspected/ }).click();
   await expect(page.getByTestId("varroa-review-provenance")).toContainText("human_selected");
   await expect(page.getByTestId("varroa-review-provenance")).toContainText(

@@ -82,6 +82,8 @@ from hive_sight_core_api.models import (
     DirectedEllipseLocalCleanupRequest,
     DirectedEllipseLocalCleanupResponse,
     ErrorResponse,
+    FrameMiteCountRequest,
+    FrameMiteCountResponse,
     FrameLevelVarroaResultSummaryResponse,
     FrameStandardResponse,
     HeadUpNormalizedBeeCropPreviewResponse,
@@ -1338,6 +1340,23 @@ def preview_varroa_detector_detections(
         workspace_id=request.workspace_id,
         training_crop_id=training_crop_id,
         bee_annotation_id=bee_annotation_id,
+    )
+
+
+@app.post(
+    "/v1/inspection-photos/{inspection_photo_id}/frame-mite-count",
+    response_model=FrameMiteCountResponse,
+)
+def count_frame_mites(
+    inspection_photo_id: UUID,
+    request: FrameMiteCountRequest,
+    user: AuthenticatedUserDep,
+    workflow: VarroaReviewWorkflowDep,
+) -> FrameMiteCountResponse:
+    return workflow.count_frame_mites(
+        user=user,
+        workspace_id=request.workspace_id,
+        inspection_photo_id=inspection_photo_id,
     )
 
 

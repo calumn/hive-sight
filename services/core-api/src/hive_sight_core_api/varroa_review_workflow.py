@@ -10,6 +10,10 @@ from uuid import UUID
 from hive_sight_core_api.dev_store import DomainError, InMemoryProductDataStore, UserContext
 from hive_sight_core_api.models import (
     AnnotationType,
+    FrameMiteCountBeeResultResponse,
+    FrameMiteCountBeeStatus,
+    FrameMiteCountResponse,
+    FrameMiteCountStatus,
     HeadUpNormalizedBeeCropPreviewResponse,
     InspectionIntent,
     LikelyVarroaDetectionResponse,
@@ -274,6 +278,217 @@ class VarroaReviewWorkflow:
         self._log_detector_preview(response)
         return response
 
+    def count_frame_mites(
+        self,
+        user: UserContext,
+        workspace_id: UUID,
+        inspection_photo_id: UUID,
+    ) -> FrameMiteCountResponse:
+        started = perf_counter()
+        self.store.require_workspace_access(user, workspace_id)
+        self.store.require_data_use_agreement(workspace_id)
+        self.store.require_dataset_curator_capability(user)
+        photo = self.store.get_inspection_photo(inspection_photo_id)
+        if photo is None or photo.workspace_id != workspace_id:
+            raise DomainError(
+                "inspection_photo_not_found",
+                "The requested Inspection Photo was not found in this Workspace.",
+                404,
+            )
+        inspection = self.store.require_inspection(workspace_id, photo.inspection_id)
+        if inspection.intent != InspectionIntent.training_data_collection:
+            raise DomainError(
+                "inspection_intent_not_for_frame_mite_count",
+                "Frame mite counts are available only for Training Data Collection inspections.",
+                409,
+            )
+        hive = self.store.get_hive(inspection.hive_id)
+
+        crops = self.store.list_training_crops_for_photo_id(
+            workspace_id=workspace_id,
+            inspection_photo_id=inspection_photo_id,
+        )
+        completed_crops = [
+            crop for crop in crops if crop.review_status == TrainingCropReviewStatus.review_complete
+        ]
+        excluded_crops = [
+            crop for crop in crops if crop.review_status == TrainingCropReviewStatus.excluded
+        ]
+        unfinished_crops = [
+            crop
+            for crop in crops
+            if crop.review_status
+            not in {TrainingCropReviewStatus.review_complete, TrainingCropReviewStatus.excluded}
+        ]
+        bee_results: list[FrameMiteCountBeeResultResponse] = []
+        not_assessed_reasons: dict[str, int] = {}
+        failure_reasons: dict[str, int] = {}
+        eligible_bee_count = 0
+
+        for crop_ordinal, crop in enumerate(crops, start=1):
+            if crop.review_status != TrainingCropReviewStatus.review_complete:
+                continue
+            ellipses = self.store.get_ellipses_for_training_crop(crop.training_crop_id)
+            for bee_ordinal, ellipse in enumerate(ellipses, start=1):
+                reasons = _ineligibility_reasons(crop=crop, ellipse=ellipse)
+                if reasons:
+                    reason = ", ".join(reasons)
+                    _increment(not_assessed_reasons, reason)
+                    bee_results.append(
+                        FrameMiteCountBeeResultResponse(
+                            training_crop_id=crop.training_crop_id,
+                            bee_annotation_id=ellipse.annotation_id,
+                            crop_ordinal=crop_ordinal,
+                            bee_ordinal=bee_ordinal,
+                            status=FrameMiteCountBeeStatus.not_assessed,
+                            detection_count=0,
+                            not_assessed_reason=reason,
+                        )
+                    )
+                    continue
+
+                eligible_bee_count += 1
+                head_up_crop = _preview_response(workspace_id=workspace_id, crop=crop, ellipse=ellipse)
+                try:
+                    image = self._build_head_up_normalized_crop_image(
+                        workspace_id=workspace_id,
+                        crop=crop,
+                        ellipse=ellipse,
+                    )
+                except DomainError as error:
+                    if error.code in {
+                        "source_image_not_available",
+                        "image_processing_unavailable",
+                        "varroa_review_candidate_ineligible",
+                    }:
+                        _increment(not_assessed_reasons, error.code)
+                        bee_results.append(
+                            FrameMiteCountBeeResultResponse(
+                                training_crop_id=crop.training_crop_id,
+                                bee_annotation_id=ellipse.annotation_id,
+                                crop_ordinal=crop_ordinal,
+                                bee_ordinal=bee_ordinal,
+                                status=FrameMiteCountBeeStatus.not_assessed,
+                                detection_count=0,
+                                not_assessed_reason=error.code,
+                                head_up_normalized_crop=head_up_crop,
+                                transform_version=head_up_crop.transform_version,
+                                transform_metadata=head_up_crop.transform_metadata,
+                            )
+                        )
+                        continue
+                    raise
+
+                request = VarroaDetectorRequest(
+                    workspace_id=workspace_id,
+                    inspection_photo_id=inspection_photo_id,
+                    training_crop_id=crop.training_crop_id,
+                    bee_annotation_id=ellipse.annotation_id,
+                    head_up_normalized_image_bytes=image.body,
+                    image_width_px=head_up_crop.image_width_px,
+                    image_height_px=head_up_crop.image_height_px,
+                    transform_version=head_up_crop.transform_version,
+                    transform_metadata=head_up_crop.transform_metadata,
+                    source_geometry_snapshot=head_up_crop.bee_annotation_geometry_snapshot,
+                )
+                try:
+                    detections = self.varroa_detector_adapter.detect(request)
+                except VarroaDetectorFailure as error:
+                    _increment(failure_reasons, error.code)
+                    bee_results.append(
+                        FrameMiteCountBeeResultResponse(
+                            training_crop_id=crop.training_crop_id,
+                            bee_annotation_id=ellipse.annotation_id,
+                            crop_ordinal=crop_ordinal,
+                            bee_ordinal=bee_ordinal,
+                            status=FrameMiteCountBeeStatus.failed,
+                            detection_count=0,
+                            failure_code=error.code,
+                            failure_message=error.message,
+                            head_up_normalized_crop=head_up_crop,
+                            transform_version=head_up_crop.transform_version,
+                            transform_metadata=head_up_crop.transform_metadata,
+                        )
+                    )
+                    continue
+
+                bee_results.append(
+                    FrameMiteCountBeeResultResponse(
+                        training_crop_id=crop.training_crop_id,
+                        bee_annotation_id=ellipse.annotation_id,
+                        crop_ordinal=crop_ordinal,
+                        bee_ordinal=bee_ordinal,
+                        status=FrameMiteCountBeeStatus.completed,
+                        detection_count=len(detections),
+                        detections=detections,
+                        head_up_normalized_crop=head_up_crop,
+                        transform_version=head_up_crop.transform_version,
+                        transform_metadata=head_up_crop.transform_metadata,
+                    )
+                )
+
+        processed_bee_count = sum(
+            1 for result in bee_results if result.status == FrameMiteCountBeeStatus.completed
+        )
+        failed_bee_count = sum(
+            1 for result in bee_results if result.status == FrameMiteCountBeeStatus.failed
+        )
+        not_assessed_bee_count = sum(
+            1 for result in bee_results if result.status == FrameMiteCountBeeStatus.not_assessed
+        )
+        detection_count = sum(result.detection_count for result in bee_results)
+        bees_with_likely_varroa_count = sum(
+            1
+            for result in bee_results
+            if result.status == FrameMiteCountBeeStatus.completed and result.detection_count > 0
+        )
+        status = _frame_count_status(
+            processed_bee_count=processed_bee_count,
+            failed_bee_count=failed_bee_count,
+            not_assessed_bee_count=not_assessed_bee_count,
+            unfinished_crop_count=len(unfinished_crops),
+            excluded_crop_count=len(excluded_crops),
+        )
+        response = FrameMiteCountResponse(
+            workspace_id=workspace_id,
+            inspection_id=inspection.inspection_id,
+            hive_id=inspection.hive_id,
+            apiary_id=hive.apiary_id if hive is not None else None,
+            inspection_date=inspection.inspection_date,
+            inspection_photo_id=inspection_photo_id,
+            source_image_filename=photo.filename,
+            source_intent=inspection.intent,
+            adapter_type=self.varroa_detector_adapter.adapter_type,
+            adapter_version=self.varroa_detector_adapter.adapter_version,
+            model_reference=self.varroa_detector_adapter.model_reference,
+            status=status,
+            elapsed_ms=_elapsed_ms(started),
+            completed_training_crop_count=len(completed_crops),
+            unfinished_training_crop_count=len(unfinished_crops),
+            excluded_training_crop_count=len(excluded_crops),
+            eligible_bee_count=eligible_bee_count,
+            processed_bee_count=processed_bee_count,
+            failed_bee_count=failed_bee_count,
+            not_assessed_bee_count=not_assessed_bee_count,
+            likely_visible_varroa_detection_count=detection_count,
+            bees_with_likely_varroa_count=bees_with_likely_varroa_count,
+            model_determinate_coverage_percent=_percent(processed_bee_count, eligible_bee_count),
+            not_assessed_reasons=not_assessed_reasons,
+            failure_reasons=failure_reasons,
+            bee_results=bee_results,
+            not_user_facing_reason="Model-assisted frame mite count only; not user-facing.",
+            caveat=_frame_count_caveat(
+                status=status,
+                unfinished_crop_count=len(unfinished_crops),
+                excluded_crop_count=len(excluded_crops),
+                not_assessed_bee_count=not_assessed_bee_count,
+                failed_bee_count=failed_bee_count,
+            ),
+            advisor_context_available=False,
+        )
+        self._log_frame_mite_count(response)
+        return response
+
     def _build_head_up_normalized_crop_image(
         self,
         workspace_id: UUID,
@@ -375,6 +590,24 @@ class VarroaReviewWorkflow:
                 "elapsed_ms": response.elapsed_ms,
                 "status": str(response.status),
                 "failure_code": response.failure_code,
+            },
+        )
+
+    def _log_frame_mite_count(self, response: FrameMiteCountResponse) -> None:
+        LOGGER.info(
+            "Calculated model-assisted frame mite count",
+            extra={
+                "workspace_id": str(response.workspace_id),
+                "inspection_id": str(response.inspection_id),
+                "inspection_photo_id": str(response.inspection_photo_id),
+                "adapter_type": response.adapter_type,
+                "adapter_version": response.adapter_version,
+                "status": str(response.status),
+                "eligible_bee_count": response.eligible_bee_count,
+                "processed_bee_count": response.processed_bee_count,
+                "failed_bee_count": response.failed_bee_count,
+                "likely_visible_varroa_detection_count": response.likely_visible_varroa_detection_count,
+                "elapsed_ms": response.elapsed_ms,
             },
         )
 
@@ -768,6 +1001,61 @@ def _clean_optional_text(value: str | None) -> str | None:
         return None
     stripped = value.strip()
     return stripped or None
+
+
+def _increment(counts: dict[str, int], key: str) -> None:
+    counts[key] = counts.get(key, 0) + 1
+
+
+def _percent(numerator: int, denominator: int) -> float:
+    if denominator == 0:
+        return 0.0
+    return round((numerator / denominator) * 100, 1)
+
+
+def _frame_count_status(
+    *,
+    processed_bee_count: int,
+    failed_bee_count: int,
+    not_assessed_bee_count: int,
+    unfinished_crop_count: int,
+    excluded_crop_count: int,
+) -> FrameMiteCountStatus:
+    if processed_bee_count == 0:
+        return FrameMiteCountStatus.not_available
+    if (
+        failed_bee_count > 0
+        or not_assessed_bee_count > 0
+        or unfinished_crop_count > 0
+        or excluded_crop_count > 0
+    ):
+        return FrameMiteCountStatus.completed_with_warnings
+    return FrameMiteCountStatus.completed
+
+
+def _frame_count_caveat(
+    *,
+    status: FrameMiteCountStatus,
+    unfinished_crop_count: int,
+    excluded_crop_count: int,
+    not_assessed_bee_count: int,
+    failed_bee_count: int,
+) -> str:
+    caveats = [
+        "Model-assisted frame mite count only; not treatment advice and not a human Varroa review.",
+        "Count is over bee annotations on this selected Inspection Photo, not deduplicated physical bees.",
+    ]
+    if status == FrameMiteCountStatus.not_available:
+        caveats.append("No eligible Head-Up Normalized Bee Crops could be processed.")
+    if unfinished_crop_count > 0:
+        caveats.append(f"{unfinished_crop_count} unfinished crops were not included.")
+    if excluded_crop_count > 0:
+        caveats.append(f"{excluded_crop_count} excluded crops were not included.")
+    if not_assessed_bee_count > 0:
+        caveats.append(f"{not_assessed_bee_count} bees were not assessed by the detector.")
+    if failed_bee_count > 0:
+        caveats.append(f"{failed_bee_count} eligible bees failed during detector processing.")
+    return " ".join(caveats)
 
 
 def _elapsed_ms(started: float) -> int:

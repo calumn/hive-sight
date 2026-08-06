@@ -1157,6 +1157,82 @@ label span {
   width: 14px;
 }
 
+.frame-mite-count-panel {
+  border: 1px solid #dce2d7;
+  border-radius: 6px;
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+}
+
+.frame-mite-count-metrics {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.frame-mite-count-metrics div {
+  background: #f7f9f5;
+  border: 1px solid #dce2d7;
+  border-radius: 6px;
+  display: grid;
+  gap: 4px;
+  min-height: 74px;
+  padding: 10px;
+}
+
+.frame-mite-count-metrics span {
+  color: #515b4c;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.frame-mite-count-metrics strong {
+  font-size: 1.4rem;
+}
+
+.frame-mite-count-provenance {
+  margin: 0;
+}
+
+.frame-mite-count-bee-list {
+  border: 1px solid #dce2d7;
+  border-radius: 6px;
+  display: grid;
+  max-height: 260px;
+  overflow: auto;
+}
+
+.frame-mite-count-bee-row {
+  align-items: center;
+  background: #ffffff;
+  border: 0;
+  border-bottom: 1px solid #dce2d7;
+  border-radius: 0;
+  color: #1f251d;
+  display: grid;
+  font: inherit;
+  gap: 8px;
+  grid-template-columns: minmax(110px, 0.7fr) minmax(105px, 0.7fr) minmax(160px, 1fr);
+  min-height: 44px;
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.frame-mite-count-bee-row:last-child {
+  border-bottom: 0;
+}
+
+.frame-mite-count-bee-row:hover,
+.frame-mite-count-bee-row:focus-visible {
+  background: #eef7ef;
+}
+
+.frame-mite-count-bee-row.not_assessed,
+.frame-mite-count-bee-row.failed {
+  color: #515b4c;
+}
+
 .varroa-detector-box {
   border: 3px solid #7c3aed;
   border-radius: 999px;
@@ -1254,7 +1330,9 @@ label span {
 
 @media (max-width: 900px) {
   .varroa-head-up-pair,
-  .detector-preview-panel {
+  .detector-preview-panel,
+  .frame-mite-count-metrics,
+  .frame-mite-count-bee-row {
     grid-template-columns: minmax(0, 1fr);
   }
 }

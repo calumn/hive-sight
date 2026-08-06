@@ -185,6 +185,14 @@ export type VarroaReviewOutcomeValue =
 
 export type VarroaDetectorPreviewStatus = "completed" | "failed" | "not_assessed";
 
+export type FrameMiteCountStatus =
+  | "completed"
+  | "completed_with_warnings"
+  | "failed"
+  | "not_available";
+
+export type FrameMiteCountBeeStatus = "completed" | "not_assessed" | "failed";
+
 export type TrainingCropReviewStatus = "review_pending" | "review_complete" | "excluded";
 
 export type TrainingCropExclusionReason =
@@ -678,6 +686,55 @@ export type VarroaDetectorPreview = {
   detectionCount: number;
   headUpNormalizedCrop: HeadUpNormalizedBeeCropPreview | null;
   caveat: string;
+};
+
+export type FrameMiteCountBeeResult = {
+  trainingCropId: string;
+  beeAnnotationId: string;
+  cropOrdinal: number;
+  beeOrdinal: number;
+  status: FrameMiteCountBeeStatus;
+  detectionCount: number;
+  detections: LikelyVarroaDetection[];
+  notAssessedReason: string | null;
+  failureCode: string | null;
+  failureMessage: string | null;
+  headUpNormalizedCrop: HeadUpNormalizedBeeCropPreview | null;
+  transformVersion: string | null;
+  transformMetadata: Record<string, unknown> | null;
+};
+
+export type FrameMiteCount = {
+  workspaceId: string;
+  inspectionId: string;
+  hiveId: string;
+  apiaryId: string | null;
+  inspectionDate: string;
+  inspectionPhotoId: string;
+  sourceImageFilename: string;
+  sourceIntent: InspectionIntent;
+  modelPurpose: "varroa_detection";
+  adapterType: string;
+  adapterVersion: string;
+  modelReference: string;
+  status: FrameMiteCountStatus;
+  elapsedMs: number;
+  completedTrainingCropCount: number;
+  unfinishedTrainingCropCount: number;
+  excludedTrainingCropCount: number;
+  eligibleBeeCount: number;
+  processedBeeCount: number;
+  failedBeeCount: number;
+  notAssessedBeeCount: number;
+  likelyVisibleVarroaDetectionCount: number;
+  beesWithLikelyVarroaCount: number;
+  modelDeterminateCoveragePercent: number;
+  notAssessedReasons: Record<string, number>;
+  failureReasons: Record<string, number>;
+  beeResults: FrameMiteCountBeeResult[];
+  notUserFacingReason: string;
+  caveat: string;
+  advisorContextAvailable: boolean;
 };
 
 export type ReviewQueueItemStatus = "available" | "completed" | "cancelled";
@@ -2268,6 +2325,26 @@ export async function runVarroaDetectorPreview({
   return parseVarroaDetectorPreview(await response.json());
 }
 
+export async function runFrameMiteCount({
+  devUserId,
+  workspaceId,
+  inspectionPhotoId
+}: {
+  devUserId: string;
+  workspaceId: string;
+  inspectionPhotoId: string;
+}): Promise<FrameMiteCount> {
+  const response = await fetch(`${coreApiUrl}/v1/inspection-photos/${inspectionPhotoId}/frame-mite-count`, {
+    method: "POST",
+    headers: jsonHeaders(devUserId),
+    body: JSON.stringify({
+      workspace_id: workspaceId
+    })
+  });
+  await ensureOk(response);
+  return parseFrameMiteCount(await response.json());
+}
+
 export async function saveVarroaReviewOutcome({
   devUserId,
   workspaceId,
@@ -3261,6 +3338,85 @@ function parseVarroaDetectorPreview(value: unknown): VarroaDetectorPreview {
         ? null
         : parseHeadUpNormalizedBeeCropPreview(record.head_up_normalized_crop),
     caveat: requireString(record.caveat, "caveat")
+  };
+}
+
+function parseFrameMiteCount(value: unknown): FrameMiteCount {
+  const record = requireRecord(value, "Frame Mite Count response");
+  return {
+    workspaceId: requireString(record.workspace_id, "workspace_id"),
+    inspectionId: requireString(record.inspection_id, "inspection_id"),
+    hiveId: requireString(record.hive_id, "hive_id"),
+    apiaryId: optionalString(record.apiary_id, "apiary_id"),
+    inspectionDate: requireString(record.inspection_date, "inspection_date"),
+    inspectionPhotoId: requireString(record.inspection_photo_id, "inspection_photo_id"),
+    sourceImageFilename: requireString(record.source_image_filename, "source_image_filename"),
+    sourceIntent: requireInspectionIntent(record.source_intent),
+    modelPurpose: requireLiteral(record.model_purpose, "varroa_detection", "model_purpose"),
+    adapterType: requireString(record.adapter_type, "adapter_type"),
+    adapterVersion: requireString(record.adapter_version, "adapter_version"),
+    modelReference: requireString(record.model_reference, "model_reference"),
+    status: requireFrameMiteCountStatus(record.status),
+    elapsedMs: requireNumber(record.elapsed_ms, "elapsed_ms"),
+    completedTrainingCropCount: requireNumber(
+      record.completed_training_crop_count,
+      "completed_training_crop_count"
+    ),
+    unfinishedTrainingCropCount: requireNumber(
+      record.unfinished_training_crop_count,
+      "unfinished_training_crop_count"
+    ),
+    excludedTrainingCropCount: requireNumber(
+      record.excluded_training_crop_count,
+      "excluded_training_crop_count"
+    ),
+    eligibleBeeCount: requireNumber(record.eligible_bee_count, "eligible_bee_count"),
+    processedBeeCount: requireNumber(record.processed_bee_count, "processed_bee_count"),
+    failedBeeCount: requireNumber(record.failed_bee_count, "failed_bee_count"),
+    notAssessedBeeCount: requireNumber(record.not_assessed_bee_count, "not_assessed_bee_count"),
+    likelyVisibleVarroaDetectionCount: requireNumber(
+      record.likely_visible_varroa_detection_count,
+      "likely_visible_varroa_detection_count"
+    ),
+    beesWithLikelyVarroaCount: requireNumber(
+      record.bees_with_likely_varroa_count,
+      "bees_with_likely_varroa_count"
+    ),
+    modelDeterminateCoveragePercent: requireNumber(
+      record.model_determinate_coverage_percent,
+      "model_determinate_coverage_percent"
+    ),
+    notAssessedReasons: parseNumberMap(record.not_assessed_reasons, "not_assessed_reasons"),
+    failureReasons: parseNumberMap(record.failure_reasons, "failure_reasons"),
+    beeResults: requireArray(record.bee_results, "bee_results").map(parseFrameMiteCountBeeResult),
+    notUserFacingReason: requireString(record.not_user_facing_reason, "not_user_facing_reason"),
+    caveat: requireString(record.caveat, "caveat"),
+    advisorContextAvailable: requireBoolean(record.advisor_context_available, "advisor_context_available")
+  };
+}
+
+function parseFrameMiteCountBeeResult(value: unknown): FrameMiteCountBeeResult {
+  const record = requireRecord(value, "Frame Mite Count Bee Result response");
+  return {
+    trainingCropId: requireString(record.training_crop_id, "training_crop_id"),
+    beeAnnotationId: requireString(record.bee_annotation_id, "bee_annotation_id"),
+    cropOrdinal: requireNumber(record.crop_ordinal, "crop_ordinal"),
+    beeOrdinal: requireNumber(record.bee_ordinal, "bee_ordinal"),
+    status: requireFrameMiteCountBeeStatus(record.status),
+    detectionCount: requireNumber(record.detection_count, "detection_count"),
+    detections: requireArray(record.detections, "detections").map(parseLikelyVarroaDetection),
+    notAssessedReason: optionalString(record.not_assessed_reason, "not_assessed_reason"),
+    failureCode: optionalString(record.failure_code, "failure_code"),
+    failureMessage: optionalString(record.failure_message, "failure_message"),
+    headUpNormalizedCrop:
+      record.head_up_normalized_crop === null
+        ? null
+        : parseHeadUpNormalizedBeeCropPreview(record.head_up_normalized_crop),
+    transformVersion: optionalString(record.transform_version, "transform_version"),
+    transformMetadata:
+      record.transform_metadata === null
+        ? null
+        : requireRecord(record.transform_metadata, "transform_metadata")
   };
 }
 
@@ -4411,6 +4567,25 @@ function requireVarroaDetectorPreviewStatus(value: unknown): VarroaDetectorPrevi
     return value;
   }
   throw new Error("Core API response had an unexpected Varroa Detector Preview status");
+}
+
+function requireFrameMiteCountStatus(value: unknown): FrameMiteCountStatus {
+  if (
+    value === "completed" ||
+    value === "completed_with_warnings" ||
+    value === "failed" ||
+    value === "not_available"
+  ) {
+    return value;
+  }
+  throw new Error("Core API response had an unexpected Frame Mite Count status");
+}
+
+function requireFrameMiteCountBeeStatus(value: unknown): FrameMiteCountBeeStatus {
+  if (value === "completed" || value === "not_assessed" || value === "failed") {
+    return value;
+  }
+  throw new Error("Core API response had an unexpected Frame Mite Count bee status");
 }
 
 function requireVarroaDetectorCoordinateSpace(value: unknown): "head_up_normalized_crop" {

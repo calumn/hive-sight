@@ -87,6 +87,7 @@ import {
   fetchVarroaReviewCandidates,
   processAnalysisRun,
   requestTrainingCropReview,
+  runFrameMiteCount,
   runVarroaDetectorPreview,
   saveVarroaReviewOutcome,
   startDatasetLabellingSession,
@@ -131,6 +132,7 @@ import {
   type InspectionPhoto,
   type FrameStandard,
   type FrameLevelVarroaResultSummary,
+  type FrameMiteCount,
   type OrientedBeeEllipse,
   type PhysicalYoloObbExport,
   type PhotoIntake,
@@ -2481,6 +2483,19 @@ function formatGeometryValue(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
+function formatFrameMiteCountStatus(status: FrameMiteCount["status"]): string {
+  if (status === "completed") return "Completed";
+  if (status === "completed_with_warnings") return "Completed with warnings";
+  if (status === "not_available") return "Not available";
+  return "Failed";
+}
+
+function formatFrameMiteCountBeeStatus(status: FrameMiteCount["beeResults"][number]["status"]): string {
+  if (status === "completed") return "Processed";
+  if (status === "not_assessed") return "Not assessed";
+  return "Failed";
+}
+
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.max(minimum, Math.min(maximum, value));
 }
@@ -2649,6 +2664,7 @@ function TrainingCropAnnotationPanel({
   const [varroaReview, setVarroaReview] = useState<VarroaReviewCandidateList | null>(null);
   const [photoVisibleVarroaSummary, setPhotoVisibleVarroaSummary] =
     useState<FrameLevelVarroaResultSummary | null>(null);
+  const [frameMiteCount, setFrameMiteCount] = useState<FrameMiteCount | null>(null);
   const [varroaPreview, setVarroaPreview] = useState<HeadUpNormalizedBeeCropPreview | null>(null);
   const [varroaPreviewUrl, setVarroaPreviewUrl] = useState<string | null>(null);
   const [varroaDetectorPreview, setVarroaDetectorPreview] =
@@ -2860,6 +2876,7 @@ function TrainingCropAnnotationPanel({
     setSelectedCropId(null);
     setSelectedEllipseId(null);
     setTrainingCropDatasetItem(null);
+    setFrameMiteCount(null);
     void refreshCropsForPhoto(selectedPhoto.inspectionPhotoId);
     void refreshPhotoVisibleVarroaSummary(selectedPhoto.inspectionPhotoId);
     fetchInspectionPhotoObjectUrl({
@@ -3290,6 +3307,25 @@ function TrainingCropAnnotationPanel({
       });
       setVarroaDetectorPreview(preview);
     });
+  }
+
+  async function runSelectedPhotoFrameMiteCount() {
+    if (!selectedPhoto) {
+      return;
+    }
+    await runCropAction("Running frame mite count", async () => {
+      const count = await runFrameMiteCount({
+        devUserId,
+        workspaceId,
+        inspectionPhotoId: selectedPhoto.inspectionPhotoId
+      });
+      setFrameMiteCount(count);
+    });
+  }
+
+  function selectFrameMiteCountBee(trainingCropId: string, beeAnnotationId: string) {
+    setSelectedCropId(trainingCropId);
+    setSelectedEllipseId(beeAnnotationId);
   }
 
   async function saveSelectedVarroaOutcome() {
@@ -5311,6 +5347,103 @@ function TrainingCropAnnotationPanel({
                       </p>
                     </section>
                   ) : null}
+                  <section
+                    className="frame-mite-count-panel"
+                    data-testid="frame-mite-count-panel"
+                    aria-label="Frame mite count"
+                  >
+                    <div className="model-workflow-header">
+                      <div>
+                        <strong>Frame mite count</strong>
+                        <p>
+                          {selectedPhoto?.filename ?? photoVisibleVarroaSummary?.sourceImageFilename ?? "Selected photo"} / model-assisted evidence only
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => void runSelectedPhotoFrameMiteCount()}
+                        disabled={Boolean(workingLabel) || !selectedPhoto}
+                        data-testid="run-frame-mite-count-button"
+                      >
+                        <RefreshCw size={18} />
+                        Run frame mite count
+                      </button>
+                    </div>
+                    {frameMiteCount?.inspectionPhotoId === selectedCrop.inspectionPhotoId ? (
+                      <>
+                        <div className="frame-mite-count-metrics" data-testid="frame-mite-count-result">
+                          <div>
+                            <span>Likely visible Varroa detections</span>
+                            <strong>{frameMiteCount.likelyVisibleVarroaDetectionCount}</strong>
+                          </div>
+                          <div>
+                            <span>Bees with likely Varroa</span>
+                            <strong>{frameMiteCount.beesWithLikelyVarroaCount}</strong>
+                          </div>
+                          <div>
+                            <span>Processed bees</span>
+                            <strong>
+                              {frameMiteCount.processedBeeCount} / {frameMiteCount.eligibleBeeCount}
+                            </strong>
+                          </div>
+                          <div>
+                            <span>Coverage</span>
+                            <strong>
+                              {formatGeometryValue(frameMiteCount.modelDeterminateCoveragePercent)}%
+                            </strong>
+                          </div>
+                        </div>
+                        <div className="export-summary frame-mite-count-provenance">
+                          <span>{formatFrameMiteCountStatus(frameMiteCount.status)}</span>
+                          <span>{frameMiteCount.adapterType}</span>
+                          <span>{frameMiteCount.adapterVersion}</span>
+                          <span>{Math.round(frameMiteCount.elapsedMs)} ms</span>
+                          <span>Completed crops {frameMiteCount.completedTrainingCropCount}</span>
+                          <span>Unfinished crops {frameMiteCount.unfinishedTrainingCropCount}</span>
+                          <span>Excluded crops {frameMiteCount.excludedTrainingCropCount}</span>
+                          <span>Not assessed bees {frameMiteCount.notAssessedBeeCount}</span>
+                          <span>Failed bees {frameMiteCount.failedBeeCount}</span>
+                        </div>
+                        {frameMiteCount.beeResults.length > 0 ? (
+                          <div className="frame-mite-count-bee-list" aria-label="Frame mite count bee results">
+                            {frameMiteCount.beeResults.map((result) => (
+                              <button
+                                type="button"
+                                key={`${result.trainingCropId}-${result.beeAnnotationId}`}
+                                className={`frame-mite-count-bee-row ${result.status}`}
+                                onClick={() =>
+                                  selectFrameMiteCountBee(
+                                    result.trainingCropId,
+                                    result.beeAnnotationId
+                                  )
+                                }
+                                data-testid="frame-mite-count-bee-result"
+                              >
+                                <strong>
+                                  Crop {result.cropOrdinal} / Bee {result.beeOrdinal}
+                                </strong>
+                                <span>{formatFrameMiteCountBeeStatus(result.status)}</span>
+                                <span>
+                                  {result.status === "completed"
+                                    ? `${result.detectionCount} likely detection${
+                                        result.detectionCount === 1 ? "" : "s"
+                                      }`
+                                    : result.failureCode ?? result.notAssessedReason ?? "not assessed"}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        ) : null}
+                        <p className="list-context-note" data-testid="frame-mite-count-caveat">
+                          {frameMiteCount.caveat}
+                        </p>
+                      </>
+                    ) : (
+                      <p className="list-context-note">
+                        Run the configured Varroa Detector across eligible bees on this selected photo.
+                      </p>
+                    )}
+                  </section>
                   <div className="export-summary" data-testid="varroa-review-summary">
                     <span>Eligible {varroaReview.summary.eligibleBeeCount}</span>
                     <span>Reviewed {varroaReview.summary.reviewedBeeCount}</span>

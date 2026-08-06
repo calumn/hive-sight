@@ -139,6 +139,19 @@ class VarroaDetectorPreviewStatus(StrEnum):
     not_assessed = "not_assessed"
 
 
+class FrameMiteCountStatus(StrEnum):
+    completed = "completed"
+    completed_with_warnings = "completed_with_warnings"
+    failed = "failed"
+    not_available = "not_available"
+
+
+class FrameMiteCountBeeStatus(StrEnum):
+    completed = "completed"
+    not_assessed = "not_assessed"
+    failed = "failed"
+
+
 class VarroaDetectorCoordinateSpace(StrEnum):
     head_up_normalized_crop = "head_up_normalized_crop"
 
@@ -1469,6 +1482,10 @@ class VarroaDetectorPreviewRequest(BaseModel):
     workspace_id: UUID
 
 
+class FrameMiteCountRequest(BaseModel):
+    workspace_id: UUID
+
+
 class LikelyVarroaDetectionResponse(BaseModel):
     detection_id: str
     x: float = Field(ge=0, le=1)
@@ -1501,6 +1518,55 @@ class VarroaDetectorPreviewResponse(BaseModel):
     detection_count: int
     head_up_normalized_crop: HeadUpNormalizedBeeCropPreviewResponse | None = None
     caveat: str
+
+
+class FrameMiteCountBeeResultResponse(BaseModel):
+    training_crop_id: UUID
+    bee_annotation_id: UUID
+    crop_ordinal: int
+    bee_ordinal: int
+    status: FrameMiteCountBeeStatus
+    detection_count: int
+    detections: list[LikelyVarroaDetectionResponse] = Field(default_factory=list)
+    not_assessed_reason: str | None = None
+    failure_code: str | None = None
+    failure_message: str | None = None
+    head_up_normalized_crop: HeadUpNormalizedBeeCropPreviewResponse | None = None
+    transform_version: str | None = None
+    transform_metadata: dict[str, object] | None = None
+
+
+class FrameMiteCountResponse(BaseModel):
+    workspace_id: UUID
+    inspection_id: UUID
+    hive_id: UUID
+    apiary_id: UUID | None = None
+    inspection_date: date
+    inspection_photo_id: UUID
+    source_image_filename: str
+    source_intent: InspectionIntent
+    model_purpose: str = "varroa_detection"
+    adapter_type: str
+    adapter_version: str
+    model_reference: str
+    status: FrameMiteCountStatus
+    elapsed_ms: int
+    completed_training_crop_count: int
+    unfinished_training_crop_count: int
+    excluded_training_crop_count: int
+    eligible_bee_count: int
+    processed_bee_count: int
+    failed_bee_count: int
+    not_assessed_bee_count: int
+    likely_visible_varroa_detection_count: int
+    bees_with_likely_varroa_count: int
+    model_determinate_coverage_percent: float
+    not_assessed_reasons: dict[str, int] = Field(default_factory=dict)
+    failure_reasons: dict[str, int] = Field(default_factory=dict)
+    bee_results: list[FrameMiteCountBeeResultResponse] = Field(default_factory=list)
+    not_user_facing_reason: str
+    caveat: str
+    advisor_context_available: bool = False
 
 
 class ReviewQueueEllipseEvidence(BaseModel):

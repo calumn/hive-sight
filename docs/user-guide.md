@@ -128,23 +128,27 @@ Use this when a completed Training Crop is ready for model-curation Varroa evide
 
 1. Open the `Varroa Review` workflow stage.
 2. Select a completed Training Crop.
-3. Pick an eligible bee from the candidate list. Suspected-visible-Varroa cues appear first.
-4. Review the paired Head-up bee crop:
+3. Optionally click `Run frame mite count` to run the configured Varroa Detector across all currently eligible bees on the selected Inspection Photo.
+4. Review the model-assisted frame count for likely visible Varroa detections, bees with likely Varroa, processed bees, coverage, crop exclusions, bee failures, per-bee rows, adapter provenance, and caveats.
+5. Pick an eligible bee from the candidate list. Suspected-visible-Varroa cues appear first.
+6. Review the paired Head-up bee crop:
    - `Clean` keeps the bee image unobscured.
    - `Marked` shows human mite markers and any model-preview boxes.
-5. Use `Place marker` mode to click the marked Head-up bee crop and place point markers for visible mites.
-6. Use `Pan` mode when you need to move the clean and marked views together at the current zoom.
-7. Optionally click `Run detector preview` to show deterministic stub Varroa Detector boxes for the selected eligible bee. These boxes are preview-only and do not save an outcome.
-8. Choose an outcome:
+7. Use `Place marker` mode to click the marked Head-up bee crop and place point markers for visible mites.
+8. Use `Pan` mode when you need to move the clean and marked views together at the current zoom.
+9. Optionally click `Run detector preview` to show deterministic stub Varroa Detector boxes for the selected eligible bee. These boxes are preview-only and do not save an outcome.
+10. Choose an outcome:
    - `Visible Varroa` requires one or more markers.
    - `No visible Varroa` records an active negative judgement and requires zero markers.
    - `Not determined` requires a note and requires zero markers.
-9. Delete and replace markers if needed.
-10. Click `Save outcome`.
+11. Delete and replace markers if needed.
+12. Click `Save outcome`.
 
 The `Photo-visible Varroa evidence` summary rolls the reviewed bee outcomes for the selected Inspection Photo into one current frame/photo-level view. It separates visible-Varroa bees from visible mite markers, active negatives, unresolved bees, unreviewed eligible bees, hidden or ineligible bees, completed crops, unfinished crops, review completion, and determinate coverage.
 
-The Varroa Review summary is model-curation progress only. Detector preview boxes are deterministic stub output until replaced by a real adapter. Neither the summary nor the preview is a Varroa assessment, visible mite rate, treatment recommendation, or HiveSight Advisor trigger.
+The `Frame mite count` card is transient model-assisted evidence for the selected Inspection Photo. It does not save a result history, does not change human Varroa Review Outcomes, and clears when you select a different photo.
+
+The Varroa Review summary is model-curation progress only. Frame mite counts and detector preview boxes are deterministic stub output until replaced by a real adapter. They are not Varroa assessments, visible mite rates, treatment recommendations, HiveSight Advisor contexts, or HiveSight Advisor triggers.
 
 ## Reopen And Continue A Training Crop
 

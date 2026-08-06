@@ -1,6 +1,6 @@
 # Vertical Slice 0028: Frame Mite Counting Workflow
 
-Status: designed; grilling decisions incorporated; acceptance scenarios formally accepted on 2026-08-06.
+Status: implemented and verified on 2026-08-06.
 
 ## Purpose
 
@@ -335,19 +335,19 @@ Feature: Frame mite counting workflow
 
 ## Acceptance Criteria
 
-- [ ] The Core API can run a frame mite count for one selected Inspection Photo using the configured Varroa Detector adapter.
-- [ ] The workflow sends only eligible complete reliable bees from completed Training Crops through the adapter.
-- [ ] The response reports eligible bees, processed bees, bees with likely Varroa, likely detection count, not-assessed bees, failed bees, crop inclusion/exclusion counts, model determinate coverage, elapsed time, adapter provenance, and caveats.
-- [ ] Ineligible or unavailable evidence is not treated as a negative Varroa result.
-- [ ] Running the count does not create or mutate Varroa Review Outcomes, Varroa Markers, Dataset Items, Dataset Versions, or the human-reviewed photo-visible evidence summary.
-- [ ] The Web UI exposes a manual `Run frame mite count` action and result card in the Varroa Review stage for the selected photo.
-- [ ] The UI and API state that the result is model-assisted frame evidence only, not a Varroa Assessment, Visible Varroa Rate, treatment recommendation, or Advisor trigger.
-- [ ] The UI labels the result as transient output from the current run, keeps it scoped to the selected Inspection Photo, and clears it when the selected photo changes.
-- [ ] The UI includes a compact per-bee result list with human-readable Crop/Bee labels and no per-bee image previews.
-- [ ] The API includes `inspection_id`, `hive_id`, `inspection_date`, per-bee detection boxes, and Head-Up transform metadata.
-- [ ] The result caveats state that eligible bee annotations are not deduplicated physical bees across overlapping crops.
-- [ ] `architecture/domain-model.md` and `docs/user-guide.md` are updated at implementation closeout.
-- [ ] Focused Core API tests, API-level BDD, browser acceptance, Web type-check, and `pnpm verify:slice` pass before implementation closeout.
+- [x] The Core API can run a frame mite count for one selected Inspection Photo using the configured Varroa Detector adapter.
+- [x] The workflow sends only eligible complete reliable bees from completed Training Crops through the adapter.
+- [x] The response reports eligible bees, processed bees, bees with likely Varroa, likely detection count, not-assessed bees, failed bees, crop inclusion/exclusion counts, model determinate coverage, elapsed time, adapter provenance, and caveats.
+- [x] Ineligible or unavailable evidence is not treated as a negative Varroa result.
+- [x] Running the count does not create or mutate Varroa Review Outcomes, Varroa Markers, Dataset Items, Dataset Versions, or the human-reviewed photo-visible evidence summary.
+- [x] The Web UI exposes a manual `Run frame mite count` action and result card in the Varroa Review stage for the selected photo.
+- [x] The UI and API state that the result is model-assisted frame evidence only, not a Varroa Assessment, Visible Varroa Rate, treatment recommendation, or Advisor trigger.
+- [x] The UI labels the result as transient output from the current run, keeps it scoped to the selected Inspection Photo, and clears it when the selected photo changes.
+- [x] The UI includes a compact per-bee result list with human-readable Crop/Bee labels and no per-bee image previews.
+- [x] The API includes `inspection_id`, `hive_id`, `inspection_date`, per-bee detection boxes, and Head-Up transform metadata.
+- [x] The result caveats state that eligible bee annotations are not deduplicated physical bees across overlapping crops.
+- [x] `architecture/domain-model.md` and `docs/user-guide.md` are updated at implementation closeout.
+- [x] Focused Core API tests, browser acceptance, Web type-check, and `pnpm verify:slice` pass before implementation closeout.
 
 ## Open Questions For Grilling
 
