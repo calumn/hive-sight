@@ -104,9 +104,17 @@ Rationale: Original images and structured annotations are needed for auditabilit
 
 ### FR-025 Advisor Treatment Recommendation Intake
 
-When HiveSight requests treatment guidance from HiveSight Advisor, the system shall be able to store the returned Treatment Recommendation as an advisory record linked to the Workspace, Apiary, Hive, source Inspection or Varroa evidence context, recommendation date/time, Advisor contract version, and Advisor provenance.
+When HiveSight requests treatment guidance from HiveSight Advisor, the system shall be able to store the Advisor Varroa Context Snapshot, outbound Advisor request payload, Advisor response payload, and returned Treatment Recommendation as advisory provenance linked to the Workspace, Apiary, Hive, source Inspection or Varroa evidence context, recommendation date/time, Advisor contract version, adapter provenance, and Advisor provenance.
 
 Rationale: A recommendation must be traceable to the hive, evidence, and Advisor response that produced it, without pretending that advice has already been accepted or applied.
+
+Version: Deferred until HiveSight Advisor integration.
+
+### FR-025A Advisor Treatment Advice Attempts
+
+When a Beekeeper requests Advisor treatment advice, the system shall preserve the advice attempt as part of a Treatment Evidence Chain whether the attempt is blocked before Advisor is called, fails during the Advisor call, or returns a Treatment Recommendation. Blocked and failed attempts shall not be represented as Treatment Recommendations.
+
+Rationale: Treatment-advice history should explain why advice was or was not produced without confusing safety/readiness blockers or integration failures with actual Advisor recommendations.
 
 Version: Deferred until HiveSight Advisor integration.
 
@@ -120,7 +128,7 @@ Version: Deferred until HiveSight Advisor integration.
 
 ### FR-027 Hive Treatment Course
 
-When a Beekeeper accepts a Treatment Recommendation or manually records treatment activity, the system shall create or update a beekeeper-owned Hive Treatment Course linked to one Hive. A Treatment Recommendation shall not itself become the treatment course; it may be the provenance source for a separate course.
+When a Beekeeper accepts a Treatment Recommendation or manually records treatment activity, the system shall create or update a beekeeper-owned Hive Treatment Course linked to one Hive. A Treatment Recommendation shall not itself become the treatment course; it may be the provenance source for a separate course. Accepting an Advisor recommendation may initially create a planned course without dated Treatment Applications.
 
 Rationale: Keeping the advisory suggestion separate from the beekeeper-owned treatment course preserves responsibility, auditability, and the ability to record treatments that were not Advisor-recommended.
 
@@ -144,7 +152,7 @@ Version: Deferred until treatment follow-up implementation.
 
 ### FR-030 Treatment Evidence Chain
 
-The system shall preserve a Treatment Evidence Chain from the Varroa evidence or Varroa Assessment context that triggered an Advisor request, through the request payload sent to HiveSight Advisor, the returned Treatment Recommendation, the Beekeeper's decision, any resulting Hive Treatment Course, Treatment Applications, and Treatment Outcome.
+The system shall preserve an explicit Treatment Evidence Chain from the Varroa evidence or Varroa Assessment context that triggered an Advisor request, through the Advisor Varroa Context Snapshot, request payload sent to HiveSight Advisor, blocked or failed advice attempts where relevant, returned Treatment Recommendation, the Beekeeper's decision, any resulting Hive Treatment Course, Treatment Applications, and Treatment Outcome.
 
 Rationale: Future review, audit, and learning need to know which Varroa count or assessment context led to which advice, what the Beekeeper actually did, and what later evidence suggested about the result.
 

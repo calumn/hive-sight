@@ -116,6 +116,14 @@ _Avoid_: Training data collection when the purpose is product analysis.
 An advisory suggestion for managing a Hive health concern, such as Varroa, that has not itself been applied by the Beekeeper. It may be pending, accepted, or declined, and remains separate from any Hive Treatment Course created from it.
 _Avoid_: Treatment Course when the recommendation is not yet the beekeeper's own treatment record.
 
+**Advisor Varroa Context Snapshot**:
+The immutable snapshot of HiveSight's Advisor Varroa context at the moment a Beekeeper requests treatment advice. It preserves exactly what HiveSight knew before transforming that context into HiveSight Advisor's treatment-plan request payload.
+_Avoid_: Reconstructing historical advice context from current inspection, model, treatment, or hive state.
+
+**Advisor Treatment Advice Attempt**:
+A Beekeeper's attempt to obtain HiveSight Advisor treatment advice for a Hive evidence context. It may be blocked before Advisor is called, fail during the Advisor call, or produce a Treatment Recommendation.
+_Avoid_: Treatment Recommendation when no recommendation was returned.
+
 **Hive Treatment Course**:
 A beekeeper-owned treatment plan or record for one Hive, covering the intended purpose and lifecycle of a treatment from planning through completion or cancellation. It may originate from an accepted Treatment Recommendation or be recorded manually.
 _Avoid_: Treatment Recommendation when the beekeeper has not accepted responsibility for carrying out or recording the treatment.
@@ -129,7 +137,7 @@ The beekeeper-recorded or inspection-supported result observed after a Hive Trea
 _Avoid_: Cure, success, diagnosis.
 
 **Treatment Evidence Chain**:
-The traceable relationship from Varroa evidence or Varroa Assessment context, through a HiveSight Advisor request and Treatment Recommendation, to the Beekeeper's decision, Hive Treatment Course, Treatment Applications, and Treatment Outcome.
+The explicit, durable relationship from Varroa evidence or Varroa Assessment context, through an Advisor Varroa Context Snapshot, HiveSight Advisor request, Treatment Recommendation or blocked/failed advice attempt, to the Beekeeper's decision, Hive Treatment Course, Treatment Applications, and Treatment Outcome.
 _Avoid_: Treating later treatment records as independent facts when they came from a specific evidence-backed recommendation.
 
 **Frame Label**:

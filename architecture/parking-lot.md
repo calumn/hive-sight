@@ -1244,3 +1244,49 @@ Promoted into `architecture/vertical-slice-0030-varroa-corpus-governance.md`. Th
 Suggested owner or area:
 
 Varroa review workflow, annotation UI, persistence, and dataset governance.
+
+## PARK-0053: Advisor Recommendation Callback And Resume Integration
+
+Status: parked
+Date parked: 2026-08-06
+Source: Slice 0029.5 grilling
+Area: HiveSight Advisor integration, treatment lifecycle
+
+Context:
+
+Slice 0029.5 records Advisor Treatment Advice Attempts, pending Treatment Recommendations, Beekeeper accept/decline decisions, and planned Hive Treatment Courses inside HiveSight. It deliberately does not notify HiveSight Advisor when a recommendation is accepted or declined.
+
+Why parked:
+
+HiveSight Advisor currently has test-only completion and rejection endpoints standing in for a future resume workflow. HiveSight should not build callback/resume integration until the HiveSight treatment lifecycle can represent treatment applications, completion, cancellation, revision, and outcome clearly enough to avoid sending misleading state back to Advisor.
+
+Revisit trigger:
+
+After HiveSight can record Treatment Applications and course completion or cancellation, before HiveSight Advisor depends on HiveSight callbacks to resume or close treatment-plan workflows.
+
+Suggested owner or area:
+
+HiveSight Advisor integration, treatment lifecycle, and cross-system workflow reliability.
+
+## PARK-0054: Treatment Evidence Chain Retention And Minimisation
+
+Status: parked
+Date parked: 2026-08-06
+Source: Slice 0029.5 grilling
+Area: data governance, treatment evidence, Advisor learning governance
+
+Context:
+
+Slice 0029.5 retains raw Advisor Varroa context snapshots, outbound Advisor request payloads, and inbound Advisor response payloads as durable provenance for Treatment Evidence Chains.
+
+Why parked:
+
+The first treatment-advice slice needs exact snapshots for audit and debugging, but long-term retention, deletion, minimisation, anonymisation, and permitted-use rules require broader privacy and governance decisions. Those rules also affect any later Advisor learning, retrieval, RAG, export, or evaluation use.
+
+Revisit trigger:
+
+Before exposing Treatment Evidence Chain records outside HiveSight treatment history, before implementing Advisor learning export governance, or before defining production data retention/deletion policy for treatment records.
+
+Suggested owner or area:
+
+Data governance, treatment evidence, privacy, and HiveSight Advisor learning governance.

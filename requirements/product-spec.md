@@ -181,16 +181,23 @@ Feature: Future Advisor treatment workflow
     Given HiveSight has requested treatment guidance from HiveSight Advisor for a selected Hive
     And HiveSight Advisor returns a suggested treatment plan
     When HiveSight stores the response
-    Then the Treatment Recommendation is linked to the Workspace, Apiary, Hive, source evidence, recommendation date, and Advisor provenance
+    Then the Treatment Recommendation is linked to the Workspace, Apiary, Hive, source evidence, Advisor Varroa Context Snapshot, Advisor request payload, recommendation date, and Advisor provenance
     And HiveSight does not treat the recommendation as an applied treatment
     And HiveSight preserves the original recommendation even if the Beekeeper later declines it
+
+  Scenario: HiveSight records blocked or failed Advisor advice attempts without creating recommendations
+    Given a Beekeeper requests Advisor treatment advice for a Hive
+    When HiveSight blocks the request before calling Advisor or the Advisor call fails
+    Then HiveSight records an Advisor Treatment Advice Attempt in the Treatment Evidence Chain
+    And HiveSight does not create a Treatment Recommendation
+    And HiveSight does not create a Hive Treatment Course
 
   Scenario: Beekeeper accepts a recommendation into a Hive Treatment Course
     Given a Hive has a pending Treatment Recommendation
     When the Beekeeper accepts that recommendation
-    Then HiveSight creates a separate Hive Treatment Course for that Hive
+    Then HiveSight creates a separate planned Hive Treatment Course for that Hive
     And the Treatment Recommendation remains linked as the provenance source
-    And the course can contain one or more dated Treatment Applications
+    And the course does not imply treatment has been applied
 
   Scenario: Beekeeper records treatment without an Advisor recommendation
     Given a Beekeeper has treated a Hive outside HiveSight Advisor
@@ -210,7 +217,7 @@ Feature: Future Advisor treatment workflow
     And HiveSight has sent that context to HiveSight Advisor
     And HiveSight Advisor has returned a Treatment Recommendation
     When the Beekeeper accepts the recommendation into a Hive Treatment Course
-    Then HiveSight preserves the chain from Varroa evidence to Advisor request, Advisor recommendation, Beekeeper decision, Treatment Course, Treatment Applications, and Treatment Outcome
+    Then HiveSight preserves the chain from Varroa evidence, Advisor Varroa Context Snapshot, Advisor request, Advisor recommendation, Beekeeper decision, Treatment Course, Treatment Applications, and Treatment Outcome
     And HiveSight can later distinguish what was advised from what was actually applied
 
   Scenario: Advisor learning use is governed separately from treatment history

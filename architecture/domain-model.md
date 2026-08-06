@@ -890,6 +890,166 @@ Rules:
 - A Frame Mite Count does not create, update, or approve Varroa Review Outcomes, Varroa Markers, Dataset Items, Dataset Versions, or Varroa Corpus Curation Decisions.
 - It is model-assisted frame evidence only. It is not a Visible Varroa Rate, Varroa Assessment, Treatment Recommendation, HiveSight Advisor context, Advisor trigger, or whole-colony measurement.
 
+### Advisor Treatment Advice Attempt
+
+A Beekeeper's attempt to obtain HiveSight Advisor treatment advice for one Hive evidence context.
+
+Essential fields:
+
+- id
+- treatment evidence chain id
+- workspace id
+- apiary id
+- hive id
+- inspection id
+- inspection photo id
+- concern
+- state
+- blocked reasons
+- adapter type
+- adapter version
+- created by user id
+- created at
+
+Version-one states:
+
+- `blocked_not_ready`
+- `advisor_request_failed`
+- `recommendation_pending`
+- `recommendation_accepted`
+- `recommendation_declined`
+
+Rules:
+
+- An Advisor Treatment Advice Attempt is not a Treatment Recommendation unless HiveSight Advisor returns usable advice.
+- Blocked and failed attempts remain visible in chain history without creating treatment history.
+- Training Data Collection evidence is not product-eligible for Advisor treatment advice; tests may inject synthetic ready context through a controlled seam.
+- Production-like configuration must not allow deterministic stub advice to become beekeeper treatment history.
+
+### Advisor Varroa Context Snapshot
+
+The immutable Slice 0029 Advisor Varroa context captured when a Beekeeper asks for treatment advice.
+
+Essential fields:
+
+- id
+- treatment evidence chain id
+- workspace id
+- apiary id
+- hive id
+- inspection id
+- inspection photo id
+- context contract version
+- full context payload
+- context summary
+- created by user id
+- created at
+
+Rules:
+
+- The snapshot is created only for an Advisor treatment advice attempt, not every transient context read.
+- It stores what HiveSight knew at the time advice was requested or blocked.
+- Later evidence, model changes, treatment history, or context-builder changes do not rewrite the snapshot.
+
+### Treatment Evidence Chain
+
+The explicit audit handle connecting source Varroa evidence, Advisor context, Advisor request and response, Beekeeper decision, and any resulting treatment course.
+
+Essential fields:
+
+- id
+- workspace id
+- apiary id
+- hive id
+- inspection id
+- inspection photo id
+- concern
+- state
+- created by user id
+- created at
+- updated at
+
+Rules:
+
+- A Treatment Evidence Chain can end at a blocked attempt, failed Advisor request, pending recommendation, declined recommendation, accepted recommendation, or planned Hive Treatment Course.
+- Chain-history list views show summaries by default.
+- Single-chain detail may expose full raw context, request, and response payload snapshots for audit.
+- Advisor learning, retrieval, RAG, export, anonymisation, retention, and minimisation are later governance concerns, not implicit uses of chain records.
+
+### Treatment Recommendation
+
+An advisory suggestion returned by HiveSight Advisor for a Hive health concern.
+
+Essential fields:
+
+- id
+- treatment evidence chain id
+- Advisor treatment request snapshot id
+- workspace id
+- apiary id
+- hive id
+- concern
+- status
+- raw Advisor response payload
+- recommendation text
+- grounding status
+- citations
+- adapter type
+- adapter version
+- Advisor response contract version
+- response received at
+- decision by user id
+- decision at
+- decision note
+
+Version-one statuses:
+
+- `pending`
+- `accepted`
+- `declined`
+- `superseded`
+
+Rules:
+
+- A Treatment Recommendation is a suggested treatment plan requiring Beekeeper decision, not applied treatment.
+- Accept and decline are current decision fields in the first slice; immutable decision history is deferred.
+- Accepting a recommendation is idempotent and creates at most one planned Hive Treatment Course.
+- Declining is idempotent for already declined recommendations, but cannot reverse acceptance.
+- Advisor citations are stored as structured data as well as inside the raw response payload.
+
+### Hive Treatment Course
+
+A Beekeeper-owned planned or actual treatment course for one Hive.
+
+Essential fields:
+
+- id
+- treatment evidence chain id, nullable for manual courses
+- source treatment recommendation id, nullable
+- workspace id
+- apiary id
+- hive id
+- purpose
+- status
+- planned course snapshot
+- accepted by user id
+- accepted at
+- acceptance note
+- created by user id
+- created at
+
+Version-one Advisor-created status:
+
+- `planned`
+
+Rules:
+
+- A Hive Treatment Course created from an accepted Treatment Recommendation is separate from the recommendation.
+- A planned course does not imply treatment has been applied.
+- Slice 0029.5 does not edit planned courses, schedule reminders, record dated Treatment Applications, mark completion, or record outcomes.
+- Manual Hive Treatment Course entry without Advisor provenance is a separate roadmap item.
+- A new Advisor recommendation request is blocked while the Hive already has an open planned Varroa treatment course.
+
 ### User Correction
 
 A beekeeper flag about model output.

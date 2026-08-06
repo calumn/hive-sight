@@ -100,11 +100,13 @@ HiveSight remains the system of record for hive identity, Varroa assessment evid
 
 | Candidate Slice | Type | Outcome |
 | --- | --- | --- |
-| Hive Treatment History | Business / Technical | Let a Beekeeper record a Hive Treatment Course and one or more dated Treatment Applications against a selected Hive, including treatments that were not Advisor-recommended. |
-| Slice 0029.5 Advisor Treatment Recommendation Intake And Acceptance | Business / Technical | Store a Treatment Recommendation returned by HiveSight Advisor as an advisory record linked to the source Varroa evidence, Advisor request payload, Advisor response provenance, and a pending beekeeper decision, then let the Beekeeper accept it into a separate planned Hive Treatment Course. |
+| Manual Hive Treatment History | Business / Technical | Let a Beekeeper record a Hive Treatment Course and one or more dated Treatment Applications against a selected Hive when the treatment was not Advisor-recommended. Keep this separate from Slice 0029.5 so manual treatment provenance is not blurred with Advisor recommendation provenance. |
+| Slice 0029.5 Advisor Treatment Recommendation Intake And Acceptance | Business / Technical | Store blocked, failed, pending, accepted, and declined Advisor treatment advice attempts as explicit Treatment Evidence Chains, then let the Beekeeper accept a pending Treatment Recommendation into a separate planned Hive Treatment Course. |
 | Recommendation Decline And Audit Trail | Business / Governance | Let the Beekeeper decline a Treatment Recommendation with optional notes while preserving the original recommendation and decision history. |
+| Advisor Recommendation Callback And Resume Integration | Integration | Notify HiveSight Advisor when a recommendation is accepted, declined, completed, or needs revision once HiveSight's treatment lifecycle is ready to support that cross-system resume workflow. |
 | Broader Advisor Context API | Technical / Integration | Extend the Varroa context contract with richer hive, apiary, jurisdiction, inspection-history, and treatment-history context once the first Advisor integration shape has proved useful. |
 | Treatment Completion And Follow-up Outcome | Business | Let a Beekeeper mark a Hive Treatment Course complete and relate later Inspection evidence to the treatment outcome without rewriting the original recommendation. |
+| Treatment Evidence Chain Retention And Minimisation | Governance | Decide how long raw Advisor context, request, and response snapshots are retained and what minimised form is allowed for audit, deletion, export, or learning governance. |
 | Advisor Learning Evidence Export Governance | Governance / Integration | Define if and how anonymised Treatment Evidence Chain records may be exposed to HiveSight Advisor retrieval, evaluation, or learning with permitted-use, minimisation, and provenance controls. |
 
 ## Product Workflow And UX
