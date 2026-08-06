@@ -674,3 +674,24 @@ Human judgment still required:
 
 - Review the Slice 0030 implementation once the API and browser bindings execute the shared feature.
 - Decide which capability should migrate next only after the pilot demonstrates its maintenance and reporting cost.
+
+### 2026-08-06 Slice 0030 Dual-Seam Acceptance Specification Pilot Implementation
+
+Human-confirmed direction:
+
+- Build the signed-off pilot without broad migration of historical slice features.
+- Keep the selected Varroa Review behaviour in one canonical, client-neutral feature file and bind it through both Core API and Web UI.
+- Preserve the Slice 0025 document as historical evidence while moving the living executable scenario to the acceptance catalogue.
+
+AI contribution:
+
+- Added `acceptance/features/varroa/visible-varroa-review-outcome.feature` as the canonical feature.
+- Added a Core API `pytest-bdd` binding and removed the migrated scenario from the legacy Slice 0025 executable feature.
+- Added `playwright-bdd`, a dedicated browser BDD Playwright config, and browser step bindings for the same feature.
+- Narrowed the Slice 0025 Playwright spec to browser-specific visual and interaction coverage so it no longer asserts a competing one-marker business outcome.
+- Updated `pnpm verify:slice` to report shared-feature Core API and Web UI executions separately.
+- Updated the generic BDD skill and skills index with client-neutral feature and seam-specific binding guidance.
+
+Human judgment still required:
+
+- Decide the next capability to migrate into the living acceptance catalogue after seeing the pilot's maintenance cost in real use.

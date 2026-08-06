@@ -9,6 +9,7 @@
     "check": "tsc --noEmit",
     "preview": "vite preview",
     "test:acceptance": "playwright test",
+    "test:bdd": "bddgen test -c playwright.bdd.config.ts && playwright test -c playwright.bdd.config.ts",
     "test:acceptance:live-api": "HIVESIGHT_PLAYWRIGHT_PROFILE=live-api playwright test",
     "test:acceptance:headed": "playwright test --headed"
   },
@@ -22,6 +23,7 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.3.4",
+    "playwright-bdd": "^9.2.0",
     "typescript": "^5.7.0",
     "vite": "^6.0.0"
   }

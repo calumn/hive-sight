@@ -1,6 +1,6 @@
 # Vertical Slice 0030: Dual-Seam Acceptance Specification Pilot
 
-Status: designed; Gherkin acceptance signed off 2026-08-06.
+Status: implemented; focused Core API and browser BDD checks, Web type-check, focused browser regression, and full `pnpm verify:slice` passed on 2026-08-06.
 
 ## Purpose
 
@@ -107,16 +107,16 @@ Delivery-test assets introduced by this slice:
 
 ## Acceptance Criteria
 
-- [ ] The signed-off Varroa Review scenario exists once in a capability-organised canonical feature file.
-- [ ] The feature contains no HTTP method, button, selector, route, or storage wording.
-- [ ] `pytest-bdd` executes the canonical feature through the Core API.
-- [ ] `playwright-bdd` executes the same canonical feature through the Web UI.
-- [ ] Both bindings prove two markers, one visible-Varroa bee, and saved marker visibility after reopening.
-- [ ] The legacy Slice 0025 browser test retains browser-specific visual/interaction checks but no competing one-marker outcome assertion.
-- [ ] Slice 0025 remains historical acceptance evidence and links to the living canonical feature.
-- [ ] `pnpm verify:slice` reports distinct API and browser results for the shared feature.
-- [ ] The generic BDD skill and skills index record the new client-neutral, dual-seam practice without HiveSight-specific wording.
-- [ ] Focused API and browser checks, Web type-check, and `pnpm verify:slice` pass.
+- [x] The signed-off Varroa Review scenario exists once in a capability-organised canonical feature file.
+- [x] The feature contains no HTTP method, button, selector, route, or storage wording.
+- [x] `pytest-bdd` executes the canonical feature through the Core API.
+- [x] `playwright-bdd` executes the same canonical feature through the Web UI.
+- [x] Both bindings prove two markers, one visible-Varroa bee, and saved marker visibility after reopening.
+- [x] The legacy Slice 0025 browser test retains browser-specific visual/interaction checks but no competing one-marker outcome assertion.
+- [x] Slice 0025 remains historical acceptance evidence and links to the living canonical feature.
+- [x] `pnpm verify:slice` reports distinct API and browser results for the shared feature.
+- [x] The generic BDD skill and skills index record the new client-neutral, dual-seam practice without HiveSight-specific wording.
+- [x] Focused API and browser checks, Web type-check, and `pnpm verify:slice` pass.
 
 ## Open Questions
 

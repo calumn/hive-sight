@@ -29,6 +29,8 @@ This is deliberately a model-curation slice. It creates active positive, active 
 
 These scenarios were accepted for Slice 0025 implementation signoff on 2026-08-05.
 
+Implementation note after Slice 0030: the visible-Varroa two-marker scenario remains here as historical signoff evidence. The living executable scenario now lives at `acceptance/features/varroa/visible-varroa-review-outcome.feature` and is executed through both Core API and Web UI bindings.
+
 ```gherkin
 Feature: Varroa Review Outcome Labelling
 

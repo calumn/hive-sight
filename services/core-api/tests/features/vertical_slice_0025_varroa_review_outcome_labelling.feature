@@ -25,14 +25,6 @@ Feature: Varroa Review Outcome Labelling
     And HiveSight records zero Varroa markers
     And HiveSight labels the evidence as an active negative judgement
 
-  Scenario: Dataset Curator records a visible Varroa outcome with marker evidence
-    Given a Head-Up Normalized Bee Crop is open for Varroa review
-    When the Dataset Curator places two mite markers and records visible Varroa present
-    Then HiveSight saves a Varroa Review Outcome of visible_varroa_present
-    And HiveSight records the mite markers in normalized bee-crop coordinates
-    And HiveSight reports one visible-Varroa bee and two visible Varroa markers
-    And HiveSight shows the markers when the review is reopened
-
   Scenario: Dataset Curator records an unresolved Varroa Review Outcome
     Given a Head-Up Normalized Bee Crop is open for Varroa review
     When the Dataset Curator records not determined with a note

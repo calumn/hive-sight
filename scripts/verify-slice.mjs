@@ -8,6 +8,29 @@ const reportPath = resolve(repoRoot, "reports/slice-verification/latest.md");
 
 const checks = [
   {
+    name: "Shared Gherkin pilot - Core API",
+    command:
+      "./.venv/bin/python -m pytest -p no:cacheprovider tests/test_visible_varroa_review_outcome_api_bdd.py",
+    cwd: "services/core-api",
+    args: [
+      "./.venv/bin/python",
+      "-m",
+      "pytest",
+      "-p",
+      "no:cacheprovider",
+      "tests/test_visible_varroa_review_outcome_api_bdd.py"
+    ],
+    note: "Executes the canonical Varroa review feature through the Core API binding."
+  },
+  {
+    name: "Shared Gherkin pilot - Web UI",
+    command: "pnpm --filter @hive-sight/web test:bdd",
+    cwd: ".",
+    args: ["pnpm", "--filter", "@hive-sight/web", "test:bdd"],
+    note:
+      "Executes the canonical Varroa review feature through playwright-bdd and the Web UI binding."
+  },
+  {
     name: "Core API tests",
     command: "./.venv/bin/python -m pytest -p no:cacheprovider",
     cwd: "services/core-api",

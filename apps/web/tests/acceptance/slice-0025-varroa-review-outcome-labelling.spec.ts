@@ -4,7 +4,7 @@ import { createApiaryAndHive } from "./support/setup-workflow";
 
 const fixtureImagePath = fileURLToPath(new URL("../fixtures/bee-frame-test.png", import.meta.url));
 
-test("Dataset Curator records Varroa review cues and a visible Varroa outcome", async ({
+test("Dataset Curator reviews Varroa image context and marker interaction affordances", async ({
   page
 }) => {
   await page.goto("/");
@@ -164,30 +164,4 @@ test("Dataset Curator records Varroa review cues and a visible Varroa outcome", 
   await expect(page.getByTestId("varroa-review-outcome-select")).toHaveValue(
     "visible_varroa_present"
   );
-  await page.getByTestId("save-varroa-review-outcome-button").click();
-
-  await expect(page.getByTestId("varroa-review-summary")).toContainText("Visible Varroa bees 1");
-  await expect(page.getByTestId("varroa-review-summary")).toContainText("Markers 1");
-  await expect(page.getByTestId("photo-visible-varroa-summary")).toContainText(
-    "Photo-visible Varroa evidence"
-  );
-  await expect(page.getByTestId("photo-visible-varroa-summary")).toContainText(
-    "Visible Varroa bees 1"
-  );
-  await expect(page.getByTestId("photo-visible-varroa-summary")).toContainText(
-    "Visible mite markers 1"
-  );
-  await expect(page.getByTestId("photo-visible-varroa-summary")).toContainText(
-    "Active negatives 0"
-  );
-  await expect(page.getByTestId("photo-visible-varroa-summary")).toContainText(
-    "Determinate coverage"
-  );
-  await expect(page.getByTestId("photo-visible-varroa-readiness")).toContainText(
-    "Advisor context available with caveats"
-  );
-  await expect(page.getByTestId("photo-visible-varroa-caveats")).toContainText(
-    "Photo-visible evidence only; not treatment advice."
-  );
-  await expect(page.getByTestId("workflow-stage-varroa-review-button")).toContainText("1 reviewed");
 });
