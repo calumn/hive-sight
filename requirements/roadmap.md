@@ -33,9 +33,9 @@ Recent slices have established:
 
 Important current limitation:
 
-HiveSight can now build, train, and benchmark an early crop-level Bee Localisation candidate, build and evaluate the first Bee Orientation baseline path, label bee-level Varroa Review Outcomes for human model-curation evidence, roll those reviewed outcomes into a current photo-visible Varroa evidence summary, preview deterministic stub Varroa Detector boxes for one eligible Head-Up Normalized Bee Crop, and run a transient model-assisted frame mite count across eligible bees on one photographed frame. It cannot yet make a user-facing Varroa assessment, trigger HiveSight Advisor, persist model-only Varroa result history, or produce a statistically defensible photo-visible estimate.
+HiveSight can now build, train, and benchmark an early crop-level Bee Localisation candidate, build and evaluate the first Bee Orientation baseline path, label bee-level Varroa Review Outcomes for human model-curation evidence, roll those reviewed outcomes into a current photo-visible Varroa evidence summary, preview deterministic stub Varroa Detector boxes for one eligible Head-Up Normalized Bee Crop, run a transient model-assisted frame mite count across eligible bees on one photographed frame, and assemble Advisor Varroa context for a later HiveSight-to-Advisor treatment-plan request. It cannot yet make a user-facing Varroa assessment, trigger HiveSight Advisor, persist model-only Varroa result history, or produce a statistically defensible photo-visible estimate.
 
-## Immediate Candidate Slices
+## Immediate Future Candidate Slices
 
 These are the strongest near-term candidates based on the current project state.
 
@@ -43,15 +43,8 @@ These are the strongest near-term candidates based on the current project state.
 | --- | --- | --- | --- |
 | Benchmark Dataset Curation Browser | Business / Technical | Let a Dataset Curator see and manage protected benchmark evidence as a named asset. | Slice 0015.4 uses benchmark items frozen inside a training Dataset Version; comparing candidates fairly soon needs a reusable benchmark lifecycle. |
 | Full-Frame Bee Localisation Evaluation | Technical | Evaluate whether the Bee Localisation candidate can find bees in realistic whole-frame photos, not just reviewed crops. | Crop-level success does not prove the model works on real inspection photos. |
-| Orientation Reliability Review | Business / Technical | Add explicit `reliable` / `unreliable` orientation review for directed bee ellipses. | Promoted into `architecture/vertical-slice-0021-orientation-reliability-review.md`. |
-| Bee Orientation Model Baseline | Technical | Build and validate the first Head Up / Head Down orientation package from the shared Bee Detection and Bee Orientation marked-bee Dataset Version, and record the first non-user-facing orientation candidate. | Implemented by Slice 0022 as `architecture/vertical-slice-0022-bee-orientation-training-baseline.md`; real predictive orientation training and benchmark evaluation remain later work. |
-| Varroa Review Outcome Labelling | Business | Designed as Slice 0025: add the CAPTCHA-like workflow for `visible_varroa_present`, `no_visible_varroa`, and `not_determined` on Head-Up Normalized Bee Crops, using reliable complete human-reviewed bees only. | Varroa training needs active positives and active negatives, not silent absence. |
 | Varroa Evidence Methodology And Gold-Standard Design | Research / Governance | Establish the full-depth annotation, review, split, sampling-experiment, and field-calibration protocol before Varroa corpus construction begins. | This is documented in `requirements/varroa-evidence-methodology.md`; the protocol prevents training convenience from becoming an unsupported beekeeper-facing statistical claim. |
-| Frame-Level Varroa Result Summary | Business / Technical | Implemented as Slice 0026: derive a frame/photo-level visible Varroa evidence summary from reviewed bee-level Varroa Review Outcomes, including marker count, positive bee count, active negatives, unresolved bees, and coverage. | This gives the upcoming detector and Advisor-context work a coherent result shape. |
-| Varroa Detector Adapter Seam | Technical | Implemented as Slice 0027: add a replaceable deterministic stub adapter seam that can return likely Varroa detections for one eligible Head-Up Normalized Bee Crop, with paired clean/annotated preview UI and non-user-facing provenance. | Once a frame-level result shape exists, adapter output has somewhere coherent to land without coupling the UI to a specific model runtime. |
-| Frame Mite Counting Workflow | Business / Technical | Implemented as Slice 0028: run the Varroa detector path over eligible bees from a photographed frame and produce the first model-assisted visible mite count with caveats. | This is the first end-to-end mite-counting path, even if the adapter is still stubbed. |
-| Advisor Varroa Context Assembly API | Technical / Integration | Implemented as Slice 0029: assemble the minimum Varroa and hive context HiveSight will later send to HiveSight Advisor, without yet calling Advisor or accepting treatment recommendations back into HiveSight. | This reaches the integration-context point while keeping Advisor treatment logic outside HiveSight and avoiding an Advisor-to-HiveSight dependency. |
-| Varroa Corpus Governance | Business / Governance | Preserved as Slice 0030: review saved Varroa Review Outcomes across the Workspace and record include, exclude, or defer decisions before Varroa Detector training datasets are frozen. | Still needed for model-curation discipline, but the current tranche prioritises the frame-count and Advisor-context path. |
+| Varroa Corpus Governance | Business / Governance | Designed as Slice 0030: review saved Varroa Review Outcomes across the Workspace and record include, exclude, or defer decisions before Varroa Detector training datasets are frozen. | Now that frame counting and Advisor context assembly exist, the next model-evidence gap is deciding which human Varroa outcomes enter the first Varroa corpus. |
 | Public Dataset Candidate Import | Technical / Governance | Import public USDA-ARS image/XML evidence as Candidate Annotations requiring human review. | This could accelerate dataset growth, but only if provenance and source rights are handled correctly. |
 
 ## Bee Localisation And Dataset Quality
@@ -73,23 +66,13 @@ These are the strongest near-term candidates based on the current project state.
 
 | Candidate Slice | Type | Outcome |
 | --- | --- | --- |
-| Orientation Reliability Review | Business / Technical | Promoted into `architecture/vertical-slice-0021-orientation-reliability-review.md` to let a curator mark whether each directed ellipse has reliable head direction. |
-| Shared Marked-Bee Dataset Version Promotion | Technical / Governance | Implemented in Slice 0022 for new Model Governance Dataset Versions: one marked oriented-bee Dataset Version stays in lockstep for Bee Localisation and Bee Orientation source evidence. |
-| Bee Orientation Dataset Builder | Technical / Governance | Implemented in Slice 0022 as a derived package builder that exports reliable complete directed ellipses into reproducible Head Up / Head Down crop packages with source maps and exclusion reasons. |
-| Real Bee Training Baseline | Technical | Implemented in Slice 0023: Bee Training commands replace YOLO-named user commands, Bee Localisation and Bee Orientation train sequentially from one shared Marked-Bee Dataset Version, and the real Bee Orientation adapter creates a non-user-facing Model Candidate with training-run validation metrics only. |
-| Bee Orientation Benchmark Report | Technical | Implemented by Slice 0024: evaluate a completed Bee Orientation Model Candidate against protected reliable complete benchmark bees from its shared Marked-Bee Dataset Version, report Head Up / Head Down accuracy and confusion matrix, and keep evidence purpose-limited. Angular error, promotion thresholds, live orientation inference, and Head-Up Normalized Bee Crop generation remain later work. |
 | Orientation-Assisted Crop Normalisation | Technical | Partly folded into Slice 0025 as the review-preview transform for human Varroa labelling. Automated orientation inference, model-input package export, and live pipeline crop generation remain later work. |
 
 ## Varroa Detection
 
 | Candidate Slice | Type | Outcome |
 | --- | --- | --- |
-| Varroa Review Outcome Labelling | Business | Designed as Slice 0025: let a Dataset Curator actively mark a Head-Up Normalized Bee Crop as `visible_varroa_present`, `no_visible_varroa`, or `not_determined`, with mite point markers for positives. |
-| Frame-Level Varroa Result Summary | Business / Technical | Implemented as Slice 0026: derive a current photo/frame-level visible Varroa evidence summary from reviewed bee-level outcomes, including positive bees, active negatives, unresolved bees, coverage, and visible mite marker count. |
-| Varroa Detector Adapter Seam | Technical | Implemented as Slice 0027: add a replaceable deterministic stub adapter boundary for previewing likely Varroa detections on one eligible Head-Up Normalized Bee Crop, without persisting model output as human review evidence. |
-| Frame Mite Counting Workflow | Business / Technical | Implemented as Slice 0028: run the Varroa detector path over eligible bees from a photographed frame and produce the first model-assisted visible mite count with caveats. |
-| Advisor Varroa Context Assembly API | Technical / Integration | Implemented as Slice 0029: assemble frame-level Varroa result context for a later HiveSight-to-Advisor request without importing treatment advice back into HiveSight yet. |
-| Varroa Corpus Governance | Business / Governance | Preserved as Slice 0030: show saved Varroa Review Outcomes across the Workspace, separate positive, active negative, unresolved, stale, included, excluded, and deferred evidence, and record current corpus curation decisions without freezing a Dataset Version. |
+| Varroa Corpus Governance | Business / Governance | Designed as Slice 0030: show saved Varroa Review Outcomes across the Workspace, separate positive, active negative, unresolved, stale, included, excluded, and deferred evidence, and record current corpus curation decisions without freezing a Dataset Version. |
 | Gold-Standard Full-Frame Annotation Pilot | Research / Technical | Demonstrate the methodology on a small, fully reconciled set of complete frame images and measure annotation/review workload and agreement. |
 | Varroa Model-Curation Sampling Plan | Business / Technical | Select Varroa labelling tasks using `stratified_random`, `curator_targeted`, and explicit `human_selected` versus `upstream_model_selected` metadata. |
 | Varroa Dataset Repository Browser | Business / Technical | Show positive, active negative, and not-determined Varroa evidence by dataset role, source, orientation reliability, and selection method. |
@@ -101,7 +84,6 @@ These are the strongest near-term candidates based on the current project state.
 
 | Candidate Slice | Type | Outcome |
 | --- | --- | --- |
-| Frame-Level Varroa Result Summary | Business / Technical | Implemented as Slice 0026: show the current countable evidence for one photographed frame before claiming a statistical visible Varroa rate. |
 | Inspection-Rate Sampling Policy | Business / Technical | Define how sampled bees support a stated visible Varroa rate and confidence interval. |
 | Sampling-Strategy Simulation And Calibration | Research / Technical | Use protected full-depth frames to select an initial spatial/quality-stratified and possibly sequential inspection-rate plan; separately study paired field-reference measurements without conflating their targets. |
 | End-To-End Pipeline Evaluation | Technical / Governance | Evaluate Bee Localisation, Bee Orientation, and Varroa Detection together on protected full-frame evidence. |
@@ -117,7 +99,6 @@ HiveSight remains the system of record for hive identity, Varroa assessment evid
 | Candidate Slice | Type | Outcome |
 | --- | --- | --- |
 | Hive Treatment History | Business / Technical | Let a Beekeeper record a Hive Treatment Course, one or more Treatment Applications, and simple notes against a selected Hive. |
-| Advisor Varroa Context Assembly API | Technical / Integration | Implemented as Slice 0029: assemble the minimum frame-level Varroa evidence, hive, apiary, jurisdiction, treatment-history modelling status, and situational-input readiness HiveSight will need before it can ask HiveSight Advisor for treatment guidance. |
 | Advisor Treatment Recommendation Intake | Business / Technical | Accept a Treatment Recommendation from HiveSight Advisor, show it to the Beekeeper as suggested rather than applied, and let the Beekeeper accept or decline it. |
 | Broader Advisor Context API | Technical / Integration | Extend the Varroa context contract with richer hive, apiary, jurisdiction, inspection-history, and treatment-history context once the first Advisor integration shape has proved useful. |
 | Treatment Completion And Follow-up Outcome | Business | Let a Beekeeper mark a Hive Treatment Course complete and relate later Inspection evidence to the treatment outcome without rewriting the original recommendation. |
@@ -182,8 +163,9 @@ HiveSight remains the system of record for hive identity, Varroa assessment evid
 
 The likely next tranche should stay model-evidence focused:
 
-1. Slice 0027 Varroa Detector adapter seam is implemented, so a stubbed or real model can return mite detections for Head-Up Normalized Bee Crops.
-2. Add the Slice 0029 Advisor Varroa Context Assembly API so HiveSight can prepare treatment-relevant Varroa context before a later HiveSight-to-Advisor treatment-plan request.
-3. Preserve Slice 0030 Varroa Corpus Governance, Varroa Detector training, protected benchmark work, and statistical inference as follow-on work now that the frame-counting path exists.
+1. Close Slice 0030 Varroa Corpus Governance so saved Varroa Review Outcomes can be deliberately included, excluded, or deferred before a Varroa Detection training dataset is frozen.
+2. Build the first Varroa Detector Baseline once there is enough curated positive and active-negative evidence.
+3. Add protected Varroa benchmark and gold-standard full-frame work before making any user-facing Varroa Assessment or treatment-trigger claim.
+4. Start Hive Treatment History and Advisor Treatment Recommendation Intake when the product workflow is ready to move from evidence context to treatment guidance.
 
 This order can change if annotation productivity becomes the limiting factor, or if source-rights/contributor governance becomes necessary before using external evidence.
