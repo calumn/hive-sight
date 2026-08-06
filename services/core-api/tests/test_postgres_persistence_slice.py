@@ -21,11 +21,17 @@ from hive_sight_core_api.dev_store import (
 from hive_sight_core_api.dev_users import DEV_USERS
 from hive_sight_core_api.main import app
 from hive_sight_core_api.models import (
+    AdvisorTreatmentAdapterType,
+    AdvisorTreatmentCitationResponse,
+    AdvisorTreatmentRequestSnapshotResponse,
+    AdvisorTreatmentRequestStatus,
+    AdvisorVarroaContextSnapshotResponse,
     AnnotationType,
     ArtifactResponse,
     BenchmarkEvaluationResponse,
     CoordinateSpace,
     DatasetVersionResponse,
+    HiveTreatmentCourseResponse,
     ModelCandidateResponse,
     ReviewQueueEllipseEvidence,
     ReviewQueueEvidenceSnapshot,
@@ -36,6 +42,10 @@ from hive_sight_core_api.models import (
     ReviewQueueSubjectType,
     TrainingCropReviewStatus,
     TrainingRunResponse,
+    TreatmentEvidenceChainResponse,
+    TreatmentEvidenceChainState,
+    TreatmentRecommendationResponse,
+    TreatmentRecommendationStatus,
     VisibleBeeStatus,
 )
 from hive_sight_core_api.postgres_store import PostgresProductDataStore
@@ -334,6 +344,142 @@ def test_postgres_store_survives_restart_for_training_crop_dataset_item_path() -
         assert reassignment.json()["reviewed_ellipse_snapshots"][0]["rotation_degrees"] == 15
     finally:
         app.dependency_overrides.clear()
+
+
+@pytest.mark.skipif(
+    importlib.util.find_spec("psycopg") is None or not os.getenv("HIVESIGHT_TEST_DATABASE_URL"),
+    reason="Set HIVESIGHT_TEST_DATABASE_URL and install psycopg to run Postgres persistence integration.",
+)
+def test_postgres_store_survives_restart_for_treatment_evidence_chain() -> None:
+    database_url = os.environ["HIVESIGHT_TEST_DATABASE_URL"]
+    reset_database(database_url)
+    store = PostgresProductDataStore(database_url=database_url)
+    store.seed_development_users()
+    seed = DEV_USERS[0]
+    now = datetime(2026, 8, 6, 12, 0, tzinfo=UTC)
+    chain_id = UUID("00000000-0000-0000-0000-000000029501")
+    context_snapshot_id = UUID("00000000-0000-0000-0000-000000029502")
+    request_snapshot_id = UUID("00000000-0000-0000-0000-000000029503")
+    recommendation_id = UUID("00000000-0000-0000-0000-000000029504")
+    course_id = UUID("00000000-0000-0000-0000-000000029505")
+    inspection_id = UUID("00000000-0000-0000-0000-000000029506")
+    inspection_photo_id = UUID("00000000-0000-0000-0000-000000029507")
+
+    chain = store.save_treatment_evidence_chain(
+        TreatmentEvidenceChainResponse(
+            treatment_evidence_chain_id=chain_id,
+            workspace_id=seed.workspace_id,
+            apiary_id=seed.apiary_id,
+            hive_id=seed.hive_id,
+            inspection_id=inspection_id,
+            inspection_photo_id=inspection_photo_id,
+            state=TreatmentEvidenceChainState.recommendation_accepted,
+            created_by_user_id=seed.user_id,
+            created_at=now,
+            updated_at=now,
+        )
+    )
+    store.save_advisor_varroa_context_snapshot(
+        AdvisorVarroaContextSnapshotResponse(
+            advisor_varroa_context_snapshot_id=context_snapshot_id,
+            treatment_evidence_chain_id=chain.treatment_evidence_chain_id,
+            workspace_id=seed.workspace_id,
+            apiary_id=seed.apiary_id,
+            hive_id=seed.hive_id,
+            inspection_id=inspection_id,
+            inspection_photo_id=inspection_photo_id,
+            advisor_context_contract_version="advisor_varroa_context_v1",
+            context_payload={"contract_version": "advisor_varroa_context_v1"},
+            context_summary={"can_request_advice": True},
+            created_by_user_id=seed.user_id,
+            created_at=now,
+        )
+    )
+    store.save_advisor_treatment_request_snapshot(
+        AdvisorTreatmentRequestSnapshotResponse(
+            advisor_treatment_request_snapshot_id=request_snapshot_id,
+            treatment_evidence_chain_id=chain.treatment_evidence_chain_id,
+            workspace_id=seed.workspace_id,
+            apiary_id=seed.apiary_id,
+            hive_id=seed.hive_id,
+            inspection_id=inspection_id,
+            inspection_photo_id=inspection_photo_id,
+            advisor_context_contract_version="advisor_varroa_context_v1",
+            advisor_request_contract_version="hivesight_advisor_treatment_plan_request_v1",
+            jurisdiction_code="gb-eng",
+            situational_context="Synthetic treatment evidence context.",
+            request_payload={"jurisdiction_code": "gb-eng"},
+            request_status=AdvisorTreatmentRequestStatus.sent,
+            adapter_type=AdvisorTreatmentAdapterType.deterministic_stub,
+            adapter_version="deterministic_stub_v1",
+            created_by_user_id=seed.user_id,
+            created_at=now,
+        )
+    )
+    store.save_treatment_recommendation(
+        TreatmentRecommendationResponse(
+            treatment_recommendation_id=recommendation_id,
+            treatment_evidence_chain_id=chain.treatment_evidence_chain_id,
+            advisor_treatment_request_snapshot_id=request_snapshot_id,
+            workspace_id=seed.workspace_id,
+            apiary_id=seed.apiary_id,
+            hive_id=seed.hive_id,
+            status=TreatmentRecommendationStatus.accepted,
+            advisor_response_payload={"answer_id": "advisor-answer-1"},
+            recommendation_text="Suggested treatment plan.",
+            grounding_status="grounded",
+            citations=[
+                AdvisorTreatmentCitationResponse(
+                    passage_id="passage-1",
+                    document_title="Advisor source",
+                    document_source="advisor",
+                    document_licence_terms="internal-test-only",
+                )
+            ],
+            advisor_answer_id="advisor-answer-1",
+            adapter_type=AdvisorTreatmentAdapterType.deterministic_stub,
+            adapter_version="deterministic_stub_v1",
+            advisor_response_contract_version="treatment_plan_stub_v1",
+            response_received_at=now,
+            decision_by_user_id=seed.user_id,
+            decision_at=now,
+            decision_note="Accepted.",
+        )
+    )
+    store.save_hive_treatment_course(
+        HiveTreatmentCourseResponse(
+            hive_treatment_course_id=course_id,
+            treatment_evidence_chain_id=chain.treatment_evidence_chain_id,
+            source_treatment_recommendation_id=recommendation_id,
+            workspace_id=seed.workspace_id,
+            apiary_id=seed.apiary_id,
+            hive_id=seed.hive_id,
+            planned_course_snapshot={"recommendation_text": "Suggested treatment plan."},
+            accepted_by_user_id=seed.user_id,
+            accepted_at=now,
+            acceptance_note="Accepted.",
+            created_by_user_id=seed.user_id,
+            created_at=now,
+        )
+    )
+
+    restarted = PostgresProductDataStore(database_url=database_url)
+
+    assert restarted.treatment_evidence_chains[chain_id].state == (
+        TreatmentEvidenceChainState.recommendation_accepted
+    )
+    assert restarted.advisor_varroa_context_snapshots[
+        context_snapshot_id
+    ].treatment_evidence_chain_id == chain_id
+    assert restarted.advisor_treatment_request_snapshots[
+        request_snapshot_id
+    ].treatment_evidence_chain_id == chain_id
+    assert restarted.treatment_recommendations[recommendation_id].advisor_answer_id == (
+        "advisor-answer-1"
+    )
+    assert restarted.hive_treatment_courses[course_id].source_treatment_recommendation_id == (
+        recommendation_id
+    )
 
 
 @pytest.mark.skipif(

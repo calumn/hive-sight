@@ -5,6 +5,9 @@ from fastapi import Depends, FastAPI, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 
+from hive_sight_core_api.advisor_treatment_recommendation_workflow import (
+    AdvisorTreatmentRecommendationWorkflow,
+)
 from hive_sight_core_api.advisor_varroa_context_workflow import AdvisorVarroaContextWorkflow
 from hive_sight_core_api.analysis_processing_workflow import AnalysisProcessingWorkflow
 from hive_sight_core_api.analysis_request_workflow import AnalysisRequestWorkflow
@@ -23,6 +26,7 @@ from hive_sight_core_api.dataset_repository_workflow import DatasetRepositoryWor
 from hive_sight_core_api.dataset_role_assignment_workflow import DatasetRoleAssignmentWorkflow
 from hive_sight_core_api.dependencies import (
     DevStateDep,
+    get_advisor_treatment_recommendation_workflow,
     get_advisor_varroa_context_workflow,
     get_analysis_processing_workflow,
     get_analysis_request_workflow,
@@ -50,6 +54,7 @@ from hive_sight_core_api.frame_level_varroa_result_workflow import FrameLevelVar
 from hive_sight_core_api.hive_configuration_workflow import HiveConfigurationWorkflow
 from hive_sight_core_api.inspection_photo_access import InspectionPhotoAccess
 from hive_sight_core_api.models import (
+    AdvisorTreatmentRecommendationCreateRequest,
     AdvisorVarroaContextRequest,
     AdvisorVarroaContextResponse,
     AnalysisEvidenceResponse,
@@ -97,6 +102,8 @@ from hive_sight_core_api.models import (
     HiveCreateRequest,
     HiveListResponse,
     HiveResponse,
+    HiveTreatmentCourseListResponse,
+    HiveTreatmentCourseResponse,
     InspectionCreateRequest,
     InspectionIntent,
     InspectionIntentUpdateRequest,
@@ -135,6 +142,11 @@ from hive_sight_core_api.models import (
     TrainingRunListResponse,
     TrainingRunResponse,
     TrainingRunStartRequest,
+    TreatmentEvidenceChainDetailResponse,
+    TreatmentEvidenceChainListResponse,
+    TreatmentRecommendationDecisionRequest,
+    TreatmentRecommendationListResponse,
+    TreatmentRecommendationResponse,
     UpdateDatasetLabellingSessionRequest,
     VarroaDetectorPreviewRequest,
     VarroaDetectorPreviewResponse,
@@ -178,6 +190,10 @@ AnalysisRequestWorkflowDep = Annotated[
 AdvisorVarroaContextWorkflowDep = Annotated[
     AdvisorVarroaContextWorkflow,
     Depends(get_advisor_varroa_context_workflow),
+]
+AdvisorTreatmentRecommendationWorkflowDep = Annotated[
+    AdvisorTreatmentRecommendationWorkflow,
+    Depends(get_advisor_treatment_recommendation_workflow),
 ]
 AnalysisProcessingWorkflowDep = Annotated[
     AnalysisProcessingWorkflow,
@@ -1383,6 +1399,105 @@ def assemble_advisor_varroa_context(
         hive_id=hive_id,
         inspection_photo_id=request.inspection_photo_id,
         jurisdiction_id=request.jurisdiction_id,
+    )
+
+
+@app.post(
+    "/v1/hives/{hive_id}/advisor-treatment-recommendations",
+    response_model=TreatmentEvidenceChainDetailResponse,
+    status_code=201,
+)
+def request_advisor_treatment_recommendation(
+    hive_id: UUID,
+    request: AdvisorTreatmentRecommendationCreateRequest,
+    user: AuthenticatedUserDep,
+    workflow: AdvisorTreatmentRecommendationWorkflowDep,
+) -> TreatmentEvidenceChainDetailResponse:
+    return workflow.request_treatment_advice(user=user, hive_id=hive_id, request=request)
+
+
+@app.get(
+    "/v1/hives/{hive_id}/treatment-recommendations",
+    response_model=TreatmentRecommendationListResponse,
+)
+def list_treatment_recommendations(
+    hive_id: UUID,
+    user: AuthenticatedUserDep,
+    workflow: AdvisorTreatmentRecommendationWorkflowDep,
+) -> TreatmentRecommendationListResponse:
+    return workflow.list_treatment_recommendations(user=user, hive_id=hive_id)
+
+
+@app.post(
+    "/v1/treatment-recommendations/{treatment_recommendation_id}/accept",
+    response_model=HiveTreatmentCourseResponse,
+)
+def accept_treatment_recommendation(
+    treatment_recommendation_id: UUID,
+    request: TreatmentRecommendationDecisionRequest,
+    user: AuthenticatedUserDep,
+    workflow: AdvisorTreatmentRecommendationWorkflowDep,
+) -> HiveTreatmentCourseResponse:
+    return workflow.accept_recommendation(
+        user=user,
+        treatment_recommendation_id=treatment_recommendation_id,
+        note=request.note,
+    )
+
+
+@app.post(
+    "/v1/treatment-recommendations/{treatment_recommendation_id}/decline",
+    response_model=TreatmentRecommendationResponse,
+)
+def decline_treatment_recommendation(
+    treatment_recommendation_id: UUID,
+    request: TreatmentRecommendationDecisionRequest,
+    user: AuthenticatedUserDep,
+    workflow: AdvisorTreatmentRecommendationWorkflowDep,
+) -> TreatmentRecommendationResponse:
+    return workflow.decline_recommendation(
+        user=user,
+        treatment_recommendation_id=treatment_recommendation_id,
+        note=request.note,
+    )
+
+
+@app.get(
+    "/v1/hives/{hive_id}/treatment-courses",
+    response_model=HiveTreatmentCourseListResponse,
+)
+def list_hive_treatment_courses(
+    hive_id: UUID,
+    user: AuthenticatedUserDep,
+    workflow: AdvisorTreatmentRecommendationWorkflowDep,
+) -> HiveTreatmentCourseListResponse:
+    return workflow.list_treatment_courses(user=user, hive_id=hive_id)
+
+
+@app.get(
+    "/v1/hives/{hive_id}/advisor-treatment-advice-attempts",
+    response_model=TreatmentEvidenceChainListResponse,
+)
+def list_advisor_treatment_advice_attempts(
+    hive_id: UUID,
+    user: AuthenticatedUserDep,
+    workflow: AdvisorTreatmentRecommendationWorkflowDep,
+) -> TreatmentEvidenceChainListResponse:
+    return workflow.list_advice_attempts(user=user, hive_id=hive_id)
+
+
+@app.get(
+    "/v1/treatment-evidence-chains/{treatment_evidence_chain_id}",
+    response_model=TreatmentEvidenceChainDetailResponse,
+)
+def get_treatment_evidence_chain(
+    treatment_evidence_chain_id: UUID,
+    user: AuthenticatedUserDep,
+    workflow: AdvisorTreatmentRecommendationWorkflowDep,
+) -> TreatmentEvidenceChainDetailResponse:
+    return workflow.get_treatment_evidence_chain(
+        user=user,
+        treatment_evidence_chain_id=treatment_evidence_chain_id,
     )
 
 

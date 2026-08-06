@@ -14,6 +14,8 @@ from hive_sight_core_api.dev_store import (
 )
 from hive_sight_core_api.dev_users import DEV_USERS, DevUserSeed
 from hive_sight_core_api.models import (
+    AdvisorTreatmentRequestSnapshotResponse,
+    AdvisorVarroaContextSnapshotResponse,
     AnalysisResultResponse,
     AnalysisRunResponse,
     AnnotationResponse,
@@ -25,6 +27,7 @@ from hive_sight_core_api.models import (
     DatasetVersionResponse,
     HiveConfigurationResponse,
     HiveResponse,
+    HiveTreatmentCourseResponse,
     InspectionPhotoResponse,
     InspectionResponse,
     ModelCandidateResponse,
@@ -34,6 +37,8 @@ from hive_sight_core_api.models import (
     ReviewQueueOutcomeRecord,
     TrainingCropResponse,
     TrainingRunResponse,
+    TreatmentEvidenceChainResponse,
+    TreatmentRecommendationResponse,
     VarroaReviewOutcomeResponse,
 )
 
@@ -59,6 +64,11 @@ MODEL_RECORD_TYPES: dict[str, type] = {
     "benchmark_evaluation": BenchmarkEvaluationResponse,
     "model_candidate": ModelCandidateResponse,
     "artifact": ArtifactResponse,
+    "treatment_evidence_chain": TreatmentEvidenceChainResponse,
+    "advisor_varroa_context_snapshot": AdvisorVarroaContextSnapshotResponse,
+    "advisor_treatment_request_snapshot": AdvisorTreatmentRequestSnapshotResponse,
+    "treatment_recommendation": TreatmentRecommendationResponse,
+    "hive_treatment_course": HiveTreatmentCourseResponse,
 }
 
 
@@ -209,6 +219,56 @@ class PostgresProductDataStore(InMemoryProductDataStore):
         response = super().save_varroa_review_outcome(outcome)
         self._persist_model("varroa_review_outcome", response.varroa_review_outcome_id, response)
         self._upsert_varroa_review_outcome_projection(response)
+        return response
+
+    def save_treatment_evidence_chain(self, chain: TreatmentEvidenceChainResponse):
+        response = super().save_treatment_evidence_chain(chain)
+        self._persist_model(
+            "treatment_evidence_chain",
+            response.treatment_evidence_chain_id,
+            response,
+        )
+        return response
+
+    def save_advisor_varroa_context_snapshot(
+        self,
+        snapshot: AdvisorVarroaContextSnapshotResponse,
+    ):
+        response = super().save_advisor_varroa_context_snapshot(snapshot)
+        self._persist_model(
+            "advisor_varroa_context_snapshot",
+            response.advisor_varroa_context_snapshot_id,
+            response,
+        )
+        return response
+
+    def save_advisor_treatment_request_snapshot(
+        self,
+        snapshot: AdvisorTreatmentRequestSnapshotResponse,
+    ):
+        response = super().save_advisor_treatment_request_snapshot(snapshot)
+        self._persist_model(
+            "advisor_treatment_request_snapshot",
+            response.advisor_treatment_request_snapshot_id,
+            response,
+        )
+        return response
+
+    def save_treatment_recommendation(
+        self,
+        recommendation: TreatmentRecommendationResponse,
+    ):
+        response = super().save_treatment_recommendation(recommendation)
+        self._persist_model(
+            "treatment_recommendation",
+            response.treatment_recommendation_id,
+            response,
+        )
+        return response
+
+    def save_hive_treatment_course(self, course: HiveTreatmentCourseResponse):
+        response = super().save_hive_treatment_course(course)
+        self._persist_model("hive_treatment_course", response.hive_treatment_course_id, response)
         return response
 
     def delete_training_crop_ellipse_record(self, annotation_id: UUID) -> None:
@@ -407,6 +467,18 @@ class PostgresProductDataStore(InMemoryProductDataStore):
             self.model_candidates[model.model_candidate_id] = model
         elif record_type == "artifact":
             self.artifacts[model.artifact_id] = model
+        elif record_type == "treatment_evidence_chain":
+            self.treatment_evidence_chains[model.treatment_evidence_chain_id] = model
+        elif record_type == "advisor_varroa_context_snapshot":
+            self.advisor_varroa_context_snapshots[model.advisor_varroa_context_snapshot_id] = model
+        elif record_type == "advisor_treatment_request_snapshot":
+            self.advisor_treatment_request_snapshots[
+                model.advisor_treatment_request_snapshot_id
+            ] = model
+        elif record_type == "treatment_recommendation":
+            self.treatment_recommendations[model.treatment_recommendation_id] = model
+        elif record_type == "hive_treatment_course":
+            self.hive_treatment_courses[model.hive_treatment_course_id] = model
 
     def _persist_core_identity(self, user_id: UUID, workspace_id: UUID) -> None:
         self._persist_payload("user", user_id, {"user_id": str(user_id)})

@@ -1,5 +1,6 @@
 from datetime import date, datetime
 from enum import StrEnum
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -155,6 +156,31 @@ class FrameMiteCountBeeStatus(StrEnum):
 class AdvisorVarroaContextStatus(StrEnum):
     available = "available"
     not_available = "not_available"
+
+
+class TreatmentEvidenceChainState(StrEnum):
+    blocked_not_ready = "blocked_not_ready"
+    advisor_request_failed = "advisor_request_failed"
+    recommendation_pending = "recommendation_pending"
+    recommendation_accepted = "recommendation_accepted"
+    recommendation_declined = "recommendation_declined"
+
+
+class TreatmentRecommendationStatus(StrEnum):
+    pending = "pending"
+    accepted = "accepted"
+    declined = "declined"
+    superseded = "superseded"
+
+
+class AdvisorTreatmentAdapterType(StrEnum):
+    deterministic_stub = "deterministic_stub"
+    hivesight_advisor = "hivesight_advisor"
+
+
+class AdvisorTreatmentRequestStatus(StrEnum):
+    sent = "sent"
+    failed = "failed"
 
 
 class VarroaDetectorCoordinateSpace(StrEnum):
@@ -1652,6 +1678,151 @@ class AdvisorVarroaContextResponse(BaseModel):
     advisor_required_situational_inputs: AdvisorRequiredSituationalInputsContext
     advisor_request_readiness: AdvisorRequestReadiness
     not_advice_reason: str
+
+
+class AdvisorTreatmentRecommendationCreateRequest(BaseModel):
+    inspection_photo_id: UUID
+    jurisdiction_code: str = Field(min_length=1, max_length=32)
+
+
+class TreatmentRecommendationDecisionRequest(BaseModel):
+    note: str | None = Field(default=None, max_length=1000)
+
+
+class AdvisorTreatmentCitationResponse(BaseModel):
+    passage_id: str
+    document_title: str
+    document_source: str
+    document_source_url: str | None = None
+    document_licence_terms: str
+    is_superseded: bool = False
+    superseded_by_document_title: str | None = None
+
+
+class AdvisorTreatmentRequestSnapshotResponse(BaseModel):
+    advisor_treatment_request_snapshot_id: UUID
+    treatment_evidence_chain_id: UUID
+    workspace_id: UUID
+    apiary_id: UUID
+    hive_id: UUID
+    inspection_id: UUID
+    inspection_photo_id: UUID
+    advisor_context_contract_version: str
+    advisor_request_contract_version: str
+    jurisdiction_code: str
+    situational_context: str
+    request_payload: dict[str, Any]
+    request_status: AdvisorTreatmentRequestStatus
+    error_summary: str | None = None
+    adapter_type: AdvisorTreatmentAdapterType
+    adapter_version: str
+    created_by_user_id: UUID
+    created_at: datetime
+
+
+class AdvisorVarroaContextSnapshotResponse(BaseModel):
+    advisor_varroa_context_snapshot_id: UUID
+    treatment_evidence_chain_id: UUID
+    workspace_id: UUID
+    apiary_id: UUID
+    hive_id: UUID
+    inspection_id: UUID
+    inspection_photo_id: UUID
+    advisor_context_contract_version: str
+    context_payload: dict[str, Any]
+    context_summary: dict[str, Any]
+    created_by_user_id: UUID
+    created_at: datetime
+
+
+class TreatmentEvidenceChainResponse(BaseModel):
+    treatment_evidence_chain_id: UUID
+    workspace_id: UUID
+    apiary_id: UUID
+    hive_id: UUID
+    inspection_id: UUID
+    inspection_photo_id: UUID
+    concern: str = "varroa"
+    state: TreatmentEvidenceChainState
+    blocked_reasons: list[str] = Field(default_factory=list)
+    created_by_user_id: UUID
+    created_at: datetime
+    updated_at: datetime
+
+
+class TreatmentRecommendationResponse(BaseModel):
+    treatment_recommendation_id: UUID
+    treatment_evidence_chain_id: UUID
+    advisor_treatment_request_snapshot_id: UUID
+    workspace_id: UUID
+    apiary_id: UUID
+    hive_id: UUID
+    concern: str = "varroa"
+    status: TreatmentRecommendationStatus
+    advisor_response_payload: dict[str, Any]
+    recommendation_text: str
+    grounding_status: str
+    citations: list[AdvisorTreatmentCitationResponse]
+    advisor_answer_id: str | None = None
+    adapter_type: AdvisorTreatmentAdapterType
+    adapter_version: str
+    advisor_response_contract_version: str | None = None
+    response_received_at: datetime
+    decision_by_user_id: UUID | None = None
+    decision_at: datetime | None = None
+    decision_note: str | None = None
+    display_label: str = "suggested treatment plan requiring beekeeper decision"
+
+
+class HiveTreatmentCourseResponse(BaseModel):
+    hive_treatment_course_id: UUID
+    treatment_evidence_chain_id: UUID | None = None
+    source_treatment_recommendation_id: UUID | None = None
+    workspace_id: UUID
+    apiary_id: UUID
+    hive_id: UUID
+    purpose: str = "varroa"
+    status: str = "planned"
+    planned_course_snapshot: dict[str, Any]
+    accepted_by_user_id: UUID | None = None
+    accepted_at: datetime | None = None
+    acceptance_note: str | None = None
+    created_by_user_id: UUID
+    created_at: datetime
+
+
+class TreatmentRecommendationListResponse(BaseModel):
+    treatment_recommendations: list[TreatmentRecommendationResponse]
+
+
+class HiveTreatmentCourseListResponse(BaseModel):
+    treatment_courses: list[HiveTreatmentCourseResponse]
+
+
+class TreatmentEvidenceChainSummaryResponse(BaseModel):
+    treatment_evidence_chain_id: UUID
+    hive_id: UUID
+    inspection_photo_id: UUID
+    state: TreatmentEvidenceChainState
+    blocked_reasons: list[str] = Field(default_factory=list)
+    treatment_recommendation_id: UUID | None = None
+    hive_treatment_course_id: UUID | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class TreatmentEvidenceChainListResponse(BaseModel):
+    treatment_evidence_chains: list[TreatmentEvidenceChainSummaryResponse]
+
+
+class TreatmentEvidenceChainDetailResponse(BaseModel):
+    chain: TreatmentEvidenceChainResponse
+    context_snapshot: AdvisorVarroaContextSnapshotResponse | None = None
+    request_snapshot: AdvisorTreatmentRequestSnapshotResponse | None = None
+    recommendation: TreatmentRecommendationResponse | None = None
+    treatment_course: HiveTreatmentCourseResponse | None = None
+    learning_export_allowed: bool = False
+    anonymised_export_created: bool = False
 
 
 class ReviewQueueEllipseEvidence(BaseModel):

@@ -1290,3 +1290,26 @@ Before exposing Treatment Evidence Chain records outside HiveSight treatment his
 Suggested owner or area:
 
 Data governance, treatment evidence, privacy, and HiveSight Advisor learning governance.
+
+## PARK-0055: Advisor Treatment Plan Contract Readiness
+
+Status: parked
+Date parked: 2026-08-06
+Source: HiveSight Advisor review of Slice 0029.5
+Area: HiveSight Advisor integration contract
+
+Context:
+
+HiveSight Advisor reviewed Slice 0029.5 and confirmed HiveSight should call `POST /integrations/hivesight/treatment-plans` with `hive_id`, `jurisdiction_id`, and `situational_context`, returning `text`, `grounding_status`, and structured `citations`. The review also identified contract-readiness gaps on the Advisor side: `jurisdiction_id` is currently an internal Advisor UUID with no discovery endpoint, responses do not include a contract version, responses do not include an Advisor answer id, and repeated unresolved treatment-plan requests for the same Hive can orphan previous Advisor suggestions.
+
+Why parked:
+
+HiveSight can build the stub-backed Treatment Evidence Chain and recommendation/course persistence without these Advisor-side fixes. The real Advisor adapter should remain opt-in and not production-ready until the cross-service contract has stable jurisdiction identity, response versioning, audit correlation, and repeated-request behaviour.
+
+Revisit trigger:
+
+Before enabling the real HiveSight Advisor treatment-plan adapter outside controlled smoke tests, or when HiveSight Advisor completes its corresponding contract-readiness slice.
+
+Suggested owner or area:
+
+HiveSight Advisor integration contract, Advisor service implementation, and cross-app verification.

@@ -25,6 +25,8 @@ from hive_sight_core_api.models import (
     AnnotationType,
     AnnotationWorkflowType,
     ApiaryResponse,
+    AdvisorTreatmentRequestSnapshotResponse,
+    AdvisorVarroaContextSnapshotResponse,
     ArtifactResponse,
     BenchmarkEvaluationResponse,
     DatasetExclusionReason,
@@ -44,6 +46,7 @@ from hive_sight_core_api.models import (
     HiveConfigurationSnapshotResponse,
     HiveConfigurationUpsertRequest,
     HiveResponse,
+    HiveTreatmentCourseResponse,
     ImageQualityStatus,
     InspectionIntent,
     InspectionPhotoListResponse,
@@ -69,6 +72,8 @@ from hive_sight_core_api.models import (
     TrainingCropResponse,
     TrainingCropUpdateRequest,
     TrainingRunResponse,
+    TreatmentEvidenceChainResponse,
+    TreatmentRecommendationResponse,
     UploadStatus,
     VarroaReviewOutcomeResponse,
     WorkspaceDataUseAgreementAcceptanceResponse,
@@ -203,6 +208,19 @@ class InMemoryProductDataStore:
     varroa_review_outcomes: dict[UUID, VarroaReviewOutcomeResponse] = field(default_factory=dict)
     review_queue_items: dict[UUID, ReviewQueueItemRecord] = field(default_factory=dict)
     review_queue_outcomes: dict[UUID, ReviewQueueOutcomeRecord] = field(default_factory=dict)
+    treatment_evidence_chains: dict[UUID, TreatmentEvidenceChainResponse] = field(
+        default_factory=dict
+    )
+    advisor_varroa_context_snapshots: dict[UUID, AdvisorVarroaContextSnapshotResponse] = field(
+        default_factory=dict
+    )
+    advisor_treatment_request_snapshots: dict[UUID, AdvisorTreatmentRequestSnapshotResponse] = field(
+        default_factory=dict
+    )
+    treatment_recommendations: dict[UUID, TreatmentRecommendationResponse] = field(
+        default_factory=dict
+    )
+    hive_treatment_courses: dict[UUID, HiveTreatmentCourseResponse] = field(default_factory=dict)
     reviewer_user_ids: set[UUID] = field(
         default_factory=lambda: {DEFAULT_DEV_REVIEWER_USER_ID}
     )
@@ -1131,6 +1149,45 @@ class InMemoryProductDataStore:
     ) -> ReviewQueueOutcomeRecord:
         self.review_queue_outcomes[outcome.review_queue_outcome_id] = outcome
         return outcome
+
+    def save_treatment_evidence_chain(
+        self,
+        chain: TreatmentEvidenceChainResponse,
+    ) -> TreatmentEvidenceChainResponse:
+        self.treatment_evidence_chains[chain.treatment_evidence_chain_id] = chain
+        return chain
+
+    def save_advisor_varroa_context_snapshot(
+        self,
+        snapshot: AdvisorVarroaContextSnapshotResponse,
+    ) -> AdvisorVarroaContextSnapshotResponse:
+        self.advisor_varroa_context_snapshots[snapshot.advisor_varroa_context_snapshot_id] = snapshot
+        return snapshot
+
+    def save_advisor_treatment_request_snapshot(
+        self,
+        snapshot: AdvisorTreatmentRequestSnapshotResponse,
+    ) -> AdvisorTreatmentRequestSnapshotResponse:
+        self.advisor_treatment_request_snapshots[
+            snapshot.advisor_treatment_request_snapshot_id
+        ] = snapshot
+        return snapshot
+
+    def save_treatment_recommendation(
+        self,
+        recommendation: TreatmentRecommendationResponse,
+    ) -> TreatmentRecommendationResponse:
+        self.treatment_recommendations[recommendation.treatment_recommendation_id] = (
+            recommendation
+        )
+        return recommendation
+
+    def save_hive_treatment_course(
+        self,
+        course: HiveTreatmentCourseResponse,
+    ) -> HiveTreatmentCourseResponse:
+        self.hive_treatment_courses[course.hive_treatment_course_id] = course
+        return course
 
     def get_review_queue_item(
         self,

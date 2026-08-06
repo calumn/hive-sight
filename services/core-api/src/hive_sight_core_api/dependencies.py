@@ -7,6 +7,10 @@ from uuid import UUID
 
 from fastapi import Depends
 
+from hive_sight_core_api.advisor_treatment_recommendation_workflow import (
+    AdvisorTreatmentRecommendationWorkflow,
+    DeterministicStubAdvisorTreatmentPlanAdapter,
+)
 from hive_sight_core_api.advisor_varroa_context_workflow import AdvisorVarroaContextWorkflow
 from hive_sight_core_api.analysis_processing_workflow import (
     AnalysisProcessingWorkflow,
@@ -191,6 +195,18 @@ def get_advisor_varroa_context_workflow(state: DevStateDep) -> AdvisorVarroaCont
             image_loader=state.object_storage.get_object,
         ),
         frame_level_varroa_result_workflow=FrameLevelVarroaResultWorkflow(store=state.store),
+    )
+
+
+def get_advisor_treatment_recommendation_workflow(
+    state: DevStateDep,
+) -> AdvisorTreatmentRecommendationWorkflow:
+    settings = get_settings()
+    return AdvisorTreatmentRecommendationWorkflow(
+        store=state.store,
+        context_builder=get_advisor_varroa_context_workflow(state),
+        adapter=DeterministicStubAdvisorTreatmentPlanAdapter(),
+        allow_stub_adapter_for_product_data=settings.database_purpose == "dev",
     )
 
 
