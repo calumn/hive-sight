@@ -439,7 +439,7 @@ def test_postgres_store_survives_restart_for_treatment_evidence_chain() -> None:
             advisor_answer_id="advisor-answer-1",
             adapter_type=AdvisorTreatmentAdapterType.deterministic_stub,
             adapter_version="deterministic_stub_v1",
-            advisor_response_contract_version="treatment_plan_stub_v1",
+            advisor_response_contract_version="treatment_plan_v1",
             response_received_at=now,
             decision_by_user_id=seed.user_id,
             decision_at=now,

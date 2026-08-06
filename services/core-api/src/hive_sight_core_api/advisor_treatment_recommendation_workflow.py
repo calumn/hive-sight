@@ -24,6 +24,7 @@ from hive_sight_core_api.models import (
 )
 
 ADVISOR_TREATMENT_REQUEST_CONTRACT_VERSION = "hivesight_advisor_treatment_plan_request_v1"
+ADVISOR_TREATMENT_RESPONSE_CONTRACT_VERSION = "treatment_plan_v1"
 STUB_ADAPTER_VERSION = "deterministic_stub_v1"
 
 
@@ -87,7 +88,7 @@ class DeterministicStubAdvisorTreatmentPlanAdapter:
             f"guidance for jurisdiction {jurisdiction_code} before planning treatment."
         )
         payload = {
-            "contract_version": "treatment_plan_stub_v1",
+            "contract_version": ADVISOR_TREATMENT_RESPONSE_CONTRACT_VERSION,
             "answer_id": f"stub-answer-{hive_id}",
             "text": text,
             "grounding_status": "grounded",
@@ -99,7 +100,7 @@ class DeterministicStubAdvisorTreatmentPlanAdapter:
             grounding_status="grounded",
             citations=[citation],
             raw_payload=payload,
-            contract_version="treatment_plan_stub_v1",
+            contract_version=ADVISOR_TREATMENT_RESPONSE_CONTRACT_VERSION,
             answer_id=f"stub-answer-{hive_id}",
         )
 

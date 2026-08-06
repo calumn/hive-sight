@@ -69,9 +69,9 @@ For the treatment-advice integration, likely shared acceptance areas are:
 ## Open Alignment Questions For Advisor
 
 - Which Advisor behaviours should become canonical Gherkin scenarios rather than API-only contract tests?
-- What endpoint and response fields should Advisor expose for treatment recommendation intake and replayable evidence?
-- What stable `advisor_answer_id` and `contract_version` format should HiveSight store?
 - Which scenarios should run in both repos, and which should remain repo-local?
+
+Resolved by HiveSight Advisor Slice 0011: Advisor's treatment-plan endpoint accepts `hive_id`, `jurisdiction_code`, and `situational_context`; responses include `contract_version = treatment_plan_v1` and `answer_id`.
 
 ## Verification Result From HiveSight Pilot
 

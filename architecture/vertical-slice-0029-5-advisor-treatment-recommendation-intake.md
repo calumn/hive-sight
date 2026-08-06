@@ -1,6 +1,6 @@
 # Vertical Slice 0029.5: Advisor Treatment Recommendation Intake And Acceptance
 
-Status: designed; acceptance scenarios formally accepted on 2026-08-06; HiveSight Advisor review incorporated. HiveSight-side stub implementation can proceed, but real Advisor adapter production readiness depends on Advisor-side contract follow-ups.
+Status: implemented; acceptance scenarios formally accepted on 2026-08-06; HiveSight Advisor Slice 0011 contract update incorporated. HiveSight-side stub implementation is aligned to Advisor's `treatment_plan_v1` response shape; the real Advisor adapter remains a later opt-in integration path.
 
 Numbering note: this slice intentionally uses `0029.5` because it belongs after Slice 0029 Advisor Varroa Context Assembly API. Varroa Corpus Governance is now an unnumbered future candidate; Slice 0030 is reserved for the accepted Dual-Seam Acceptance Specification Pilot.
 
@@ -25,7 +25,7 @@ The recommendation does not become the treatment course. The course does not pro
 - `requirements/decision-log.md`: 2026-08-06 Treatment Recommendation And Treatment Course Are Separate Records.
 - `requirements/roadmap.md`: Treatment And Advisor Integration tranche.
 - `architecture/vertical-slice-0029-advisor-varroa-context-api.md`: Advisor Varroa context assembly and readiness blockers.
-- `hivesight-advisor-integration-contract` skill: HiveSight Advisor exposes `POST /integrations/hivesight/treatment-plans` with `hive_id`, `jurisdiction_id`, and `situational_context`, authenticated by `X-HiveSight-Service-Key`.
+- `hivesight-advisor-integration-contract` skill: HiveSight Advisor exposes `POST /integrations/hivesight/treatment-plans` with `hive_id`, `jurisdiction_code`, and `situational_context`, authenticated by `X-HiveSight-Service-Key`.
 
 ## HiveSight Advisor Review Outcome
 
@@ -33,24 +33,20 @@ HiveSight Advisor reviewed this slice on 2026-08-06 and confirmed the main direc
 
 - HiveSight remains the sole caller into HiveSight Advisor.
 - HiveSight should continue to call `POST /integrations/hivesight/treatment-plans`.
-- The current Advisor request body is:
+- Advisor Slice 0011 updated the request body to:
   - `hive_id`: string, treated by Advisor as an opaque HiveSight identifier;
-  - `jurisdiction_id`: UUID, currently Advisor's internal jurisdiction primary key;
+  - `jurisdiction_code`: stable external jurisdiction code, currently `uk` or `us`;
   - `situational_context`: string, used by Advisor as the RAG query text.
 - Advisor currently accepts only prose `situational_context`. HiveSight should transform its richer Slice 0029 context into concise Advisor-facing prose rather than expecting Advisor to consume a structured evidence object.
-- The current Advisor response body is:
+- Advisor Slice 0011 response bodies include:
+  - `contract_version`: `treatment_plan_v1`;
+  - `answer_id`: Advisor's durable recommendation identifier;
   - `text`;
   - `grounding_status`: `grounded` | `partial` | `ungrounded`;
   - `citations`: list of passage/document provenance objects.
-- Advisor does not currently return structured treatment schedule data, inline citation markers, `contract_version`, or an Advisor-side `answer_id`.
+- Repeated unresolved treatment-plan requests for the same Hive are idempotent on the Advisor side and return the existing pending recommendation rather than creating a competing one.
 
-Advisor also identified three Advisor-side issues that should be resolved before HiveSight enables the real Advisor adapter outside controlled smoke tests:
-
-- Advisor should make repeated unresolved treatment-plan requests idempotent per Hive or otherwise prevent orphaning previous unresolved suggestions.
-- Advisor should expose a stable cross-service jurisdiction identifier, preferably a jurisdiction code such as `uk` or `us`, rather than requiring HiveSight to know Advisor's internal jurisdiction UUIDs.
-- Advisor should add response contract versioning, and preferably an Advisor-side answer identifier, so HiveSight can persist concrete provenance instead of inferred values.
-
-Until those are settled, Slice 0029.5 can still build and verify the HiveSight-side domain model, persistence, stub adapter, blocked/failed attempt handling, recommendation decisions, and planned-course creation. The real Advisor adapter remains opt-in and should not be treated as production-ready.
+The previous Advisor-side contract-readiness blockers are therefore closed by Advisor Slice 0011. One HiveSight-side integration concern remains parked: when HiveSight later exposes reverse-direction callbacks for Advisor, it should use a direction-specific inbound service-auth header such as `X-Advisor-Service-Key` rather than reusing Advisor's `X-HiveSight-Service-Key`.
 
 ## Grilling Decisions
 
@@ -67,19 +63,19 @@ Until those are settled, Slice 0029.5 can still build and verify the HiveSight-s
 - Manual Hive Treatment Course entry without an Advisor recommendation is a separate roadmap item, not part of Slice 0029.5.
 - Local development, automated tests, and normal slice verification use a deterministic stub Advisor treatment-plan adapter by default. The real HiveSight Advisor adapter is opt-in configuration and should be covered by a separate smoke/integration check.
 - Before implementation, HiveSight Advisor should review this slice and confirm the exact treatment-plan request and response shape HiveSight should build against.
-- Advisor review confirmed the current endpoint shape, but raised real-adapter readiness blockers around Advisor idempotency, jurisdiction identifiers, contract versioning, and optional `answer_id` provenance.
+- Advisor Slice 0011 resolved the real-adapter contract blockers around Advisor idempotency, jurisdiction identifiers, response contract versioning, and `answer_id` provenance.
 - Slice 0029.5 creates an explicit lightweight `TreatmentEvidenceChain` id rather than implying the chain from foreign keys.
 - The chain starts from an immutable `AdvisorVarroaContextSnapshot`, not only from an Inspection Photo, because the same photo may produce different advice context over time.
 - Accepting a recommendation snapshots beekeeper decision context: who accepted it, when, optional note, recommendation id, and evidence-chain id.
 - Decline notes are optional.
 - Recommendation state leaves room for later staleness or supersession, but Slice 0029.5 does not auto-expire pending recommendations.
-- `jurisdiction_id` is required before HiveSight calls Advisor. Advisor currently expects an internal jurisdiction UUID, but HiveSight should avoid baking Advisor primary keys into product behaviour; the real adapter should wait for a stable jurisdiction contract or explicit mapping decision.
+- `jurisdiction_code` is required before HiveSight calls Advisor. HiveSight must send a stable external code and must not depend on Advisor's internal jurisdiction primary keys.
 - Advisor responses are labelled as suggested treatment plans requiring beekeeper decision, not authoritative applied treatment.
 - Treatment records should have a generic enough concern/purpose field, but Slice 0029.5 supports only `varroa` behaviour.
 - Planned treatment courses created in this slice do not require planned dates.
 - Treatment recommendation and course persistence must work in both in-memory and Postgres-backed paths; Postgres verification is part of acceptance closeout.
 - Read routes are required so the stored recommendation, planned course, and chain provenance can be verified without a UI.
-- The shared `hivesight-advisor-integration-contract` skill should be updated only after Advisor review confirms the real call shape.
+- The shared `hivesight-advisor-integration-contract` skill has been updated after Advisor Slice 0011 implemented the settled real call shape.
 - Slice 0029.5 is API-only. The future `Ask Advisor` UI trigger belongs behind a genuine user-facing Varroa Assessment flow, not Training Data Collection evidence.
 - Training Data Collection evidence remains blocked in product behaviour. Tests may use a synthetic ready context seam, but product advice requires real Advisor-ready Varroa Assessment context.
 - Accepted planned courses are visible as `planned` treatment history, but they do not imply treatment has been applied.
@@ -253,7 +249,7 @@ Requesting advice:
 - assembles current Advisor Varroa context using the Slice 0029 context builder;
 - stores an immutable Advisor Varroa context snapshot;
 - records a blocked Treatment Evidence Chain and refuses to call Advisor when the context has readiness blockers;
-- builds the Advisor request payload with HiveSight's canonical `hive_id`, `jurisdiction_id`, and `situational_context`;
+- builds the Advisor request payload with HiveSight's canonical `hive_id`, `jurisdiction_code`, and `situational_context`;
 - calls Advisor through `HiveSightAdvisorTreatmentPlanAdapter`;
 - stores the exact request snapshot sent through the adapter;
 - records a failed Treatment Evidence Chain and creates no Treatment Recommendation when Advisor fails to return usable advice;
@@ -323,7 +319,7 @@ Minimum new records:
   - `inspection_photo_id`
   - `advisor_context_contract_version`
   - `advisor_request_contract_version`
-  - `jurisdiction_id`
+  - `jurisdiction_code`
   - `situational_context`
   - `request_payload`
   - `request_status`: `sent` | `failed`
@@ -374,10 +370,10 @@ Minimum new records:
   - `recommendation_text`
   - `grounding_status`
   - `citations`
-  - `advisor_answer_id`, nullable until Advisor exposes one
+  - `advisor_answer_id`, nullable only when no usable Advisor response is available
   - `adapter_type`: `stub` | `hivesight_advisor`
   - `adapter_version`
-  - `advisor_response_contract_version`, nullable until Advisor exposes one
+  - `advisor_response_contract_version`, nullable only when no usable Advisor response is available
   - `response_received_at`
   - `decision_by_user_id`
   - `decision_at`
@@ -411,13 +407,14 @@ Minimum API routes:
 
 ## HiveSight Advisor Follow-Up Questions
 
-Before enabling the real Advisor adapter beyond controlled smoke tests, confirm:
+Advisor Slice 0011 answered the blocking request/response contract questions:
 
-- what stable jurisdiction identifier HiveSight should send;
-- what response `contract_version` value HiveSight should persist;
-- whether Advisor will expose an `answer_id` or equivalent audit-correlation id;
-- whether Advisor has fixed or deliberately redesigned repeated unresolved treatment-plan request behaviour for the same Hive;
-- whether the shared `hivesight-advisor-integration-contract` skill should be updated to reflect the final settled request and response contract.
+- HiveSight sends `jurisdiction_code`, not Advisor's internal jurisdiction id.
+- HiveSight persists Advisor response `contract_version = treatment_plan_v1`.
+- HiveSight persists Advisor `answer_id` as the cross-service recommendation identifier.
+- Advisor returns the existing pending recommendation for repeated unresolved treatment-plan requests for the same Hive.
+
+Before enabling reverse-direction calls from Advisor into HiveSight, agree the HiveSight inbound service-auth header name. The current recommendation is `X-Advisor-Service-Key`.
 
 ## Out Of Scope
 

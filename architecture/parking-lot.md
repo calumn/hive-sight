@@ -1300,23 +1300,47 @@ Data governance, treatment evidence, privacy, and HiveSight Advisor learning gov
 
 ## PARK-0055: Advisor Treatment Plan Contract Readiness
 
-Status: parked
+Status: closed
 Date parked: 2026-08-06
+Date closed: 2026-08-06
 Source: HiveSight Advisor review of Slice 0029.5
 Area: HiveSight Advisor integration contract
 
 Context:
 
-HiveSight Advisor reviewed Slice 0029.5 and confirmed HiveSight should call `POST /integrations/hivesight/treatment-plans` with `hive_id`, `jurisdiction_id`, and `situational_context`, returning `text`, `grounding_status`, and structured `citations`. The review also identified contract-readiness gaps on the Advisor side: `jurisdiction_id` is currently an internal Advisor UUID with no discovery endpoint, responses do not include a contract version, responses do not include an Advisor answer id, and repeated unresolved treatment-plan requests for the same Hive can orphan previous Advisor suggestions.
+HiveSight Advisor reviewed Slice 0029.5 and confirmed HiveSight should call `POST /integrations/hivesight/treatment-plans`. Advisor Slice 0011 then closed the previously identified contract-readiness gaps: HiveSight now sends `jurisdiction_code` rather than Advisor's internal jurisdiction id, Advisor responses include `contract_version = treatment_plan_v1`, Advisor responses include `answer_id`, and repeated unresolved treatment-plan requests for the same Hive return the existing pending recommendation.
 
-Why parked:
+Resolution:
 
-HiveSight can build the stub-backed Treatment Evidence Chain and recommendation/course persistence without these Advisor-side fixes. The real Advisor adapter should remain opt-in and not production-ready until the cross-service contract has stable jurisdiction identity, response versioning, audit correlation, and repeated-request behaviour.
+The Advisor-side contract readiness concern is closed. HiveSight's Slice 0029.5 deterministic stub and documents now align to the settled request/response shape. The real adapter implementation and cross-service smoke check remain later delivery work rather than an unresolved contract blocker.
 
-Revisit trigger:
+Residual follow-up:
 
-Before enabling the real HiveSight Advisor treatment-plan adapter outside controlled smoke tests, or when HiveSight Advisor completes its corresponding contract-readiness slice.
+HiveSight still needs a direction-specific inbound service-auth header before building reverse-direction callbacks from Advisor into HiveSight; tracked separately as PARK-0056.
 
 Suggested owner or area:
 
 HiveSight Advisor integration contract, Advisor service implementation, and cross-app verification.
+
+## PARK-0056: Direction-Specific Advisor Inbound Service Header
+
+Status: parked
+Date parked: 2026-08-06
+Source: HiveSight Advisor Slice 0011 guidance
+Area: HiveSight Advisor integration contract, service authentication
+
+Context:
+
+Advisor already uses `X-HiveSight-Service-Key` for HiveSight-to-Advisor calls into `POST /integrations/hivesight/treatment-plans`. HiveSight previously floated the same header name for future Advisor-to-HiveSight calls. That would create two different secrets with one header name in opposite directions, making configuration and incident debugging unnecessarily ambiguous.
+
+Why parked:
+
+HiveSight has not yet built Advisor-to-HiveSight callback endpoints for recommendation acceptance, decline, completion, revision, or treatment outcome workflows. The header name decision should be made before those inbound routes are designed or implemented, but it does not block the current HiveSight-to-Advisor treatment recommendation intake path.
+
+Revisit trigger:
+
+Before implementing any endpoint that HiveSight Advisor calls on HiveSight, including recommendation decision callbacks, treatment-course status callbacks, learning-export acknowledgements, or future resume workflows.
+
+Suggested owner or area:
+
+HiveSight Advisor integration contract and Core API service authentication.

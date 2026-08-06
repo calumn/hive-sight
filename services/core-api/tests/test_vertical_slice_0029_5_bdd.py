@@ -378,7 +378,11 @@ def context_snapshot_stored(slice_context: SliceContext) -> None:
 
 @then("HiveSight stores the Advisor request snapshot")
 def request_snapshot_stored(slice_context: SliceContext) -> None:
-    assert slice_context.response.json()["request_snapshot"]["advisor_request_contract_version"]
+    request_snapshot = slice_context.response.json()["request_snapshot"]
+    assert request_snapshot["advisor_request_contract_version"]
+    assert request_snapshot["jurisdiction_code"] == slice_context.jurisdiction_code
+    assert request_snapshot["request_payload"]["jurisdiction_code"] == slice_context.jurisdiction_code
+    assert "jurisdiction_id" not in request_snapshot["request_payload"]
 
 
 @then("HiveSight stores the Advisor response as a pending Treatment Recommendation")
@@ -386,6 +390,15 @@ def pending_recommendation_stored(slice_context: SliceContext) -> None:
     body = slice_context.response.json()
     assert body["recommendation"]["status"] == "pending"
     assert body["recommendation"]["recommendation_text"]
+    assert body["recommendation"]["advisor_answer_id"] == (
+        f"stub-answer-{slice_context.seed.hive_id}"
+    )
+    assert body["recommendation"]["advisor_response_contract_version"] == "treatment_plan_v1"
+    assert (
+        body["recommendation"]["advisor_response_payload"]["contract_version"]
+        == "treatment_plan_v1"
+    )
+    assert body["recommendation"]["advisor_response_payload"]["answer_id"]
 
 
 @then(

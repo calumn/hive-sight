@@ -713,3 +713,20 @@ Human judgment still required:
 
 - Decide whether HiveSight Advisor should adopt the same folder/runner structure or only align on the client-neutral scenario-writing rules.
 - Choose the first Advisor-facing treatment-advice behaviour to express as a shared acceptance scenario.
+
+### 2026-08-06 Advisor Slice 0011 Contract Alignment
+
+Human-confirmed direction:
+
+- Align HiveSight's Slice 0029.5 treatment recommendation intake documents and stub response shape to HiveSight Advisor Slice 0011.
+- Treat Advisor-side readiness gaps as closed, while tracking HiveSight's reverse-direction service-auth header name as a separate follow-up.
+
+AI contribution:
+
+- Updated Slice 0029.5 to use Advisor's settled `jurisdiction_code` request field and `treatment_plan_v1` / `answer_id` response provenance.
+- Closed the parked Advisor Treatment Plan Contract Readiness item and added a separate parked item for the future `X-Advisor-Service-Key` inbound-header decision.
+- Added focused regression guards that HiveSight stores `jurisdiction_code` in the outbound Advisor request payload and does not regress to `jurisdiction_id`.
+
+Human judgment still required:
+
+- Decide whether HiveSight's own Slice 0029 Varroa context API should later rename its optional `jurisdiction_id` context field to `jurisdiction_code`; that would be a separate HiveSight API-surface decision.

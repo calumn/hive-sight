@@ -61,7 +61,7 @@ Advisor noted that its treatment guidance also needs situational/treatment-metho
 - `architecture/domain-model.md`: Frame Mite Count and its non-claims around Advisor, treatment, rate, and whole-colony measurement.
 - `architecture/vertical-slice-0026-frame-level-varroa-result-summary.md`: human-reviewed photo-visible evidence summary and Advisor-context availability caveats.
 - `architecture/vertical-slice-0028-frame-mite-counting-workflow.md`: model-assisted frame mite count shape and transient result rules.
-- HiveSight Advisor review response, 2026-08-06: HiveSight should assemble context and later call Advisor's existing `POST /integrations/hivesight/treatment-plans` with `hive_id`, `jurisdiction_id`, and `situational_context`; Advisor should not call HiveSight.
+- HiveSight Advisor review response, 2026-08-06, updated by Advisor Slice 0011: HiveSight should assemble context and later call Advisor's existing `POST /integrations/hivesight/treatment-plans` with `hive_id`, `jurisdiction_code`, and `situational_context`; Advisor should not call HiveSight for this flow.
 - `hivesight-advisor-integration-contract` skill: Advisor already exposes `POST /integrations/hivesight/treatment-plans`; HiveSight has not yet built a real caller or recommendation intake.
 - `architecture/parking-lot.md`: revisit any parked treatment-history, sampling, and Advisor integration follow-ons.
 
