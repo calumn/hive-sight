@@ -1,5 +1,21 @@
 # Decision Log
 
+## 2026-08-06 Treatment Recommendation And Treatment Course Are Separate Records
+
+Decision: HiveSight will store a HiveSight Advisor response as a Treatment Recommendation and will store beekeeper-owned treatment activity as a separate Hive Treatment Course with one or more Treatment Applications. Accepting a recommendation may create a linked Hive Treatment Course, but the recommendation itself does not become the treatment record. The records must remain connected by a Treatment Evidence Chain from the source Varroa evidence and Advisor request through the recommendation, beekeeper decision, treatment applications, and outcome.
+
+Rationale: Advisor guidance, beekeeper decision-making, and real-world treatment activity have different provenance, actors, and lifecycle states. Keeping them separate preserves auditability and lets the beekeeper record treatments that were not Advisor-recommended. Keeping them linked preserves future value for review, field learning, and carefully governed Advisor improvement.
+
+Implications:
+
+- A Treatment Recommendation can be pending, accepted, declined, or retained for audit without implying that treatment occurred.
+- A Hive Treatment Course can be created from an accepted recommendation or manually recorded without Advisor provenance.
+- Treatment Applications record dated real-world steps or doses inside a course.
+- Treatment Outcomes and later inspection evidence link to the Hive Treatment Course without rewriting the original Advisor recommendation.
+- The source Varroa evidence or Varroa Assessment context, Advisor request payload, Advisor response, beekeeper decision, actual applications, and outcome must remain traceable as one chain.
+- Any future use of anonymised treatment/advice/outcome chains for HiveSight Advisor retrieval, evaluation, or learning needs its own permitted-use policy and data-minimisation contract.
+- HiveSight remains the system of record for hive treatment history, while HiveSight Advisor remains the source of advisory suggestions.
+
 ## 2026-07-29 AI-Assisted Annotation Is The Initial Dataset Bootstrap Path
 
 Decision: HiveSight will use AI-assisted annotation as the intended bootstrap path for creating the first reviewed bee and Varroa datasets. A model, hosted vision service, generative AI tool, or other candidate-generation mechanism may create Candidate Annotations, but those Candidate Annotations are not ground truth until a human reviewer checks, corrects, approves, rejects, marks uncertain, or excludes them.

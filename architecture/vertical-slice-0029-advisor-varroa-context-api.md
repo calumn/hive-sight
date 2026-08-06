@@ -136,6 +136,8 @@ The context must not say:
 - Contracts: Add a HiveSight-side context assembly contract. Do not update the shared HiveSight Advisor integration contract until implementation of an actual cross-app call or settled cross-app endpoint has passed.
 - Observability: Log one context assembly request with hive id, inspection photo id, availability, frame-count status, processed bee count, detection count, and no treatment-advice flag.
 
+Future Advisor-call and treatment-history slices must preserve this context as the first link in a Treatment Evidence Chain: source Varroa evidence or Varroa Assessment context, Advisor request payload, Advisor Treatment Recommendation, Beekeeper decision, Hive Treatment Course, Treatment Applications, and Treatment Outcome.
+
 ## Test Seams
 
 - Seam: HiveSight auth and Workspace access
@@ -417,6 +419,7 @@ Feature: Advisor Varroa context assembly API
 - UI button to request Advisor guidance.
 - Receiving, displaying, accepting, rejecting, or completing Advisor Treatment Recommendations.
 - Hive Treatment Course, Treatment Application, or Treatment Outcome persistence.
+- Durable Treatment Evidence Chain persistence beyond the current context payload.
 - Jurisdiction, brood, honey-super, temperature, organic-certification, or treatment-method condition modelling.
 - Treatment thresholds, risk bands, action language, or beekeeper-facing recommendation text.
 - Statistical visible Varroa rate, confidence interval, sampling plan, or colony-level estimate.

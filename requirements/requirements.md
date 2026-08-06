@@ -102,6 +102,62 @@ The system shall store original photos, analysis results, and reusable annotatio
 
 Rationale: Original images and structured annotations are needed for auditability, re-rendering tagged images, and later model evaluation.
 
+### FR-025 Advisor Treatment Recommendation Intake
+
+When HiveSight requests treatment guidance from HiveSight Advisor, the system shall be able to store the returned Treatment Recommendation as an advisory record linked to the Workspace, Apiary, Hive, source Inspection or Varroa evidence context, recommendation date/time, Advisor contract version, and Advisor provenance.
+
+Rationale: A recommendation must be traceable to the hive, evidence, and Advisor response that produced it, without pretending that advice has already been accepted or applied.
+
+Version: Deferred until HiveSight Advisor integration.
+
+### FR-026 Treatment Recommendation Decision
+
+The system shall let the Beekeeper accept, decline, or leave pending a stored Treatment Recommendation. The decision shall record actor, timestamp, decision state, and optional notes. Declining a recommendation shall preserve the original recommendation for audit rather than deleting or overwriting it.
+
+Rationale: The Beekeeper remains responsible for deciding whether to act on advice, and HiveSight needs to distinguish "Advisor suggested" from "beekeeper accepted".
+
+Version: Deferred until HiveSight Advisor integration.
+
+### FR-027 Hive Treatment Course
+
+When a Beekeeper accepts a Treatment Recommendation or manually records treatment activity, the system shall create or update a beekeeper-owned Hive Treatment Course linked to one Hive. A Treatment Recommendation shall not itself become the treatment course; it may be the provenance source for a separate course.
+
+Rationale: Keeping the advisory suggestion separate from the beekeeper-owned treatment course preserves responsibility, auditability, and the ability to record treatments that were not Advisor-recommended.
+
+Version: Deferred until treatment history implementation.
+
+### FR-028 Treatment Applications
+
+A Hive Treatment Course shall support one or more dated Treatment Applications, each representing one application, dose, or step in the treatment schedule. The course shall support single-step and multi-step schedules without forcing every treatment into one event.
+
+Rationale: Some treatments are applied once, while others require a sequence; HiveSight needs enough structure to record what actually happened.
+
+Version: Deferred until treatment history implementation.
+
+### FR-029 Treatment Outcome And Follow-Up Evidence
+
+The system shall allow a Beekeeper to record a Treatment Outcome for a Hive Treatment Course and link later inspection evidence where relevant, without rewriting the original Treatment Recommendation or the originally planned course.
+
+Rationale: Treatment effectiveness should be reviewable against later evidence, while preserving the history of what was advised, accepted, planned, and actually done.
+
+Version: Deferred until treatment follow-up implementation.
+
+### FR-030 Treatment Evidence Chain
+
+The system shall preserve a Treatment Evidence Chain from the Varroa evidence or Varroa Assessment context that triggered an Advisor request, through the request payload sent to HiveSight Advisor, the returned Treatment Recommendation, the Beekeeper's decision, any resulting Hive Treatment Course, Treatment Applications, and Treatment Outcome.
+
+Rationale: Future review, audit, and learning need to know which Varroa count or assessment context led to which advice, what the Beekeeper actually did, and what later evidence suggested about the result.
+
+Version: Deferred until HiveSight Advisor integration and treatment history implementation.
+
+### FR-031 Advisor Learning Dataset Governance
+
+The system may later expose anonymised or governed Treatment Evidence Chain records for HiveSight Advisor learning, retrieval, evaluation, or quality review, but only through an explicit permitted-use policy, data minimisation rules, and provenance-preserving export or integration contract. HiveSight shall not automatically use identifiable hive, apiary, Beekeeper, or Workspace treatment history as Advisor RAG material without that policy.
+
+Rationale: Treatment recommendation, application, and outcome history may become valuable evidence for improving Advisor guidance, but it is sensitive operational history and must be governed separately from product treatment records.
+
+Version: Deferred until Advisor learning governance is designed.
+
 ### FR-016 Workspace Data Use Agreement
 
 The system shall require the Workspace owner to accept the Workspace Data Use Agreement before upload and analysis features can be used.

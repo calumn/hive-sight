@@ -175,6 +175,50 @@ Feature: Claim boundaries and user trust
     Then the system clearly indicates that the estimate may be unreliable
     And the system encourages the beekeeper to use normal inspection methods alongside the AI-assisted estimate
 
+Feature: Future Advisor treatment workflow
+
+  Scenario: HiveSight stores an Advisor treatment recommendation separately from treatment history
+    Given HiveSight has requested treatment guidance from HiveSight Advisor for a selected Hive
+    And HiveSight Advisor returns a suggested treatment plan
+    When HiveSight stores the response
+    Then the Treatment Recommendation is linked to the Workspace, Apiary, Hive, source evidence, recommendation date, and Advisor provenance
+    And HiveSight does not treat the recommendation as an applied treatment
+    And HiveSight preserves the original recommendation even if the Beekeeper later declines it
+
+  Scenario: Beekeeper accepts a recommendation into a Hive Treatment Course
+    Given a Hive has a pending Treatment Recommendation
+    When the Beekeeper accepts that recommendation
+    Then HiveSight creates a separate Hive Treatment Course for that Hive
+    And the Treatment Recommendation remains linked as the provenance source
+    And the course can contain one or more dated Treatment Applications
+
+  Scenario: Beekeeper records treatment without an Advisor recommendation
+    Given a Beekeeper has treated a Hive outside HiveSight Advisor
+    When the Beekeeper records that treatment
+    Then HiveSight creates a Hive Treatment Course without requiring a Treatment Recommendation
+    And the course is still associated with the Hive and Workspace history
+
+  Scenario: Treatment outcome preserves original advice and actual treatment history
+    Given a Hive Treatment Course has one or more Treatment Applications
+    When the Beekeeper records an outcome or later inspection evidence
+    Then HiveSight records the Treatment Outcome against the course
+    And HiveSight does not rewrite the original Treatment Recommendation
+    And HiveSight does not rewrite the dated Treatment Applications
+
+  Scenario: Treatment history remains traceable to the Varroa evidence that triggered advice
+    Given HiveSight has assembled Varroa context from a specific Hive and Inspection evidence
+    And HiveSight has sent that context to HiveSight Advisor
+    And HiveSight Advisor has returned a Treatment Recommendation
+    When the Beekeeper accepts the recommendation into a Hive Treatment Course
+    Then HiveSight preserves the chain from Varroa evidence to Advisor request, Advisor recommendation, Beekeeper decision, Treatment Course, Treatment Applications, and Treatment Outcome
+    And HiveSight can later distinguish what was advised from what was actually applied
+
+  Scenario: Advisor learning use is governed separately from treatment history
+    Given HiveSight has accumulated Treatment Evidence Chain records over time
+    When those records are considered for HiveSight Advisor retrieval, evaluation, or learning
+    Then HiveSight requires an explicit permitted-use policy and data-minimisation rules
+    And HiveSight does not expose identifiable Beekeeper, Workspace, Apiary, or Hive treatment history as Advisor learning material by default
+
 Feature: Requirements traceability and AI-SDLC evidence
 
   Scenario: Requirement evidence is traceable through the project
@@ -353,6 +397,7 @@ Feature: Deferred guest trial analysis
 - Image upload formats and size limits should be configurable.
 - Model, dataset, training, evaluation, data-use agreement, privacy/deletion, and release-gate requirements are governed by the separate model requirements baseline and domain model.
 - The product language must preserve the boundary that results are AI-assisted visual estimates, not diagnoses, treatment recommendations, or official infestation measurements.
+- Treatment recommendations remain out of scope for version one. A future Advisor workflow may store advisory Treatment Recommendations and convert accepted recommendations into separate beekeeper-owned Hive Treatment Courses.
 
 ## Testing Decisions
 
@@ -375,7 +420,7 @@ Feature: Deferred guest trial analysis
 
 ## Out Of Scope
 
-- Treatment recommendations.
+- Treatment recommendations in version one.
 - Official Varroa diagnosis or certification.
 - Full commercial apiary management.
 - Full frame inventory management.

@@ -2,9 +2,11 @@
 
 Date started: 2026-08-03
 
-This roadmap captures potential future vertical slices and work packages. It is not a committed delivery plan, and slice numbers are deliberately provisional unless a slice document already exists.
+This roadmap captures potential future vertical slices and work packages. It is not a committed delivery plan. Future candidate work should stay unnumbered until it is promoted into an actual slice document or deliberately scheduled into the delivery order.
 
 Use this document when planning the next slice or a tranche of work. Before promoting an item, review `architecture/parking-lot.md`, the relevant requirements, and recent slice closeout notes so the new slice closes the right loop rather than adding another loose end.
+
+Numbering convention: candidate roadmap rows should normally use descriptive names, not slice numbers. Add a slice number only when the work has a concrete slice artifact or has been explicitly pulled into the next build sequence.
 
 ## Roadmap Principles
 
@@ -94,14 +96,16 @@ These are the strongest near-term candidates based on the current project state.
 
 ## Treatment And Advisor Integration
 
-HiveSight remains the system of record for hive identity, Varroa assessment evidence, and treatment history. HiveSight Advisor may recommend a treatment plan from grounded guidance, but HiveSight owns whether the beekeeper accepts it, records it, applies it, and later judges the result.
+HiveSight remains the system of record for hive identity, Varroa assessment evidence, treatment history, and the Treatment Evidence Chain. HiveSight Advisor may recommend a treatment plan from grounded guidance, but HiveSight owns whether the beekeeper accepts it, records it, applies it, and later judges the result.
 
 | Candidate Slice | Type | Outcome |
 | --- | --- | --- |
-| Hive Treatment History | Business / Technical | Let a Beekeeper record a Hive Treatment Course, one or more Treatment Applications, and simple notes against a selected Hive. |
-| Advisor Treatment Recommendation Intake | Business / Technical | Accept a Treatment Recommendation from HiveSight Advisor, show it to the Beekeeper as suggested rather than applied, and let the Beekeeper accept or decline it. |
+| Hive Treatment History | Business / Technical | Let a Beekeeper record a Hive Treatment Course and one or more dated Treatment Applications against a selected Hive, including treatments that were not Advisor-recommended. |
+| Slice 0029.5 Advisor Treatment Recommendation Intake And Acceptance | Business / Technical | Store a Treatment Recommendation returned by HiveSight Advisor as an advisory record linked to the source Varroa evidence, Advisor request payload, Advisor response provenance, and a pending beekeeper decision, then let the Beekeeper accept it into a separate planned Hive Treatment Course. |
+| Recommendation Decline And Audit Trail | Business / Governance | Let the Beekeeper decline a Treatment Recommendation with optional notes while preserving the original recommendation and decision history. |
 | Broader Advisor Context API | Technical / Integration | Extend the Varroa context contract with richer hive, apiary, jurisdiction, inspection-history, and treatment-history context once the first Advisor integration shape has proved useful. |
 | Treatment Completion And Follow-up Outcome | Business | Let a Beekeeper mark a Hive Treatment Course complete and relate later Inspection evidence to the treatment outcome without rewriting the original recommendation. |
+| Advisor Learning Evidence Export Governance | Governance / Integration | Define if and how anonymised Treatment Evidence Chain records may be exposed to HiveSight Advisor retrieval, evaluation, or learning with permitted-use, minimisation, and provenance controls. |
 
 ## Product Workflow And UX
 
@@ -166,6 +170,7 @@ The likely next tranche should stay model-evidence focused:
 1. Close Slice 0030 Varroa Corpus Governance so saved Varroa Review Outcomes can be deliberately included, excluded, or deferred before a Varroa Detection training dataset is frozen.
 2. Build the first Varroa Detector Baseline once there is enough curated positive and active-negative evidence.
 3. Add protected Varroa benchmark and gold-standard full-frame work before making any user-facing Varroa Assessment or treatment-trigger claim.
-4. Start Hive Treatment History and Advisor Treatment Recommendation Intake when the product workflow is ready to move from evidence context to treatment guidance.
+4. Build Slice 0029.5 Advisor Treatment Recommendation Intake And Acceptance when the product workflow is ready to move from evidence context to treatment guidance.
+5. Follow with full Hive Treatment History, Treatment Applications, treatment outcomes, and Advisor learning export governance once the first evidence-chain path is stable.
 
 This order can change if annotation productivity becomes the limiting factor, or if source-rights/contributor governance becomes necessary before using external evidence.

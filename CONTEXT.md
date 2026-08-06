@@ -113,11 +113,11 @@ An Inspection Intent for estimating visible Varroa evidence from inspection phot
 _Avoid_: Training data collection when the purpose is product analysis.
 
 **Treatment Recommendation**:
-An advisory suggestion for managing a Hive health concern, such as Varroa, that has not yet been accepted or applied by the Beekeeper.
+An advisory suggestion for managing a Hive health concern, such as Varroa, that has not itself been applied by the Beekeeper. It may be pending, accepted, or declined, and remains separate from any Hive Treatment Course created from it.
 _Avoid_: Treatment Course when the recommendation is not yet the beekeeper's own treatment record.
 
 **Hive Treatment Course**:
-A beekeeper-owned treatment plan or record for one Hive, covering the intended purpose and lifecycle of a treatment from planning through completion or cancellation.
+A beekeeper-owned treatment plan or record for one Hive, covering the intended purpose and lifecycle of a treatment from planning through completion or cancellation. It may originate from an accepted Treatment Recommendation or be recorded manually.
 _Avoid_: Treatment Recommendation when the beekeeper has not accepted responsibility for carrying out or recording the treatment.
 
 **Treatment Application**:
@@ -127,6 +127,10 @@ _Avoid_: Treatment Course when referring to a single event in a multi-step sched
 **Treatment Outcome**:
 The beekeeper-recorded or inspection-supported result observed after a Hive Treatment Course.
 _Avoid_: Cure, success, diagnosis.
+
+**Treatment Evidence Chain**:
+The traceable relationship from Varroa evidence or Varroa Assessment context, through a HiveSight Advisor request and Treatment Recommendation, to the Beekeeper's decision, Hive Treatment Course, Treatment Applications, and Treatment Outcome.
+_Avoid_: Treating later treatment records as independent facts when they came from a specific evidence-backed recommendation.
 
 **Frame Label**:
 An optional label that groups photos believed to show the same frame during one inspection.
