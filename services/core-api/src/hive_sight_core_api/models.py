@@ -152,6 +152,11 @@ class FrameMiteCountBeeStatus(StrEnum):
     failed = "failed"
 
 
+class AdvisorVarroaContextStatus(StrEnum):
+    available = "available"
+    not_available = "not_available"
+
+
 class VarroaDetectorCoordinateSpace(StrEnum):
     head_up_normalized_crop = "head_up_normalized_crop"
 
@@ -1567,6 +1572,86 @@ class FrameMiteCountResponse(BaseModel):
     not_user_facing_reason: str
     caveat: str
     advisor_context_available: bool = False
+
+
+class AdvisorVarroaContextRequest(BaseModel):
+    inspection_photo_id: UUID
+    jurisdiction_id: str | None = None
+
+
+class AdvisorVarroaFrameMiteCountEvidence(BaseModel):
+    status: FrameMiteCountStatus
+    eligible_bee_count: int
+    processed_bee_count: int
+    bees_with_likely_varroa_count: int
+    likely_visible_varroa_detection_count: int
+    model_determinate_coverage_percent: float
+    completed_training_crop_count: int
+    unfinished_training_crop_count: int
+    excluded_training_crop_count: int
+    not_assessed_bee_count: int
+    failed_bee_count: int
+    not_assessed_reasons: dict[str, int] = Field(default_factory=dict)
+    failure_reasons: dict[str, int] = Field(default_factory=dict)
+    adapter_type: str
+    adapter_version: str
+    model_reference: str
+    caveats: str
+
+
+class AdvisorVarroaPhotoVisibleEvidence(BaseModel):
+    readiness_state: str
+    eligible_complete_bee_count: int
+    reviewed_eligible_bee_count: int
+    determinate_eligible_bee_count: int
+    visible_varroa_bee_count: int
+    visible_mite_marker_count: int
+    active_negative_bee_count: int
+    not_determined_bee_count: int
+    review_completion_percent: float
+    determinate_varroa_coverage_percent: float
+    caveats: str
+
+
+class AdvisorVarroaEvidence(BaseModel):
+    source_intent: InspectionIntent
+    evidence_readiness: str
+    frame_mite_count: AdvisorVarroaFrameMiteCountEvidence
+    photo_visible_varroa_evidence: AdvisorVarroaPhotoVisibleEvidence
+
+
+class AdvisorTreatmentHistoryContext(BaseModel):
+    status: str = "not_modelled"
+    recent_treatment_count: int | None = None
+    courses: list[dict[str, object]] = Field(default_factory=list)
+
+
+class AdvisorRequiredSituationalInputsContext(BaseModel):
+    status: str = "not_modelled"
+    missing_inputs: list[str] = Field(default_factory=list)
+
+
+class AdvisorRequestReadiness(BaseModel):
+    can_request_advice: bool
+    blocking_reasons: list[str] = Field(default_factory=list)
+    caveats: list[str] = Field(default_factory=list)
+
+
+class AdvisorVarroaContextResponse(BaseModel):
+    contract_version: str = "advisor_varroa_context_v1"
+    status: AdvisorVarroaContextStatus
+    workspace_id: UUID
+    hive_id: UUID
+    apiary_id: UUID | None = None
+    inspection_id: UUID
+    inspection_photo_id: UUID
+    inspection_date: date
+    jurisdiction_id: str | None = None
+    varroa_evidence: AdvisorVarroaEvidence
+    treatment_history: AdvisorTreatmentHistoryContext
+    advisor_required_situational_inputs: AdvisorRequiredSituationalInputsContext
+    advisor_request_readiness: AdvisorRequestReadiness
+    not_advice_reason: str
 
 
 class ReviewQueueEllipseEvidence(BaseModel):

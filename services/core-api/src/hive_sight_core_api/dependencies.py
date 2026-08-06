@@ -7,6 +7,7 @@ from uuid import UUID
 
 from fastapi import Depends
 
+from hive_sight_core_api.advisor_varroa_context_workflow import AdvisorVarroaContextWorkflow
 from hive_sight_core_api.analysis_processing_workflow import (
     AnalysisProcessingWorkflow,
     DeterministicStubAnalysisExecutor,
@@ -180,6 +181,17 @@ def get_varroa_review_workflow(state: DevStateDep) -> VarroaReviewWorkflow:
 
 def get_frame_level_varroa_result_workflow(state: DevStateDep) -> FrameLevelVarroaResultWorkflow:
     return FrameLevelVarroaResultWorkflow(store=state.store)
+
+
+def get_advisor_varroa_context_workflow(state: DevStateDep) -> AdvisorVarroaContextWorkflow:
+    return AdvisorVarroaContextWorkflow(
+        store=state.store,
+        varroa_review_workflow=VarroaReviewWorkflow(
+            store=state.store,
+            image_loader=state.object_storage.get_object,
+        ),
+        frame_level_varroa_result_workflow=FrameLevelVarroaResultWorkflow(store=state.store),
+    )
 
 
 def get_review_queue_workflow(state: DevStateDep) -> ReviewQueueWorkflow:

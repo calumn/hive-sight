@@ -5,6 +5,7 @@ from fastapi import Depends, FastAPI, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 
+from hive_sight_core_api.advisor_varroa_context_workflow import AdvisorVarroaContextWorkflow
 from hive_sight_core_api.analysis_processing_workflow import AnalysisProcessingWorkflow
 from hive_sight_core_api.analysis_request_workflow import AnalysisRequestWorkflow
 from hive_sight_core_api.bee_detector_benchmark_evaluation_workflow import (
@@ -22,6 +23,7 @@ from hive_sight_core_api.dataset_repository_workflow import DatasetRepositoryWor
 from hive_sight_core_api.dataset_role_assignment_workflow import DatasetRoleAssignmentWorkflow
 from hive_sight_core_api.dependencies import (
     DevStateDep,
+    get_advisor_varroa_context_workflow,
     get_analysis_processing_workflow,
     get_analysis_request_workflow,
     get_bee_detector_benchmark_evaluation_workflow,
@@ -48,6 +50,8 @@ from hive_sight_core_api.frame_level_varroa_result_workflow import FrameLevelVar
 from hive_sight_core_api.hive_configuration_workflow import HiveConfigurationWorkflow
 from hive_sight_core_api.inspection_photo_access import InspectionPhotoAccess
 from hive_sight_core_api.models import (
+    AdvisorVarroaContextRequest,
+    AdvisorVarroaContextResponse,
     AnalysisEvidenceResponse,
     AnalysisRunDetailListResponse,
     AnalysisRunDetailResponse,
@@ -82,9 +86,9 @@ from hive_sight_core_api.models import (
     DirectedEllipseLocalCleanupRequest,
     DirectedEllipseLocalCleanupResponse,
     ErrorResponse,
+    FrameLevelVarroaResultSummaryResponse,
     FrameMiteCountRequest,
     FrameMiteCountResponse,
-    FrameLevelVarroaResultSummaryResponse,
     FrameStandardResponse,
     HeadUpNormalizedBeeCropPreviewResponse,
     HealthResponse,
@@ -170,6 +174,10 @@ InspectionPhotoAccessDep = Annotated[InspectionPhotoAccess, Depends(get_inspecti
 AnalysisRequestWorkflowDep = Annotated[
     AnalysisRequestWorkflow,
     Depends(get_analysis_request_workflow),
+]
+AdvisorVarroaContextWorkflowDep = Annotated[
+    AdvisorVarroaContextWorkflow,
+    Depends(get_advisor_varroa_context_workflow),
 ]
 AnalysisProcessingWorkflowDep = Annotated[
     AnalysisProcessingWorkflow,
@@ -1357,6 +1365,24 @@ def count_frame_mites(
         user=user,
         workspace_id=request.workspace_id,
         inspection_photo_id=inspection_photo_id,
+    )
+
+
+@app.post(
+    "/v1/hives/{hive_id}/advisor-varroa-context",
+    response_model=AdvisorVarroaContextResponse,
+)
+def assemble_advisor_varroa_context(
+    hive_id: UUID,
+    request: AdvisorVarroaContextRequest,
+    user: AuthenticatedUserDep,
+    workflow: AdvisorVarroaContextWorkflowDep,
+) -> AdvisorVarroaContextResponse:
+    return workflow.assemble_context(
+        user=user,
+        hive_id=hive_id,
+        inspection_photo_id=request.inspection_photo_id,
+        jurisdiction_id=request.jurisdiction_id,
     )
 
 
