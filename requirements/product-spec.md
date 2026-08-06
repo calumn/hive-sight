@@ -420,7 +420,7 @@ Feature: Deferred guest trial analysis
 - Privacy tests should verify that Data Deletion Requests can be recorded even while deletion workflow details are deferred.
 - UI or acceptance tests should verify that result wording does not claim diagnosis, treatment guidance, or official infestation measurement.
 - Browser acceptance tests should exercise the Web UI path for implemented vertical slices, including the photo intake, stub analysis, and annotation evidence review workflow.
-- API-level Gherkin scenarios should remain distinct from UI-level browser acceptance tests. UI-level Gherkin is parked as a future option; until deliberately reselected, UI acceptance coverage uses Playwright specs plus generated slice verification reports.
+- Gherkin scenarios describe client-neutral observable behaviour. Where meaningful, one canonical feature may execute through distinct API and browser bindings; API contract tests, lower-level tests, and browser-only visual checks remain separate. Slice 0030 is the first limited pilot; plain Playwright remains the browser-acceptance default for un-migrated workflows.
 - A slice verification report should summarize the checks run before a slice is closed, including service tests, API-level BDD scenarios, Web TypeScript checks, and browser acceptance tests where available.
 - Slice verification reports summarize executed checks and failure artifacts; they should not claim formal code coverage percentages until separate coverage tooling exists.
 - Future model evaluation tests should measure false positives, missed detections, confidence, and correction rates against reviewed image sets.

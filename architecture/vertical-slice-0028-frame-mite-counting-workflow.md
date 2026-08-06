@@ -13,7 +13,7 @@ This is still not a user-facing Varroa Assessment, Visible Varroa Rate, treatmen
 ## Source Inputs
 
 - `CONTEXT.md`: Varroa Detector, Head-Up Normalized Bee Crop, Frame-Level Varroa Result Summary, Varroa Review, Likely Varroa Detection, Varroa Assessment, Varroa Sampling Plan.
-- `requirements/roadmap.md`: Slice 0028 Frame Mite Counting Workflow, Slice 0029 Advisor Varroa Context API, Slice 0030 Varroa Corpus Governance.
+- `requirements/roadmap.md`: Slice 0028 Frame Mite Counting Workflow, Slice 0029 Advisor Varroa Context API, and the unnumbered Varroa Corpus Governance candidate.
 - `requirements/model-requirements.md`: MR-002 Varroa Detection, MR-003 Detection Association, MR-004 Complete Bee Denominator, MR-006 Headline Varroa Numerator, MR-007 Additional Varroa Evidence, MR-018C Separate Varroa Sampling Policies, MR-030A End-To-End Pipeline Evaluation Before Promotion.
 - `requirements/varroa-evidence-methodology.md`: separation of detector output, end-to-end pipeline evaluation, and future inspection-rate estimation.
 - `architecture/adr/0007-three-stage-bee-localisation-orientation-and-varroa-pipeline.md`: the staged Bee Localisation, Bee Orientation, and Varroa Detection pipeline; no Varroa inference on guessed orientation.
@@ -331,7 +331,7 @@ Feature: Frame mite counting workflow
 - Inspection-rate sampling, stratification, sequential stopping, confidence intervals, or a statistically defended Visible Varroa Rate.
 - User-facing treatment thresholds, risk bands, advice language, or HiveSight Advisor calls.
 - HiveSight Advisor Varroa Context API; that remains Slice 0029.
-- Varroa Corpus Governance; that remains Slice 0030.
+- Varroa Corpus Governance; that remains an unnumbered candidate.
 
 ## Acceptance Criteria
 

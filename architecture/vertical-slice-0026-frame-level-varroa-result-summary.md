@@ -16,7 +16,7 @@ This is not yet a real model-only Varroa Assessment, treatment trigger, HiveSigh
 - `requirements/roadmap.md`: Varroa Detection, Statistical Inference And Beekeeper Results, Treatment And Advisor Integration.
 - `requirements/varroa-evidence-methodology.md`: separation of model curation, evaluation, and inspection-rate estimation.
 - `architecture/vertical-slice-0025-varroa-review-outcome-labelling.md`: single-bee Varroa Review Outcomes and Head-Up Normalized Bee Crop markers.
-- `architecture/vertical-slice-0030-varroa-corpus-governance.md`: later model-curation corpus governance, deliberately not part of this slice.
+- `architecture/candidate-varroa-corpus-governance.md`: later model-curation corpus governance, deliberately not part of this slice.
 - `architecture/parking-lot.md`: PARK-0030 Inspection-Rate Sampling Policy, PARK-0031 User-Facing Varroa Coverage Threshold, PARK-0032 Inadequate-Coverage Review Recovery, PARK-0051 Production Inspection-Rate Sampling And Field Calibration Implementation.
 
 ## Acceptance Scenarios

@@ -54,8 +54,8 @@ The only product metadata persistence is in memory. Records do not survive API r
 ## Current Testing Standard
 
 - API-level acceptance uses Gherkin through pytest-bdd.
-- UI acceptance uses Playwright specs plus generated verification reports.
-- UI-level Gherkin is parked as a future option.
+- Slice 0030 pilots one client-neutral Gherkin feature through both API and browser bindings.
+- Playwright remains the browser-acceptance default for un-migrated workflows; further shared-feature migration is deliberately deferred until the pilot proves its value.
 
 ## Known Gaps
 
@@ -68,4 +68,3 @@ The only product metadata persistence is in memory. Records do not survive API r
 - No production deployment target.
 - No Analysis Store ownership decision.
 - Varroa detection remains product/model intent, not implemented capability.
-

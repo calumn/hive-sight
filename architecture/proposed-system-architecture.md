@@ -47,7 +47,7 @@ flowchart LR
 - Image bytes, dataset package files, and model artifacts remain outside Postgres.
 - Analysis Service stays separate and private.
 - The first Analysis Service integration uses an in-memory queue adapter before durable queue technology is chosen.
-- API-level Gherkin remains the acceptance BDD path. UI acceptance remains direct Playwright specs plus generated reports for now.
+- Client-neutral Gherkin is the acceptance BDD path. Slice 0030 pilots the same canonical feature through API and browser bindings; direct Playwright remains the browser-acceptance default for un-migrated workflows.
 
 ## Deferred Decisions
 
@@ -57,7 +57,7 @@ flowchart LR
 - Deployment platform.
 - Analysis Store physical ownership.
 - Signed upload/view URL implementation.
-- UI-level Gherkin harness.
+- Capability-by-capability migration into the shared Gherkin catalogue after Slice 0030.
 - Security, contract-governance, and release-readiness skills until their parked triggers occur.
 
 ## Known Gaps
@@ -66,4 +66,3 @@ flowchart LR
 - Slice 0015 must add durable Training Run and Model Candidate records if it proceeds.
 - Varroa-specific model and annotation slices must not start until traceability clearly distinguishes implemented bee-detector foundations from future Varroa capability.
 - The proposed architecture still needs a production deployment view once external access becomes real.
-

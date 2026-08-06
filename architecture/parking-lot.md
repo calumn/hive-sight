@@ -22,13 +22,13 @@ Context:
 
 API acceptance currently uses Gherkin and pytest-bdd. UI acceptance currently uses Playwright specs directly.
 
-Why parked:
+Promotion decision:
 
-Slice 0013 grilling decided that UI acceptance should remain Playwright specs plus generated verification reports for now. UI-level Gherkin remains a future option, not a near-term promise.
+Slice 0030 promotes a deliberately narrow pilot: one canonical client-neutral Gherkin scenario runs through both API and browser bindings. It does not commit HiveSight to migrate every browser test or to dual-run scenarios that are genuinely API-only or browser-only.
 
-Revisit trigger:
+Follow-on trigger:
 
-When Playwright specs and generated verification reports stop being readable enough as executable behaviour documentation, or before a major cross-role UI workflow where Gherkin would materially improve acceptance review.
+After Slice 0030 demonstrates maintainable shared execution and reporting, prioritise capability-by-capability migration when a current workflow needs clearer acceptance documentation.
 
 Suggested owner or area:
 
@@ -1239,7 +1239,7 @@ If the source Training Crop, Bee Annotation geometry, annotation type, or Orient
 
 Revisit trigger:
 
-Promoted into `architecture/vertical-slice-0030-varroa-corpus-governance.md`. The slice should block stale Varroa Review Outcomes from inclusion in the model-curation corpus until the curator rechecks the review against current source evidence.
+Captured by `architecture/candidate-varroa-corpus-governance.md`. When that candidate is deliberately scheduled, it should block stale Varroa Review Outcomes from inclusion in the model-curation corpus until the curator rechecks the review against current source evidence.
 
 Suggested owner or area:
 

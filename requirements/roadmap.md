@@ -46,7 +46,8 @@ These are the strongest near-term candidates based on the current project state.
 | Benchmark Dataset Curation Browser | Business / Technical | Let a Dataset Curator see and manage protected benchmark evidence as a named asset. | Slice 0015.4 uses benchmark items frozen inside a training Dataset Version; comparing candidates fairly soon needs a reusable benchmark lifecycle. |
 | Full-Frame Bee Localisation Evaluation | Technical | Evaluate whether the Bee Localisation candidate can find bees in realistic whole-frame photos, not just reviewed crops. | Crop-level success does not prove the model works on real inspection photos. |
 | Varroa Evidence Methodology And Gold-Standard Design | Research / Governance | Establish the full-depth annotation, review, split, sampling-experiment, and field-calibration protocol before Varroa corpus construction begins. | This is documented in `requirements/varroa-evidence-methodology.md`; the protocol prevents training convenience from becoming an unsupported beekeeper-facing statistical claim. |
-| Varroa Corpus Governance | Business / Governance | Designed as Slice 0030: review saved Varroa Review Outcomes across the Workspace and record include, exclude, or defer decisions before Varroa Detector training datasets are frozen. | Now that frame counting and Advisor context assembly exist, the next model-evidence gap is deciding which human Varroa outcomes enter the first Varroa corpus. |
+| Slice 0030 Dual-Seam Acceptance Specification Pilot | Technical / Quality | Establish one capability-organised, client-neutral Gherkin feature that runs through both Core API and browser bindings. | It closes the gap between accepted slice Gherkin, API-level BDD, and browser acceptance without a broad test-suite rewrite. |
+| Varroa Corpus Governance | Business / Governance | Review saved Varroa Review Outcomes across the Workspace and record include, exclude, or defer decisions before Varroa Detector training datasets are frozen. | This previously designed work returns to an unnumbered candidate until it is deliberately scheduled after the testing pilot. |
 | Public Dataset Candidate Import | Technical / Governance | Import public USDA-ARS image/XML evidence as Candidate Annotations requiring human review. | This could accelerate dataset growth, but only if provenance and source rights are handled correctly. |
 
 ## Bee Localisation And Dataset Quality
@@ -74,7 +75,7 @@ These are the strongest near-term candidates based on the current project state.
 
 | Candidate Slice | Type | Outcome |
 | --- | --- | --- |
-| Varroa Corpus Governance | Business / Governance | Designed as Slice 0030: show saved Varroa Review Outcomes across the Workspace, separate positive, active negative, unresolved, stale, included, excluded, and deferred evidence, and record current corpus curation decisions without freezing a Dataset Version. |
+| Varroa Corpus Governance | Business / Governance | Show saved Varroa Review Outcomes across the Workspace, separate positive, active negative, unresolved, stale, included, excluded, and deferred evidence, and record current corpus curation decisions without freezing a Dataset Version. |
 | Gold-Standard Full-Frame Annotation Pilot | Research / Technical | Demonstrate the methodology on a small, fully reconciled set of complete frame images and measure annotation/review workload and agreement. |
 | Varroa Model-Curation Sampling Plan | Business / Technical | Select Varroa labelling tasks using `stratified_random`, `curator_targeted`, and explicit `human_selected` versus `upstream_model_selected` metadata. |
 | Varroa Dataset Repository Browser | Business / Technical | Show positive, active negative, and not-determined Varroa evidence by dataset role, source, orientation reliability, and selection method. |
@@ -159,7 +160,7 @@ HiveSight remains the system of record for hive identity, Varroa assessment evid
 
 | Candidate Slice | Type | Outcome |
 | --- | --- | --- |
-| UI-Level Gherkin Harness | Technical / Quality | Add BDD-style UI acceptance where it improves behaviour readability beyond Playwright specs. |
+| Capability-Based Acceptance Catalogue Migration | Technical / Quality | Migrate additional active behaviours into shared, capability-organised Gherkin features after Slice 0030 proves the approach. |
 | Cross-Inspection Submitted Review Dashboard | Business / Quality | Let Dataset Curators see crops they submitted for review across inspections so waiting work can be chased or cancelled deliberately. |
 | Real Model QA Test Environment | Technical / Quality | Keep real YOLO training/evaluation smoke tests outside normal CI but runnable on demand against a QA database. |
 | Test Coverage Report Expansion | Technical / Quality | Extend slice verification reports to show unit, API, BDD, UI, real-adapter QA, and known skipped tests in one place. |
@@ -170,10 +171,10 @@ HiveSight remains the system of record for hive identity, Varroa assessment evid
 
 The likely next tranche should stay model-evidence focused:
 
-1. Close Slice 0030 Varroa Corpus Governance so saved Varroa Review Outcomes can be deliberately included, excluded, or deferred before a Varroa Detection training dataset is frozen.
-2. Build the first Varroa Detector Baseline once there is enough curated positive and active-negative evidence.
-3. Add protected Varroa benchmark and gold-standard full-frame work before making any user-facing Varroa Assessment or treatment-trigger claim.
-4. Build Slice 0029.5 Advisor Treatment Recommendation Intake And Acceptance when the product workflow is ready to move from evidence context to treatment guidance.
+1. Build Slice 0030 Dual-Seam Acceptance Specification Pilot to establish the living acceptance catalogue and prove shared API/browser execution.
+2. Schedule Varroa Corpus Governance when the first Varroa Detector training dataset needs deliberate inclusion, exclusion, or deferral decisions.
+3. Build the first Varroa Detector Baseline once there is enough curated positive and active-negative evidence.
+4. Add protected Varroa benchmark and gold-standard full-frame work before making any user-facing Varroa Assessment or treatment-trigger claim.
 5. Follow with full Hive Treatment History, Treatment Applications, treatment outcomes, and Advisor learning export governance once the first evidence-chain path is stable.
 
 This order can change if annotation productivity becomes the limiting factor, or if source-rights/contributor governance becomes necessary before using external evidence.

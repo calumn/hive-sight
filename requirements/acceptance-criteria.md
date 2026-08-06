@@ -73,7 +73,7 @@ Implementation traceability note: the Varroa Detection and Infection-Rate Estima
 - The slice verification report records the service tests, API-level BDD scenarios, Web TypeScript checks, and browser acceptance tests that were executed.
 - The slice verification report records pass/fail status, commands run, concise summaries, and failure artifact locations where available.
 - The slice verification report does not claim formal code coverage percentages unless separate coverage tooling is added.
-- UI-level Gherkin is parked as a future option. Until deliberately reselected, browser acceptance coverage uses Playwright specs plus generated slice verification reports.
+- Slice 0030 establishes a limited shared Gherkin pilot: one client-neutral feature runs through API and browser bindings. Plain Playwright remains the browser-acceptance default for un-migrated workflows, and broader migration remains a future prioritisation decision.
 
 ## Ownership And Permissions
 

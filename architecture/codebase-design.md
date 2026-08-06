@@ -315,7 +315,7 @@ Recommended early test layers:
 
 Avoid tests that lock onto private helper functions or route-handler internals. If a test has to change when the implementation is reorganized but behaviour is unchanged, it is probably testing past the interface.
 
-Keep API-level Gherkin and UI-level browser acceptance distinct. API-level Gherkin remains the stable acceptance seam for Core API behaviour; UI-level Gherkin should be added after the initial Playwright harness stabilizes so browser workflows also have executable specification language.
+Keep client-neutral Gherkin features distinct from API contract tests, lower-level tests, and browser-only visual checks. Where meaningful, one canonical feature can execute through API and browser bindings; Slice 0030 introduces this as a limited pilot while Playwright remains the browser-acceptance default for un-migrated workflows.
 
 ## Next Implementation Recommendation
 

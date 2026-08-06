@@ -652,3 +652,25 @@ Human judgment still required:
 - Review and sign off the Slice 0026 Gherkin before implementation starts.
 - Decide whether Slice 0026 summaries are scoped to one Inspection Photo only or also need an Inspection-level roll-up.
 - Decide whether Advisor context availability requires complete determinate coverage or can be partial with caveats.
+
+### 2026-08-06 Dual-Seam Acceptance Specification Pilot Planning
+
+Human-confirmed direction:
+
+- Promote Dual-Seam Acceptance Specification Pilot as Slice 0030.
+- Keep one client-neutral, capability-organised Gherkin feature as the living acceptance specification; bind it separately to the Core API and Web UI where both seams are meaningful.
+- Use `playwright-bdd` for the browser binding while retaining native Playwright execution and reporting.
+- Pilot the approach with the accepted Varroa Review scenario that records visible Varroa with two mite markers.
+- Preserve Slice 0025 as historical acceptance evidence, keep browser-specific visual regression coverage, and return the previously designed Varroa Corpus Governance work to an unnumbered candidate.
+
+AI contribution:
+
+- Identified that existing API Gherkin and browser acceptance tests are executable but still organised primarily by transient slice history.
+- Identified a current API/browser drift in the selected Varroa outcome example: the API Gherkin described two markers while the browser test asserted one.
+- Designed `architecture/vertical-slice-0030-dual-seam-acceptance-specification-pilot.md` with formally accepted Gherkin, scoped migration, runner choice, verification boundaries, and follow-on limits.
+- Renamed the unbuilt Slice 0030 Varroa Corpus Governance design to `architecture/candidate-varroa-corpus-governance.md` and aligned roadmap, architecture, and testing-policy references.
+
+Human judgment still required:
+
+- Review the Slice 0030 implementation once the API and browser bindings execute the shared feature.
+- Decide which capability should migrate next only after the pilot demonstrates its maintenance and reporting cost.

@@ -2,7 +2,7 @@
 
 Status: designed; acceptance scenarios formally accepted on 2026-08-06; HiveSight Advisor review incorporated. HiveSight-side stub implementation can proceed, but real Advisor adapter production readiness depends on Advisor-side contract follow-ups.
 
-Numbering note: this slice intentionally uses `0029.5` because it belongs after Slice 0029 Advisor Varroa Context Assembly API and before the already-designed Slice 0030 Varroa Corpus Governance.
+Numbering note: this slice intentionally uses `0029.5` because it belongs after Slice 0029 Advisor Varroa Context Assembly API. Varroa Corpus Governance is now an unnumbered future candidate; Slice 0030 is reserved for the accepted Dual-Seam Acceptance Specification Pilot.
 
 ## Purpose
 

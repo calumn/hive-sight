@@ -1,12 +1,12 @@
-# Vertical Slice 0030: Varroa Corpus Governance
+# Candidate: Varroa Corpus Governance
 
-Status: designed; acceptance scenarios pending signoff; renumbered from Slice 0026 after the Varroa-to-Advisor tranche was replanned.
+Status: unnumbered candidate; previously designed as Slice 0030. Its acceptance scenarios remain unapproved and it returns to the roadmap until it is deliberately scheduled again.
 
 ## Purpose
 
 Let a Dataset Curator govern saved Varroa Review Outcomes across the Workspace before any Varroa Detector training begins.
 
-Slice 0025 creates human Varroa evidence one Head-Up Normalized Bee Crop at a time. Slice 0030 turns those reviewed outcomes into a deliberate model-curation corpus decision: include, exclude, or defer. The slice makes active positives and active negatives inspectable as a corpus, keeps unresolved or stale evidence out of model training by default, and preserves provenance back to the same source bee evidence used by Bee Localisation and Bee Orientation.
+Slice 0025 creates human Varroa evidence one Head-Up Normalized Bee Crop at a time. This candidate turns those reviewed outcomes into a deliberate model-curation corpus decision: include, exclude, or defer. It makes active positives and active negatives inspectable as a corpus, keeps unresolved or stale evidence out of model training by default, and preserves provenance back to the same source bee evidence used by Bee Localisation and Bee Orientation.
 
 This is not a Varroa Detector training slice. It does not create a user-facing Varroa Assessment, visible rate, sampling estimate, HiveSight Advisor trigger, or treatment recommendation.
 
