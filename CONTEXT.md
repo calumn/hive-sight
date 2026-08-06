@@ -104,6 +104,10 @@ _Avoid_: Dataset Version when the evidence has not yet been frozen for training,
 A derived, current summary of visible Varroa evidence for one Inspection Photo or photographed frame, based on reviewed bee-level Varroa Review Outcomes. It separates eligible bees, reviewed bees, determinate positives, active negatives, unresolved evidence, marker count, coverage, and caveats so the system can count mites on a frame before making any statistical or treatment claim.
 _Avoid_: Visible Varroa Rate when there is no sampling estimator or confidence model, and Treatment Recommendation when no Advisor or beekeeper treatment decision has occurred.
 
+**Frame Mite Count**:
+A model-assisted count of likely visible Varroa detections across eligible complete reliable bees for one photographed frame, derived by running the Varroa Detector over Head-Up Normalized Bee Crops. In Slice 0028 this is on-demand, stub-backed, non-user-facing frame evidence only; it is separate from human Varroa Review Outcomes and from a beekeeper-facing Varroa Assessment.
+_Avoid_: Visible Varroa Rate, Varroa Assessment, treatment trigger, or human-reviewed photo-visible evidence summary.
+
 **Varroa Assessment**:
 An Inspection Intent for estimating visible Varroa evidence from inspection photos for beekeeper-facing support.
 _Avoid_: Training data collection when the purpose is product analysis.

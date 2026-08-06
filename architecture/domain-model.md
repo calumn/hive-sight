@@ -850,6 +850,46 @@ Rules:
 - Reviewed Annotations still require Dataset Role assignment before dataset use.
 - A legacy or model-produced Varroa Annotation is evidence of a positive marker candidate. A Varroa Review carries the explicit positive, negative, or not-determined judgement for the bee-relative crop, and its Varroa Markers carry human-reviewed point evidence in normalized bee-crop coordinates.
 
+### Frame Mite Count
+
+A transient, model-assisted count of likely visible Varroa detections across eligible bee annotations for one photographed frame.
+
+Essential fields:
+
+- workspace id
+- inspection id
+- hive id
+- inspection photo id
+- inspection date
+- source image filename
+- model purpose
+- adapter type
+- adapter version
+- model reference
+- completed Training Crop count
+- unfinished Training Crop count
+- excluded Training Crop count
+- eligible bee count
+- processed bee count
+- bees with likely Varroa count
+- likely Varroa detection count
+- not-assessed bee count
+- failed bee count
+- model determinate coverage percent
+- per-bee result summaries
+- caveats
+
+Rules:
+
+- Slice 0028 Frame Mite Counts are run on demand and are not persisted as durable result history.
+- A Frame Mite Count belongs to one selected Inspection Photo, not a whole Inspection.
+- It runs the configured Varroa Detector over eligible complete reliable bee annotations from completed, non-excluded Training Crops.
+- It counts bee annotations, not deduplicated physical bees across overlapping Training Crops.
+- Partial visible bees, unreliable-orientation bees, unfinished crops, excluded crops, transform failures, and adapter failures are disclosed separately and are not negative Varroa results.
+- A detector result with zero detections is a completed model inference with `0 likely detections`; it is not a human `no_visible_varroa` review outcome.
+- A Frame Mite Count does not create, update, or approve Varroa Review Outcomes, Varroa Markers, Dataset Items, Dataset Versions, or Varroa Corpus Curation Decisions.
+- It is model-assisted frame evidence only. It is not a Visible Varroa Rate, Varroa Assessment, Treatment Recommendation, HiveSight Advisor context, Advisor trigger, or whole-colony measurement.
+
 ### User Correction
 
 A beekeeper flag about model output.
