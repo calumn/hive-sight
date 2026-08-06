@@ -30,6 +30,13 @@ Follow-on trigger:
 
 After Slice 0030 demonstrates maintainable shared execution and reporting, prioritise capability-by-capability migration when a current workflow needs clearer acceptance documentation.
 
+Follow-on work:
+
+- Inventory active API BDD and browser acceptance tests and label each behaviour as shared, API-only, browser-only, service-only, legacy historical evidence, or lower-level coverage.
+- Promote high-value shared behaviours into `acceptance/features/<capability>/...` when they are touched or when API/browser drift risk is high.
+- Keep browser-only visual, geometry, interaction, and accessibility assertions in Playwright specs.
+- Share the Slice 0030 pattern with HiveSight Advisor before designing more cross-repo treatment-advice acceptance scenarios.
+
 Suggested owner or area:
 
 Delivery test automation and acceptance BDD.

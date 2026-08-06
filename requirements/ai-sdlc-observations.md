@@ -695,3 +695,21 @@ AI contribution:
 Human judgment still required:
 
 - Decide the next capability to migrate into the living acceptance catalogue after seeing the pilot's maintenance cost in real use.
+
+### 2026-08-06 Acceptance Catalogue Follow-Up And Advisor Alignment
+
+Human-confirmed direction:
+
+- Treat Slice 0030 as a proven POC that needs three follow-ups: skills alignment, explicit roadmap items for migration, and a shareable note for HiveSight Advisor.
+- Avoid broad, blind migration of all tests; prioritise current behaviours and cross-client drift risk.
+
+AI contribution:
+
+- Updated the HiveSight-specific delivery skill so it no longer says browser Gherkin is merely deferred; it now points to the Slice 0030 shared acceptance-catalogue pattern.
+- Added roadmap and parking-lot follow-up items for acceptance catalogue inventory, capability-by-capability migration, and Advisor alignment.
+- Added `architecture/hivesight-advisor-dual-seam-acceptance-alignment.md` as a concise context note to share with HiveSight Advisor.
+
+Human judgment still required:
+
+- Decide whether HiveSight Advisor should adopt the same folder/runner structure or only align on the client-neutral scenario-writing rules.
+- Choose the first Advisor-facing treatment-advice behaviour to express as a shared acceptance scenario.
