@@ -767,3 +767,22 @@ AI contribution:
 Human judgment still required:
 
 - Use the inventory's next recommended migration candidate when acceptance-catalogue migration resumes.
+
+### 2026-08-07 Slice 0032 Photo-Visible Varroa Evidence Summary Catalogue Migration
+
+Human-confirmed direction:
+
+- Migrate the existing Slice 0026 Photo-visible Varroa evidence summary scenarios as-is into the canonical acceptance catalogue.
+- Keep this as an API-only catalogue migration with no product behaviour, UI, storage, or Advisor contract changes.
+
+AI contribution:
+
+- Added `acceptance/features/varroa/photo-visible-varroa-evidence-summary.feature` with the six signed-off scenarios tagged `@api`.
+- Renamed the Core API BDD binding to `services/core-api/tests/test_photo_visible_varroa_evidence_summary_api_bdd.py` and pointed it at the canonical feature.
+- Removed the old legacy Slice 0026 executable feature file from the Core API feature directory.
+- Updated slice verification metadata so the migrated feature appears in the BDD Feature Area Summary.
+- Updated the acceptance catalogue inventory and roadmap to reflect the new canonical feature.
+
+Human judgment still required:
+
+- Migrate the Varroa detector adapter seam only when that behaviour is next touched or drift risk becomes material.

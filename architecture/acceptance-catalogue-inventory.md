@@ -41,7 +41,16 @@ Legacy slice-history tests remain useful evidence. They should not be bulk-migra
 | Capability | Behaviour | Current location | Seam | Classification | Migration recommendation | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
 | varroa | Visible Varroa review outcome | `acceptance/features/varroa/visible-varroa-review-outcome.feature` | API + Web UI | shared | already canonical | Living dual-seam feature from Slice 0030. |
+| varroa | Photo-visible Varroa evidence summary | `acceptance/features/varroa/photo-visible-varroa-evidence-summary.feature` | API | api-only | already canonical | Migrated by Slice 0032 because it feeds frame-level count and Advisor context evidence. |
 | treatment | Advisor treatment recommendation intake | `acceptance/features/treatment/advisor-treatment-recommendation-intake.feature` | API | api-only | already canonical | Living API-bound catalogue feature for the Advisor recommendation intake and treatment evidence chain. |
+
+## Canonical Core API BDD Bindings
+
+| Capability | Behaviour | Current location | Seam | Classification | Migration recommendation | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| varroa | Visible Varroa review outcome | `services/core-api/tests/test_visible_varroa_review_outcome_api_bdd.py` | Core API | shared | already canonical | Core API binding for the canonical Varroa Review Outcome feature. |
+| varroa | Photo-visible Varroa evidence summary | `services/core-api/tests/test_photo_visible_varroa_evidence_summary_api_bdd.py` | Core API | api-only | already canonical | Core API binding for the canonical photo-visible Varroa evidence summary feature. |
+| treatment | Advisor treatment recommendation intake | `services/core-api/tests/test_advisor_treatment_recommendation_api_bdd.py` | Core API | api-only | already canonical | Core API binding for the canonical treatment recommendation intake feature. |
 
 ## Browser BDD Bindings
 
@@ -72,7 +81,6 @@ Legacy slice-history tests remain useful evidence. They should not be bulk-migra
 | model | Real bee training baseline | `services/core-api/tests/features/vertical_slice_0023_real_bee_training_baseline.feature` | Core API | legacy historical evidence | migrate when touched | Candidate if combined training workflow changes. |
 | model | Bee orientation benchmark evaluation | `services/core-api/tests/features/vertical_slice_0024_bee_orientation_benchmark_evaluation.feature` | Core API | legacy historical evidence | migrate when touched | Model governance behaviour; not next priority. |
 | varroa | Varroa review outcome labelling | `services/core-api/tests/features/vertical_slice_0025_varroa_review_outcome_labelling.feature` | Core API | legacy historical evidence | keep as legacy evidence | Current living business outcome moved to canonical Varroa catalogue; remaining details stay historical until touched. |
-| varroa | Photo visible Varroa evidence summary | `services/core-api/tests/features/vertical_slice_0026_photo_visible_varroa_evidence_summary.feature` | Core API | api-only | migrate now | Next recommended migration candidate because it feeds frame-level count and Advisor context evidence. |
 | varroa | Varroa detector adapter seam | `services/core-api/tests/features/vertical_slice_0027_varroa_detector_adapter_seam.feature` | Core API | api-only | migrate when touched | Adapter seam is current, but lower priority than the evidence summary. |
 
 ## Legacy Core API BDD Bindings
@@ -98,7 +106,6 @@ Legacy slice-history tests remain useful evidence. They should not be bulk-migra
 | model | Real bee training baseline | `services/core-api/tests/test_vertical_slice_0023_bdd.py` | Core API | legacy historical evidence | migrate when touched | Binding for legacy feature. |
 | model | Bee orientation benchmark evaluation | `services/core-api/tests/test_vertical_slice_0024_bdd.py` | Core API | legacy historical evidence | migrate when touched | Binding for legacy feature. |
 | varroa | Varroa review outcome labelling | `services/core-api/tests/test_vertical_slice_0025_bdd.py` | Core API | legacy historical evidence | keep as legacy evidence | Current living business outcome moved to canonical Varroa catalogue. |
-| varroa | Photo visible Varroa evidence summary | `services/core-api/tests/test_vertical_slice_0026_bdd.py` | Core API | api-only | migrate now | Next recommended migration candidate. |
 | varroa | Varroa detector adapter seam | `services/core-api/tests/test_vertical_slice_0027_bdd.py` | Core API | api-only | migrate when touched | Binding for legacy feature. |
 
 ## Plain Browser Acceptance Specs
@@ -138,11 +145,10 @@ Legacy slice-history tests remain useful evidence. They should not be bulk-migra
 
 ## Next Recommended Migration Candidate
 
-`Photo visible Varroa evidence summary` should be the next migration candidate when acceptance-catalogue migration resumes.
+`Varroa detector adapter seam` should be the next Varroa migration candidate when that adapter behaviour is touched.
 
 Reason:
 
 - It is current Varroa behaviour.
-- It feeds frame-level mite count and Advisor context evidence.
-- It is API-level behaviour today, so it can migrate without forcing a browser binding before one is useful.
-- It sits close to the integration point the project is moving toward: counted mite evidence leading to Advisor treatment recommendation.
+- It remains API-level behaviour today, so it can migrate without forcing a browser binding before one is useful.
+- It sits near the model-to-frame-count path, but is less urgent now that the human-reviewed evidence summary is canonical.

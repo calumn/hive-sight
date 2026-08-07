@@ -47,7 +47,7 @@ def test_acceptance_inventory_names_next_migration_candidate() -> None:
     inventory = INVENTORY_PATH.read_text(encoding="utf8")
 
     assert "Next Recommended Migration Candidate" in inventory
-    assert "Photo visible Varroa evidence summary" in inventory
+    assert "Varroa detector adapter seam" in inventory
 
 
 def _feature_level_tags(feature_path: Path) -> set[str]:

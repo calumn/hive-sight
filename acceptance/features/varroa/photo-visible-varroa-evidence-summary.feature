@@ -1,3 +1,4 @@
+@api
 Feature: Photo-visible Varroa evidence summary
 
   Scenario: Dataset Curator sees a photo-visible result from reviewed bee outcomes

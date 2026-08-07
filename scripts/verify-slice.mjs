@@ -10,7 +10,7 @@ const checks = [
   {
     name: "Acceptance catalogue - Core API",
     command:
-      "./.venv/bin/python -m pytest -p no:cacheprovider -m api tests/test_visible_varroa_review_outcome_api_bdd.py tests/test_advisor_treatment_recommendation_api_bdd.py",
+      "./.venv/bin/python -m pytest -p no:cacheprovider -m api tests/test_visible_varroa_review_outcome_api_bdd.py tests/test_photo_visible_varroa_evidence_summary_api_bdd.py tests/test_advisor_treatment_recommendation_api_bdd.py",
     cwd: "services/core-api",
     args: [
       "./.venv/bin/python",
@@ -21,6 +21,7 @@ const checks = [
       "-m",
       "api",
       "tests/test_visible_varroa_review_outcome_api_bdd.py",
+      "tests/test_photo_visible_varroa_evidence_summary_api_bdd.py",
       "tests/test_advisor_treatment_recommendation_api_bdd.py"
     ],
     note:
@@ -33,6 +34,15 @@ const checks = [
         tag: "api",
         featureFile: "acceptance/features/varroa/visible-varroa-review-outcome.feature",
         testFile: "tests/test_visible_varroa_review_outcome_api_bdd.py"
+      },
+      {
+        area: "Photo-visible Varroa evidence summary",
+        capability: "varroa",
+        seam: "Core API",
+        tag: "api",
+        featureFile:
+          "acceptance/features/varroa/photo-visible-varroa-evidence-summary.feature",
+        testFile: "tests/test_photo_visible_varroa_evidence_summary_api_bdd.py"
       },
       {
         area: "Advisor treatment recommendation intake",

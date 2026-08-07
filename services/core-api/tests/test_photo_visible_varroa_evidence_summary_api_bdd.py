@@ -16,9 +16,7 @@ from test_vertical_slice_0026_photo_visible_varroa_summary import (
 from hive_sight_core_api.dependencies import build_dev_state, get_dev_state
 from hive_sight_core_api.main import app
 
-FEATURES_DIR = Path(__file__).parent / "features"
-
-scenarios(str(FEATURES_DIR / "vertical_slice_0026_photo_visible_varroa_evidence_summary.feature"))
+scenarios("../../../acceptance/features/varroa/photo-visible-varroa-evidence-summary.feature")
 
 
 @dataclass
