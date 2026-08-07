@@ -750,3 +750,20 @@ Human judgment still required:
 
 - Share the alignment note with HiveSight Advisor and decide which Advisor-side treatment behaviour should be migrated into their own catalogue first.
 - Decide the next HiveSight capability migration after seeing whether the treatment feature's API-only catalogue placement feels natural.
+
+### 2026-08-07 Slice 0031 Acceptance Catalogue Inventory And Labels
+
+Human-confirmed direction:
+
+- Promote Acceptance Catalogue Inventory And Labels as Slice 0031.
+- Keep the slice focused on inventory, labelling, and lightweight guards rather than broad migration of historical slice tests.
+
+AI contribution:
+
+- Drafted Slice 0031 with signed-off catalogue-inventory Gherkin scenarios.
+- Added the initial acceptance catalogue inventory covering canonical features, legacy Core API Gherkin, browser BDD bindings, plain browser acceptance specs, and harness/reporting guards.
+- Added focused regression coverage so canonical catalogue features must declare supported seam labels and the inventory must list the current catalogue, legacy API features, browser specs, and browser BDD bindings.
+
+Human judgment still required:
+
+- Use the inventory's next recommended migration candidate when acceptance-catalogue migration resumes.

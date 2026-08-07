@@ -26,13 +26,15 @@ Promotion decision:
 
 Slice 0030 promotes a deliberately narrow pilot: one canonical client-neutral Gherkin scenario runs through both API and browser bindings. It does not commit HiveSight to migrate every browser test or to dual-run scenarios that are genuinely API-only or browser-only.
 
+Slice 0031 promotes the first follow-on inventory pass so the remaining migration work is classified before more behaviours move.
+
 Follow-on trigger:
 
 After Slice 0030 demonstrates maintainable shared execution and reporting, prioritise capability-by-capability migration when a current workflow needs clearer acceptance documentation.
 
 Follow-on work:
 
-- Inventory active API BDD and browser acceptance tests and label each behaviour as shared, API-only, browser-only, service-only, legacy historical evidence, or lower-level coverage.
+- Slice 0031 inventory: active API BDD and browser acceptance tests are labelled as shared, API-only, browser-only, service-only, legacy historical evidence, or lower-level coverage.
 - Promote high-value shared behaviours into `acceptance/features/<capability>/...` when they are touched or when API/browser drift risk is high.
 - Keep browser-only visual, geometry, interaction, and accessibility assertions in Playwright specs.
 - Share the Slice 0030 pattern with HiveSight Advisor before designing more cross-repo treatment-advice acceptance scenarios.
