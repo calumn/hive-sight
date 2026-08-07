@@ -908,6 +908,7 @@ Essential fields:
 - analysed bees
 - failed bees
 - mites found
+- bees with likely visible Varroa
 - mite ratio basis
 - adapter type
 - adapter version
@@ -922,8 +923,10 @@ Essential fields:
 Rules:
 
 - A Varroa Photo Analysis belongs to one Inspection Photo, not a whole Inspection or Hive.
-- Rerunning analysis creates a new evidence run; it does not replace previous runs.
+- A photo has at most one active or produced current-model analysis. Completed, partial, and no-usable-bees results are not rerun; a failed run may be retried. Model-version reanalysis is a separate future workflow that creates a new immutable evidence run.
 - Job status and human review status are separate fields.
+- Product analysis is independent of Training Crops and Training Crop Bee Annotations.
+- Each Inspection Photo Bee Evidence record is a child of the analysis and also retains the Inspection Photo id and source geometry for evidence display and integrity checking.
 - `partial` means every eligible bee was attempted, but one or more bee detector calls failed.
 - `no_usable_bees` means analysis ran but no bees were eligible for Varroa evaluation.
 - A failed or aborted analysis is not a partial result and cannot be accepted.

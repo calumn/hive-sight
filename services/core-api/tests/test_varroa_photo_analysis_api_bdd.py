@@ -132,7 +132,7 @@ def run_photo_analysis(slice_context: SliceContext) -> None:
 
 @then("HiveSight persists one Photo Analysis run for the photo")
 def one_photo_analysis_run_persisted(slice_context: SliceContext) -> None:
-    assert slice_context.response.status_code == 201
+    assert slice_context.response.status_code == 200
     listed = slice_context.client.get(
         f"/v1/inspection-photos/{slice_context.inspection_photo_id}/varroa-photo-analyses"
         f"?workspace_id={slice_context.workspace_id}",
@@ -173,11 +173,16 @@ def varroa_photo_has_no_usable_bees(slice_context: SliceContext) -> None:
     slice_context.workspace_id = workspace_id
     slice_context.crop_id = crop_id
     slice_context.inspection_photo_id = _inspection_photo_id_for_crop(slice_context.state, crop_id)
+    app.dependency_overrides[get_varroa_photo_analysis_workflow] = lambda: VarroaPhotoAnalysisWorkflow(
+        store=slice_context.state.store,
+        image_loader=slice_context.state.object_storage.get_object,
+        product_candidate_geometries=(),
+    )
 
 
 @then("HiveSight records the Photo Analysis as no usable bees")
 def photo_analysis_no_usable_bees(slice_context: SliceContext) -> None:
-    assert slice_context.response.status_code == 201
+    assert slice_context.response.status_code == 200
     assert slice_context.response.json()["status"] == "no_usable_bees"
 
 
@@ -198,7 +203,7 @@ def completed_photo_analysis_unreviewed(slice_context: SliceContext) -> None:
     workspace_id, crop_id, _, _ = _completed_crop_with_two_bees(slice_context.client)
     inspection_photo_id = _inspection_photo_id_for_crop(slice_context.state, crop_id)
     response = _run_photo_analysis(slice_context.client, workspace_id, inspection_photo_id)
-    assert response.status_code == 201
+    assert response.status_code == 200
     assert response.json()["status"] == "completed"
     assert response.json()["review_status"] == "unreviewed"
     slice_context.workspace_id = workspace_id

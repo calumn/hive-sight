@@ -118,6 +118,17 @@ export type InspectionPhotoList = {
   photos: InspectionPhoto[];
 };
 
+export type VarroaPhotoAnalysis = {
+  photoAnalysisRunId: string;
+  inspectionPhotoId: string;
+  status: "running" | "completed" | "partial" | "failed" | "no_usable_bees";
+  reviewStatus: "unreviewed" | "accepted" | "rejected" | "inconclusive" | "needs_expert_review";
+  analysedBees: number;
+  failedBees: number;
+  beesWithLikelyVarroa: number;
+  caveat: string;
+};
+
 export type PhotoIntake = {
   inspectionPhoto: InspectionPhoto;
   analysisRun: {
@@ -1387,6 +1398,64 @@ export async function fetchInspectionPhotos({
   });
   await ensureOk(response);
   return parseInspectionPhotoList(await response.json());
+}
+
+export async function runVarroaPhotoAnalysis({
+  devUserId,
+  workspaceId,
+  inspectionPhotoId
+}: {
+  devUserId: string;
+  workspaceId: string;
+  inspectionPhotoId: string;
+}): Promise<VarroaPhotoAnalysis> {
+  const response = await fetch(
+    `${coreApiUrl}/v1/inspection-photos/${inspectionPhotoId}/varroa-photo-analyses`,
+    { method: "POST", headers: jsonHeaders(devUserId), body: JSON.stringify({ workspace_id: workspaceId }) }
+  );
+  await ensureOk(response);
+  return parseVarroaPhotoAnalysis(await response.json());
+}
+
+export async function fetchVarroaPhotoAnalyses({ devUserId, workspaceId, inspectionPhotoId }: {
+  devUserId: string; workspaceId: string; inspectionPhotoId: string;
+}): Promise<VarroaPhotoAnalysis[]> {
+  const params = new URLSearchParams({ workspace_id: workspaceId });
+  const response = await fetch(
+    `${coreApiUrl}/v1/inspection-photos/${inspectionPhotoId}/varroa-photo-analyses?${params}`,
+    { headers: devAuthHeaders(devUserId) }
+  );
+  await ensureOk(response);
+  const record = requireRecord(await response.json(), "Varroa Photo Analysis list response");
+  return requireArray(record.runs, "runs").map(parseVarroaPhotoAnalysis);
+}
+
+export async function runAllVarroaPhotoAnalyses({ devUserId, workspaceId, inspectionId }: {
+  devUserId: string; workspaceId: string; inspectionId: string;
+}): Promise<void> {
+  const response = await fetch(
+    `${coreApiUrl}/v1/inspections/${inspectionId}/varroa-photo-analyses/batch`,
+    { method: "POST", headers: jsonHeaders(devUserId), body: JSON.stringify({ workspace_id: workspaceId }) }
+  );
+  await ensureOk(response);
+}
+
+export async function reviewVarroaPhotoAnalysis({
+  devUserId, workspaceId, photoAnalysisRunId, reviewStatus, reviewNote
+}: {
+  devUserId: string;
+  workspaceId: string;
+  photoAnalysisRunId: string;
+  reviewStatus: VarroaPhotoAnalysis["reviewStatus"];
+  reviewNote?: string;
+}): Promise<VarroaPhotoAnalysis> {
+  const response = await fetch(`${coreApiUrl}/v1/varroa-photo-analyses/${photoAnalysisRunId}/review`, {
+    method: "PATCH",
+    headers: jsonHeaders(devUserId),
+    body: JSON.stringify({ workspace_id: workspaceId, review_status: reviewStatus, review_note: reviewNote })
+  });
+  await ensureOk(response);
+  return parseVarroaPhotoAnalysis(await response.json());
 }
 
 export async function uploadInspectionPhoto({
@@ -2902,6 +2971,28 @@ function parseInspectionPhoto(value: unknown): InspectionPhoto {
     uploadStatus: requireUploadStatus(photo.upload_status),
     uploadedByUserId: requireString(photo.uploaded_by_user_id, "uploaded_by_user_id"),
     uploadedAt: requireString(photo.uploaded_at, "uploaded_at")
+  };
+}
+
+function parseVarroaPhotoAnalysis(value: unknown): VarroaPhotoAnalysis {
+  const record = requireRecord(value, "Varroa Photo Analysis response");
+  const status = requireString(record.status, "status");
+  if (!["running", "completed", "partial", "failed", "no_usable_bees"].includes(status)) {
+    throw new Error("Core API response had an unexpected Varroa Photo Analysis status");
+  }
+  const reviewStatus = requireString(record.review_status, "review_status");
+  if (!["unreviewed", "accepted", "rejected", "inconclusive", "needs_expert_review"].includes(reviewStatus)) {
+    throw new Error("Core API response had an unexpected Varroa Photo Analysis review status");
+  }
+  return {
+    photoAnalysisRunId: requireString(record.photo_analysis_run_id, "photo_analysis_run_id"),
+    inspectionPhotoId: requireString(record.inspection_photo_id, "inspection_photo_id"),
+    status: status as VarroaPhotoAnalysis["status"],
+    reviewStatus: reviewStatus as VarroaPhotoAnalysis["reviewStatus"],
+    analysedBees: requireNumber(record.analysed_bees, "analysed_bees"),
+    failedBees: requireNumber(record.failed_bees, "failed_bees"),
+    beesWithLikelyVarroa: requireNumber(record.bees_with_likely_varroa, "bees_with_likely_varroa"),
+    caveat: requireString(record.caveat, "caveat")
   };
 }
 

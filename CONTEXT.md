@@ -109,8 +109,12 @@ A model-assisted count of likely visible Varroa detections across eligible compl
 _Avoid_: Visible Varroa Rate, Varroa Assessment, treatment trigger, or human-reviewed photo-visible evidence summary.
 
 **Varroa Photo Analysis**:
-A persisted, model-assisted evidence run for one Inspection Photo. It records the configured Varroa Detector adapter provenance, photo-level counts, per-bee analysis records, failed bee evaluations, and a separate human review status. `accepted` is the only review status eligible for later Advisor evidence; `unreviewed`, `rejected`, `inconclusive`, and `needs_expert_review` remain preserved but are not Advisor-ready.
+A persisted, model-assisted product-evidence run for one Varroa Assessment Inspection Photo. One `Analyze photo` action drives Bee Localisation, Bee Orientation, and Varroa Detection together, without creating or relying on a Training Crop. It records configured adapter provenance, photo-level counts, Inspection Photo Bee Evidence, failed bee evaluations, and a separate human review status. `accepted` is the only review status eligible for later Advisor evidence; `unreviewed`, `rejected`, `inconclusive`, and `needs_expert_review` remain preserved but are not Advisor-ready.
 _Avoid_: Visible Varroa Rate, whole-inspection assessment, treatment advice, or automatic no-Varroa truth.
+
+**Inspection Photo Bee Evidence**:
+A per-bee record produced by one Varroa Photo Analysis. It is a child of that analysis and retains a direct Inspection Photo reference, source geometry, model provenance, visible-mite markers, and any per-bee processing failure. It is product evidence, not a Training Crop or training annotation.
+_Avoid_: Bee Annotation when referring to model-curation evidence created in the Training Inspection Workflow.
 
 **Varroa Assessment**:
 An Inspection Intent for estimating visible Varroa evidence from inspection photos for beekeeper-facing support.

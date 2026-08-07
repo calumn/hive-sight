@@ -1,7 +1,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import Depends, FastAPI, Header, Request
+from fastapi import BackgroundTasks, Depends, FastAPI, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 
@@ -154,6 +154,7 @@ from hive_sight_core_api.models import (
     VarroaDetectorPreviewResponse,
     VarroaDetectorReadinessResponse,
     VarroaPhotoAnalysisCreateRequest,
+    VarroaPhotoAnalysisBatchResponse,
     VarroaPhotoAnalysisReviewRequest,
     VarroaPhotoAnalysisRunListResponse,
     VarroaPhotoAnalysisRunResponse,
@@ -1425,19 +1426,40 @@ def count_frame_mites(
 @app.post(
     "/v1/inspection-photos/{inspection_photo_id}/varroa-photo-analyses",
     response_model=VarroaPhotoAnalysisRunResponse,
-    status_code=201,
+    status_code=202,
 )
 def run_varroa_photo_analysis(
     inspection_photo_id: UUID,
     request: VarroaPhotoAnalysisCreateRequest,
+    background_tasks: BackgroundTasks,
     user: AuthenticatedUserDep,
     workflow: VarroaPhotoAnalysisWorkflowDep,
 ) -> VarroaPhotoAnalysisRunResponse:
-    return workflow.run_photo_analysis(
+    run = workflow.enqueue_photo_analysis(
         user=user,
         workspace_id=request.workspace_id,
         inspection_photo_id=inspection_photo_id,
     )
+    background_tasks.add_task(
+        workflow.process_photo_analysis_run,
+        request.workspace_id,
+        run.photo_analysis_run_id,
+    )
+    return run
+
+
+@app.post(
+    "/v1/inspections/{inspection_id}/varroa-photo-analyses/batch",
+    response_model=VarroaPhotoAnalysisBatchResponse,
+    status_code=201,
+)
+def run_all_varroa_photo_analyses(
+    inspection_id: UUID,
+    request: VarroaPhotoAnalysisCreateRequest,
+    user: AuthenticatedUserDep,
+    workflow: VarroaPhotoAnalysisWorkflowDep,
+) -> VarroaPhotoAnalysisBatchResponse:
+    return workflow.run_all_photo_analyses(user, request.workspace_id, inspection_id)
 
 
 @app.get(

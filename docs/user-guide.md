@@ -83,6 +83,18 @@ Use this when you want to upload frame photos and create Training Crops for bee 
 
 Training-data collection inspections show the Training Crop workflow. Varroa assessment inspections do not.
 
+## Analyse A Varroa Assessment Photo
+
+Use this when you want HiveSight to inspect a photographed frame for likely visible Varroa.
+
+1. Select or create an Inspection with intent `Varroa assessment`.
+2. Upload one or more frame photos.
+3. Select `Analyze photo` for a photo you want to inspect, or `Analyze all photos` to process all eligible unanalysed photos in turn.
+4. HiveSight records a running photo analysis, then reports the number of analysed eligible bees and bees with likely visible Varroa.
+5. Review the result. You can mark a completed or partial analysis as `Accepted`, `Inconclusive`, `Rejected`, or `Needs expert review`. A note is required unless you accept it.
+
+This is model-assisted development evidence, not treatment advice or a statistically valid hive-level mite rate. An accepted result becomes eligible for later Advisor evidence, but this release does not contact HiveSight Advisor or recommend treatment.
+
 ## Create Training Crops
 
 Use this when you want to cut a large frame photo into smaller annotation areas.

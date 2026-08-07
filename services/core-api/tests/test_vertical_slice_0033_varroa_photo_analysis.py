@@ -15,6 +15,7 @@ from hive_sight_core_api.dependencies import (
     get_dev_state,
     get_varroa_photo_analysis_workflow,
 )
+from hive_sight_core_api.models import InspectionIntent
 from hive_sight_core_api.main import app
 from hive_sight_core_api.varroa_photo_analysis_workflow import VarroaPhotoAnalysisWorkflow
 from hive_sight_core_api.varroa_review_workflow import (
@@ -35,12 +36,12 @@ def test_varroa_photo_analysis_persists_run_and_per_bee_evidence(tmp_path: Path)
     )
     client = TestClient(app)
     try:
-        workspace_id, crop_id, first_bee_id, second_bee_id = _completed_crop_with_two_bees(client)
+        workspace_id, crop_id, _, _ = _completed_crop_with_two_bees(client)
         inspection_photo_id = _inspection_photo_id_for_crop(state, crop_id)
 
         response = _run_photo_analysis(client, workspace_id, inspection_photo_id)
 
-        assert response.status_code == 201
+        assert response.status_code == 200
         body = response.json()
         assert body["status"] == "partial"
         assert body["review_status"] == "unreviewed"
@@ -55,10 +56,9 @@ def test_varroa_photo_analysis_persists_run_and_per_bee_evidence(tmp_path: Path)
         assert body["command_contract_version"] == "varroa_detector_command_v1"
         assert body["advisor_evidence_eligible"] is False
         assert "incomplete" in body["caveat"]
-        assert [result["bee_annotation_id"] for result in body["bee_results"]] == [
-            first_bee_id,
-            second_bee_id,
-        ]
+        assert [result["bee_annotation_id"] for result in body["bee_results"]] == [None, None]
+        assert all(result["training_crop_id"] is None for result in body["bee_results"])
+        assert all(result["inspection_photo_id"] == inspection_photo_id for result in body["bee_results"])
         assert body["bee_results"][0]["status"] == "failed"
         assert body["bee_results"][0]["raw_error_payload"] is not None
         assert body["bee_results"][1]["status"] == "completed"
@@ -77,7 +77,55 @@ def test_varroa_photo_analysis_persists_run_and_per_bee_evidence(tmp_path: Path)
         app.dependency_overrides.clear()
 
 
-def test_rerunning_photo_analysis_keeps_separate_evidence_runs(tmp_path: Path):
+def test_product_photo_analysis_does_not_require_a_training_crop(tmp_path: Path):
+    state = build_dev_state(dataset_export_root=tmp_path / "exports")
+    app.dependency_overrides[get_dev_state] = lambda: state
+    client = TestClient(app)
+    try:
+        workspace_id, crop_id, _, _ = _completed_crop_with_two_bees(client)
+        inspection_photo_id = _inspection_photo_id_for_crop(state, crop_id)
+        response = _run_photo_analysis(client, workspace_id, inspection_photo_id)
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["status"] == "completed"
+        assert body["eligible_bees"] == 2
+        assert body["analysed_bees"] == 2
+        assert body["bees_with_likely_varroa"] == 2
+        assert body["bee_results"][0]["training_crop_id"] is None
+        assert body["bee_results"][0]["inspection_photo_id"] == inspection_photo_id
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_batch_analysis_skips_a_photo_with_a_produced_result(tmp_path: Path):
+    state = build_dev_state(dataset_export_root=tmp_path / "exports")
+    app.dependency_overrides[get_dev_state] = lambda: state
+    client = TestClient(app)
+    try:
+        workspace_id, crop_id, _, _ = _completed_crop_with_two_bees(client)
+        inspection_photo_id = _inspection_photo_id_for_crop(state, crop_id)
+        first = _run_photo_analysis(client, workspace_id, inspection_photo_id)
+        inspection_id = first.json()["inspection_id"]
+        state.store.inspections[UUID(inspection_id)] = state.store.inspections[
+            UUID(inspection_id)
+        ].model_copy(update={"intent": InspectionIntent.varroa_assessment})
+
+        batch = client.post(
+            f"/v1/inspections/{inspection_id}/varroa-photo-analyses/batch",
+            json={"workspace_id": workspace_id},
+            headers=_headers(),
+        )
+
+        assert batch.status_code == 201
+        assert batch.json()["status"] == "completed"
+        assert batch.json()["attempted_photo_ids"] == []
+        assert batch.json()["skipped_photo_ids"] == [inspection_photo_id]
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_produced_photo_analysis_cannot_be_started_again(tmp_path: Path):
     state = build_dev_state(dataset_export_root=tmp_path / "exports")
     app.dependency_overrides[get_dev_state] = lambda: state
     client = TestClient(app)
@@ -88,15 +136,15 @@ def test_rerunning_photo_analysis_keeps_separate_evidence_runs(tmp_path: Path):
         first = _run_photo_analysis(client, workspace_id, inspection_photo_id)
         second = _run_photo_analysis(client, workspace_id, inspection_photo_id)
 
-        assert first.status_code == 201
-        assert second.status_code == 201
-        assert first.json()["photo_analysis_run_id"] != second.json()["photo_analysis_run_id"]
+        assert first.status_code == 200
+        assert second.status_code == 409
+        assert second.json()["detail"]["code"] == "photo_analysis_already_produced"
         listed = client.get(
             f"/v1/inspection-photos/{inspection_photo_id}/varroa-photo-analyses"
             f"?workspace_id={workspace_id}",
             headers=_headers(),
         ).json()
-        assert len(listed["runs"]) == 2
+        assert len(listed["runs"]) == 1
     finally:
         app.dependency_overrides.clear()
 
@@ -106,14 +154,13 @@ def test_no_usable_bees_photo_analysis_cannot_be_accepted(tmp_path: Path):
     app.dependency_overrides[get_dev_state] = lambda: state
     client = TestClient(app)
     try:
-        workspace_id, crop_id, first_bee_id, _ = _completed_crop_with_two_bees(
-            client,
-            second_annotation_type="partial_visible_bee",
-            complete_crop=False,
-        )
-        _patch_ellipse(client, workspace_id, first_bee_id, annotation_type="partial_visible_bee")
-        assert _complete_crop(client, workspace_id, crop_id).status_code == 200
+        workspace_id, crop_id, _, _ = _completed_crop_with_two_bees(client)
         inspection_photo_id = _inspection_photo_id_for_crop(state, crop_id)
+        app.dependency_overrides[get_varroa_photo_analysis_workflow] = lambda: VarroaPhotoAnalysisWorkflow(
+            store=state.store,
+            image_loader=state.object_storage.get_object,
+            product_candidate_geometries=(),
+        )
 
         created = _run_photo_analysis(client, workspace_id, inspection_photo_id)
         accepted = _review_photo_analysis(
@@ -130,7 +177,7 @@ def test_no_usable_bees_photo_analysis_cannot_be_accepted(tmp_path: Path):
             "No usable bees in the photo.",
         )
 
-        assert created.status_code == 201
+        assert created.status_code == 200
         assert created.json()["status"] == "no_usable_bees"
         assert created.json()["analysed_bees"] == 0
         assert accepted.status_code == 409
@@ -177,12 +224,49 @@ def test_only_accepted_photo_analysis_is_advisor_eligible(tmp_path: Path):
         app.dependency_overrides.clear()
 
 
+def test_non_accepted_photo_analysis_review_requires_a_note(tmp_path: Path):
+    state = build_dev_state(dataset_export_root=tmp_path / "exports")
+    app.dependency_overrides[get_dev_state] = lambda: state
+    client = TestClient(app)
+    try:
+        workspace_id, crop_id, _, _ = _completed_crop_with_two_bees(client)
+        inspection_photo_id = _inspection_photo_id_for_crop(state, crop_id)
+        created = _run_photo_analysis(client, workspace_id, inspection_photo_id).json()
+
+        response = _review_photo_analysis(
+            client, workspace_id, created["photo_analysis_run_id"], "needs_expert_review"
+        )
+
+        assert response.status_code == 422
+        assert response.json()["detail"]["code"] == "photo_analysis_review_note_required"
+    finally:
+        app.dependency_overrides.clear()
+
+
 def _run_photo_analysis(client: TestClient, workspace_id: str, inspection_photo_id: str):
-    return client.post(
+    started = client.post(
         f"/v1/inspection-photos/{inspection_photo_id}/varroa-photo-analyses",
         json={"workspace_id": workspace_id},
         headers=_headers(),
     )
+    if started.status_code != 202:
+        return started
+    completed = client.get(
+        f"/v1/inspection-photos/{inspection_photo_id}/varroa-photo-analyses"
+        f"?workspace_id={workspace_id}",
+        headers=_headers(),
+    )
+    return _CompletedRunResponse(completed.json()["runs"][-1])
+
+
+class _CompletedRunResponse:
+    status_code = 200
+
+    def __init__(self, payload: dict):
+        self._payload = payload
+
+    def json(self) -> dict:
+        return self._payload
 
 
 def _review_photo_analysis(

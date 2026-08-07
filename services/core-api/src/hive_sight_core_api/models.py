@@ -1608,6 +1608,12 @@ class VarroaPhotoAnalysisStatus(StrEnum):
     no_usable_bees = "no_usable_bees"
 
 
+class VarroaPhotoAnalysisBatchStatus(StrEnum):
+    completed = "completed"
+    completed_with_issues = "completed_with_issues"
+    failed = "failed"
+
+
 class VarroaPhotoAnalysisReviewStatus(StrEnum):
     unreviewed = "unreviewed"
     accepted = "accepted"
@@ -1634,8 +1640,10 @@ class VarroaPhotoAnalysisReviewRequest(BaseModel):
 class VarroaPhotoAnalysisBeeResultResponse(BaseModel):
     photo_analysis_bee_result_id: UUID
     photo_analysis_run_id: UUID
-    training_crop_id: UUID
-    bee_annotation_id: UUID
+    training_crop_id: UUID | None = None
+    bee_annotation_id: UUID | None = None
+    inspection_photo_id: UUID | None = None
+    source_geometry_snapshot: dict[str, object] | None = None
     status: VarroaPhotoAnalysisBeeStatus
     mites_found: int
     detections: list[LikelyVarroaDetectionResponse] = Field(default_factory=list)
@@ -1666,6 +1674,8 @@ class VarroaPhotoAnalysisRunResponse(BaseModel):
     analysed_bees: int
     failed_bees: int
     mites_found: int
+    bees_with_likely_varroa: int = 0
+    current_stage: str | None = None
     mite_ratio_basis: str = "analysed_eligible_bees"
     adapter_type: str
     adapter_version: str
@@ -1684,6 +1694,18 @@ class VarroaPhotoAnalysisRunListResponse(BaseModel):
     workspace_id: UUID
     inspection_photo_id: UUID
     runs: list[VarroaPhotoAnalysisRunResponse]
+
+
+class VarroaPhotoAnalysisBatchResponse(BaseModel):
+    photo_analysis_batch_id: UUID
+    workspace_id: UUID
+    inspection_id: UUID
+    status: VarroaPhotoAnalysisBatchStatus
+    attempted_photo_ids: list[UUID] = Field(default_factory=list)
+    skipped_photo_ids: list[UUID] = Field(default_factory=list)
+    runs: list[VarroaPhotoAnalysisRunResponse] = Field(default_factory=list)
+    started_at: datetime
+    completed_at: datetime | None = None
 
 
 class VarroaDetectorReadinessResponse(BaseModel):

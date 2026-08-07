@@ -76,6 +76,7 @@ from hive_sight_core_api.models import (
     TreatmentRecommendationResponse,
     UploadStatus,
     VarroaPhotoAnalysisBeeResultResponse,
+    VarroaPhotoAnalysisBatchResponse,
     VarroaPhotoAnalysisRunResponse,
     VarroaReviewOutcomeResponse,
     WorkspaceDataUseAgreementAcceptanceResponse,
@@ -212,6 +213,9 @@ class InMemoryProductDataStore:
         default_factory=dict
     )
     varroa_photo_analysis_bee_results: dict[UUID, VarroaPhotoAnalysisBeeResultResponse] = field(
+        default_factory=dict
+    )
+    varroa_photo_analysis_batches: dict[UUID, VarroaPhotoAnalysisBatchResponse] = field(
         default_factory=dict
     )
     review_queue_items: dict[UUID, ReviewQueueItemRecord] = field(default_factory=dict)
@@ -1113,6 +1117,12 @@ class InMemoryProductDataStore:
     ) -> VarroaPhotoAnalysisBeeResultResponse:
         self.varroa_photo_analysis_bee_results[result.photo_analysis_bee_result_id] = result
         return result
+
+    def save_varroa_photo_analysis_batch(
+        self, batch: VarroaPhotoAnalysisBatchResponse
+    ) -> VarroaPhotoAnalysisBatchResponse:
+        self.varroa_photo_analysis_batches[batch.photo_analysis_batch_id] = batch
+        return batch
 
     def get_varroa_photo_analysis_run(
         self,

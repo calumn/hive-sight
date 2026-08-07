@@ -58,8 +58,8 @@ class HeadUpNormalizedCropImage:
 class VarroaDetectorRequest:
     workspace_id: UUID
     inspection_photo_id: UUID
-    training_crop_id: UUID
-    bee_annotation_id: UUID
+    training_crop_id: UUID | None
+    bee_annotation_id: UUID | None
     head_up_normalized_image_bytes: bytes
     image_width_px: int
     image_height_px: int

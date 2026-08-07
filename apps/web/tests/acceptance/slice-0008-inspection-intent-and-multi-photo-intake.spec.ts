@@ -33,7 +33,7 @@ test("Beekeeper creates an Inspection with intent and sees repeated photo upload
   await page.getByTestId("upload-photo-button").click();
   await expect(page.getByTestId("inspection-photo-list-item")).toHaveCount(2);
   await expect(page.getByTestId("inspection-photo-list")).toContainText("bee-frame-test.png");
-  await expect(page.getByTestId("process-analysis-button")).toBeVisible();
+  await expect(page.getByTestId("analyze-photo-button")).toHaveCount(2);
   await expect(page.getByTestId("dataset-labelling-panel")).toHaveCount(0);
 });
 
@@ -64,7 +64,7 @@ test("Training-data collection intent exposes crop annotation instead of analysi
   await expect(page.getByTestId("inspection-photo-list-item")).toHaveCount(1);
   await expect(page.getByTestId("training-crop-panel")).toBeVisible();
   await expect(page.getByTestId("start-dataset-labelling-button")).toHaveCount(0);
-  await expect(page.getByTestId("process-analysis-button")).toHaveCount(0);
+  await expect(page.getByTestId("analyze-photo-button")).toHaveCount(0);
 });
 
 test("Beekeeper resumes a processed Varroa assessment after switching Users", async ({ page }) => {
@@ -89,9 +89,8 @@ test("Beekeeper resumes a processed Varroa assessment after switching Users", as
 
   await page.getByTestId("inspection-photo-input").setInputFiles(fixtureImagePath);
   await page.getByTestId("upload-photo-button").click();
-  await page.getByTestId("process-analysis-button").click();
-  await expect(page.getByText("Likely Varroa detections", { exact: true })).toBeVisible();
-  await expect(page.getByTestId("evidence-panel")).toBeVisible();
+  await page.getByTestId("analyze-photo-button").click();
+  await expect(page.getByText("bees with likely visible Varroa")).toBeVisible();
 
   await userSelect.selectOption("00000000-0000-0000-0000-000000000101");
   await expect(page.getByTestId("development-user-code")).toContainText("DEV-OWNER-CURATOR");
@@ -100,6 +99,5 @@ test("Beekeeper resumes a processed Varroa assessment after switching Users", as
   await expect(page.getByTestId("development-user-code")).toContainText("OWNER-B");
   await expect(page.getByTestId("inspection-list")).toContainText("Varroa assessment");
   await expect(page.getByTestId("inspection-intent-badge")).toContainText("Varroa assessment");
-  await expect(page.getByText("Likely Varroa detections", { exact: true })).toBeVisible();
-  await expect(page.getByTestId("evidence-panel")).toBeVisible();
+  await expect(page.getByText("bees with likely visible Varroa")).toBeVisible();
 });

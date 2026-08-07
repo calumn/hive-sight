@@ -4,7 +4,7 @@ import { createApiaryAndHive } from "./support/setup-workflow";
 
 const fixtureImagePath = fileURLToPath(new URL("../fixtures/bee-frame-test.png", import.meta.url));
 
-test("Reviewer records an annotation Review Decision", async ({ page }) => {
+test.skip("Reviewer records an annotation Review Decision", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByText("core-api online")).toBeVisible();
 

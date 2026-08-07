@@ -66,6 +66,7 @@ import {
   fetchHiveInspections,
   fetchInspectionAnalysisRuns,
   fetchInspectionPhotos,
+  fetchVarroaPhotoAnalyses,
   fetchInspectionPhotoObjectUrl,
   fetchBenchmarkEvaluationReadiness,
   fetchBenchmarkEvaluations,
@@ -88,6 +89,9 @@ import {
   processAnalysisRun,
   requestTrainingCropReview,
   runFrameMiteCount,
+  runVarroaPhotoAnalysis,
+  runAllVarroaPhotoAnalyses,
+  reviewVarroaPhotoAnalysis,
   runVarroaDetectorPreview,
   saveVarroaReviewOutcome,
   startDatasetLabellingSession,
@@ -103,6 +107,7 @@ import {
   uploadInspectionPhoto,
   type AnalysisEvidence,
   type AnalysisRunDetail,
+  type VarroaPhotoAnalysis,
   type Annotation,
   type Apiary,
   type ApiError,
@@ -219,6 +224,7 @@ export function App() {
   const [inspection, setInspection] = useState<Inspection | null>(null);
   const [inspectionPhotos, setInspectionPhotos] = useState<InspectionPhoto[]>([]);
   const [analysisDetail, setAnalysisDetail] = useState<AnalysisRunDetail | null>(null);
+  const [photoAnalyses, setPhotoAnalyses] = useState<Record<string, VarroaPhotoAnalysis>>({});
   const [analysisEvidence, setAnalysisEvidence] = useState<AnalysisEvidence | null>(null);
   const [evidenceImageUrl, setEvidenceImageUrl] = useState<string | null>(null);
   const [labellingEvidence, setLabellingEvidence] = useState<DatasetLabellingEvidence | null>(null);
@@ -727,6 +733,17 @@ export function App() {
     });
     setInspection(listing.inspection);
     setInspectionPhotos(listing.photos);
+    if (listing.inspection.intent === "varroa_assessment") {
+      const entries = await Promise.all(
+        listing.photos.map(async (photo) => {
+          const runs = await fetchVarroaPhotoAnalyses({
+            devUserId, workspaceId: session.workspaceId, inspectionPhotoId: photo.inspectionPhotoId
+          });
+          return [photo.inspectionPhotoId, runs.at(-1)] as const;
+        })
+      );
+      setPhotoAnalyses(Object.fromEntries(entries.filter((entry) => entry[1])) as Record<string, VarroaPhotoAnalysis>);
+    }
   }
 
   async function onProcessAnalysis() {
@@ -768,6 +785,46 @@ export function App() {
       if (actionState.kind === "accepted") {
         setActionState({ kind: "accepted", intake: actionState.intake });
       }
+    });
+  }
+
+  async function onAnalyzePhoto(inspectionPhotoId: string) {
+    if (!session) return;
+    await runAction("Analysing photo", async () => {
+      const analysis = await runVarroaPhotoAnalysis({
+        devUserId, workspaceId: session.workspaceId, inspectionPhotoId
+      });
+      setPhotoAnalyses((current) => ({ ...current, [inspectionPhotoId]: analysis }));
+      window.setTimeout(() => {
+        void refreshInspectionPhotos();
+      }, 750);
+    });
+  }
+
+  async function onAnalyzeAllPhotos() {
+    if (!session || !inspection) return;
+    await runAction("Analysing photos", async () => {
+      await runAllVarroaPhotoAnalyses({
+        devUserId, workspaceId: session.workspaceId, inspectionId: inspection.inspectionId
+      });
+      await refreshInspectionPhotos();
+    });
+  }
+
+  async function onReviewPhotoAnalysis(
+    inspectionPhotoId: string,
+    reviewStatus: VarroaPhotoAnalysis["reviewStatus"],
+    reviewNote?: string
+  ) {
+    if (!session) return;
+    const analysis = photoAnalyses[inspectionPhotoId];
+    if (!analysis) return;
+    await runAction("Saving photo analysis review", async () => {
+      const reviewed = await reviewVarroaPhotoAnalysis({
+        devUserId, workspaceId: session.workspaceId,
+        photoAnalysisRunId: analysis.photoAnalysisRunId, reviewStatus, reviewNote
+      });
+      setPhotoAnalyses((current) => ({ ...current, [inspectionPhotoId]: reviewed }));
     });
   }
 
@@ -1432,11 +1489,18 @@ export function App() {
             </form>
 
             {inspection ? (
-              <InspectionPhotoListPanel photos={inspectionPhotos} intent={inspection.intent} />
+              <InspectionPhotoListPanel
+                photos={inspectionPhotos}
+                intent={inspection.intent}
+                analyses={photoAnalyses}
+                onAnalyzePhoto={onAnalyzePhoto}
+                onAnalyzeAllPhotos={onAnalyzeAllPhotos}
+                onReviewPhotoAnalysis={onReviewPhotoAnalysis}
+              />
             ) : null}
 
             <Outcome state={actionState} analysisDetail={analysisDetail} />
-            {isVarroaAssessment && (actionState.kind === "accepted" || analysisDetail) ? (
+            {!isVarroaAssessment && (actionState.kind === "accepted" || analysisDetail) ? (
               <AnalysisPanel
                 analysisRunId={
                   actionState.kind === "accepted"
@@ -1583,10 +1647,22 @@ function RecordBadge({ value }: { value: string | undefined }) {
 
 function InspectionPhotoListPanel({
   photos,
-  intent
+  intent,
+  analyses,
+  onAnalyzePhoto,
+  onAnalyzeAllPhotos,
+  onReviewPhotoAnalysis
 }: {
   photos: InspectionPhoto[];
   intent: InspectionIntent;
+  analyses: Record<string, VarroaPhotoAnalysis>;
+  onAnalyzePhoto: (inspectionPhotoId: string) => void;
+  onAnalyzeAllPhotos: () => void;
+  onReviewPhotoAnalysis: (
+    inspectionPhotoId: string,
+    reviewStatus: VarroaPhotoAnalysis["reviewStatus"],
+    reviewNote?: string
+  ) => void;
 }) {
   return (
     <section
@@ -1598,6 +1674,11 @@ function InspectionPhotoListPanel({
         <PanelHeading icon={<Image size={20} />} title="Inspection photos" />
         <span className="analysis-status status-queued">{formatInspectionIntent(intent)}</span>
       </div>
+      {intent === "varroa_assessment" ? (
+        <button type="button" onClick={onAnalyzeAllPhotos} disabled={photos.length === 0}>
+          Analyze all photos
+        </button>
+      ) : null}
       {photos.length === 0 ? (
         <p className="analysis-caveat">No photos uploaded for this Inspection yet.</p>
       ) : (
@@ -1611,6 +1692,24 @@ function InspectionPhotoListPanel({
                   {photo.uploadStatus} / {Math.round(photo.sizeBytes / 1024)} KB /{" "}
                   {new Date(photo.uploadedAt).toLocaleString()}
                 </p>
+                {intent === "varroa_assessment" ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => onAnalyzePhoto(photo.inspectionPhotoId)}
+                      disabled={Boolean(analyses[photo.inspectionPhotoId])}
+                      data-testid="analyze-photo-button"
+                    >
+                      {analyses[photo.inspectionPhotoId] ? "Already analysed" : "Analyze photo"}
+                    </button>
+                    {analyses[photo.inspectionPhotoId] ? (
+                      <PhotoAnalysisSummary
+                        analysis={analyses[photo.inspectionPhotoId]}
+                        onReview={(status, note) => onReviewPhotoAnalysis(photo.inspectionPhotoId, status, note)}
+                      />
+                    ) : null}
+                  </>
+                ) : null}
               </div>
             </li>
           ))}
@@ -1618,6 +1717,81 @@ function InspectionPhotoListPanel({
       )}
     </section>
   );
+}
+
+function PhotoAnalysisSummary({
+  analysis,
+  onReview
+}: {
+  analysis: VarroaPhotoAnalysis;
+  onReview: (status: VarroaPhotoAnalysis["reviewStatus"], note?: string) => void;
+}) {
+  const [reviewStatus, setReviewStatus] = useState<VarroaPhotoAnalysis["reviewStatus"]>(
+    analysis.reviewStatus
+  );
+  const [reviewNote, setReviewNote] = useState(analysis.reviewStatus === "accepted" ? "" : "");
+  const acceptanceDisabled = ["failed", "no_usable_bees"].includes(analysis.status);
+  const needsNote = reviewStatus !== "accepted";
+
+  useEffect(() => {
+    setReviewStatus(analysis.reviewStatus);
+    if (analysis.reviewStatus === "accepted") {
+      setReviewNote("");
+    }
+  }, [analysis.photoAnalysisRunId, analysis.reviewStatus]);
+
+  return (
+    <div className="analysis-summary" aria-label="Photo analysis result">
+      <p>
+        <strong>{formatPhotoAnalysisStatus(analysis.status)}</strong>
+        {" / "}
+        {analysis.beesWithLikelyVarroa} bees with likely visible Varroa / {analysis.analysedBees}
+        {" analysed eligible bees"}
+      </p>
+      <p className="analysis-caveat">{analysis.caveat}</p>
+      <label>
+        Review outcome
+        <select
+          value={reviewStatus}
+          onChange={(event) => setReviewStatus(event.target.value as VarroaPhotoAnalysis["reviewStatus"])}
+        >
+          <option value="unreviewed">Unreviewed</option>
+          <option value="accepted" disabled={acceptanceDisabled}>Accepted</option>
+          <option value="inconclusive">Inconclusive</option>
+          <option value="rejected">Rejected</option>
+          <option value="needs_expert_review">Needs expert review</option>
+        </select>
+      </label>
+      {needsNote ? (
+        <label>
+          Review note
+          <input
+            value={reviewNote}
+            onChange={(event) => setReviewNote(event.target.value)}
+            placeholder="Required unless accepted"
+          />
+        </label>
+      ) : null}
+      <button
+        type="button"
+        onClick={() => onReview(reviewStatus, reviewStatus === "accepted" ? undefined : reviewNote)}
+        disabled={reviewStatus === "unreviewed" || (needsNote && !reviewNote.trim())}
+      >
+        Save review
+      </button>
+    </div>
+  );
+}
+
+function formatPhotoAnalysisStatus(status: VarroaPhotoAnalysis["status"]) {
+  const labels: Record<VarroaPhotoAnalysis["status"], string> = {
+    running: "Analysing photo",
+    completed: "Analysis completed",
+    partial: "Analysis completed with caveats",
+    failed: "Photo could not be analysed",
+    no_usable_bees: "No bees found"
+  };
+  return labels[status];
 }
 
 function formatInspectionIntent(intent: InspectionIntent) {

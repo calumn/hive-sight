@@ -40,6 +40,7 @@ from hive_sight_core_api.models import (
     TreatmentEvidenceChainResponse,
     TreatmentRecommendationResponse,
     VarroaPhotoAnalysisBeeResultResponse,
+    VarroaPhotoAnalysisBatchResponse,
     VarroaPhotoAnalysisRunResponse,
     VarroaReviewOutcomeResponse,
 )
@@ -73,6 +74,7 @@ MODEL_RECORD_TYPES: dict[str, type] = {
     "hive_treatment_course": HiveTreatmentCourseResponse,
     "varroa_photo_analysis_run": VarroaPhotoAnalysisRunResponse,
     "varroa_photo_analysis_bee_result": VarroaPhotoAnalysisBeeResultResponse,
+    "varroa_photo_analysis_batch": VarroaPhotoAnalysisBatchResponse,
 }
 
 
@@ -244,6 +246,11 @@ class PostgresProductDataStore(InMemoryProductDataStore):
             response.photo_analysis_bee_result_id,
             response,
         )
+        return response
+
+    def save_varroa_photo_analysis_batch(self, batch: VarroaPhotoAnalysisBatchResponse):
+        response = super().save_varroa_photo_analysis_batch(batch)
+        self._persist_model("varroa_photo_analysis_batch", response.photo_analysis_batch_id, response)
         return response
 
     def save_treatment_evidence_chain(self, chain: TreatmentEvidenceChainResponse):
@@ -508,6 +515,8 @@ class PostgresProductDataStore(InMemoryProductDataStore):
             self.varroa_photo_analysis_runs[model.photo_analysis_run_id] = model
         elif record_type == "varroa_photo_analysis_bee_result":
             self.varroa_photo_analysis_bee_results[model.photo_analysis_bee_result_id] = model
+        elif record_type == "varroa_photo_analysis_batch":
+            self.varroa_photo_analysis_batches[model.photo_analysis_batch_id] = model
 
     def _persist_core_identity(self, user_id: UUID, workspace_id: UUID) -> None:
         self._persist_payload("user", user_id, {"user_id": str(user_id)})
