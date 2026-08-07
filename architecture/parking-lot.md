@@ -11,6 +11,45 @@ Use this when something is out of scope now but expected later. Prefer ADRs or t
 - `closed`: no longer needed.
 - `superseded`: replaced by another parked item or decision.
 
+## PARK-0016: Product Photo Analysis Confidence Policy
+
+Status: parked
+Date parked: 2026-08-07
+Source: Slice 0034 grilling
+Area: model evidence, product policy
+
+Context:
+
+Slice 0034 treats a model-produced low-confidence orientation as usable evidence, while an absent or unusable orientation is a per-bee failure. The same question exists independently for Bee Localisation, Bee Orientation, and Varroa Detection confidence.
+
+Revisit trigger:
+
+Before replacing the deterministic product-photo adapter with real model adapters, defining user-facing confidence/caveat language, or making a statistical claim from Photo Analysis.
+
+## PARK-0017: Product Photo Analysis Follow-On Workflow
+
+Status: parked
+Date parked: 2026-08-07
+Source: Slice 0034 grilling
+Area: beekeeper workflow, evidence governance
+
+Context:
+
+Slice 0034 deliberately proves one-photo analysis and review without pretending it answers the wider inspection, feedback, or support workflow.
+
+Follow-on work:
+
+- Reanalyse an Inspection Photo using a newer model as a new immutable Photo Analysis and evidence set.
+- Define product handling, denominator policy, and user explanation for Partial Visible Bees.
+- Let a beekeeper identify suspect bee/orientation/mite decisions and submit corrective feedback, with an expert-review queue and managed response.
+- Define logical photo deletion, retention, and the relationship to retained analysis evidence.
+- Decide whether and how accepted beekeeper product evidence may be reused for model training, detector validation, and alcohol-wash/sugar-roll calibration.
+- Add support/admin impersonation with narrow authority, restrictions, and audit history.
+
+Revisit trigger:
+
+After the real adapter replaces the deterministic Slice 0034 adapter, or when beekeepers begin reporting evidence they believe is wrong.
+
 ## PARK-0001: UI-Level Gherkin Harness
 
 Status: promoted
