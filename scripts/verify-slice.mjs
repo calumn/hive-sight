@@ -8,9 +8,9 @@ const reportPath = resolve(repoRoot, "reports/slice-verification/latest.md");
 
 const checks = [
   {
-    name: "Shared Gherkin pilot - Core API",
+    name: "Acceptance catalogue - Core API",
     command:
-      "./.venv/bin/python -m pytest -p no:cacheprovider tests/test_visible_varroa_review_outcome_api_bdd.py",
+      "./.venv/bin/python -m pytest -p no:cacheprovider tests/test_visible_varroa_review_outcome_api_bdd.py tests/test_advisor_treatment_recommendation_api_bdd.py",
     cwd: "services/core-api",
     args: [
       "./.venv/bin/python",
@@ -18,17 +18,19 @@ const checks = [
       "pytest",
       "-p",
       "no:cacheprovider",
-      "tests/test_visible_varroa_review_outcome_api_bdd.py"
+      "tests/test_visible_varroa_review_outcome_api_bdd.py",
+      "tests/test_advisor_treatment_recommendation_api_bdd.py"
     ],
-    note: "Executes the canonical Varroa review feature through the Core API binding."
+    note:
+      "Executes canonical acceptance-catalogue features that have a Core API binding."
   },
   {
-    name: "Shared Gherkin pilot - Web UI",
+    name: "Acceptance catalogue - Web UI",
     command: "pnpm --filter @hive-sight/web test:bdd",
     cwd: ".",
     args: ["pnpm", "--filter", "@hive-sight/web", "test:bdd"],
     note:
-      "Executes the canonical Varroa review feature through playwright-bdd and the Web UI binding."
+      "Executes canonical shared features that have a Web UI binding through playwright-bdd."
   },
   {
     name: "Core API tests",

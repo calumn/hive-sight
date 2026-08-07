@@ -35,10 +35,14 @@ from hive_sight_core_api.models import (
     TreatmentRecommendationStatus,
 )
 
-FEATURES_DIR = Path(__file__).parent / "features"
-
 scenarios(
-    str(FEATURES_DIR / "vertical_slice_0029_5_advisor_treatment_recommendation_intake.feature")
+    str(
+        Path(__file__).parents[3]
+        / "acceptance"
+        / "features"
+        / "treatment"
+        / "advisor-treatment-recommendation-intake.feature"
+    )
 )
 
 

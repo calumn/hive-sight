@@ -730,3 +730,23 @@ AI contribution:
 Human judgment still required:
 
 - Decide whether HiveSight's own Slice 0029 Varroa context API should later rename its optional `jurisdiction_id` context field to `jurisdiction_code`; that would be a separate HiveSight API-surface decision.
+
+### 2026-08-06 First Capability-Based Acceptance Catalogue Migration
+
+Human-confirmed direction:
+
+- Complete the shareable Advisor alignment context and proceed with acceptance-catalogue migration.
+- Start with current, cross-project-relevant behaviour rather than attempting a bulk move of historical slice tests.
+
+AI contribution:
+
+- Migrated Advisor Treatment Recommendation Intake And Acceptance from `services/core-api/tests/features/vertical_slice_0029_5_advisor_treatment_recommendation_intake.feature` to `acceptance/features/treatment/advisor-treatment-recommendation-intake.feature`.
+- Renamed the Core API binding to `services/core-api/tests/test_advisor_treatment_recommendation_api_bdd.py`.
+- Added seam tags so catalogue features declare whether they are currently covered by `@api`, `@web`, or both.
+- Updated `pnpm verify:slice` reporting from pilot wording to acceptance-catalogue wording and included the migrated treatment feature in the dedicated Core API catalogue check.
+- Expanded the HiveSight Advisor alignment note with the concrete first migration and seam-tag convention.
+
+Human judgment still required:
+
+- Share the alignment note with HiveSight Advisor and decide which Advisor-side treatment behaviour should be migrated into their own catalogue first.
+- Decide the next HiveSight capability migration after seeing whether the treatment feature's API-only catalogue placement feels natural.

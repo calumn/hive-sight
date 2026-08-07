@@ -1,17 +1,19 @@
 # HiveSight Advisor Alignment: Dual-Seam Acceptance Specification Pattern
 
 Date: 2026-08-06
-Source: HiveSight Slice 0030 Dual-Seam Acceptance Specification Pilot
+Source: HiveSight Slice 0030 Dual-Seam Acceptance Specification Pilot and first capability-catalogue migration
 
 ## Purpose
 
-HiveSight has proved a narrow acceptance-testing pattern that may be useful for HiveSight Advisor as the two projects begin sharing treatment-advice workflows.
+HiveSight has proved a narrow acceptance-testing pattern and has started migrating active behaviours out of slice-history feature files into a living capability catalogue. This may be useful for HiveSight Advisor as the two projects begin sharing treatment-advice workflows.
 
 The goal is not to make every test Gherkin, and not to force every scenario through every client. The goal is to keep important cross-client behaviours described once in client-neutral domain language, then execute that same behaviour through whichever technical seams matter.
 
 ## What HiveSight Implemented
 
-HiveSight now has one canonical feature file:
+HiveSight now has canonical feature files under `acceptance/features/<capability>/...`.
+
+The first dual-seam feature is:
 
 ```text
 acceptance/features/varroa/visible-varroa-review-outcome.feature
@@ -22,7 +24,21 @@ The same feature executes through:
 - Core API binding: `pytest-bdd`
 - Web UI binding: `playwright-bdd`
 
+The first API-only migrated treatment feature is:
+
+```text
+acceptance/features/treatment/advisor-treatment-recommendation-intake.feature
+```
+
+That feature executes through HiveSight's Core API binding today. It is deliberately not Web-bound yet because HiveSight has not built the beekeeper-facing treatment advice UI.
+
 The Gherkin does not mention HTTP methods, routes, button labels, selectors, or database tables. Those details live in seam-specific step bindings.
+
+Features are tagged by supported seam:
+
+- `@api` for Core API acceptance bindings.
+- `@web` for Web UI acceptance bindings.
+- A feature can carry both tags when both seams prove the same product behaviour.
 
 ## Proven Example
 
@@ -75,9 +91,9 @@ Resolved by HiveSight Advisor Slice 0011: Advisor's treatment-plan endpoint acce
 
 ## Verification Result From HiveSight Pilot
 
-HiveSight `pnpm verify:slice` now reports the shared feature separately:
+HiveSight `pnpm verify:slice` now reports the acceptance catalogue separately:
 
-- `Shared Gherkin pilot - Core API`: passed
-- `Shared Gherkin pilot - Web UI`: passed
+- `Acceptance catalogue - Core API`: runs the Varroa shared feature and the Advisor treatment recommendation feature.
+- `Acceptance catalogue - Web UI`: runs catalogue scenarios tagged `@web`.
 
 The full Slice 0030 verification also passed Core API tests, Analysis Service tests, Web TypeScript checks, dev-script tests, and the existing browser acceptance suite.

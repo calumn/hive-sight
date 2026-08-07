@@ -13,6 +13,7 @@ const testDir = defineBddConfig({
   features: "../../acceptance/features/**/*.feature",
   featuresRoot: "../../acceptance/features",
   steps: "./tests/bdd/steps/**/*.ts",
+  tags: "@web",
   outputDir: "./.features-gen"
 });
 

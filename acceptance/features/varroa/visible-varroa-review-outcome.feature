@@ -1,3 +1,4 @@
+@api @web
 Feature: Varroa review outcome
 
   Scenario: Dataset Curator records visible Varroa evidence with two mite markers

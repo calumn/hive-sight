@@ -32,6 +32,10 @@ packages = ["src/hive_sight_core_api"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+  "api: acceptance-catalogue scenario covered by the Core API binding",
+  "web: acceptance-catalogue scenario covered by the Web UI binding"
+]
 
 [tool.ruff]
 line-length = 100

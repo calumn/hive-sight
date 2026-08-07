@@ -161,9 +161,9 @@ HiveSight remains the system of record for hive identity, Varroa assessment evid
 
 | Candidate Slice | Type | Outcome |
 | --- | --- | --- |
-| Capability-Based Acceptance Catalogue Migration | Technical / Quality | Migrate additional active behaviours into shared, capability-organised Gherkin features after Slice 0030 proved the approach. Prioritise current cross-client behaviours, not historical completeness. |
+| Capability-Based Acceptance Catalogue Migration | Technical / Quality | Started after Slice 0030: keep active behaviours in `acceptance/features/<capability>/...`, tagged by seam. Varroa review is dual API/Web; Advisor treatment recommendation intake is now API-bound catalogue coverage. Continue capability-by-capability, prioritising current drift risk over historical completeness. |
 | Acceptance Catalogue Inventory And Labels | Technical / Quality | Inventory existing API BDD features and browser acceptance specs, then label each behaviour as shared, API-only, browser-only, service-only, legacy historical evidence, or lower-level test coverage. |
-| Advisor Integration Shared Acceptance Catalogue | Integration / Quality | Align HiveSight and HiveSight Advisor on client-neutral Gherkin conventions for shared treatment-advice behaviours so both repos can reason from comparable acceptance language. |
+| Advisor Integration Shared Acceptance Catalogue | Integration / Quality | Share HiveSight's acceptance-catalogue note with Advisor and align on client-neutral Gherkin conventions for treatment-advice behaviours so both repos can reason from comparable acceptance language. |
 | Cross-Inspection Submitted Review Dashboard | Business / Quality | Let Dataset Curators see crops they submitted for review across inspections so waiting work can be chased or cancelled deliberately. |
 | Real Model QA Test Environment | Technical / Quality | Keep real YOLO training/evaluation smoke tests outside normal CI but runnable on demand against a QA database. |
 | Test Coverage Report Expansion | Technical / Quality | Extend slice verification reports to show unit, API, BDD, UI, real-adapter QA, and known skipped tests in one place. |

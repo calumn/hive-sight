@@ -1,3 +1,4 @@
+@api
 Feature: Advisor Treatment Recommendation Intake And Acceptance
 
   Scenario: HiveSight stores Advisor treatment advice as a pending recommendation with an evidence chain
