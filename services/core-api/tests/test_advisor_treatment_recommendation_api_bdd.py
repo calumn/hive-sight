@@ -36,13 +36,7 @@ from hive_sight_core_api.models import (
 )
 
 scenarios(
-    str(
-        Path(__file__).parents[3]
-        / "acceptance"
-        / "features"
-        / "treatment"
-        / "advisor-treatment-recommendation-intake.feature"
-    )
+    "../../../acceptance/features/treatment/advisor-treatment-recommendation-intake.feature"
 )
 
 

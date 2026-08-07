@@ -40,6 +40,12 @@ Features are tagged by supported seam:
 - `@web` for Web UI acceptance bindings.
 - A feature can carry both tags when both seams prove the same product behaviour.
 
+The tags are load-bearing in HiveSight's harness:
+
+- The Core API catalogue check runs with `-m api`.
+- The Core API full test suite skips catalogue scenarios that declare seam tags but omit `@api`.
+- The Web UI catalogue check filters to `@web` through `playwright-bdd`.
+
 ## Proven Example
 
 ```gherkin
@@ -93,7 +99,7 @@ Resolved by HiveSight Advisor Slice 0011: Advisor's treatment-plan endpoint acce
 
 HiveSight `pnpm verify:slice` now reports the acceptance catalogue separately:
 
-- `Acceptance catalogue - Core API`: runs the Varroa shared feature and the Advisor treatment recommendation feature.
+- `Acceptance catalogue - Core API`: runs catalogue scenarios tagged `@api`, including the Varroa shared feature and the Advisor treatment recommendation feature.
 - `Acceptance catalogue - Web UI`: runs catalogue scenarios tagged `@web`.
 
 The full Slice 0030 verification also passed Core API tests, Analysis Service tests, Web TypeScript checks, dev-script tests, and the existing browser acceptance suite.

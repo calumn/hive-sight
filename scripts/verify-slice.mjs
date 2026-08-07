@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
@@ -10,7 +10,7 @@ const checks = [
   {
     name: "Acceptance catalogue - Core API",
     command:
-      "./.venv/bin/python -m pytest -p no:cacheprovider tests/test_visible_varroa_review_outcome_api_bdd.py tests/test_advisor_treatment_recommendation_api_bdd.py",
+      "./.venv/bin/python -m pytest -p no:cacheprovider -m api tests/test_visible_varroa_review_outcome_api_bdd.py tests/test_advisor_treatment_recommendation_api_bdd.py",
     cwd: "services/core-api",
     args: [
       "./.venv/bin/python",
@@ -18,11 +18,32 @@ const checks = [
       "pytest",
       "-p",
       "no:cacheprovider",
+      "-m",
+      "api",
       "tests/test_visible_varroa_review_outcome_api_bdd.py",
       "tests/test_advisor_treatment_recommendation_api_bdd.py"
     ],
     note:
-      "Executes canonical acceptance-catalogue features that have a Core API binding."
+      "Executes canonical acceptance-catalogue features that have a Core API binding.",
+    bddAreas: [
+      {
+        area: "Varroa review outcome",
+        capability: "varroa",
+        seam: "Core API",
+        tag: "api",
+        featureFile: "acceptance/features/varroa/visible-varroa-review-outcome.feature",
+        testFile: "tests/test_visible_varroa_review_outcome_api_bdd.py"
+      },
+      {
+        area: "Advisor treatment recommendation intake",
+        capability: "treatment",
+        seam: "Core API",
+        tag: "api",
+        featureFile:
+          "acceptance/features/treatment/advisor-treatment-recommendation-intake.feature",
+        testFile: "tests/test_advisor_treatment_recommendation_api_bdd.py"
+      }
+    ]
   },
   {
     name: "Acceptance catalogue - Web UI",
@@ -30,7 +51,16 @@ const checks = [
     cwd: ".",
     args: ["pnpm", "--filter", "@hive-sight/web", "test:bdd"],
     note:
-      "Executes canonical shared features that have a Web UI binding through playwright-bdd."
+      "Executes canonical shared features that have a Web UI binding through playwright-bdd.",
+    bddAreas: [
+      {
+        area: "Varroa review outcome",
+        capability: "varroa",
+        seam: "Web UI",
+        tag: "web",
+        featureFile: "acceptance/features/varroa/visible-varroa-review-outcome.feature"
+      }
+    ]
   },
   {
     name: "Core API tests",
@@ -75,6 +105,10 @@ for (const check of checks) {
   results.push(await runCheck(check));
 }
 
+for (const result of results) {
+  result.bddAreaSummaries = await summarizeBddAreas(result);
+}
+
 const overallPassed = results.every((result) => result.status === "passed");
 const report = renderReport({
   generatedAt: new Date(),
@@ -116,6 +150,7 @@ function runCheck(check) {
         status: code === 0 ? "passed" : "failed",
         exitCode: code,
         durationMs: Date.now() - started.getTime(),
+        output,
         summary: summarizeOutput(output),
         outputTail: tail(output)
       });
@@ -148,6 +183,90 @@ function tail(output) {
     .trim();
 }
 
+async function summarizeBddAreas(result) {
+  if (!result.bddAreas) return [];
+  return Promise.all(
+    result.bddAreas.map(async (area) => {
+      const selected = await countTaggedScenarios(area.featureFile, area.tag);
+      const execution = executionCountsForArea({
+        output: result.output,
+        testFile: area.testFile,
+        selected,
+        checkPassed: result.status === "passed"
+      });
+      return {
+        ...area,
+        selected,
+        ...execution,
+        result: execution.failed === 0 && execution.completed === selected ? "passed" : result.status
+      };
+    })
+  );
+}
+
+async function countTaggedScenarios(featureFile, tag) {
+  const text = await readFile(resolve(repoRoot, featureFile), "utf8");
+  const wantedTag = tag.startsWith("@") ? tag : `@${tag}`;
+  const lines = text.split(/\r?\n/);
+  let featureTags = new Set();
+  let pendingTags = [];
+  let count = 0;
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line) continue;
+    if (line.startsWith("@")) {
+      pendingTags = line.split(/\s+/);
+      continue;
+    }
+    if (line.startsWith("Feature:")) {
+      featureTags = new Set(pendingTags);
+      pendingTags = [];
+      continue;
+    }
+    if (line.startsWith("Scenario:") || line.startsWith("Scenario Outline:")) {
+      const scenarioTags = new Set([...featureTags, ...pendingTags]);
+      if (scenarioTags.has(wantedTag)) {
+        count += 1;
+      }
+      pendingTags = [];
+      continue;
+    }
+    pendingTags = [];
+  }
+
+  return count;
+}
+
+function executionCountsForArea({ output, testFile, selected, checkPassed }) {
+  if (!testFile) {
+    return checkPassed
+      ? { run: selected, completed: selected, failed: 0, skipped: 0 }
+      : { run: selected, completed: 0, failed: selected, skipped: 0 };
+  }
+
+  const line = output.split(/\r?\n/).find((candidate) => candidate.trim().startsWith(testFile));
+  if (!line) {
+    return checkPassed
+      ? { run: selected, completed: selected, failed: 0, skipped: 0 }
+      : { run: 0, completed: 0, failed: selected, skipped: 0 };
+  }
+
+  const symbols = line
+    .slice(line.indexOf(testFile) + testFile.length)
+    .replace(/\[[^\]]+\]/g, "")
+    .replace(/\s+/g, "");
+  const completed = countChars(symbols, ".");
+  const failed = countChars(symbols, "F") + countChars(symbols, "E");
+  const skipped = countChars(symbols, "s") + countChars(symbols, "S");
+  const run = completed + failed + skipped + countChars(symbols, "x") + countChars(symbols, "X");
+  return { run, completed, failed, skipped };
+}
+
+function countChars(text, char) {
+  return [...text].filter((candidate) => candidate === char).length;
+}
+
 function renderReport({ generatedAt, overallPassed, results, startedAt }) {
   const lines = [
     "# HiveSight Slice Verification Report",
@@ -155,10 +274,29 @@ function renderReport({ generatedAt, overallPassed, results, startedAt }) {
     `Generated: ${generatedAt.toISOString()}`,
     `Duration: ${generatedAt.getTime() - startedAt.getTime()} ms`,
     `Overall result: ${overallPassed ? "passed" : "failed"}`,
-    "",
-    "## Checks",
     ""
   ];
+
+  const bddAreaSummaries = results.flatMap((result) => result.bddAreaSummaries ?? []);
+  if (bddAreaSummaries.length) {
+    lines.push("## BDD Feature Area Summary");
+    lines.push("");
+    for (const area of bddAreaSummaries) {
+      lines.push(
+        `- **${area.area}** (${area.capability}, ${area.seam}): ${area.completed}/${area.selected} complete; ${area.run} run; ${area.failed} failed; ${area.skipped} skipped; result ${area.result}.`
+      );
+    }
+    lines.push("");
+    lines.push(
+      "`Selected` is the number of scenarios in the canonical feature tagged for that seam. `Complete` is the number that passed in the executed binding."
+    );
+    lines.push("");
+  }
+
+  lines.push(
+    "## Checks",
+    ""
+  );
 
   for (const result of results) {
     lines.push(`### ${result.name}`);
