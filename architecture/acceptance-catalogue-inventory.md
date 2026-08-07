@@ -42,6 +42,7 @@ Legacy slice-history tests remain useful evidence. They should not be bulk-migra
 | --- | --- | --- | --- | --- | --- | --- |
 | varroa | Visible Varroa review outcome | `acceptance/features/varroa/visible-varroa-review-outcome.feature` | API + Web UI | shared | already canonical | Living dual-seam feature from Slice 0030. |
 | varroa | Photo-visible Varroa evidence summary | `acceptance/features/varroa/photo-visible-varroa-evidence-summary.feature` | API | api-only | already canonical | Migrated by Slice 0032 because it feeds frame-level count and Advisor context evidence. |
+| varroa | Varroa Photo Analysis evidence and adapter readiness | `acceptance/features/varroa/varroa-photo-analysis-evidence-and-adapter-readiness.feature` | API | api-only | already canonical | Added by Slice 0033 for the safe adapter, persisted Photo Analysis, per-bee evidence, and Advisor-eligibility trust boundary. |
 | treatment | Advisor treatment recommendation intake | `acceptance/features/treatment/advisor-treatment-recommendation-intake.feature` | API | api-only | already canonical | Living API-bound catalogue feature for the Advisor recommendation intake and treatment evidence chain. |
 
 ## Canonical Core API BDD Bindings
@@ -50,6 +51,7 @@ Legacy slice-history tests remain useful evidence. They should not be bulk-migra
 | --- | --- | --- | --- | --- | --- | --- |
 | varroa | Visible Varroa review outcome | `services/core-api/tests/test_visible_varroa_review_outcome_api_bdd.py` | Core API | shared | already canonical | Core API binding for the canonical Varroa Review Outcome feature. |
 | varroa | Photo-visible Varroa evidence summary | `services/core-api/tests/test_photo_visible_varroa_evidence_summary_api_bdd.py` | Core API | api-only | already canonical | Core API binding for the canonical photo-visible Varroa evidence summary feature. |
+| varroa | Varroa Photo Analysis evidence and adapter readiness | `services/core-api/tests/test_varroa_photo_analysis_api_bdd.py` | Core API | api-only | already canonical | Core API binding for the canonical Varroa Photo Analysis evidence and adapter readiness feature. |
 | treatment | Advisor treatment recommendation intake | `services/core-api/tests/test_advisor_treatment_recommendation_api_bdd.py` | Core API | api-only | already canonical | Core API binding for the canonical treatment recommendation intake feature. |
 
 ## Browser BDD Bindings
@@ -145,10 +147,10 @@ Legacy slice-history tests remain useful evidence. They should not be bulk-migra
 
 ## Next Recommended Migration Candidate
 
-`Varroa detector adapter seam` should be the next Varroa migration candidate when that adapter behaviour is touched.
+No immediate next migration candidate is promoted.
 
 Reason:
 
-- It is current Varroa behaviour.
-- It remains API-level behaviour today, so it can migrate without forcing a browser binding before one is useful.
-- It sits near the model-to-frame-count path, but is less urgent now that the human-reviewed evidence summary is canonical.
+- Slice 0033 migrated the touched Varroa detector/photo-analysis behaviour into the canonical catalogue.
+- Remaining legacy Core API Gherkin should continue to migrate when touched or when drift risk becomes high.
+- Browser-only visual, geometry, zoom, and marker-containment behaviours should remain in browser acceptance coverage unless a future shared behaviour needs them.

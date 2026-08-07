@@ -22,6 +22,9 @@ class Settings:
     object_storage_root: str = "var/object-storage"
     persistence_backend: str = "in_memory"
     dev_users_enabled: bool = False
+    varroa_detector_adapter: str = "deterministic_stub"
+    varroa_detector_command: str | None = None
+    varroa_detector_model_reference: str | None = None
 
 
 def load_settings() -> Settings:
@@ -47,6 +50,14 @@ def load_settings() -> Settings:
         bee_orientation_training_adapter=os.getenv(
             "HIVESIGHT_BEE_ORIENTATION_TRAINING_ADAPTER",
             "fake",
+        ),
+        varroa_detector_adapter=os.getenv(
+            "HIVESIGHT_VARROA_DETECTOR_ADAPTER",
+            "deterministic_stub",
+        ),
+        varroa_detector_command=os.getenv("HIVESIGHT_VARROA_DETECTOR_COMMAND"),
+        varroa_detector_model_reference=os.getenv(
+            "HIVESIGHT_VARROA_DETECTOR_MODEL_REFERENCE"
         ),
         model_artifact_root=os.getenv("HIVESIGHT_MODEL_ARTIFACT_ROOT", "var/model-runs"),
         database_purpose=os.getenv("HIVESIGHT_DATABASE_PURPOSE", "dev"),

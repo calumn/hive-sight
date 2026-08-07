@@ -1600,6 +1600,104 @@ class FrameMiteCountResponse(BaseModel):
     advisor_context_available: bool = False
 
 
+class VarroaPhotoAnalysisStatus(StrEnum):
+    running = "running"
+    completed = "completed"
+    partial = "partial"
+    failed = "failed"
+    no_usable_bees = "no_usable_bees"
+
+
+class VarroaPhotoAnalysisReviewStatus(StrEnum):
+    unreviewed = "unreviewed"
+    accepted = "accepted"
+    rejected = "rejected"
+    inconclusive = "inconclusive"
+    needs_expert_review = "needs_expert_review"
+
+
+class VarroaPhotoAnalysisBeeStatus(StrEnum):
+    completed = "completed"
+    failed = "failed"
+
+
+class VarroaPhotoAnalysisCreateRequest(BaseModel):
+    workspace_id: UUID
+
+
+class VarroaPhotoAnalysisReviewRequest(BaseModel):
+    workspace_id: UUID
+    review_status: VarroaPhotoAnalysisReviewStatus
+    review_note: str | None = None
+
+
+class VarroaPhotoAnalysisBeeResultResponse(BaseModel):
+    photo_analysis_bee_result_id: UUID
+    photo_analysis_run_id: UUID
+    training_crop_id: UUID
+    bee_annotation_id: UUID
+    status: VarroaPhotoAnalysisBeeStatus
+    mites_found: int
+    detections: list[LikelyVarroaDetectionResponse] = Field(default_factory=list)
+    adapter_type: str
+    adapter_version: str
+    model_reference: str
+    command_contract_version: str | None = None
+    detector_answer_id: str | None = None
+    failure_code: str | None = None
+    failure_message: str | None = None
+    raw_error_payload: str | None = None
+    head_up_normalized_crop: HeadUpNormalizedBeeCropPreviewResponse | None = None
+
+
+class VarroaPhotoAnalysisRunResponse(BaseModel):
+    photo_analysis_run_id: UUID
+    workspace_id: UUID
+    inspection_id: UUID
+    inspection_photo_id: UUID
+    source_image_filename: str
+    status: VarroaPhotoAnalysisStatus
+    review_status: VarroaPhotoAnalysisReviewStatus = (
+        VarroaPhotoAnalysisReviewStatus.unreviewed
+    )
+    review_note: str | None = None
+    total_detected_bees: int
+    eligible_bees: int
+    analysed_bees: int
+    failed_bees: int
+    mites_found: int
+    mite_ratio_basis: str = "analysed_eligible_bees"
+    adapter_type: str
+    adapter_version: str
+    model_reference: str
+    command_contract_version: str | None = None
+    started_at: datetime
+    completed_at: datetime | None = None
+    failure_code: str | None = None
+    failure_message: str | None = None
+    caveat: str
+    advisor_evidence_eligible: bool = False
+    bee_results: list[VarroaPhotoAnalysisBeeResultResponse] = Field(default_factory=list)
+
+
+class VarroaPhotoAnalysisRunListResponse(BaseModel):
+    workspace_id: UUID
+    inspection_photo_id: UUID
+    runs: list[VarroaPhotoAnalysisRunResponse]
+
+
+class VarroaDetectorReadinessResponse(BaseModel):
+    adapter_type: str
+    adapter_version: str
+    model_reference: str
+    available: bool
+    unavailable_reason: str | None = None
+    database_purpose: str
+    deterministic_stub_evidence: bool
+    replaceable_non_stub_adapter: bool
+    last_validation_error: str | None = None
+
+
 class AdvisorVarroaContextRequest(BaseModel):
     inspection_photo_id: UUID
     jurisdiction_id: str | None = None

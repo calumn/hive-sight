@@ -79,6 +79,20 @@ def test_slice_0014_migration_declares_durable_annotation_repository_shape() -> 
     assert "raw_exif" not in migration.casefold()
 
 
+def test_slice_0033_migration_declares_varroa_photo_analysis_evidence_shape() -> None:
+    migration = (MIGRATIONS_DIR / "0033_varroa_photo_analysis_evidence.sql").read_text(
+        encoding="utf-8"
+    )
+
+    assert "CREATE TABLE IF NOT EXISTS varroa_photo_analysis_runs" in migration
+    assert "CREATE TABLE IF NOT EXISTS varroa_photo_analysis_bee_results" in migration
+    assert "status IN ('running', 'completed', 'partial', 'failed', 'no_usable_bees')" in migration
+    assert "needs_expert_review" in migration
+    assert "advisor_evidence_eligible boolean NOT NULL DEFAULT false" in migration
+    assert "raw_error_payload text" in migration
+    assert "raw_request" not in migration.casefold()
+
+
 @pytest.mark.skipif(
     importlib.util.find_spec("psycopg") is None or not os.getenv("HIVESIGHT_TEST_DATABASE_URL"),
     reason="Set HIVESIGHT_TEST_DATABASE_URL and install psycopg to run Postgres persistence integration.",

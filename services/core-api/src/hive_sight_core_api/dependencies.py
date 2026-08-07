@@ -63,7 +63,10 @@ from hive_sight_core_api.training_crop_dataset_item_workflow import (
     TrainingCropDatasetItemWorkflow,
 )
 from hive_sight_core_api.training_crop_workflow import TrainingCropWorkflow
+from hive_sight_core_api.varroa_detector_adapters import build_varroa_detector_adapter
+from hive_sight_core_api.varroa_review_workflow import VarroaDetectorAdapter
 from hive_sight_core_api.varroa_review_workflow import VarroaReviewWorkflow
+from hive_sight_core_api.varroa_photo_analysis_workflow import VarroaPhotoAnalysisWorkflow
 
 DEFAULT_DATASET_EXPORT_ROOT = Path(__file__).resolve().parents[4] / "var" / "exports" / "datasets"
 DEFAULT_MODEL_ARTIFACT_ROOT = Path(__file__).resolve().parents[4] / "var" / "model-runs"
@@ -156,6 +159,14 @@ def build_bee_prelabeler(settings: Settings) -> BeePrelabeler:
     raise ValueError(f"Unknown HiveSight pre-labeller provider: {settings.prelabeler}")
 
 
+def build_configured_varroa_detector_adapter(settings: Settings) -> VarroaDetectorAdapter:
+    return build_varroa_detector_adapter(
+        adapter_name=settings.varroa_detector_adapter,
+        command=settings.varroa_detector_command,
+        model_reference=settings.varroa_detector_model_reference,
+    )
+
+
 def get_dataset_role_assignment_workflow(
     state: DevStateDep,
 ) -> DatasetRoleAssignmentWorkflow:
@@ -177,9 +188,20 @@ def get_training_crop_dataset_item_workflow(
 
 
 def get_varroa_review_workflow(state: DevStateDep) -> VarroaReviewWorkflow:
+    settings = get_settings()
     return VarroaReviewWorkflow(
         store=state.store,
         image_loader=state.object_storage.get_object,
+        varroa_detector_adapter=build_configured_varroa_detector_adapter(settings),
+    )
+
+
+def get_varroa_photo_analysis_workflow(state: DevStateDep) -> VarroaPhotoAnalysisWorkflow:
+    settings = get_settings()
+    return VarroaPhotoAnalysisWorkflow(
+        store=state.store,
+        image_loader=state.object_storage.get_object,
+        varroa_detector_adapter=build_configured_varroa_detector_adapter(settings),
     )
 
 
@@ -188,11 +210,13 @@ def get_frame_level_varroa_result_workflow(state: DevStateDep) -> FrameLevelVarr
 
 
 def get_advisor_varroa_context_workflow(state: DevStateDep) -> AdvisorVarroaContextWorkflow:
+    settings = get_settings()
     return AdvisorVarroaContextWorkflow(
         store=state.store,
         varroa_review_workflow=VarroaReviewWorkflow(
             store=state.store,
             image_loader=state.object_storage.get_object,
+            varroa_detector_adapter=build_configured_varroa_detector_adapter(settings),
         ),
         frame_level_varroa_result_workflow=FrameLevelVarroaResultWorkflow(store=state.store),
     )

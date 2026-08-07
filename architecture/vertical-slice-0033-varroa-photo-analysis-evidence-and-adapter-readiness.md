@@ -1,6 +1,6 @@
 # Vertical Slice 0033: Varroa Photo Analysis Evidence And Adapter Readiness
 
-Status: designed; awaiting acceptance scenario signoff.
+Status: implemented; focused checks and `pnpm verify:slice` passed on 2026-08-07.
 
 ## Purpose
 
@@ -24,7 +24,7 @@ This slice is readiness work for the real beekeeper flow, but it deliberately st
 
 ## Draft Acceptance Scenarios
 
-These scenarios need explicit signoff before implementation.
+These scenarios were accepted and implemented.
 
 ```gherkin
 @api
@@ -368,23 +368,23 @@ Per-bee Photo Analysis record:
 
 ## Acceptance Criteria
 
-- [ ] Default configuration still uses deterministic stub Varroa Detector output and labels it as non-user-facing stub evidence.
-- [ ] `HIVESIGHT_VARROA_DETECTOR_ADAPTER=local_command` selects a non-stub command adapter when a runnable command is configured.
-- [ ] A configured but unavailable local command adapter reports unavailable/failure and does not fall back to deterministic stub output.
-- [ ] Detector preview can return detections from a fake local command adapter through the existing `LikelyVarroaDetection` shape.
-- [ ] Local command request/response uses JSON over stdin/stdout with `contract_version = varroa_detector_command_v1` in both directions.
-- [ ] Malformed command output, invalid detections, missing provenance, non-zero exit, and timeout are reported as adapter failures, not as zero detections.
-- [ ] Zero detections is valid only from an explicit completed response with matching contract version, provenance, and `detections: []`.
-- [ ] Varroa Photo Analysis persists one run record and per-bee analysis records, including structured adapter/model provenance.
-- [ ] Rerunning Photo Analysis creates a new evidence run rather than replacing previous evidence.
-- [ ] Partial Photo Analysis runs record analysed bees, failed bees, and a permanent incomplete-result warning.
-- [ ] `no_usable_bees` Photo Analysis runs cannot be marked accepted.
-- [ ] Only accepted Photo Analysis runs are eligible for later Advisor evidence.
-- [ ] Readiness endpoint reports adapter type, version, model reference, availability, database purpose, and stub/non-stub caveat without exposing secrets or full command paths.
-- [ ] `pnpm model:qa:varroa:detect` checks readiness, runs a single-crop contract smoke test, and runs a Photo Analysis path when fixture data is available.
-- [ ] Default fast tests and `pnpm verify:slice` do not require a real Varroa model, external model dependencies, or network access.
-- [ ] Impacted Varroa Detector/Photo Analysis Gherkin scenarios are migrated into the capability-based acceptance catalogue.
-- [ ] Roadmap keeps the remaining legacy Core API Gherkin catalogue cleanup visible.
+- [x] Default configuration still uses deterministic stub Varroa Detector output and labels it as non-user-facing stub evidence.
+- [x] `HIVESIGHT_VARROA_DETECTOR_ADAPTER=local_command` selects a non-stub command adapter when a runnable command is configured.
+- [x] A configured but unavailable local command adapter reports unavailable/failure and does not fall back to deterministic stub output.
+- [x] Detector preview can return detections from a fake local command adapter through the existing `LikelyVarroaDetection` shape.
+- [x] Local command request/response uses JSON over stdin/stdout with `contract_version = varroa_detector_command_v1` in both directions.
+- [x] Malformed command output, invalid detections, missing provenance, non-zero exit, and timeout are reported as adapter failures, not as zero detections.
+- [x] Zero detections is valid only from an explicit completed response with matching contract version, provenance, and `detections: []`.
+- [x] Varroa Photo Analysis persists one run record and per-bee analysis records, including structured adapter/model provenance.
+- [x] Rerunning Photo Analysis creates a new evidence run rather than replacing previous evidence.
+- [x] Partial Photo Analysis runs record analysed bees, failed bees, and a permanent incomplete-result warning.
+- [x] `no_usable_bees` Photo Analysis runs cannot be marked accepted.
+- [x] Only accepted Photo Analysis runs are eligible for later Advisor evidence.
+- [x] Readiness endpoint reports adapter type, version, model reference, availability, database purpose, and stub/non-stub caveat without exposing secrets or full command paths.
+- [x] `pnpm model:qa:varroa:detect` checks readiness, runs a single-crop contract smoke test, and runs a Photo Analysis path when fixture data is available.
+- [x] Default fast tests and `pnpm verify:slice` do not require a real Varroa model, external model dependencies, or network access.
+- [x] Impacted Varroa Detector/Photo Analysis Gherkin scenarios are migrated into the capability-based acceptance catalogue.
+- [x] Roadmap keeps the remaining legacy Core API Gherkin catalogue cleanup visible.
 
 ## Open Questions
 

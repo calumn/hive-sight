@@ -69,9 +69,10 @@ class VarroaDetectorRequest:
 
 
 class VarroaDetectorFailure(Exception):
-    def __init__(self, code: str, message: str) -> None:
+    def __init__(self, code: str, message: str, raw_error_payload: str | None = None) -> None:
         self.code = code
         self.message = message
+        self.raw_error_payload = raw_error_payload
         super().__init__(message)
 
 

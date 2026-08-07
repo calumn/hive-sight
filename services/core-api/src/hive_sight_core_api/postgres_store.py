@@ -39,6 +39,8 @@ from hive_sight_core_api.models import (
     TrainingRunResponse,
     TreatmentEvidenceChainResponse,
     TreatmentRecommendationResponse,
+    VarroaPhotoAnalysisBeeResultResponse,
+    VarroaPhotoAnalysisRunResponse,
     VarroaReviewOutcomeResponse,
 )
 
@@ -69,6 +71,8 @@ MODEL_RECORD_TYPES: dict[str, type] = {
     "advisor_treatment_request_snapshot": AdvisorTreatmentRequestSnapshotResponse,
     "treatment_recommendation": TreatmentRecommendationResponse,
     "hive_treatment_course": HiveTreatmentCourseResponse,
+    "varroa_photo_analysis_run": VarroaPhotoAnalysisRunResponse,
+    "varroa_photo_analysis_bee_result": VarroaPhotoAnalysisBeeResultResponse,
 }
 
 
@@ -219,6 +223,27 @@ class PostgresProductDataStore(InMemoryProductDataStore):
         response = super().save_varroa_review_outcome(outcome)
         self._persist_model("varroa_review_outcome", response.varroa_review_outcome_id, response)
         self._upsert_varroa_review_outcome_projection(response)
+        return response
+
+    def save_varroa_photo_analysis_run(self, run: VarroaPhotoAnalysisRunResponse):
+        response = super().save_varroa_photo_analysis_run(run)
+        self._persist_model(
+            "varroa_photo_analysis_run",
+            response.photo_analysis_run_id,
+            response,
+        )
+        return response
+
+    def save_varroa_photo_analysis_bee_result(
+        self,
+        result: VarroaPhotoAnalysisBeeResultResponse,
+    ):
+        response = super().save_varroa_photo_analysis_bee_result(result)
+        self._persist_model(
+            "varroa_photo_analysis_bee_result",
+            response.photo_analysis_bee_result_id,
+            response,
+        )
         return response
 
     def save_treatment_evidence_chain(self, chain: TreatmentEvidenceChainResponse):
@@ -479,6 +504,10 @@ class PostgresProductDataStore(InMemoryProductDataStore):
             self.treatment_recommendations[model.treatment_recommendation_id] = model
         elif record_type == "hive_treatment_course":
             self.hive_treatment_courses[model.hive_treatment_course_id] = model
+        elif record_type == "varroa_photo_analysis_run":
+            self.varroa_photo_analysis_runs[model.photo_analysis_run_id] = model
+        elif record_type == "varroa_photo_analysis_bee_result":
+            self.varroa_photo_analysis_bee_results[model.photo_analysis_bee_result_id] = model
 
     def _persist_core_identity(self, user_id: UUID, workspace_id: UUID) -> None:
         self._persist_payload("user", user_id, {"user_id": str(user_id)})

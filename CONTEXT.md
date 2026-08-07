@@ -108,6 +108,10 @@ _Avoid_: Visible Varroa Rate when there is no sampling estimator or confidence m
 A model-assisted count of likely visible Varroa detections across eligible complete reliable bees for one photographed frame, derived by running the Varroa Detector over Head-Up Normalized Bee Crops. In Slice 0028 this is on-demand, stub-backed, non-user-facing frame evidence only; it is separate from human Varroa Review Outcomes and from a beekeeper-facing Varroa Assessment.
 _Avoid_: Visible Varroa Rate, Varroa Assessment, treatment trigger, or human-reviewed photo-visible evidence summary.
 
+**Varroa Photo Analysis**:
+A persisted, model-assisted evidence run for one Inspection Photo. It records the configured Varroa Detector adapter provenance, photo-level counts, per-bee analysis records, failed bee evaluations, and a separate human review status. `accepted` is the only review status eligible for later Advisor evidence; `unreviewed`, `rejected`, `inconclusive`, and `needs_expert_review` remain preserved but are not Advisor-ready.
+_Avoid_: Visible Varroa Rate, whole-inspection assessment, treatment advice, or automatic no-Varroa truth.
+
 **Varroa Assessment**:
 An Inspection Intent for estimating visible Varroa evidence from inspection photos for beekeeper-facing support.
 _Avoid_: Training data collection when the purpose is product analysis.

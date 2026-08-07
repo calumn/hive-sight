@@ -31,6 +31,7 @@
     "model:qa:bee:evaluate": "node scripts/model-qa-bee-evaluate.mjs",
     "model:qa:bee:orientation-evaluate": "node scripts/model-qa-bee-orientation-evaluate.mjs",
     "model:qa:bee:prelabel": "node scripts/model-qa-bee-prelabel.mjs",
+    "model:qa:varroa:detect": "node scripts/model-qa-varroa-detect.mjs",
     "model:reset:directed-ellipse-review": "node scripts/reset-directed-ellipse-review.mjs",
     "verify:slice": "node scripts/verify-slice.mjs"
   }

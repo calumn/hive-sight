@@ -890,6 +890,49 @@ Rules:
 - A Frame Mite Count does not create, update, or approve Varroa Review Outcomes, Varroa Markers, Dataset Items, Dataset Versions, or Varroa Corpus Curation Decisions.
 - It is model-assisted frame evidence only. It is not a Visible Varroa Rate, Varroa Assessment, Treatment Recommendation, HiveSight Advisor context, Advisor trigger, or whole-colony measurement.
 
+### Varroa Photo Analysis
+
+A persisted, model-assisted evidence run for one Inspection Photo.
+
+Essential fields:
+
+- id
+- workspace id
+- inspection id
+- inspection photo id
+- status: `running`, `completed`, `partial`, `failed`, or `no_usable_bees`
+- review status: `unreviewed`, `accepted`, `rejected`, `inconclusive`, or `needs_expert_review`
+- review note
+- total detected bees
+- eligible bees
+- analysed bees
+- failed bees
+- mites found
+- mite ratio basis
+- adapter type
+- adapter version
+- model reference
+- command contract version
+- started at
+- completed at
+- caveat
+- Advisor evidence eligibility
+- per-bee Photo Analysis results
+
+Rules:
+
+- A Varroa Photo Analysis belongs to one Inspection Photo, not a whole Inspection or Hive.
+- Rerunning analysis creates a new evidence run; it does not replace previous runs.
+- Job status and human review status are separate fields.
+- `partial` means every eligible bee was attempted, but one or more bee detector calls failed.
+- `no_usable_bees` means analysis ran but no bees were eligible for Varroa evaluation.
+- A failed or aborted analysis is not a partial result and cannot be accepted.
+- Per-bee analysis records preserve detector status, detections, failure details, and structured adapter/model provenance.
+- Raw detector request payloads are not stored by default. Capped sanitized raw response or error payload may be retained only for failed or invalid adapter calls.
+- A zero-mite model result is not automatically accepted and is not a human `no_visible_varroa` judgement.
+- Only a Photo Analysis with review status `accepted` is eligible for later Advisor evidence.
+- `needs_expert_review`, `inconclusive`, `rejected`, and `unreviewed` are not Advisor-eligible.
+
 ### Advisor Treatment Advice Attempt
 
 A Beekeeper's attempt to obtain HiveSight Advisor treatment advice for one Hive evidence context.

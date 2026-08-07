@@ -75,6 +75,8 @@ from hive_sight_core_api.models import (
     TreatmentEvidenceChainResponse,
     TreatmentRecommendationResponse,
     UploadStatus,
+    VarroaPhotoAnalysisBeeResultResponse,
+    VarroaPhotoAnalysisRunResponse,
     VarroaReviewOutcomeResponse,
     WorkspaceDataUseAgreementAcceptanceResponse,
     YoloObbExcludedItem,
@@ -206,6 +208,12 @@ class InMemoryProductDataStore:
     training_crops: dict[UUID, TrainingCropResponse] = field(default_factory=dict)
     training_crop_ellipses: dict[UUID, OrientedBeeEllipseResponse] = field(default_factory=dict)
     varroa_review_outcomes: dict[UUID, VarroaReviewOutcomeResponse] = field(default_factory=dict)
+    varroa_photo_analysis_runs: dict[UUID, VarroaPhotoAnalysisRunResponse] = field(
+        default_factory=dict
+    )
+    varroa_photo_analysis_bee_results: dict[UUID, VarroaPhotoAnalysisBeeResultResponse] = field(
+        default_factory=dict
+    )
     review_queue_items: dict[UUID, ReviewQueueItemRecord] = field(default_factory=dict)
     review_queue_outcomes: dict[UUID, ReviewQueueOutcomeRecord] = field(default_factory=dict)
     treatment_evidence_chains: dict[UUID, TreatmentEvidenceChainResponse] = field(
@@ -1091,6 +1099,54 @@ class InMemoryProductDataStore:
         ]
         for outcome_id in outcome_ids:
             self.varroa_review_outcomes.pop(outcome_id, None)
+
+    def save_varroa_photo_analysis_run(
+        self,
+        run: VarroaPhotoAnalysisRunResponse,
+    ) -> VarroaPhotoAnalysisRunResponse:
+        self.varroa_photo_analysis_runs[run.photo_analysis_run_id] = run
+        return run
+
+    def save_varroa_photo_analysis_bee_result(
+        self,
+        result: VarroaPhotoAnalysisBeeResultResponse,
+    ) -> VarroaPhotoAnalysisBeeResultResponse:
+        self.varroa_photo_analysis_bee_results[result.photo_analysis_bee_result_id] = result
+        return result
+
+    def get_varroa_photo_analysis_run(
+        self,
+        workspace_id: UUID,
+        photo_analysis_run_id: UUID,
+    ) -> VarroaPhotoAnalysisRunResponse | None:
+        run = self.varroa_photo_analysis_runs.get(photo_analysis_run_id)
+        if run is None or run.workspace_id != workspace_id:
+            return None
+        return self._with_varroa_photo_analysis_bee_results(run)
+
+    def list_varroa_photo_analysis_runs_for_photo(
+        self,
+        workspace_id: UUID,
+        inspection_photo_id: UUID,
+    ) -> list[VarroaPhotoAnalysisRunResponse]:
+        runs = [
+            self._with_varroa_photo_analysis_bee_results(run)
+            for run in self.varroa_photo_analysis_runs.values()
+            if run.workspace_id == workspace_id and run.inspection_photo_id == inspection_photo_id
+        ]
+        runs.sort(key=lambda run: run.started_at)
+        return runs
+
+    def _with_varroa_photo_analysis_bee_results(
+        self,
+        run: VarroaPhotoAnalysisRunResponse,
+    ) -> VarroaPhotoAnalysisRunResponse:
+        bee_results = [
+            result
+            for result in self.varroa_photo_analysis_bee_results.values()
+            if result.photo_analysis_run_id == run.photo_analysis_run_id
+        ]
+        return run.model_copy(update={"bee_results": bee_results})
 
     def get_training_crop_evidence(
         self,

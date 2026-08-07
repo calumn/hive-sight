@@ -26,6 +26,7 @@ from hive_sight_core_api.dataset_repository_workflow import DatasetRepositoryWor
 from hive_sight_core_api.dataset_role_assignment_workflow import DatasetRoleAssignmentWorkflow
 from hive_sight_core_api.dependencies import (
     DevStateDep,
+    build_configured_varroa_detector_adapter,
     get_advisor_treatment_recommendation_workflow,
     get_advisor_varroa_context_workflow,
     get_analysis_processing_workflow,
@@ -45,6 +46,7 @@ from hive_sight_core_api.dependencies import (
     get_settings,
     get_training_crop_dataset_item_workflow,
     get_training_crop_workflow,
+    get_varroa_photo_analysis_workflow,
     get_varroa_review_workflow,
 )
 from hive_sight_core_api.dev_store import DomainError, UserContext
@@ -150,6 +152,11 @@ from hive_sight_core_api.models import (
     UpdateDatasetLabellingSessionRequest,
     VarroaDetectorPreviewRequest,
     VarroaDetectorPreviewResponse,
+    VarroaDetectorReadinessResponse,
+    VarroaPhotoAnalysisCreateRequest,
+    VarroaPhotoAnalysisReviewRequest,
+    VarroaPhotoAnalysisRunListResponse,
+    VarroaPhotoAnalysisRunResponse,
     VarroaReviewCandidateListResponse,
     VarroaReviewOutcomeCreateRequest,
     VarroaReviewOutcomeResponse,
@@ -164,6 +171,7 @@ from hive_sight_core_api.training_crop_dataset_item_workflow import (
 )
 from hive_sight_core_api.training_crop_workflow import TrainingCropWorkflow
 from hive_sight_core_api.varroa_review_workflow import VarroaReviewWorkflow
+from hive_sight_core_api.varroa_photo_analysis_workflow import VarroaPhotoAnalysisWorkflow
 
 settings = get_settings()
 
@@ -226,6 +234,10 @@ TrainingCropDatasetItemWorkflowDep = Annotated[
 VarroaReviewWorkflowDep = Annotated[
     VarroaReviewWorkflow,
     Depends(get_varroa_review_workflow),
+]
+VarroaPhotoAnalysisWorkflowDep = Annotated[
+    VarroaPhotoAnalysisWorkflow,
+    Depends(get_varroa_photo_analysis_workflow),
 ]
 FrameLevelVarroaResultWorkflowDep = Annotated[
     FrameLevelVarroaResultWorkflow,
@@ -929,6 +941,32 @@ def get_bee_training_readiness(
     )
 
 
+@app.get(
+    "/v1/model-runtime/varroa-detector/readiness",
+    response_model=VarroaDetectorReadinessResponse,
+)
+def get_varroa_detector_readiness(user: AuthenticatedUserDep) -> VarroaDetectorReadinessResponse:
+    _ = user
+    settings = get_settings()
+    adapter = build_configured_varroa_detector_adapter(settings)
+    available = True
+    unavailable_reason = None
+    readiness = getattr(adapter, "readiness", None)
+    if callable(readiness):
+        available, unavailable_reason = readiness()
+    return VarroaDetectorReadinessResponse(
+        adapter_type=adapter.adapter_type,
+        adapter_version=adapter.adapter_version,
+        model_reference=adapter.model_reference,
+        available=available,
+        unavailable_reason=unavailable_reason,
+        database_purpose=settings.database_purpose,
+        deterministic_stub_evidence=adapter.adapter_type == "deterministic_stub",
+        replaceable_non_stub_adapter=adapter.adapter_type != "deterministic_stub",
+        last_validation_error=getattr(adapter, "last_validation_error", None),
+    )
+
+
 @app.post(
     "/v1/model-training/dataset-versions",
     response_model=DatasetVersionResponse,
@@ -1381,6 +1419,58 @@ def count_frame_mites(
         user=user,
         workspace_id=request.workspace_id,
         inspection_photo_id=inspection_photo_id,
+    )
+
+
+@app.post(
+    "/v1/inspection-photos/{inspection_photo_id}/varroa-photo-analyses",
+    response_model=VarroaPhotoAnalysisRunResponse,
+    status_code=201,
+)
+def run_varroa_photo_analysis(
+    inspection_photo_id: UUID,
+    request: VarroaPhotoAnalysisCreateRequest,
+    user: AuthenticatedUserDep,
+    workflow: VarroaPhotoAnalysisWorkflowDep,
+) -> VarroaPhotoAnalysisRunResponse:
+    return workflow.run_photo_analysis(
+        user=user,
+        workspace_id=request.workspace_id,
+        inspection_photo_id=inspection_photo_id,
+    )
+
+
+@app.get(
+    "/v1/inspection-photos/{inspection_photo_id}/varroa-photo-analyses",
+    response_model=VarroaPhotoAnalysisRunListResponse,
+)
+def list_varroa_photo_analyses(
+    inspection_photo_id: UUID,
+    workspace_id: UUID,
+    user: AuthenticatedUserDep,
+    workflow: VarroaPhotoAnalysisWorkflowDep,
+) -> VarroaPhotoAnalysisRunListResponse:
+    return workflow.list_photo_analyses(
+        user=user,
+        workspace_id=workspace_id,
+        inspection_photo_id=inspection_photo_id,
+    )
+
+
+@app.patch(
+    "/v1/varroa-photo-analyses/{photo_analysis_run_id}/review",
+    response_model=VarroaPhotoAnalysisRunResponse,
+)
+def review_varroa_photo_analysis(
+    photo_analysis_run_id: UUID,
+    request: VarroaPhotoAnalysisReviewRequest,
+    user: AuthenticatedUserDep,
+    workflow: VarroaPhotoAnalysisWorkflowDep,
+) -> VarroaPhotoAnalysisRunResponse:
+    return workflow.review_photo_analysis(
+        user=user,
+        photo_analysis_run_id=photo_analysis_run_id,
+        request=request,
     )
 
 
