@@ -94,6 +94,16 @@ def test_product_photo_analysis_does_not_require_a_training_crop(tmp_path: Path)
         assert body["bees_with_likely_varroa"] == 2
         assert body["bee_results"][0]["training_crop_id"] is None
         assert body["bee_results"][0]["inspection_photo_id"] == inspection_photo_id
+        image = client.get(
+            "/v1/varroa-photo-analyses/"
+            f"{body['photo_analysis_run_id']}/bee-results/"
+            f"{body['bee_results'][0]['photo_analysis_bee_result_id']}/head-up-image"
+            f"?workspace_id={workspace_id}",
+            headers=_headers(),
+        )
+        assert image.status_code == 200
+        assert image.headers["content-type"] == "image/png"
+        assert image.content.startswith(b"\x89PNG")
     finally:
         app.dependency_overrides.clear()
 

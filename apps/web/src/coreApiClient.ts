@@ -123,10 +123,20 @@ export type VarroaPhotoAnalysis = {
   inspectionPhotoId: string;
   status: "running" | "completed" | "partial" | "failed" | "no_usable_bees";
   reviewStatus: "unreviewed" | "accepted" | "rejected" | "inconclusive" | "needs_expert_review";
+  reviewNote: string | null;
   analysedBees: number;
   failedBees: number;
   beesWithLikelyVarroa: number;
   caveat: string;
+  beeResults: VarroaPhotoAnalysisBeeEvidence[];
+};
+
+export type VarroaPhotoAnalysisBeeEvidence = {
+  photoAnalysisBeeResultId: string;
+  status: "completed" | "failed";
+  mitesFound: number;
+  sourceGeometry: { x: number; y: number; width: number; height: number; rotationDegrees: number } | null;
+  detections: Array<{ x: number; y: number; width: number; height: number }>;
 };
 
 export type PhotoIntake = {
@@ -2989,10 +2999,44 @@ function parseVarroaPhotoAnalysis(value: unknown): VarroaPhotoAnalysis {
     inspectionPhotoId: requireString(record.inspection_photo_id, "inspection_photo_id"),
     status: status as VarroaPhotoAnalysis["status"],
     reviewStatus: reviewStatus as VarroaPhotoAnalysis["reviewStatus"],
+    reviewNote: optionalString(record.review_note, "review_note"),
     analysedBees: requireNumber(record.analysed_bees, "analysed_bees"),
     failedBees: requireNumber(record.failed_bees, "failed_bees"),
     beesWithLikelyVarroa: requireNumber(record.bees_with_likely_varroa, "bees_with_likely_varroa"),
-    caveat: requireString(record.caveat, "caveat")
+    caveat: requireString(record.caveat, "caveat"),
+    beeResults: requireArray(record.bee_results, "bee_results").map(parseVarroaPhotoAnalysisBeeEvidence)
+  };
+}
+
+function parseVarroaPhotoAnalysisBeeEvidence(value: unknown): VarroaPhotoAnalysisBeeEvidence {
+  const record = requireRecord(value, "Varroa Photo Analysis Bee Evidence");
+  const status = requireString(record.status, "bee result status");
+  if (status !== "completed" && status !== "failed") {
+    throw new Error("Core API response had an unexpected bee evidence status");
+  }
+  const geometry = record.source_geometry_snapshot === null
+    ? null
+    : requireRecord(record.source_geometry_snapshot, "source_geometry_snapshot");
+  return {
+    photoAnalysisBeeResultId: requireString(record.photo_analysis_bee_result_id, "photo_analysis_bee_result_id"),
+    status,
+    mitesFound: requireNumber(record.mites_found, "mites_found"),
+    sourceGeometry: geometry === null ? null : {
+      x: requireNumber(geometry.x, "source geometry x"),
+      y: requireNumber(geometry.y, "source geometry y"),
+      width: requireNumber(geometry.width, "source geometry width"),
+      height: requireNumber(geometry.height, "source geometry height"),
+      rotationDegrees: requireNumber(geometry.rotation_degrees, "source geometry rotation_degrees")
+    },
+    detections: requireArray(record.detections, "detections").map((detection) => {
+      const item = requireRecord(detection, "Varroa detection");
+      return {
+        x: requireNumber(item.x, "detection x"),
+        y: requireNumber(item.y, "detection y"),
+        width: requireNumber(item.width, "detection width"),
+        height: requireNumber(item.height, "detection height")
+      };
+    })
   };
 }
 

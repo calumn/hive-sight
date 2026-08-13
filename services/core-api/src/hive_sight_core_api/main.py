@@ -1479,6 +1479,27 @@ def list_varroa_photo_analyses(
     )
 
 
+@app.get(
+    "/v1/varroa-photo-analyses/{photo_analysis_run_id}/bee-results/{photo_analysis_bee_result_id}/head-up-image"
+)
+def get_varroa_photo_analysis_bee_evidence_image(
+    photo_analysis_run_id: UUID,
+    photo_analysis_bee_result_id: UUID,
+    workspace_id: UUID,
+    user: AuthenticatedUserDep,
+    workflow: VarroaPhotoAnalysisWorkflowDep,
+) -> Response:
+    return Response(
+        content=workflow.get_bee_evidence_image(
+            user=user,
+            workspace_id=workspace_id,
+            photo_analysis_run_id=photo_analysis_run_id,
+            photo_analysis_bee_result_id=photo_analysis_bee_result_id,
+        ),
+        media_type="image/png",
+    )
+
+
 @app.patch(
     "/v1/varroa-photo-analyses/{photo_analysis_run_id}/review",
     response_model=VarroaPhotoAnalysisRunResponse,

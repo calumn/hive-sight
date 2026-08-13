@@ -1490,6 +1490,7 @@ export function App() {
 
             {inspection ? (
               <InspectionPhotoListPanel
+                devUserId={devUserId}
                 photos={inspectionPhotos}
                 intent={inspection.intent}
                 analyses={photoAnalyses}
@@ -1646,6 +1647,7 @@ function RecordBadge({ value }: { value: string | undefined }) {
 }
 
 function InspectionPhotoListPanel({
+  devUserId,
   photos,
   intent,
   analyses,
@@ -1653,6 +1655,7 @@ function InspectionPhotoListPanel({
   onAnalyzeAllPhotos,
   onReviewPhotoAnalysis
 }: {
+  devUserId: string;
   photos: InspectionPhoto[];
   intent: InspectionIntent;
   analyses: Record<string, VarroaPhotoAnalysis>;
@@ -1705,6 +1708,8 @@ function InspectionPhotoListPanel({
                     {analyses[photo.inspectionPhotoId] ? (
                       <PhotoAnalysisSummary
                         analysis={analyses[photo.inspectionPhotoId]}
+                        photo={photo}
+                        devUserId={devUserId}
                         onReview={(status, note) => onReviewPhotoAnalysis(photo.inspectionPhotoId, status, note)}
                       />
                     ) : null}
@@ -1721,24 +1726,28 @@ function InspectionPhotoListPanel({
 
 function PhotoAnalysisSummary({
   analysis,
+  photo,
+  devUserId,
   onReview
 }: {
   analysis: VarroaPhotoAnalysis;
+  photo: InspectionPhoto;
+  devUserId: string;
   onReview: (status: VarroaPhotoAnalysis["reviewStatus"], note?: string) => void;
 }) {
   const [reviewStatus, setReviewStatus] = useState<VarroaPhotoAnalysis["reviewStatus"]>(
     analysis.reviewStatus
   );
-  const [reviewNote, setReviewNote] = useState(analysis.reviewStatus === "accepted" ? "" : "");
+  const [reviewNote, setReviewNote] = useState(analysis.reviewNote ?? "");
   const acceptanceDisabled = ["failed", "no_usable_bees"].includes(analysis.status);
   const needsNote = reviewStatus !== "accepted";
+  const savedReviewNote = analysis.reviewNote ?? "";
+  const isDirty = reviewStatus !== analysis.reviewStatus || reviewNote !== savedReviewNote;
 
   useEffect(() => {
     setReviewStatus(analysis.reviewStatus);
-    if (analysis.reviewStatus === "accepted") {
-      setReviewNote("");
-    }
-  }, [analysis.photoAnalysisRunId, analysis.reviewStatus]);
+    setReviewNote(analysis.reviewNote ?? "");
+  }, [analysis.photoAnalysisRunId, analysis.reviewStatus, analysis.reviewNote]);
 
   return (
     <div className="analysis-summary" aria-label="Photo analysis result">
@@ -1749,6 +1758,9 @@ function PhotoAnalysisSummary({
         {" analysed eligible bees"}
       </p>
       <p className="analysis-caveat">{analysis.caveat}</p>
+      {analysis.beeResults.length > 0 ? (
+        <ProductPhotoEvidence analysis={analysis} photo={photo} devUserId={devUserId} />
+      ) : null}
       <label>
         Review outcome
         <select
@@ -1775,11 +1787,114 @@ function PhotoAnalysisSummary({
       <button
         type="button"
         onClick={() => onReview(reviewStatus, reviewStatus === "accepted" ? undefined : reviewNote)}
-        disabled={reviewStatus === "unreviewed" || (needsNote && !reviewNote.trim())}
+        disabled={!isDirty || reviewStatus === "unreviewed" || (needsNote && !reviewNote.trim())}
+        data-testid="save-photo-analysis-review-button"
       >
         Save review
       </button>
     </div>
+  );
+}
+
+function ProductPhotoEvidence({
+  analysis,
+  photo,
+  devUserId
+}: {
+  analysis: VarroaPhotoAnalysis;
+  photo: InspectionPhoto;
+  devUserId: string;
+}) {
+  const initialBee = analysis.beeResults.find((bee) => bee.mitesFound > 0) ?? analysis.beeResults[0];
+  const [selectedBeeId, setSelectedBeeId] = useState(initialBee.photoAnalysisBeeResultId);
+  const [sourceImageUrl, setSourceImageUrl] = useState<string | null>(null);
+  const [beeImageUrl, setBeeImageUrl] = useState<string | null>(null);
+  const selectedBee = analysis.beeResults.find((bee) => bee.photoAnalysisBeeResultId === selectedBeeId) ?? initialBee;
+
+  useEffect(() => {
+    let cancelled = false;
+    const sourceViewUrl = `/v1/inspection-photos/${photo.inspectionPhotoId}/content?workspace_id=${photo.workspaceId}`;
+    const beeViewUrl = `/v1/varroa-photo-analyses/${analysis.photoAnalysisRunId}/bee-results/${selectedBee.photoAnalysisBeeResultId}/head-up-image?workspace_id=${photo.workspaceId}`;
+    void Promise.all([
+      fetchInspectionPhotoObjectUrl({ devUserId, viewUrl: sourceViewUrl }),
+      fetchInspectionPhotoObjectUrl({ devUserId, viewUrl: beeViewUrl })
+    ]).then(([nextSourceUrl, nextBeeUrl]) => {
+      if (cancelled) {
+        URL.revokeObjectURL(nextSourceUrl);
+        URL.revokeObjectURL(nextBeeUrl);
+        return;
+      }
+      setSourceImageUrl((current) => {
+        if (current) URL.revokeObjectURL(current);
+        return nextSourceUrl;
+      });
+      setBeeImageUrl((current) => {
+        if (current) URL.revokeObjectURL(current);
+        return nextBeeUrl;
+      });
+    }).catch(() => {
+      if (!cancelled) {
+        setBeeImageUrl(null);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [analysis.photoAnalysisRunId, devUserId, photo.inspectionPhotoId, photo.workspaceId, selectedBee.photoAnalysisBeeResultId]);
+
+  return (
+    <section className="product-photo-evidence" aria-label="Photo analysis evidence" data-testid="varroa-photo-evidence">
+      <div className="product-bee-list" aria-label="Analysed bees">
+        {analysis.beeResults.map((bee, index) => (
+          <button
+            type="button"
+            key={bee.photoAnalysisBeeResultId}
+            className={bee.photoAnalysisBeeResultId === selectedBeeId ? "selected" : ""}
+            onClick={() => setSelectedBeeId(bee.photoAnalysisBeeResultId)}
+          >
+            Bee {index + 1}: {bee.status === "failed" ? "not analysed" : bee.mitesFound > 0 ? "likely visible Varroa" : "no likely visible Varroa"}
+          </button>
+        ))}
+      </div>
+      <div className="product-evidence-grid">
+        <div>
+          <strong>Inspection photo context</strong>
+          <div className="photo-evidence product-source-photo">
+            {sourceImageUrl ? <img src={sourceImageUrl} alt={photo.filename} /> : <span>Loading photo evidence</span>}
+            {analysis.beeResults.map((bee) => bee.sourceGeometry ? (
+              <button
+                key={bee.photoAnalysisBeeResultId}
+                type="button"
+                aria-label="Select bee evidence"
+                className={`product-bee-outline ${bee.photoAnalysisBeeResultId === selectedBeeId ? "selected" : ""}`}
+                style={{
+                  left: `${(bee.sourceGeometry.x - bee.sourceGeometry.width / 2) * 100}%`,
+                  top: `${(bee.sourceGeometry.y - bee.sourceGeometry.height / 2) * 100}%`,
+                  width: `${bee.sourceGeometry.width * 100}%`,
+                  height: `${bee.sourceGeometry.height * 100}%`,
+                  transform: `rotate(${bee.sourceGeometry.rotationDegrees}deg)`
+                }}
+                onClick={() => setSelectedBeeId(bee.photoAnalysisBeeResultId)}
+              ><span /></button>
+            ) : null)}
+          </div>
+        </div>
+        <div>
+          <strong>Head-up bee evidence</strong>
+          <div className="paired-bee-evidence">
+            <figure>
+              <figcaption>Clean</figcaption>
+              {beeImageUrl ? <img src={beeImageUrl} alt="Head-up bee crop" /> : <span>Loading bee evidence</span>}
+            </figure>
+            <figure className="marked">
+              <figcaption>Marked</figcaption>
+              {beeImageUrl ? <img src={beeImageUrl} alt="Marked head-up bee crop" /> : <span>Loading bee evidence</span>}
+              {selectedBee.mitesFound > 0 ? <span className="likely-varroa-marker" aria-label="Likely visible Varroa" /> : null}
+            </figure>
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }
 

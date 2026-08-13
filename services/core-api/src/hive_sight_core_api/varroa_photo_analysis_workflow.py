@@ -1,6 +1,12 @@
 from collections.abc import Callable
 from dataclasses import dataclass
+from io import BytesIO
 from uuid import UUID
+
+try:
+    from PIL import Image
+except ImportError:  # pragma: no cover - declared Core API dependency.
+    Image = None
 
 from hive_sight_core_api.dev_store import DomainError, InMemoryProductDataStore, UserContext
 from hive_sight_core_api.models import (
@@ -21,6 +27,9 @@ from hive_sight_core_api.varroa_review_workflow import (
     VarroaDetectorFailure,
     VarroaDetectorRequest,
 )
+
+
+PRODUCT_EVIDENCE_IMAGE_SIZE_PX = 512
 
 
 @dataclass(frozen=True)
@@ -252,6 +261,57 @@ class VarroaPhotoAnalysisWorkflow:
                 inspection_photo_id=inspection_photo_id,
             ),
         )
+
+    def get_bee_evidence_image(
+        self,
+        user: UserContext,
+        workspace_id: UUID,
+        photo_analysis_run_id: UUID,
+        photo_analysis_bee_result_id: UUID,
+    ) -> bytes:
+        self.store.require_workspace_access(user, workspace_id)
+        run = self.store.get_varroa_photo_analysis_run(workspace_id, photo_analysis_run_id)
+        if run is None:
+            raise DomainError("photo_analysis_not_found", "The requested Varroa Photo Analysis was not found in this Workspace.", 404)
+        result = next(
+            (
+                item
+                for item in run.bee_results
+                if item.photo_analysis_bee_result_id == photo_analysis_bee_result_id
+            ),
+            None,
+        )
+        if result is None or result.source_geometry_snapshot is None:
+            raise DomainError("photo_analysis_bee_evidence_not_found", "The requested Inspection Photo Bee Evidence was not found.", 404)
+        photo = self.store.get_inspection_photo(run.inspection_photo_id)
+        body = self.image_loader(photo.original_object_key) if photo else None
+        if body is None:
+            raise DomainError("source_image_not_available", "The source Inspection Photo is not available.", 404)
+        if Image is None:
+            raise DomainError("image_processing_unavailable", "Image processing is unavailable in this Core API environment.", 503)
+        image = Image.open(BytesIO(body)).convert("RGB")
+        geometry = result.source_geometry_snapshot
+        center_x = float(geometry["x"]) * image.width
+        center_y = float(geometry["y"]) * image.height
+        span = max(float(geometry["width"]) * image.width, float(geometry["height"]) * image.height) * 1.8
+        left = max(0, int(center_x - span / 2))
+        top = max(0, int(center_y - span / 2))
+        right = min(image.width, int(center_x + span / 2))
+        bottom = min(image.height, int(center_y + span / 2))
+        crop = image.crop((left, top, right, bottom))
+        rotation_degrees = float(geometry.get("rotation_degrees", 0.0)) + 90
+        rotated = crop.rotate(
+            rotation_degrees,
+            resample=Image.Resampling.BICUBIC,
+            expand=True,
+            fillcolor=(255, 255, 255),
+        )
+        rotated.thumbnail((PRODUCT_EVIDENCE_IMAGE_SIZE_PX, PRODUCT_EVIDENCE_IMAGE_SIZE_PX), Image.Resampling.LANCZOS)
+        canvas = Image.new("RGB", (PRODUCT_EVIDENCE_IMAGE_SIZE_PX, PRODUCT_EVIDENCE_IMAGE_SIZE_PX), (255, 255, 255))
+        canvas.paste(rotated, ((PRODUCT_EVIDENCE_IMAGE_SIZE_PX - rotated.width) // 2, (PRODUCT_EVIDENCE_IMAGE_SIZE_PX - rotated.height) // 2))
+        output = BytesIO()
+        canvas.save(output, format="PNG")
+        return output.getvalue()
 
     def run_all_photo_analyses(
         self, user: UserContext, workspace_id: UUID, inspection_id: UUID

@@ -91,6 +91,15 @@ test("Beekeeper resumes a processed Varroa assessment after switching Users", as
   await page.getByTestId("upload-photo-button").click();
   await page.getByTestId("analyze-photo-button").click();
   await expect(page.getByText("bees with likely visible Varroa")).toBeVisible();
+  await expect(page.getByTestId("varroa-photo-evidence")).toBeVisible();
+  await expect(page.getByText("Inspection photo context", { exact: true })).toBeVisible();
+  await expect(page.getByText("Head-up bee evidence", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("save-photo-analysis-review-button")).toBeDisabled();
+  await page.getByLabel("Review outcome").selectOption("accepted");
+  await expect(page.getByTestId("save-photo-analysis-review-button")).toBeEnabled();
+  await page.getByTestId("save-photo-analysis-review-button").click();
+  await expect(page.getByLabel("Review outcome")).toHaveValue("accepted");
+  await expect(page.getByTestId("save-photo-analysis-review-button")).toBeDisabled();
 
   await userSelect.selectOption("00000000-0000-0000-0000-000000000101");
   await expect(page.getByTestId("development-user-code")).toContainText("DEV-OWNER-CURATOR");
