@@ -1,6 +1,6 @@
 # Current System Architecture
 
-Status: snapshot after Review Remediation 0001 and before Slice 0014 persistence.
+Status: snapshot after Slice 0034 one-click Varroa Photo Analysis workflow.
 
 ## Purpose
 
@@ -13,7 +13,7 @@ flowchart LR
     user["Developer / Beekeeper<br/>local web user"]
     web["Web App<br/>React / Vite"]
     core["Core API<br/>FastAPI"]
-    store[("InMemoryProductDataStore<br/>process-local metadata")]
+    store[("Metadata store<br/>in-memory fast path / opt-in Postgres path")]
     localfiles[("Local object files<br/>uploaded images")]
     analysis["Analysis Service<br/>FastAPI, tested separately"]
     reports[("Slice verification reports")]
@@ -22,7 +22,7 @@ flowchart LR
     web --> core
     core --> store
     core --> localfiles
-    core -. in-process deterministic stub .-> core
+    core -. replaceable local model adapters .-> core
     analysis -. not yet called by Core API .-> analysis
     core -. verification .-> reports
     web -. verification .-> reports
@@ -32,8 +32,10 @@ flowchart LR
 ## Implemented Boundaries
 
 - Web App calls Core API through `CoreApiClient`.
-- Core API owns local product workflows, dev authentication, Workspace checks, inspection photo upload, dataset labelling, crop annotation, dataset role assignment, export package construction, Hive Configuration, and deterministic stub analysis projection.
+- Core API owns local product workflows, dev authentication, Workspace checks, inspection photo upload, dataset labelling, crop annotation, dataset role assignment, export package construction, Hive Configuration, Training Inspection workflow support, and Varroa Photo Analysis evidence.
 - Analysis Service exists as a separate tested service, but Core API does not yet call it.
+- Varroa Assessment inspections use the Core API product Photo Analysis workflow: `Analyze photo` creates a Varroa Photo Analysis, runs the configured development model-adapter path, persists Inspection Photo Bee Evidence, and exposes photo-level review status.
+- Training Data Collection inspections remain separate from product Photo Analysis. Training workflows use Training Crops, Bee Annotation, Crop Governance, Varroa Review, and Model Governance; product Photo Analysis does not create Training Crops or Varroa Review Outcomes.
 - Local image bytes are stored outside metadata records.
 - Slice verification can run Core API tests, Analysis Service tests, Web TypeScript checks, and Playwright browser acceptance tests.
 
@@ -44,12 +46,15 @@ Review Remediation 0001 moved several rule clusters out of the dev store and int
 - `HiveConfigurationWorkflow`
 - `TrainingCropWorkflow`
 - `TrainingCropDatasetItemWorkflow`
+- `VarroaPhotoAnalysisWorkflow`
 
-The in-memory store still owns persistence-shaped operations and some remaining workflow-heavy behaviour, especially export/package construction and dev-oriented authorization helpers.
+The store still owns persistence-shaped operations and some remaining workflow-heavy behaviour, especially export/package construction and dev-oriented authorization helpers.
 
 ## Current Persistence
 
-The only product metadata persistence is in memory. Records do not survive API restart. This remains acceptable for fast workflow tests and local spikes, but it is no longer acceptable for the Bee Annotation Repository path that feeds model training.
+HiveSight is dual-mode locally. Fast workflow and unit tests still use the in-memory store; durable metadata can run through the opt-in Postgres-backed Core API path introduced for the Bee Annotation Repository and extended by later migrations.
+
+Local Postgres verification is required to fully acceptance-close persistence-dependent slices. The latest generated slice report records the fast verification lane for Slice 0034, but does not record live Postgres verification for migration `0034_product_photo_analysis_evidence.sql`.
 
 ## Current Testing Standard
 
@@ -59,12 +64,11 @@ The only product metadata persistence is in memory. Records do not survive API r
 
 ## Known Gaps
 
-- No durable database.
-- No database migrations.
+- Production persistence hardening remains incomplete.
 - No durable queue.
 - No Core API to Analysis Service integration.
 - No production auth provider.
 - No production object-storage provider or signed URL path.
 - No production deployment target.
 - No Analysis Store ownership decision.
-- Varroa detection remains product/model intent, not implemented capability.
+- The delivered Varroa Photo Analysis path is deterministic development model evidence, not a production Varroa model, statistically defensible Varroa estimate, Advisor trigger, diagnosis, or treatment recommendation.
