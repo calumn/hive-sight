@@ -11,9 +11,9 @@ Use this when something is out of scope now but expected later. Prefer ADRs or t
 - `closed`: no longer needed.
 - `superseded`: replaced by another parked item or decision.
 
-## PARK-0016: Product Photo Analysis Confidence Policy
+## PARK-0057: Product Photo Analysis Confidence Policy
 
-Status: parked
+Status: promoted
 Date parked: 2026-08-07
 Source: Slice 0034 grilling
 Area: model evidence, product policy
@@ -26,7 +26,11 @@ Revisit trigger:
 
 Before replacing the deterministic product-photo adapter with real model adapters, defining user-facing confidence/caveat language, or making a statistical claim from Photo Analysis.
 
-## PARK-0017: Product Photo Analysis Follow-On Workflow
+Promotion note:
+
+Promoted into `architecture/vertical-slice-0035-product-photo-analysis-confidence-policy.md` after Slice 0034 was confirmed implemented and the next delivery decision became whether accepted product Photo Analysis evidence should ever be Advisor-ready when produced by deterministic development evidence or blocked by confidence/coverage policy.
+
+## PARK-0058: Product Photo Analysis Follow-On Workflow
 
 Status: parked
 Date parked: 2026-08-07
@@ -49,6 +53,28 @@ Follow-on work:
 Revisit trigger:
 
 After the real adapter replaces the deterministic Slice 0034 adapter, or when beekeepers begin reporting evidence they believe is wrong.
+
+## PARK-0059: Product Photo Analysis Per-Bee Confidence Breakdown
+
+Status: parked
+Date parked: 2026-08-14
+Source: Slice 0035 grilling
+Area: model evidence, product policy, evidence explanation
+
+Context:
+
+Slice 0035 adds a run-level Product Photo Analysis Confidence Policy and structured caveat counts. It deliberately keeps per-bee confidence-policy fields out of scope. The future product evidence model still needs per-bee and photo-level confidence breakdowns so HiveSight can explain how confident it is that a detected object is a complete visible bee, that its orientation is usable, and that it does or does not have likely visible Varroa.
+
+Follow-on work:
+
+- Add per-bee confidence/policy status for bee presence and complete-visible-bee classification.
+- Add per-bee confidence/policy status for orientation usability.
+- Add per-bee Varroa positive/negative confidence or reliability, including zero-detection/no-visible-Varroa evidence.
+- Roll per-bee evidence into a photo-level confidence explanation without creating a Visible Varroa Rate or treatment claim.
+
+Revisit trigger:
+
+Before building corrective feedback, expert review, detector QA, user-facing evidence explanation, real adapter promotion, or any Advisor workflow that needs to explain why a photo-level product evidence result was trusted.
 
 ## PARK-0001: UI-Level Gherkin Harness
 
