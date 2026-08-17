@@ -232,9 +232,9 @@ Rationale: Selection Method makes the independence of the Varroa evidence audita
 
 ### MR-017B Dataset Split Leakage Prevention
 
-The project shall guard against duplicate or near-duplicate frame photos crossing training, validation, and benchmark splits.
+The project shall guard against duplicate, near-duplicate, and paired side photos from the same Hive Frame Slot or Inspection Frame Observation crossing training, validation, and benchmark splits unless a later approved methodology explicitly allows that split.
 
-Rationale: Similar images of the same frame can make model evaluation look better than it really is.
+Rationale: Similar images of the same frame position or observed frame, including opposite sides captured during the same inspection handling, can make model evaluation look better than it really is.
 
 ### MR-017C Training Crops
 

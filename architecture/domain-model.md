@@ -17,7 +17,7 @@ In scope:
 - workspace-owned apiaries, hives, inspections, and inspection photos
 - registered user with a default workspace and owner workspace membership
 - beekeeper as the primary product persona in version one
-- optional frame labels within an inspection
+- hive frame slots, inspection frame observations, and optional frame labels
 - AI-assisted analysis of inspection photos
 - tagged photo review
 - lightweight user corrections
@@ -231,6 +231,7 @@ Relationships:
 - belongs to one apiary
 - has many hive configurations over time
 - has one active hive configuration at a time
+- may have many hive frame slots
 - has many inspections
 
 ### Hive Configuration
@@ -283,6 +284,43 @@ Rules:
 - Training data should preserve whatever Hive Configuration was known when the source image was captured. If capture-time configuration cannot be resolved, Dataset Item provenance may fall back to assignment-time configuration and must record that fallback.
 - Detailed Hive Component or Box configuration is deferred; for Slice 0014, `box/use` remains on Hive Configuration and is snapshotted into Dataset Item provenance.
 
+### Hive Frame Slot
+
+A persistent frame position or context within one Hive.
+
+Essential fields:
+
+- id
+- hive id
+- optional hive configuration id
+- frame use
+- slot code or number
+- optional display label
+- status
+- created at
+- archived at
+
+Initial frame uses may include:
+
+- `brood`
+- `super`
+- `extra_deep`
+- `other`
+- `unknown`
+
+Relationships:
+
+- belongs to one hive
+- may reference the Hive Configuration that defined or last confirmed the slot context
+- may have many inspection frame observations over time
+
+Rules:
+
+- A Hive Frame Slot identifies where in the hive inspected frame evidence came from, such as brood frame 3 or super 1 frame 7.
+- A Hive Frame Slot is not a permanent physical wooden-frame or comb inventory record.
+- If frames are rearranged, replaced, or moved between boxes, HiveSight may later need explicit slot-history or physical-frame tracking. That is out of scope for the first frame-position refactor.
+- Hive Frame Slots should be stable enough for comparing brood position and frame-level evidence across inspections.
+
 ### Frame Standard
 
 A reusable description of expected physical frame dimensions.
@@ -306,7 +344,7 @@ Rules:
 
 ### Inspection
 
-A dated review of one hive.
+A dated opening and review of one hive.
 
 Essential fields:
 
@@ -324,6 +362,7 @@ Essential fields:
 Relationships:
 
 - belongs to one hive
+- may contain many inspection frame observations
 - contains many inspection photos
 - may define many frame labels
 - may have one current inspection summary
@@ -338,22 +377,56 @@ Rules:
 - Every Inspection has one explicit intent.
 - Initial intents are `training_data_collection` and `varroa_assessment`.
 - Dataset labelling workflows and beekeeper-facing Varroa assessment workflows must not be mixed inside the same Inspection.
+- An Inspection is the single point event for one hive opening. It may cover brood frames, super frames, or other frame-use contexts within that hive, but it must not combine evidence from multiple hives.
 
-### Frame Label
+### Inspection Frame Observation
 
-An optional label that groups photos believed to show the same frame during one inspection.
+The record that one Hive Frame Slot was inspected during one Inspection.
 
 Essential fields:
 
 - id
 - inspection id
-- label
+- hive frame slot id
+- optional observed frame use
+- optional inspection order
+- optional frame label
 - optional notes
 
 Relationships:
 
 - belongs to one inspection
-- may be attached to many inspection photos
+- references one hive frame slot
+- may have many inspection photos
+- may have at most one intended side-A photo set and one intended side-B photo set unless the beekeeper records retakes or detail photos explicitly
+
+Rules:
+
+- An Inspection Frame Observation is local to one Inspection; it records that a Hive Frame Slot was examined during that hive opening.
+- Multiple Inspection Photos may refer to the same Inspection Frame Observation when they show different sides, retakes, close-ups, or supporting detail for that observed frame.
+- A normal complete frame-side capture is two Inspection Photos for the same Inspection Frame Observation, one for each side.
+- Side labels are relative capture labels such as `side_a`, `side_b`, and `unknown`; they do not assert a permanent physical orientation of the frame.
+- A practical product upload guardrail may limit one Inspection to roughly 40-50 photos, but the domain model should not treat that as a biological or beekeeping invariant.
+
+### Frame Label
+
+An optional text label for a Hive Frame Slot, Inspection Frame Observation, or legacy grouping of photos believed to show the same frame.
+
+Essential fields:
+
+- id
+- optional hive frame slot id
+- optional inspection id
+- optional inspection frame observation id
+- label
+- optional notes
+
+Relationships:
+
+- may belong to one hive frame slot
+- may belong to one inspection
+- may be attached to one inspection frame observation
+- may be attached to many inspection photos in legacy or lightweight workflows
 
 Rules:
 
@@ -470,6 +543,8 @@ Essential fields:
 - workspace id
 - source image id
 - inspection id
+- optional inspection frame observation id
+- optional frame side
 - optional frame label id
 - upload status
 - image quality status
@@ -480,6 +555,7 @@ Relationships:
 
 - references one source image
 - belongs to one inspection
+- may reference one inspection frame observation
 - may reference one frame label
 - may have many analysis results over time
 - may have many annotations through analysis results
@@ -492,6 +568,7 @@ Rules:
 - Product workflows and UI language should continue to use Inspection Photo.
 - In Slice 0014, every persisted Source Image is an Inspection Photo source image.
 - Tagged photos are rendered views, not replacements for the original.
+- When frame-side context is known, an Inspection Photo should record the Inspection Frame Observation and side it shows so later frame-level evidence does not rely on filename guesses or loose grouping labels.
 
 ### Training Crop
 
@@ -593,7 +670,7 @@ Relationships:
 Rules:
 
 - The summary should be recalculable.
-- Aggregation must account for optional frame labels and quality warnings.
+- Aggregation must account for Hive Frame Slot, Inspection Frame Observation, frame side context, unresolved frame grouping, legacy frame labels, and quality warnings.
 
 ### Bee Annotation
 
@@ -1720,10 +1797,14 @@ Rules:
 - Workspace membership belongs to one user and one workspace.
 - Internal capability belongs to one user.
 - Apiary contains many hives.
+- Hive may have many hive frame slots.
 - Hive has many inspections.
+- Hive frame slot may have many inspection frame observations.
+- Inspection may contain many inspection frame observations.
 - Inspection contains many inspection photos.
 - Inspection may define many frame labels.
-- Frame label may group many inspection photos within one inspection.
+- Inspection frame observation may have many inspection photos.
+- Frame label may name one hive frame slot, name one inspection frame observation, or group many inspection photos in legacy/lightweight workflows.
 - Inspection photo may have many analysis results.
 - Source image may have many training crops.
 - Inspection photo may be referenced by many training crops when the source image is an inspection photo.
@@ -1931,7 +2012,7 @@ Deferred privacy decisions:
 - `Inspection` supports FR-003.
 - `Inspection Photo` supports FR-004 and FR-013.
 - `Training Crop` supports the bee annotation repository and curriculum training baseline.
-- `Frame Label` supports FR-005.
+- `Hive Frame Slot`, `Inspection Frame Observation`, `Frame Side`, and `Frame Label` support FR-005.
 - `Bee Annotation` and `Analysis Result` support FR-006 and MR-001.
 - Oriented bee ellipse geometry supports MR-008, MR-008A, MR-001A, ADR-0002, and ADR-0006.
 - `Varroa Annotation` and `Analysis Result` support FR-007 and MR-002.
@@ -1960,7 +2041,7 @@ Deferred privacy decisions:
 - What exact deletion/purge timing and legal-retention exceptions apply to withdrawn source assets and model artifacts?
 - What data deletion or purge workflow is required before production use?
 - Are uploaded photos and inspection metadata legally or operationally personally identifiable or sensitive in the target markets?
-- Should frame labels affect v1 aggregation, or only provide warning context?
+- Should Hive Frame Slot and Frame Side context affect v1 aggregation, or only provide warning context until source-frame reconciliation is implemented?
 - How should duplicate or near-duplicate inspection photos be detected?
 - What is the first model integration style: local model, hosted model service, or manual/mock analysis?
 - What annotation or review interface should be used for first ground-truth creation?

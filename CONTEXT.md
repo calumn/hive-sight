@@ -64,8 +64,20 @@ _Avoid_: Hive Type when the point includes more than the named hive family.
 The expected physical frame dimensions for a Hive Configuration and frame use, such as brood, super, or extra deep.
 _Avoid_: Frame Label when referring to physical equipment dimensions rather than grouping photos.
 
+**Hive Frame Slot**:
+A persistent frame position or context within a Hive, such as brood frame 3 or super 1 frame 7. It identifies where inspected frame evidence came from without claiming the same physical wooden frame or comb remains there forever.
+_Avoid_: Inspection Frame when the point is a reusable hive-level frame position across inspections.
+
+**Inspection Frame Observation**:
+The record that one Hive Frame Slot was inspected during one Inspection. It carries inspection-specific frame evidence and is the parent context for photos of that slot during that hive opening.
+_Avoid_: Hive Frame Slot when the point is what happened during one inspection rather than the reusable hive-level position.
+
+**Frame Side**:
+One photographed side of an Inspection Frame Observation. Version-one side labels are relative within the inspection, such as `side_a`, `side_b`, or `unknown`; they do not claim a permanent physical orientation of the frame.
+_Avoid_: Photo when the point is which side of the same observed frame the photo shows.
+
 **Inspection**:
-A dated review of one hive, containing photos and analysis evidence.
+A dated opening and review of one hive, containing frame observations, photos, and analysis evidence.
 _Avoid_: Inspection event, visit, session.
 
 **Inspection Intent**:
@@ -149,8 +161,8 @@ The explicit, durable relationship from Varroa evidence or Varroa Assessment con
 _Avoid_: Treating later treatment records as independent facts when they came from a specific evidence-backed recommendation.
 
 **Frame Label**:
-An optional label that groups photos believed to show the same frame during one inspection.
-_Avoid_: Frame record, frame inventory.
+An optional text label for a Hive Frame Slot, Inspection Frame Observation, or legacy photo grouping.
+_Avoid_: Hive Frame Slot or Inspection Frame Observation when the system needs a first-class frame-position or inspection-evidence relationship.
 
 **Source Image**:
 The underlying original image evidence record used by inspection, dataset, and model-governance workflows. In Slice 0014, every Source Image is an Inspection Photo source image. Later, imported, public, or bootstrap Source Images may exist outside the inspection workflow.

@@ -50,9 +50,9 @@ Rationale: A person must register, log in, be authorized for the Workspace, and 
 
 ### FR-005 Multiple Photos Per Frame
 
-The system should support optional frame labels so multiple photos can be marked as belonging to the same frame without requiring heavy frame management in version one.
+The system should support hive-level frame-position context so multiple photos can be marked as belonging to the same Hive Frame Slot, observed during a specific inspection, and, when known, to distinct frame sides, without requiring permanent physical-frame inventory management in version one.
 
-Rationale: Varroa detection may benefit from additional image coverage, but the first version should avoid slowing the product with complex frame modelling.
+Rationale: Varroa detection and brood-pattern interpretation may benefit from frame position, both sides, retakes, or detail photos of a frame, but the first version should avoid slowing the product with permanent wooden-frame or comb lifecycle tracking.
 
 ### FR-006 Bee Counting
 
@@ -253,7 +253,7 @@ Rationale: Version one is decision support and model-learning evidence, not a va
 
 ### NFR-003 Data Organisation
 
-The system shall preserve relationships between Users, Workspace Memberships, Workspaces, apiaries, hives, inspections, frame labels, inspection photos, analysis results, annotations, user corrections, and model-governance records.
+The system shall preserve relationships between Users, Workspace Memberships, Workspaces, apiaries, hives, Hive Frame Slots, inspections, Inspection Frame Observations, frame sides or labels, inspection photos, analysis results, annotations, user corrections, and model-governance records.
 
 Rationale: Historical inspection context is central to the product.
 

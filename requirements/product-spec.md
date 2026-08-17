@@ -14,7 +14,7 @@ The project also needs to document how AI affects the software development lifec
 
 Build a web-first inspection support system for hobbyist and small-scale beekeepers.
 
-The User registers, receives a default Workspace, and receives an owner Workspace Membership. Acting as the primary Beekeeper, that User creates an apiary, creates hives within that apiary, creates an inspection for a hive, uploads one or more inspection photos, and reviews analysis results. The system estimates complete visible bees, tracks partial visible bees separately, detects likely Varroa mites on or near bees, and, only after the required model and methodology gates are met, calculates a caveated photo-visible estimate for declared reconciled frame evidence. It presents tagged photos showing the evidence behind the estimate.
+The User registers, receives a default Workspace, and receives an owner Workspace Membership. Acting as the primary Beekeeper, that User creates an apiary, creates hives within that apiary, records Hive Frame Slots when frame position context is known, creates an inspection for a hive, records which slots were observed during that inspection, uploads one or more inspection photos for those frame sides, and reviews analysis results. The system estimates complete visible bees, tracks partial visible bees separately, detects likely Varroa mites on or near bees, and, only after the required model and methodology gates are met, calculates a caveated photo-visible estimate for declared reconciled frame evidence. It presents tagged photos showing the evidence behind the estimate.
 
 The Beekeeper can optionally view all detected bees and can lightly correct results by marking false Varroa detections or missed likely Varroa locations. The system stores the original inspection photo, structured annotation data, analysis results, and user corrections so tagged photos can be re-rendered and model accuracy can be evaluated later.
 
@@ -78,19 +78,29 @@ Feature: Hive inspection photo capture
     Then each photo is associated with the inspection
     And the original uploaded photo is preserved for later review
 
+  Scenario: Beekeeper records both sides of the same hive frame slot
+    Given a Beekeeper has a hive with a brood or super Hive Frame Slot
+    And the Beekeeper has created an inspection for that hive
+    When the Beekeeper records that slot as observed during the inspection
+    And the Beekeeper uploads one photo for side A and one photo for side B of that observed slot
+    Then both photos are associated with the same Inspection Frame Observation
+    And the observation references the Hive Frame Slot
+    And each photo keeps its side label separate from the other side
+    And HiveSight does not treat the slot as a permanent physical wooden-frame inventory record
+
   Scenario: Beekeeper uploads both sides of multiple frames to one inspection
     Given a Beekeeper has created an inspection
     And the Workspace has an accepted Workspace Data Use Agreement
     When the Beekeeper uploads photos for multiple brood frames and frame sides
     Then the inspection can contain all uploaded photos
     And each photo remains separately reviewable
-    And optional frame labels may be used to describe which photos came from the same frame
+    And Inspection Frame Observations may be used to describe which photos came from the same Hive Frame Slot and side
 
-  Scenario: Beekeeper optionally labels photos from the same frame
+  Scenario: Beekeeper optionally labels a hive frame slot
     Given a Beekeeper has uploaded multiple photos to an inspection
-    When the Beekeeper labels two or more photos with the same frame label
-    Then the system records that those photos may represent the same frame
-    And the system does not require full frame inventory management
+    When the Beekeeper gives the hive frame slot a label
+    Then the system records that the label describes the Hive Frame Slot
+    And the system does not treat that label as physical frame inventory
 
 Feature: Varroa image analysis
 
@@ -384,8 +394,8 @@ Feature: Deferred guest trial analysis
 - Workspace Membership is persisted from version one, but only the `owner` role is supported.
 - Android and Apple apps are future-facing concerns, not version-one delivery targets.
 - Guest or trial photo analysis is a deferred / V2 acquisition workflow, not a version-one delivery target.
-- The core domain model should include User, Workspace, Workspace Membership, apiary, hive, inspection, inspection photo, analysis result, annotation, user correction, Workspace Data Use Agreement, Data Deletion Request, model version, dataset version, and benchmark evaluation.
-- Frame-level handling should be light in version one. Photos may have optional frame labels, but the system should not require full frame inventory management.
+- The core domain model should include User, Workspace, Workspace Membership, apiary, hive, Hive Frame Slot, inspection, Inspection Frame Observation, Inspection Photo, analysis result, annotation, user correction, Workspace Data Use Agreement, Data Deletion Request, model version, dataset version, and benchmark evaluation.
+- Frame-level handling should be light in version one. Photos may identify an Inspection Frame Observation and side when known, while the observation references a reusable Hive Frame Slot; the system should not require permanent physical-frame inventory management.
 - Inspections must support multiple photos so a beekeeper can capture several frames and both sides of a frame within one inspection.
 - The analysis output should include estimated complete visible bee count, partial visible bee count where possible, likely Varroa count, Varroa association state, and, when promotion gates are met, a caveated photo-visible rate for reconciled frame evidence with sampling-plan and coverage provenance.
 - The system should store original photos and structured annotation data rather than relying only on flattened annotated images.
@@ -445,7 +455,7 @@ Feature: Deferred guest trial analysis
 
 ## Further Notes
 
-Multiple photos of the same frame are useful but risky for aggregation. Without careful grouping, the system may double-count bees or mites. Version one should allow optional frame labels and clearly caveat inspection-level aggregation when frame grouping is incomplete.
+Multiple photos of the same frame position are useful but risky for aggregation. Without frame-side context and reconciliation, the system may double-count bees or mites. Version one should allow lightweight Hive Frame Slot and Inspection Frame Observation context and clearly caveat inspection-level aggregation when frame grouping is incomplete.
 
 The annotation and correction loop is part of the product and part of the AI-SDLC evidence strategy. It gives users a way to inspect output quality while creating structured evidence for later model evaluation.
 

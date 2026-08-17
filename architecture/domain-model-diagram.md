@@ -8,10 +8,16 @@ erDiagram
     WORKSPACE ||--o{ WORKSPACE_MEMBERSHIP : grants_access
     WORKSPACE ||--o{ APIARY : owns
     APIARY ||--o{ HIVE : contains
+    HIVE ||--o{ HIVE_FRAME_SLOT : has
     HIVE ||--o{ INSPECTION : has
+    HIVE_FRAME_SLOT ||--o{ INSPECTION_FRAME_OBSERVATION : observed_as
+    INSPECTION ||--o{ INSPECTION_FRAME_OBSERVATION : contains
+    INSPECTION_FRAME_OBSERVATION ||--o{ INSPECTION_PHOTO : photographed_by
     INSPECTION ||--o{ INSPECTION_PHOTO : contains
     INSPECTION ||--o{ FRAME_LABEL : defines
-    FRAME_LABEL ||--o{ INSPECTION_PHOTO : groups
+    FRAME_LABEL ||--o| HIVE_FRAME_SLOT : names_slot
+    FRAME_LABEL ||--o| INSPECTION_FRAME_OBSERVATION : names_observation
+    FRAME_LABEL ||--o{ INSPECTION_PHOTO : groups_legacy
     SOURCE_IMAGE ||--o| INSPECTION_PHOTO : plays_role_as
     SOURCE_IMAGE ||--o{ TRAINING_CROP : yields
 
@@ -93,6 +99,15 @@ erDiagram
         string status
     }
 
+    HIVE_FRAME_SLOT {
+        string id
+        string hive_id
+        string frame_use
+        string slot_code
+        string display_label
+        string status
+    }
+
     INSPECTION {
         string id
         string hive_id
@@ -100,9 +115,19 @@ erDiagram
         string status
     }
 
-    FRAME_LABEL {
+    INSPECTION_FRAME_OBSERVATION {
         string id
         string inspection_id
+        string hive_frame_slot_id
+        string frame_label
+        string observed_frame_use
+        int inspection_order
+    }
+
+    FRAME_LABEL {
+        string id
+        string hive_frame_slot_id
+        string inspection_frame_observation_id
         string label
     }
 
@@ -110,6 +135,8 @@ erDiagram
         string id
         string source_image_id
         string inspection_id
+        string inspection_frame_observation_id
+        string frame_side
         string upload_status
         string image_quality_status
     }

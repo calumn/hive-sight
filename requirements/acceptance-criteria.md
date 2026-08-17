@@ -26,7 +26,7 @@ Implementation traceability note: the Varroa Detection and Infection-Rate Estima
 - A User acting as the primary Beekeeper can upload one or more photos to an inspection.
 - The system preserves the association between each photo and its inspection.
 - The system supports multiple photos for the same inspection.
-- The system can distinguish, or later allow the user to distinguish, photos that belong to the same frame.
+- The system can distinguish, or later allow the user to distinguish, photos that belong to the same Hive Frame Slot, Inspection Frame Observation, and frame side.
 
 ## Bee Counting
 
