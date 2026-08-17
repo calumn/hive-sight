@@ -1622,6 +1622,28 @@ class VarroaPhotoAnalysisReviewStatus(StrEnum):
     needs_expert_review = "needs_expert_review"
 
 
+class VarroaPhotoAnalysisConfidencePolicyStatus(StrEnum):
+    development_evidence_only = "development_evidence_only"
+    advisor_candidate_possible = "advisor_candidate_possible"
+    blocked_by_confidence_policy = "blocked_by_confidence_policy"
+    blocked_by_coverage_policy = "blocked_by_coverage_policy"
+    not_assessable = "not_assessable"
+
+
+class VarroaPhotoAnalysisStagePolicyStatus(StrEnum):
+    development_evidence_only = "development_evidence_only"
+    policy_satisfied = "policy_satisfied"
+    blocked_by_confidence_policy = "blocked_by_confidence_policy"
+    blocked_by_coverage_policy = "blocked_by_coverage_policy"
+    not_assessable = "not_assessable"
+
+
+class VarroaPhotoAnalysisAdvisorEvidenceEligibility(StrEnum):
+    ineligible = "ineligible"
+    development_integration_only = "development_integration_only"
+    product_candidate = "product_candidate"
+
+
 class VarroaPhotoAnalysisBeeStatus(StrEnum):
     completed = "completed"
     failed = "failed"
@@ -1686,7 +1708,26 @@ class VarroaPhotoAnalysisRunResponse(BaseModel):
     failure_code: str | None = None
     failure_message: str | None = None
     caveat: str
-    advisor_evidence_eligible: bool = False
+    confidence_policy_version: str = "product_photo_confidence_policy_v1"
+    confidence_policy_status: VarroaPhotoAnalysisConfidencePolicyStatus = (
+        VarroaPhotoAnalysisConfidencePolicyStatus.not_assessable
+    )
+    advisor_evidence_eligibility: VarroaPhotoAnalysisAdvisorEvidenceEligibility = (
+        VarroaPhotoAnalysisAdvisorEvidenceEligibility.ineligible
+    )
+    confidence_policy_caveats: list[str] = Field(default_factory=list)
+    confidence_policy_caveat_messages: list[str] = Field(default_factory=list)
+    bee_localisation_policy_status: VarroaPhotoAnalysisStagePolicyStatus = (
+        VarroaPhotoAnalysisStagePolicyStatus.not_assessable
+    )
+    bee_orientation_policy_status: VarroaPhotoAnalysisStagePolicyStatus = (
+        VarroaPhotoAnalysisStagePolicyStatus.not_assessable
+    )
+    varroa_detection_policy_status: VarroaPhotoAnalysisStagePolicyStatus = (
+        VarroaPhotoAnalysisStagePolicyStatus.not_assessable
+    )
+    unassessed_complete_bees: int = 0
+    low_confidence_detection_count: int = 0
     bee_results: list[VarroaPhotoAnalysisBeeResultResponse] = Field(default_factory=list)
 
 

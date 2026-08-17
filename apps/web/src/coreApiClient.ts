@@ -128,8 +128,30 @@ export type VarroaPhotoAnalysis = {
   failedBees: number;
   beesWithLikelyVarroa: number;
   caveat: string;
+  confidencePolicyVersion: string;
+  confidencePolicyStatus:
+    | "development_evidence_only"
+    | "advisor_candidate_possible"
+    | "blocked_by_confidence_policy"
+    | "blocked_by_coverage_policy"
+    | "not_assessable";
+  advisorEvidenceEligibility: "ineligible" | "development_integration_only" | "product_candidate";
+  confidencePolicyCaveats: string[];
+  confidencePolicyCaveatMessages: string[];
+  beeLocalisationPolicyStatus: VarroaPhotoAnalysisStagePolicyStatus;
+  beeOrientationPolicyStatus: VarroaPhotoAnalysisStagePolicyStatus;
+  varroaDetectionPolicyStatus: VarroaPhotoAnalysisStagePolicyStatus;
+  unassessedCompleteBees: number;
+  lowConfidenceDetectionCount: number;
   beeResults: VarroaPhotoAnalysisBeeEvidence[];
 };
+
+export type VarroaPhotoAnalysisStagePolicyStatus =
+  | "development_evidence_only"
+  | "policy_satisfied"
+  | "blocked_by_confidence_policy"
+  | "blocked_by_coverage_policy"
+  | "not_assessable";
 
 export type VarroaPhotoAnalysisBeeEvidence = {
   photoAnalysisBeeResultId: string;
@@ -3004,8 +3026,64 @@ function parseVarroaPhotoAnalysis(value: unknown): VarroaPhotoAnalysis {
     failedBees: requireNumber(record.failed_bees, "failed_bees"),
     beesWithLikelyVarroa: requireNumber(record.bees_with_likely_varroa, "bees_with_likely_varroa"),
     caveat: requireString(record.caveat, "caveat"),
+    confidencePolicyVersion: requireString(record.confidence_policy_version, "confidence_policy_version"),
+    confidencePolicyStatus: requireVarroaPhotoAnalysisConfidencePolicyStatus(record.confidence_policy_status),
+    advisorEvidenceEligibility: requireVarroaPhotoAnalysisAdvisorEvidenceEligibility(record.advisor_evidence_eligibility),
+    confidencePolicyCaveats: requireStringArray(record.confidence_policy_caveats, "confidence_policy_caveats"),
+    confidencePolicyCaveatMessages: requireStringArray(
+      record.confidence_policy_caveat_messages,
+      "confidence_policy_caveat_messages"
+    ),
+    beeLocalisationPolicyStatus: requireVarroaPhotoAnalysisStagePolicyStatus(record.bee_localisation_policy_status),
+    beeOrientationPolicyStatus: requireVarroaPhotoAnalysisStagePolicyStatus(record.bee_orientation_policy_status),
+    varroaDetectionPolicyStatus: requireVarroaPhotoAnalysisStagePolicyStatus(record.varroa_detection_policy_status),
+    unassessedCompleteBees: requireNumber(record.unassessed_complete_bees, "unassessed_complete_bees"),
+    lowConfidenceDetectionCount: requireNumber(record.low_confidence_detection_count, "low_confidence_detection_count"),
     beeResults: requireArray(record.bee_results, "bee_results").map(parseVarroaPhotoAnalysisBeeEvidence)
   };
+}
+
+function requireVarroaPhotoAnalysisConfidencePolicyStatus(
+  value: unknown
+): VarroaPhotoAnalysis["confidencePolicyStatus"] {
+  if (
+    value === "development_evidence_only" ||
+    value === "advisor_candidate_possible" ||
+    value === "blocked_by_confidence_policy" ||
+    value === "blocked_by_coverage_policy" ||
+    value === "not_assessable"
+  ) {
+    return value;
+  }
+  throw new Error("Core API response had an unexpected Photo Analysis confidence policy status");
+}
+
+function requireVarroaPhotoAnalysisAdvisorEvidenceEligibility(
+  value: unknown
+): VarroaPhotoAnalysis["advisorEvidenceEligibility"] {
+  if (
+    value === "ineligible" ||
+    value === "development_integration_only" ||
+    value === "product_candidate"
+  ) {
+    return value;
+  }
+  throw new Error("Core API response had an unexpected Photo Analysis Advisor evidence eligibility");
+}
+
+function requireVarroaPhotoAnalysisStagePolicyStatus(
+  value: unknown
+): VarroaPhotoAnalysisStagePolicyStatus {
+  if (
+    value === "development_evidence_only" ||
+    value === "policy_satisfied" ||
+    value === "blocked_by_confidence_policy" ||
+    value === "blocked_by_coverage_policy" ||
+    value === "not_assessable"
+  ) {
+    return value;
+  }
+  throw new Error("Core API response had an unexpected Photo Analysis stage policy status");
 }
 
 function parseVarroaPhotoAnalysisBeeEvidence(value: unknown): VarroaPhotoAnalysisBeeEvidence {
@@ -4550,6 +4628,10 @@ function requireArray(value: unknown, field: string): unknown[] {
     throw new Error(`Core API response field ${field} was not an array`);
   }
   return value;
+}
+
+function requireStringArray(value: unknown, field: string): string[] {
+  return requireArray(value, field).map((item, index) => requireString(item, `${field}[${index}]`));
 }
 
 function parseStringMap(value: unknown, field: string): Record<string, string> {

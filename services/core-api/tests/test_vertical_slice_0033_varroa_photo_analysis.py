@@ -54,7 +54,8 @@ def test_varroa_photo_analysis_persists_run_and_per_bee_evidence(tmp_path: Path)
         assert body["adapter_version"] == "fake_local_command_v1"
         assert body["model_reference"] == "fake-varroa-model"
         assert body["command_contract_version"] == "varroa_detector_command_v1"
-        assert body["advisor_evidence_eligible"] is False
+        assert body["advisor_evidence_eligibility"] == "ineligible"
+        assert body["confidence_policy_status"] == "blocked_by_coverage_policy"
         assert "incomplete" in body["caveat"]
         assert [result["bee_annotation_id"] for result in body["bee_results"]] == [None, None]
         assert all(result["training_crop_id"] is None for result in body["bee_results"])
@@ -92,6 +93,8 @@ def test_product_photo_analysis_does_not_require_a_training_crop(tmp_path: Path)
         assert body["eligible_bees"] == 2
         assert body["analysed_bees"] == 2
         assert body["bees_with_likely_varroa"] == 2
+        assert body["confidence_policy_status"] == "development_evidence_only"
+        assert body["advisor_evidence_eligibility"] == "ineligible"
         assert body["bee_results"][0]["training_crop_id"] is None
         assert body["bee_results"][0]["inspection_photo_id"] == inspection_photo_id
         image = client.get(
@@ -194,12 +197,12 @@ def test_no_usable_bees_photo_analysis_cannot_be_accepted(tmp_path: Path):
         assert accepted.json()["detail"]["code"] == "photo_analysis_not_acceptable"
         assert rejected.status_code == 200
         assert rejected.json()["review_status"] == "rejected"
-        assert rejected.json()["advisor_evidence_eligible"] is False
+        assert rejected.json()["advisor_evidence_eligibility"] == "ineligible"
     finally:
         app.dependency_overrides.clear()
 
 
-def test_only_accepted_photo_analysis_is_advisor_eligible(tmp_path: Path):
+def test_accepted_deterministic_photo_analysis_is_development_integration_only(tmp_path: Path):
     state = build_dev_state(dataset_export_root=tmp_path / "exports")
     app.dependency_overrides[get_dev_state] = lambda: state
     client = TestClient(app)
@@ -224,12 +227,12 @@ def test_only_accepted_photo_analysis_is_advisor_eligible(tmp_path: Path):
         )
 
         assert created["status"] == "completed"
-        assert created["advisor_evidence_eligible"] is False
+        assert created["advisor_evidence_eligibility"] == "ineligible"
         assert needs_review.status_code == 200
-        assert needs_review.json()["advisor_evidence_eligible"] is False
+        assert needs_review.json()["advisor_evidence_eligibility"] == "ineligible"
         assert accepted.status_code == 200
         assert accepted.json()["review_status"] == "accepted"
-        assert accepted.json()["advisor_evidence_eligible"] is True
+        assert accepted.json()["advisor_evidence_eligibility"] == "development_integration_only"
     finally:
         app.dependency_overrides.clear()
 

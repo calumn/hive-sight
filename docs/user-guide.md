@@ -91,9 +91,10 @@ Use this when you want HiveSight to inspect a photographed frame for likely visi
 2. Upload one or more frame photos.
 3. Select `Analyze photo` for a photo you want to inspect, or `Analyze all photos` to process all eligible unanalysed photos in turn.
 4. HiveSight records a running photo analysis, then reports the number of analysed eligible bees and bees with likely visible Varroa.
-5. Review the result. You can mark a completed or partial analysis as `Accepted`, `Inconclusive`, `Rejected`, or `Needs expert review`. A note is required unless you accept it.
+5. Read the confidence policy summary. It shows whether the result is development evidence only, potentially eligible for future Advisor evidence, blocked by confidence policy, blocked by incomplete coverage, or not assessable. It also shows the current Advisor evidence eligibility and the full caveats HiveSight used to make that judgement.
+6. Review the result. You can mark a completed or partial analysis as `Accepted`, `Inconclusive`, `Rejected`, or `Needs expert review`. A note is required unless you accept it.
 
-This is model-assisted development evidence, not treatment advice or a statistically valid hive-level mite rate. An accepted result becomes eligible for later Advisor evidence, but this release does not contact HiveSight Advisor or recommend treatment.
+This is model-assisted development evidence, not treatment advice or a statistically valid hive-level mite rate. Accepted deterministic development evidence becomes development integration evidence only. A future non-stub result can become product-candidate Advisor evidence only when it satisfies the frozen confidence policy and is accepted. This release does not contact HiveSight Advisor or recommend treatment.
 
 ## Create Training Crops
 

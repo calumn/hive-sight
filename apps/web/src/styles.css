@@ -626,6 +626,48 @@ label span {
   color: #842d21;
 }
 
+.photo-analysis-policy {
+  background: #f4f8fb;
+  border: 1px solid #c9d9e8;
+  border-radius: 8px;
+  color: #253646;
+  display: grid;
+  gap: 8px;
+  line-height: 1.45;
+  padding: 12px;
+}
+
+.photo-analysis-policy div {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  justify-content: space-between;
+}
+
+.photo-analysis-policy strong {
+  color: #162436;
+}
+
+.photo-analysis-policy span {
+  background: #ffffff;
+  border: 1px solid #c9d9e8;
+  border-radius: 999px;
+  color: #253646;
+  font-size: 0.82rem;
+  font-weight: 800;
+  padding: 4px 8px;
+}
+
+.photo-analysis-policy p,
+.photo-analysis-policy ul {
+  margin: 0;
+}
+
+.photo-analysis-policy ul {
+  padding-left: 18px;
+}
+
 .evidence-panel {
   display: grid;
   gap: 12px;

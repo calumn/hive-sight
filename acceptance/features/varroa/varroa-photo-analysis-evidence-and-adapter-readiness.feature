@@ -25,4 +25,4 @@ Feature: Varroa Photo Analysis evidence and adapter readiness
   Scenario: Human review controls Advisor eligibility
     Given a completed Varroa Photo Analysis is unreviewed
     When the Beekeeper marks the Photo Analysis as accepted
-    Then HiveSight marks that Photo Analysis as eligible for later Advisor evidence
+    Then HiveSight marks that Photo Analysis as development integration evidence

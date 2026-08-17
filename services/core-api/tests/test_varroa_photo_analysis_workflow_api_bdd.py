@@ -233,9 +233,9 @@ def mark_analysis_accepted(slice_context: SliceContext) -> None:
     )
 
 
-@then("HiveSight marks it eligible for later Advisor evidence")
+@then("HiveSight marks it as development integration evidence for later Advisor integration testing")
 def accepted_analysis_is_advisor_eligible(slice_context: SliceContext) -> None:
-    assert slice_context.response.json()["advisor_evidence_eligible"] is True
+    assert slice_context.response.json()["advisor_evidence_eligibility"] == "development_integration_only"
 
 
 @when("a Workspace member changes it to needs expert review with a note")
@@ -254,4 +254,4 @@ def mark_analysis_needs_expert_review(slice_context: SliceContext) -> None:
 
 @then("HiveSight marks it ineligible for later Advisor evidence")
 def nonaccepted_analysis_is_not_advisor_eligible(slice_context: SliceContext) -> None:
-    assert slice_context.response.json()["advisor_evidence_eligible"] is False
+    assert slice_context.response.json()["advisor_evidence_eligibility"] == "ineligible"

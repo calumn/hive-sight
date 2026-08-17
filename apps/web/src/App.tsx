@@ -1758,6 +1758,39 @@ function PhotoAnalysisSummary({
         {" analysed eligible bees"}
       </p>
       <p className="analysis-caveat">{analysis.caveat}</p>
+      <section
+        className="photo-analysis-policy"
+        aria-label="Photo analysis confidence policy"
+        data-testid="photo-analysis-confidence-policy"
+      >
+        <div>
+          <strong>{formatConfidencePolicyStatus(analysis.confidencePolicyStatus)}</strong>
+          <span>{formatAdvisorEvidenceEligibility(analysis.advisorEvidenceEligibility)}</span>
+        </div>
+        <p>
+          Policy {analysis.confidencePolicyVersion}: Bee localisation{" "}
+          {formatStagePolicyStatus(analysis.beeLocalisationPolicyStatus)}, bee orientation{" "}
+          {formatStagePolicyStatus(analysis.beeOrientationPolicyStatus)}, Varroa detection{" "}
+          {formatStagePolicyStatus(analysis.varroaDetectionPolicyStatus)}.
+        </p>
+        {analysis.unassessedCompleteBees > 0 || analysis.lowConfidenceDetectionCount > 0 ? (
+          <p>
+            {analysis.unassessedCompleteBees > 0
+              ? `${analysis.unassessedCompleteBees} eligible bee(s) were not assessed. `
+              : ""}
+            {analysis.lowConfidenceDetectionCount > 0
+              ? `${analysis.lowConfidenceDetectionCount} low-confidence Varroa detection(s) need caution.`
+              : ""}
+          </p>
+        ) : null}
+        {analysis.confidencePolicyCaveatMessages.length > 0 ? (
+          <ul data-testid="photo-analysis-confidence-caveats">
+            {analysis.confidencePolicyCaveatMessages.map((message) => (
+              <li key={message}>{message}</li>
+            ))}
+          </ul>
+        ) : null}
+      </section>
       {analysis.beeResults.length > 0 ? (
         <ProductPhotoEvidence analysis={analysis} photo={photo} devUserId={devUserId} />
       ) : null}
@@ -1905,6 +1938,37 @@ function formatPhotoAnalysisStatus(status: VarroaPhotoAnalysis["status"]) {
     partial: "Analysis completed with caveats",
     failed: "Photo could not be analysed",
     no_usable_bees: "No bees found"
+  };
+  return labels[status];
+}
+
+function formatConfidencePolicyStatus(status: VarroaPhotoAnalysis["confidencePolicyStatus"]) {
+  const labels: Record<VarroaPhotoAnalysis["confidencePolicyStatus"], string> = {
+    development_evidence_only: "Development evidence only",
+    advisor_candidate_possible: "Advisor candidate possible",
+    blocked_by_confidence_policy: "Blocked by confidence policy",
+    blocked_by_coverage_policy: "Blocked by incomplete coverage",
+    not_assessable: "Not assessable"
+  };
+  return labels[status];
+}
+
+function formatAdvisorEvidenceEligibility(eligibility: VarroaPhotoAnalysis["advisorEvidenceEligibility"]) {
+  const labels: Record<VarroaPhotoAnalysis["advisorEvidenceEligibility"], string> = {
+    ineligible: "Not eligible for Advisor evidence",
+    development_integration_only: "Development integration evidence",
+    product_candidate: "Eligible for Advisor evidence"
+  };
+  return labels[eligibility];
+}
+
+function formatStagePolicyStatus(status: VarroaPhotoAnalysis["beeLocalisationPolicyStatus"]) {
+  const labels: Record<VarroaPhotoAnalysis["beeLocalisationPolicyStatus"], string> = {
+    development_evidence_only: "development evidence only",
+    policy_satisfied: "policy satisfied",
+    blocked_by_confidence_policy: "blocked by confidence policy",
+    blocked_by_coverage_policy: "blocked by coverage policy",
+    not_assessable: "not assessable"
   };
   return labels[status];
 }

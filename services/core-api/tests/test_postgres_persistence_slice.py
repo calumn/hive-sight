@@ -46,6 +46,11 @@ from hive_sight_core_api.models import (
     TreatmentEvidenceChainState,
     TreatmentRecommendationResponse,
     TreatmentRecommendationStatus,
+    VarroaPhotoAnalysisAdvisorEvidenceEligibility,
+    VarroaPhotoAnalysisConfidencePolicyStatus,
+    VarroaPhotoAnalysisRunResponse,
+    VarroaPhotoAnalysisStagePolicyStatus,
+    VarroaPhotoAnalysisStatus,
     VisibleBeeStatus,
 )
 from hive_sight_core_api.postgres_store import PostgresProductDataStore
@@ -91,6 +96,89 @@ def test_slice_0033_migration_declares_varroa_photo_analysis_evidence_shape() ->
     assert "advisor_evidence_eligible boolean NOT NULL DEFAULT false" in migration
     assert "raw_error_payload text" in migration
     assert "raw_request" not in migration.casefold()
+
+
+def test_slice_0035_migration_declares_product_photo_confidence_policy_shape() -> None:
+    migration = (
+        MIGRATIONS_DIR / "0035_product_photo_analysis_confidence_policy.sql"
+    ).read_text(encoding="utf-8")
+
+    assert "confidence_policy_version text NOT NULL" in migration
+    assert "product_photo_confidence_policy_v1" in migration
+    assert "advisor_candidate_possible" in migration
+    assert "advisor_evidence_eligibility text NOT NULL" in migration
+    assert "development_integration_only" in migration
+    assert "product_candidate" in migration
+    assert "confidence_policy_caveats jsonb NOT NULL" in migration
+    assert "confidence_policy_caveat_messages jsonb NOT NULL" in migration
+    assert "unassessed_complete_bees integer NOT NULL DEFAULT 0" in migration
+    assert "low_confidence_detection_count integer NOT NULL DEFAULT 0" in migration
+    assert "DROP COLUMN IF EXISTS advisor_evidence_eligible" in migration
+
+
+@pytest.mark.skipif(
+    importlib.util.find_spec("psycopg") is None or not os.getenv("HIVESIGHT_TEST_DATABASE_URL"),
+    reason="Set HIVESIGHT_TEST_DATABASE_URL and install psycopg to run Postgres persistence integration.",
+)
+def test_postgres_store_survives_restart_for_varroa_photo_confidence_policy() -> None:
+    database_url = os.environ["HIVESIGHT_TEST_DATABASE_URL"]
+    reset_database(database_url)
+    workspace_id = UUID("00000000-0000-0000-0000-000000003501")
+    run_id = UUID("00000000-0000-0000-0000-000000003502")
+    store = _build_postgres_state(database_url).store
+
+    store.save_varroa_photo_analysis_run(
+        VarroaPhotoAnalysisRunResponse(
+            photo_analysis_run_id=run_id,
+            workspace_id=workspace_id,
+            inspection_id=UUID("00000000-0000-0000-0000-000000003503"),
+            inspection_photo_id=UUID("00000000-0000-0000-0000-000000003504"),
+            source_image_filename="policy-persistence.png",
+            status=VarroaPhotoAnalysisStatus.completed,
+            total_detected_bees=2,
+            eligible_bees=2,
+            analysed_bees=2,
+            failed_bees=0,
+            mites_found=1,
+            bees_with_likely_varroa=1,
+            adapter_type="local_command",
+            adapter_version="fake_local_command_v1",
+            model_reference="fake-varroa-model",
+            command_contract_version="varroa_detector_command_v1",
+            started_at=datetime(2026, 8, 14, 9, 0, tzinfo=UTC),
+            completed_at=datetime(2026, 8, 14, 9, 1, tzinfo=UTC),
+            caveat="Analysis completed for all eligible bees.",
+            confidence_policy_status=(
+                VarroaPhotoAnalysisConfidencePolicyStatus.advisor_candidate_possible
+            ),
+            advisor_evidence_eligibility=(
+                VarroaPhotoAnalysisAdvisorEvidenceEligibility.product_candidate
+            ),
+            confidence_policy_caveats=["policy_persisted"],
+            confidence_policy_caveat_messages=["Policy outcome persisted across restart."],
+            bee_localisation_policy_status=VarroaPhotoAnalysisStagePolicyStatus.policy_satisfied,
+            bee_orientation_policy_status=VarroaPhotoAnalysisStagePolicyStatus.policy_satisfied,
+            varroa_detection_policy_status=VarroaPhotoAnalysisStagePolicyStatus.policy_satisfied,
+        )
+    )
+
+    restarted_store = _build_postgres_state(database_url).store
+    restarted = restarted_store.get_varroa_photo_analysis_run(workspace_id, run_id)
+
+    assert restarted is not None
+    assert restarted.confidence_policy_version == "product_photo_confidence_policy_v1"
+    assert (
+        restarted.confidence_policy_status
+        == VarroaPhotoAnalysisConfidencePolicyStatus.advisor_candidate_possible
+    )
+    assert (
+        restarted.advisor_evidence_eligibility
+        == VarroaPhotoAnalysisAdvisorEvidenceEligibility.product_candidate
+    )
+    assert restarted.confidence_policy_caveats == ["policy_persisted"]
+    assert restarted.confidence_policy_caveat_messages == [
+        "Policy outcome persisted across restart."
+    ]
 
 
 @pytest.mark.skipif(

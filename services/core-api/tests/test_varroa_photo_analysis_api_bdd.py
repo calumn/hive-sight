@@ -222,8 +222,8 @@ def beekeeper_accepts_photo_analysis(slice_context: SliceContext) -> None:
     )
 
 
-@then("HiveSight marks that Photo Analysis as eligible for later Advisor evidence")
-def accepted_photo_analysis_is_advisor_eligible(slice_context: SliceContext) -> None:
+@then("HiveSight marks that Photo Analysis as development integration evidence")
+def accepted_photo_analysis_is_development_integration_evidence(slice_context: SliceContext) -> None:
     assert slice_context.response.status_code == 200
     assert slice_context.response.json()["review_status"] == "accepted"
-    assert slice_context.response.json()["advisor_evidence_eligible"] is True
+    assert slice_context.response.json()["advisor_evidence_eligibility"] == "development_integration_only"

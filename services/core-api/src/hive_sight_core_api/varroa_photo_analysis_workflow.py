@@ -11,14 +11,17 @@ except ImportError:  # pragma: no cover - declared Core API dependency.
 from hive_sight_core_api.dev_store import DomainError, InMemoryProductDataStore, UserContext
 from hive_sight_core_api.models import (
     LikelyVarroaDetectionResponse,
+    VarroaPhotoAnalysisAdvisorEvidenceEligibility,
     VarroaPhotoAnalysisBeeResultResponse,
     VarroaPhotoAnalysisBatchResponse,
     VarroaPhotoAnalysisBatchStatus,
     VarroaPhotoAnalysisBeeStatus,
+    VarroaPhotoAnalysisConfidencePolicyStatus,
     VarroaPhotoAnalysisReviewRequest,
     VarroaPhotoAnalysisReviewStatus,
     VarroaPhotoAnalysisRunListResponse,
     VarroaPhotoAnalysisRunResponse,
+    VarroaPhotoAnalysisStagePolicyStatus,
     VarroaPhotoAnalysisStatus,
 )
 from hive_sight_core_api.varroa_review_workflow import (
@@ -30,6 +33,8 @@ from hive_sight_core_api.varroa_review_workflow import (
 
 
 PRODUCT_EVIDENCE_IMAGE_SIZE_PX = 512
+PRODUCT_PHOTO_CONFIDENCE_POLICY_VERSION = "product_photo_confidence_policy_v1"
+VARROA_DETECTION_CONFIDENCE_FLOOR = 0.75
 
 
 @dataclass(frozen=True)
@@ -103,7 +108,13 @@ class VarroaPhotoAnalysisWorkflow:
             command_contract_version=_command_contract_version(self.varroa_detector_adapter),
             started_at=now,
             caveat="Development model evidence is being analysed; not treatment advice.",
-            advisor_evidence_eligible=False,
+            confidence_policy_version=PRODUCT_PHOTO_CONFIDENCE_POLICY_VERSION,
+            confidence_policy_status=VarroaPhotoAnalysisConfidencePolicyStatus.not_assessable,
+            advisor_evidence_eligibility=VarroaPhotoAnalysisAdvisorEvidenceEligibility.ineligible,
+            confidence_policy_caveats=["analysis_running"],
+            confidence_policy_caveat_messages=[
+                "Photo analysis is still running; Advisor evidence eligibility is not available yet."
+            ],
         )
         self.store.save_varroa_photo_analysis_run(run)
         return run
@@ -228,6 +239,13 @@ class VarroaPhotoAnalysisWorkflow:
             analysed_bees=analysed_bees,
             failed_bees=failed_bees,
         )
+        policy = _evaluate_confidence_policy(
+            status=status,
+            adapter_type=self.varroa_detector_adapter.adapter_type,
+            eligible_bees=len(candidate_geometries),
+            failed_bees=failed_bees,
+            results=results,
+        )
         run = VarroaPhotoAnalysisRunResponse(
             photo_analysis_run_id=run_id, workspace_id=workspace_id, inspection_id=inspection.inspection_id,
             inspection_photo_id=photo.inspection_photo_id, source_image_filename=photo.filename,
@@ -238,7 +256,9 @@ class VarroaPhotoAnalysisWorkflow:
             model_reference=self.varroa_detector_adapter.model_reference,
             command_contract_version=_command_contract_version(self.varroa_detector_adapter), started_at=now,
             completed_at=self.store.clock(), caveat=_photo_analysis_caveat(status=status, failed_bees=failed_bees),
-            advisor_evidence_eligible=False, bee_results=results,
+            advisor_evidence_eligibility=VarroaPhotoAnalysisAdvisorEvidenceEligibility.ineligible,
+            bee_results=results,
+            **policy,
         )
         self.store.save_varroa_photo_analysis_run(run)
         for result in results:
@@ -389,10 +409,10 @@ class VarroaPhotoAnalysisWorkflow:
                     if request.review_status == VarroaPhotoAnalysisReviewStatus.accepted
                     else _clean_note(request.review_note)
                 ),
-                "advisor_evidence_eligible": (
-                    request.review_status == VarroaPhotoAnalysisReviewStatus.accepted
-                    and run.status
-                    in {VarroaPhotoAnalysisStatus.completed, VarroaPhotoAnalysisStatus.partial}
+                "advisor_evidence_eligibility": _advisor_evidence_eligibility(
+                    status=run.status,
+                    review_status=request.review_status,
+                    confidence_policy_status=run.confidence_policy_status,
                 ),
             }
         )
@@ -457,6 +477,147 @@ def _photo_analysis_caveat(*, status: VarroaPhotoAnalysisStatus, failed_bees: in
     if status == VarroaPhotoAnalysisStatus.failed:
         caveats.append("No usable mite count was produced.")
     return " ".join(caveats)
+
+
+def _evaluate_confidence_policy(
+    *,
+    status: VarroaPhotoAnalysisStatus,
+    adapter_type: str,
+    eligible_bees: int,
+    failed_bees: int,
+    results: list[VarroaPhotoAnalysisBeeResultResponse],
+) -> dict[str, object]:
+    stage_satisfied = VarroaPhotoAnalysisStagePolicyStatus.policy_satisfied
+    caveats: list[str] = []
+    messages: list[str] = []
+    low_confidence_detection_count = 0
+
+    if status == VarroaPhotoAnalysisStatus.failed:
+        return _policy_fields(
+            status=VarroaPhotoAnalysisConfidencePolicyStatus.not_assessable,
+            bee_localisation=VarroaPhotoAnalysisStagePolicyStatus.not_assessable,
+            bee_orientation=VarroaPhotoAnalysisStagePolicyStatus.not_assessable,
+            varroa_detection=VarroaPhotoAnalysisStagePolicyStatus.not_assessable,
+            caveats=["analysis_failed"],
+            messages=["Photo analysis failed before a confidence policy judgement could be made."],
+        )
+
+    if eligible_bees == 0 or status == VarroaPhotoAnalysisStatus.no_usable_bees:
+        return _policy_fields(
+            status=VarroaPhotoAnalysisConfidencePolicyStatus.blocked_by_coverage_policy,
+            bee_localisation=VarroaPhotoAnalysisStagePolicyStatus.blocked_by_coverage_policy,
+            bee_orientation=VarroaPhotoAnalysisStagePolicyStatus.blocked_by_coverage_policy,
+            varroa_detection=VarroaPhotoAnalysisStagePolicyStatus.blocked_by_coverage_policy,
+            unassessed_complete_bees=0,
+            caveats=["no_usable_bees"],
+            messages=[
+                "No complete bees were available for Varroa assessment, so the result is blocked by coverage policy."
+            ],
+        )
+
+    if status == VarroaPhotoAnalysisStatus.partial or failed_bees > 0:
+        return _policy_fields(
+            status=VarroaPhotoAnalysisConfidencePolicyStatus.blocked_by_coverage_policy,
+            bee_localisation=stage_satisfied,
+            bee_orientation=VarroaPhotoAnalysisStagePolicyStatus.blocked_by_coverage_policy,
+            varroa_detection=VarroaPhotoAnalysisStagePolicyStatus.blocked_by_coverage_policy,
+            unassessed_complete_bees=failed_bees,
+            caveats=["unassessed_complete_bees_present"],
+            messages=[
+                f"{failed_bees} eligible complete bee(s) were not assessed for Varroa, so the result is blocked by coverage policy."
+            ],
+        )
+
+    if _is_development_adapter(adapter_type):
+        return _policy_fields(
+            status=VarroaPhotoAnalysisConfidencePolicyStatus.development_evidence_only,
+            bee_localisation=VarroaPhotoAnalysisStagePolicyStatus.development_evidence_only,
+            bee_orientation=VarroaPhotoAnalysisStagePolicyStatus.development_evidence_only,
+            varroa_detection=VarroaPhotoAnalysisStagePolicyStatus.development_evidence_only,
+            caveats=["development_model_evidence"],
+            messages=[
+                "This result was produced by deterministic development model evidence and is only eligible for development integration after accepted review."
+            ],
+        )
+
+    for result in results:
+        if result.status != VarroaPhotoAnalysisBeeStatus.completed:
+            continue
+        if not result.detections:
+            continue
+        if all(detection.confidence < VARROA_DETECTION_CONFIDENCE_FLOOR for detection in result.detections):
+            low_confidence_detection_count += len(result.detections)
+
+    if low_confidence_detection_count:
+        caveats.append("low_confidence_varroa_detection_only")
+        messages.append(
+            "At least one bee had only low-confidence Varroa detections, so weak positive evidence was not converted into Advisor-ready evidence."
+        )
+        return _policy_fields(
+            status=VarroaPhotoAnalysisConfidencePolicyStatus.blocked_by_confidence_policy,
+            bee_localisation=stage_satisfied,
+            bee_orientation=stage_satisfied,
+            varroa_detection=VarroaPhotoAnalysisStagePolicyStatus.blocked_by_confidence_policy,
+            low_confidence_detection_count=low_confidence_detection_count,
+            caveats=caveats,
+            messages=messages,
+        )
+
+    messages.append(
+        "This completed non-stub Photo Analysis satisfies product photo confidence policy version product_photo_confidence_policy_v1."
+    )
+    return _policy_fields(
+        status=VarroaPhotoAnalysisConfidencePolicyStatus.advisor_candidate_possible,
+        bee_localisation=stage_satisfied,
+        bee_orientation=stage_satisfied,
+        varroa_detection=stage_satisfied,
+        messages=messages,
+    )
+
+
+def _policy_fields(
+    *,
+    status: VarroaPhotoAnalysisConfidencePolicyStatus,
+    bee_localisation: VarroaPhotoAnalysisStagePolicyStatus,
+    bee_orientation: VarroaPhotoAnalysisStagePolicyStatus,
+    varroa_detection: VarroaPhotoAnalysisStagePolicyStatus,
+    unassessed_complete_bees: int = 0,
+    low_confidence_detection_count: int = 0,
+    caveats: list[str] | None = None,
+    messages: list[str] | None = None,
+) -> dict[str, object]:
+    return {
+        "confidence_policy_version": PRODUCT_PHOTO_CONFIDENCE_POLICY_VERSION,
+        "confidence_policy_status": status,
+        "confidence_policy_caveats": caveats or [],
+        "confidence_policy_caveat_messages": messages or [],
+        "bee_localisation_policy_status": bee_localisation,
+        "bee_orientation_policy_status": bee_orientation,
+        "varroa_detection_policy_status": varroa_detection,
+        "unassessed_complete_bees": unassessed_complete_bees,
+        "low_confidence_detection_count": low_confidence_detection_count,
+    }
+
+
+def _advisor_evidence_eligibility(
+    *,
+    status: VarroaPhotoAnalysisStatus,
+    review_status: VarroaPhotoAnalysisReviewStatus,
+    confidence_policy_status: VarroaPhotoAnalysisConfidencePolicyStatus,
+) -> VarroaPhotoAnalysisAdvisorEvidenceEligibility:
+    if review_status != VarroaPhotoAnalysisReviewStatus.accepted:
+        return VarroaPhotoAnalysisAdvisorEvidenceEligibility.ineligible
+    if status != VarroaPhotoAnalysisStatus.completed:
+        return VarroaPhotoAnalysisAdvisorEvidenceEligibility.ineligible
+    if confidence_policy_status == VarroaPhotoAnalysisConfidencePolicyStatus.development_evidence_only:
+        return VarroaPhotoAnalysisAdvisorEvidenceEligibility.development_integration_only
+    if confidence_policy_status == VarroaPhotoAnalysisConfidencePolicyStatus.advisor_candidate_possible:
+        return VarroaPhotoAnalysisAdvisorEvidenceEligibility.product_candidate
+    return VarroaPhotoAnalysisAdvisorEvidenceEligibility.ineligible
+
+
+def _is_development_adapter(adapter_type: str) -> bool:
+    return adapter_type == "deterministic_stub"
 
 
 def _command_contract_version(adapter: VarroaDetectorAdapter) -> str | None:

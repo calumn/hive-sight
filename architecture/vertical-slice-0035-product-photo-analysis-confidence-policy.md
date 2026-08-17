@@ -1,6 +1,6 @@
 # Vertical Slice 0035: Product Photo Analysis Confidence Policy
 
-Status: promoted, grilled, and designed; acceptance scenarios drafted for sign-off before implementation.
+Status: implemented and verified on 2026-08-14.
 
 ## Purpose
 
@@ -21,9 +21,12 @@ This slice adds a persisted, versioned confidence-policy outcome to each Varroa 
 - `architecture/parking-lot.md`: PARK-0057 Product Photo Analysis Confidence Policy.
 - `requirements/roadmap.md`: Product Photo Analysis Confidence Policy immediate future candidate.
 
-## Draft Acceptance Scenarios
+## Acceptance Scenarios
 
-These scenarios need explicit acceptance-scenario sign-off before implementation.
+These scenarios are implemented as the canonical API-bound acceptance feature:
+
+- `acceptance/features/varroa/product-photo-analysis-confidence-policy.feature`
+- `services/core-api/tests/test_product_photo_analysis_confidence_policy_api_bdd.py`
 
 ```gherkin
 @api
@@ -229,21 +232,23 @@ This value is hard-coded in policy version `product_photo_confidence_policy_v1`.
 
 ## Acceptance Criteria
 
-- [ ] Product Photo Analysis responses include a versioned confidence-policy summary.
-- [ ] Frozen policy outcome is persisted and does not silently change on later reads.
-- [ ] `advisor_evidence_eligible` boolean is removed/replaced by `advisor_evidence_eligibility`.
-- [ ] Deterministic development adapter runs become `development_integration_only` only when completed and accepted, and never become `product_candidate`.
-- [ ] Complete non-stub runs with confidence-policy status `advisor_candidate_possible` become `product_candidate` only after accepted review.
-- [ ] Partial runs, failed runs, no-usable-bees runs, coverage-blocked runs, and confidence-blocked runs remain `ineligible`, even when accepted.
-- [ ] A completed accepted non-stub run with zero likely Varroa detections can be `product_candidate` when every eligible complete bee has completed detector evidence with acceptable provenance.
-- [ ] Low-confidence-only Varroa evidence remains visible but blocks current Advisor evidence eligibility.
-- [ ] Unassessed eligible complete bees and no-usable-bees outcomes remain explicit coverage limitations and are not treated as negative evidence.
-- [ ] Web UI shows human-readable policy status and all human-readable caveats next to the Photo Analysis result and review controls.
-- [ ] API-level BDD and focused Core API tests cover the policy outcomes.
-- [ ] Browser acceptance covers the confidence-policy summary for at least the default deterministic development run.
-- [ ] `pnpm verify:slice` passes before implementation closeout.
-- [ ] Live Postgres migration verification is completed or explicitly recorded pending.
+- [x] Product Photo Analysis responses include a versioned confidence-policy summary.
+- [x] Frozen policy outcome is persisted and does not silently change on later reads.
+- [x] `advisor_evidence_eligible` boolean is removed/replaced by `advisor_evidence_eligibility`.
+- [x] Deterministic development adapter runs become `development_integration_only` only when completed and accepted, and never become `product_candidate`.
+- [x] Complete non-stub runs with confidence-policy status `advisor_candidate_possible` become `product_candidate` only after accepted review.
+- [x] Partial runs, failed runs, no-usable-bees runs, coverage-blocked runs, and confidence-blocked runs remain `ineligible`, even when accepted.
+- [x] A completed accepted non-stub run with zero likely Varroa detections can be `product_candidate` when every eligible complete bee has completed detector evidence with acceptable provenance.
+- [x] Low-confidence-only Varroa evidence remains visible but blocks current Advisor evidence eligibility.
+- [x] Unassessed eligible complete bees and no-usable-bees outcomes remain explicit coverage limitations and are not treated as negative evidence.
+- [x] Web UI shows human-readable policy status and all human-readable caveats next to the Photo Analysis result and review controls.
+- [x] API-level BDD and focused Core API tests cover the policy outcomes.
+- [x] Browser acceptance covers the confidence-policy summary for at least the default deterministic development run.
+- [x] `pnpm verify:slice` passes before implementation closeout.
+- [x] Live Postgres migration verification is completed.
 
-## Open Questions
+## Verification
 
-- Should the first non-stub fake adapter path be added in this slice solely to prove the `product_candidate` branch, or should that branch be API-only with a test double until a real model adapter is ready?
+- `pnpm verify:slice` passed on 2026-08-14.
+- Live Postgres migration and restart persistence verification passed with `HIVESIGHT_TEST_DATABASE_URL=postgresql://hive_sight:hive_sight@localhost:5432/hive_sight_core_test ./.venv/bin/python -m pytest -p no:cacheprovider tests/test_postgres_persistence_slice.py`.
+- The first non-stub product-candidate branch is proven through API-level test doubles. A real adapter promotion remains out of scope for this slice.

@@ -27,6 +27,6 @@ Feature: Varroa photo analysis workflow
   Scenario: Review status controls later Advisor evidence eligibility
     Given a completed or partial Photo Analysis is unreviewed
     When a Workspace member marks it accepted
-    Then HiveSight marks it eligible for later Advisor evidence
+    Then HiveSight marks it as development integration evidence for later Advisor integration testing
     When a Workspace member changes it to needs expert review with a note
     Then HiveSight marks it ineligible for later Advisor evidence

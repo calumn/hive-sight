@@ -10,7 +10,7 @@ const checks = [
   {
     name: "Acceptance catalogue - Core API",
     command:
-      "./.venv/bin/python -m pytest -p no:cacheprovider -m api tests/test_visible_varroa_review_outcome_api_bdd.py tests/test_photo_visible_varroa_evidence_summary_api_bdd.py tests/test_varroa_photo_analysis_api_bdd.py tests/test_varroa_photo_analysis_workflow_api_bdd.py tests/test_advisor_treatment_recommendation_api_bdd.py",
+      "./.venv/bin/python -m pytest -p no:cacheprovider -m api tests/test_visible_varroa_review_outcome_api_bdd.py tests/test_photo_visible_varroa_evidence_summary_api_bdd.py tests/test_varroa_photo_analysis_api_bdd.py tests/test_varroa_photo_analysis_workflow_api_bdd.py tests/test_product_photo_analysis_confidence_policy_api_bdd.py tests/test_advisor_treatment_recommendation_api_bdd.py",
     cwd: "services/core-api",
     args: [
       "./.venv/bin/python",
@@ -24,6 +24,7 @@ const checks = [
       "tests/test_photo_visible_varroa_evidence_summary_api_bdd.py",
       "tests/test_varroa_photo_analysis_api_bdd.py",
       "tests/test_varroa_photo_analysis_workflow_api_bdd.py",
+      "tests/test_product_photo_analysis_confidence_policy_api_bdd.py",
       "tests/test_advisor_treatment_recommendation_api_bdd.py"
     ],
     note:
@@ -62,6 +63,15 @@ const checks = [
         tag: "api",
         featureFile: "acceptance/features/varroa/varroa-photo-analysis-workflow.feature",
         testFile: "tests/test_varroa_photo_analysis_workflow_api_bdd.py"
+      },
+      {
+        area: "Product Photo Analysis confidence policy",
+        capability: "varroa",
+        seam: "Core API",
+        tag: "api",
+        featureFile:
+          "acceptance/features/varroa/product-photo-analysis-confidence-policy.feature",
+        testFile: "tests/test_product_photo_analysis_confidence_policy_api_bdd.py"
       },
       {
         area: "Advisor treatment recommendation intake",

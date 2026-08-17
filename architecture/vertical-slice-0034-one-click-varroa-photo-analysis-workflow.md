@@ -50,12 +50,12 @@ Feature: Varroa photo analysis workflow
   Scenario: Review status controls later Advisor evidence eligibility
     Given a completed or partial Photo Analysis is unreviewed
     When a Workspace member marks it accepted
-    Then HiveSight marks it eligible for later Advisor evidence
+    Then HiveSight marks deterministic Photo Analysis as development integration evidence
     When a Workspace member changes it to needs expert review with a note
     Then HiveSight marks it ineligible for later Advisor evidence
 ```
 
-Additional focused API tests cover product Photo Analysis without Training Crops, head-up evidence image retrieval, duplicate produced-run prevention, batch skipping for produced results, no-usable-bees review rules, Advisor eligibility, and required notes for non-accepted review statuses.
+Additional focused API tests cover product Photo Analysis without Training Crops, head-up evidence image retrieval, duplicate produced-run prevention, batch skipping for produced results, no-usable-bees review rules, review-derived Advisor evidence eligibility, and required notes for non-accepted review statuses.
 
 Browser acceptance coverage exercises the Varroa Assessment UI path: photo upload, visible `Analyze photo` controls, no Training workflow controls, result evidence display, paired source/head-up evidence, reversible review controls, and resume after Development User switching.
 
@@ -109,7 +109,7 @@ Browser acceptance coverage exercises the Varroa Assessment UI path: photo uploa
 - Review is photo-analysis-level, reversible, and available to any Workspace member.
 - Review statuses remain `unreviewed`, `accepted`, `rejected`, `inconclusive`, and `needs_expert_review`.
 - `accepted` means the beekeeper is content for the run to be used later as Advisor evidence; it does not assert complete review or model correctness.
-- Only completed and partial runs can be accepted. `failed` and `no_usable_bees` runs cannot be accepted. Accepted is the only backend state that sets `advisor_evidence_eligible`.
+- Only completed and partial runs can be accepted. `failed` and `no_usable_bees` runs cannot be accepted. Slice 0035 replaces the original boolean hook with `advisor_evidence_eligibility`, which derives current Advisor evidence eligibility from accepted review plus the frozen confidence-policy outcome.
 - Any non-accepted status requires a note. Changing review status updates the current review status and note on the Photo Analysis. Append-only review event history remains a follow-on audit hardening item; it is not surfaced in the delivered response shape.
 - No Advisor button, label, or trigger appears in the beekeeper UI. The backend eligibility hook remains for later integration.
 - Detail evidence mirrors the existing training-side Varroa review interaction: a selected head-up bee crop with linked clean and marked views, plus source photo context showing all bee/head annotations and highlighting the selected bee. Selecting evidence does not create Training Crops, Varroa Review Outcomes, or training data.

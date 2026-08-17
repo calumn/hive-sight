@@ -933,7 +933,7 @@ Rules:
 - Per-bee analysis records preserve detector status, detections, failure details, and structured adapter/model provenance.
 - Raw detector request payloads are not stored by default. Capped sanitized raw response or error payload may be retained only for failed or invalid adapter calls.
 - A zero-mite model result is not automatically accepted and is not a human `no_visible_varroa` judgement.
-- Only a Photo Analysis with review status `accepted` is eligible for later Advisor evidence.
+- Slice 0035 derives current Advisor evidence eligibility from review status plus the frozen Product Photo Analysis confidence-policy outcome: accepted deterministic development evidence can become `development_integration_only`, while accepted non-stub evidence can become `product_candidate` only when the policy status allows it.
 - `needs_expert_review`, `inconclusive`, `rejected`, and `unreviewed` are not Advisor-eligible.
 
 ### Advisor Treatment Advice Attempt
