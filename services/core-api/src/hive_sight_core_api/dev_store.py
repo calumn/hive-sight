@@ -41,14 +41,23 @@ from hive_sight_core_api.models import (
     DevUserResponse,
     FrameStandardResponse,
     FrameStandardStatus,
+    FrameContinuityStatus,
+    FrameSide,
+    FrameUse,
     GeneratedDatasetExportFileEntry,
     HiveConfigurationResponse,
     HiveConfigurationSnapshotResponse,
     HiveConfigurationUpsertRequest,
+    HiveFrameSlotListResponse,
+    HiveFrameSlotResponse,
+    HiveFrameSlotStatus,
     HiveResponse,
     HiveTreatmentCourseResponse,
     ImageQualityStatus,
     InspectionIntent,
+    InspectionFrameObservationListResponse,
+    InspectionFrameObservationResponse,
+    InspectionFrameObservationStatus,
     InspectionPhotoListResponse,
     InspectionPhotoResponse,
     InspectionResponse,
@@ -191,6 +200,10 @@ class InMemoryProductDataStore:
     apiaries: dict[UUID, ApiaryResponse] = field(default_factory=dict)
     hives: dict[UUID, HiveResponse] = field(default_factory=dict)
     hive_configurations: dict[UUID, HiveConfigurationResponse] = field(default_factory=dict)
+    hive_frame_slots: dict[UUID, HiveFrameSlotResponse] = field(default_factory=dict)
+    inspection_frame_observations: dict[UUID, InspectionFrameObservationResponse] = field(
+        default_factory=dict
+    )
     inspections: dict[UUID, InspectionResponse] = field(default_factory=dict)
     inspection_photos: dict[UUID, InspectionPhotoResponse] = field(default_factory=dict)
     analysis_runs: dict[UUID, AnalysisRunResponse] = field(default_factory=dict)
@@ -402,7 +415,58 @@ class InMemoryProductDataStore:
         configuration: HiveConfigurationResponse,
     ) -> HiveConfigurationResponse:
         self.hive_configurations[configuration.hive_id] = configuration
+        self.sync_brood_hive_frame_slots(configuration)
         return configuration
+
+    def sync_brood_hive_frame_slots(
+        self,
+        configuration: HiveConfigurationResponse,
+    ) -> list[HiveFrameSlotResponse]:
+        existing = [
+            slot
+            for slot in self.hive_frame_slots.values()
+            if slot.hive_id == configuration.hive_id and slot.frame_use == FrameUse.brood
+        ]
+        by_number = {slot.slot_number: slot for slot in existing}
+        now = self.clock()
+        for slot_number in range(1, configuration.brood_slot_count + 1):
+            slot = by_number.get(slot_number)
+            if slot is None:
+                slot = HiveFrameSlotResponse(
+                    hive_frame_slot_id=self.id_factory(),
+                    hive_id=configuration.hive_id,
+                    workspace_id=configuration.workspace_id,
+                    hive_configuration_id=configuration.hive_configuration_id,
+                    frame_use=FrameUse.brood,
+                    slot_number=slot_number,
+                    display_label=f"Brood {slot_number}",
+                    status=HiveFrameSlotStatus.active,
+                    created_at=now,
+                    updated_at=now,
+                )
+            else:
+                slot = slot.model_copy(
+                    update={
+                        "hive_configuration_id": configuration.hive_configuration_id,
+                        "status": HiveFrameSlotStatus.active,
+                        "updated_at": now,
+                    }
+                )
+            self.hive_frame_slots[slot.hive_frame_slot_id] = slot
+        for slot in existing:
+            if slot.slot_number > configuration.brood_slot_count:
+                self.hive_frame_slots[slot.hive_frame_slot_id] = slot.model_copy(
+                    update={
+                        "hive_configuration_id": configuration.hive_configuration_id,
+                        "status": HiveFrameSlotStatus.archived,
+                        "updated_at": now,
+                    }
+                )
+        return self.list_hive_frame_slots_for_hive(configuration.hive_id)
+
+    def list_hive_frame_slots_for_hive(self, hive_id: UUID) -> list[HiveFrameSlotResponse]:
+        slots = [slot for slot in self.hive_frame_slots.values() if slot.hive_id == hive_id]
+        return sorted(slots, key=lambda slot: (slot.frame_use, slot.slot_number))
 
     def upsert_hive_configuration(
         self,
@@ -551,11 +615,21 @@ class InMemoryProductDataStore:
         content_type: str,
         size_bytes: int,
         uploaded_by_user_id: UUID,
+        inspection_frame_observation_id: UUID | None = None,
+        frame_side: FrameSide | None = None,
         source_image_width_px: int | None = None,
         source_image_height_px: int | None = None,
         content_hash: str | None = None,
         content_hash_algorithm: str | None = None,
     ) -> InspectionPhotoResponse:
+        hive_frame_slot_id: UUID | None = None
+        if inspection_frame_observation_id is not None or frame_side is not None:
+            hive_frame_slot_id = self.validate_inspection_photo_frame_context(
+                workspace_id=workspace_id,
+                inspection_id=inspection_id,
+                inspection_frame_observation_id=inspection_frame_observation_id,
+                frame_side=frame_side,
+            )
         _ = (
             source_image_width_px,
             source_image_height_px,
@@ -566,6 +640,9 @@ class InMemoryProductDataStore:
             inspection_photo_id=inspection_photo_id,
             inspection_id=inspection_id,
             workspace_id=workspace_id,
+            inspection_frame_observation_id=inspection_frame_observation_id,
+            hive_frame_slot_id=hive_frame_slot_id,
+            frame_side=frame_side,
             original_object_key=original_object_key,
             filename=filename,
             content_type=content_type,
@@ -576,6 +653,67 @@ class InMemoryProductDataStore:
         )
         self.inspection_photos[inspection_photo_id] = photo
         return photo
+
+    def validate_inspection_photo_frame_context(
+        self,
+        workspace_id: UUID,
+        inspection_id: UUID,
+        inspection_frame_observation_id: UUID | None,
+        frame_side: FrameSide | None,
+    ) -> UUID:
+        if inspection_frame_observation_id is None or frame_side is None:
+            raise DomainError(
+                "inspection_frame_context_incomplete",
+                "Choose an Inspection Frame Observation and Frame Side together.",
+                422,
+            )
+        observation = self.inspection_frame_observations.get(inspection_frame_observation_id)
+        if (
+            observation is None
+            or observation.workspace_id != workspace_id
+            or observation.inspection_id != inspection_id
+        ):
+            raise DomainError(
+                "inspection_frame_observation_not_found",
+                "The requested Inspection Frame Observation was not found for this Inspection.",
+                404,
+            )
+        if observation.observation_status != InspectionFrameObservationStatus.inspected:
+            raise DomainError(
+                "inspection_frame_observation_not_inspected",
+                "Mark the brood slot inspected before attaching photos.",
+                409,
+            )
+        existing_sides = [
+            photo.frame_side
+            for photo in self.inspection_photos.values()
+            if photo.inspection_frame_observation_id == inspection_frame_observation_id
+        ]
+        if frame_side == FrameSide.unknown and existing_sides:
+            raise DomainError(
+                "frame_side_combination_invalid",
+                "An unknown-side photo cannot be combined with side A or side B evidence.",
+                409,
+            )
+        if frame_side != FrameSide.unknown and FrameSide.unknown in existing_sides:
+            raise DomainError(
+                "frame_side_combination_invalid",
+                "Choose either one unknown-side photo or side A and side B photos.",
+                409,
+            )
+        if frame_side in existing_sides:
+            raise DomainError(
+                "frame_side_duplicate",
+                "Only one photo is allowed for each side of one observed frame.",
+                409,
+            )
+        if len(existing_sides) >= 2:
+            raise DomainError(
+                "frame_side_limit_reached",
+                "Only two side photos are allowed for one observed frame.",
+                409,
+            )
+        return observation.hive_frame_slot_id
 
     def get_inspection_photo(
         self,
@@ -599,6 +737,136 @@ class InMemoryProductDataStore:
         ]
         photos.sort(key=lambda photo: photo.uploaded_at)
         return InspectionPhotoListResponse(inspection=inspection, photos=photos)
+
+    def list_hive_frame_slots(
+        self,
+        user: UserContext,
+        workspace_id: UUID,
+        hive_id: UUID,
+    ) -> HiveFrameSlotListResponse:
+        self.require_workspace_access(user, workspace_id)
+        hive = self.get_hive(hive_id)
+        if hive is None or hive.workspace_id != workspace_id:
+            raise DomainError("hive_not_found", "The requested Hive was not found.", 404)
+        return HiveFrameSlotListResponse(
+            hive_id=hive_id,
+            hive_frame_slots=self.list_hive_frame_slots_for_hive(hive_id),
+        )
+
+    def initialize_inspection_frame_observations(
+        self,
+        inspection: InspectionResponse,
+    ) -> list[InspectionFrameObservationResponse]:
+        if inspection.intent != InspectionIntent.varroa_assessment:
+            return []
+        existing = [
+            observation
+            for observation in self.inspection_frame_observations.values()
+            if observation.inspection_id == inspection.inspection_id
+        ]
+        if existing:
+            return sorted(existing, key=lambda observation: observation.hive_frame_slot.slot_number)
+        now = self.clock()
+        observations: list[InspectionFrameObservationResponse] = []
+        for slot in self.list_hive_frame_slots_for_hive(inspection.hive_id):
+            status = (
+                InspectionFrameObservationStatus.pending
+                if slot.status == HiveFrameSlotStatus.active
+                else InspectionFrameObservationStatus.inactive
+            )
+            continuity = (
+                FrameContinuityStatus.pending
+                if status == InspectionFrameObservationStatus.pending
+                else FrameContinuityStatus.not_continuous_or_unknown
+            )
+            observation = InspectionFrameObservationResponse(
+                inspection_frame_observation_id=self.id_factory(),
+                inspection_id=inspection.inspection_id,
+                workspace_id=inspection.workspace_id,
+                hive_frame_slot_id=slot.hive_frame_slot_id,
+                hive_frame_slot=slot,
+                observation_status=status,
+                continuity_status=continuity,
+                inspection_order=slot.slot_number,
+                created_at=now,
+                updated_at=now,
+            )
+            self.inspection_frame_observations[
+                observation.inspection_frame_observation_id
+            ] = observation
+            observations.append(observation)
+        return observations
+
+    def list_inspection_frame_observations(
+        self,
+        user: UserContext,
+        workspace_id: UUID,
+        inspection_id: UUID,
+    ) -> InspectionFrameObservationListResponse:
+        self.require_workspace_access(user, workspace_id)
+        inspection = self.require_inspection(workspace_id, inspection_id)
+        observations = self.initialize_inspection_frame_observations(inspection)
+        return InspectionFrameObservationListResponse(
+            inspection=inspection,
+            observations=sorted(
+                observations,
+                key=lambda observation: observation.hive_frame_slot.slot_number,
+            ),
+        )
+
+    def update_inspection_frame_observation(
+        self,
+        user: UserContext,
+        workspace_id: UUID,
+        inspection_frame_observation_id: UUID,
+        observation_status: InspectionFrameObservationStatus,
+        continuity_status: FrameContinuityStatus | None,
+        notes: str | None = None,
+    ) -> InspectionFrameObservationResponse:
+        self.require_workspace_access(user, workspace_id)
+        observation = self.inspection_frame_observations.get(inspection_frame_observation_id)
+        if observation is None or observation.workspace_id != workspace_id:
+            raise DomainError(
+                "inspection_frame_observation_not_found",
+                "The requested Inspection Frame Observation was not found.",
+                404,
+            )
+        if observation.observation_status == InspectionFrameObservationStatus.inactive:
+            raise DomainError(
+                "inactive_observation_locked",
+                "Inactive brood slot observations cannot be changed in this Inspection.",
+                409,
+            )
+        if observation_status == InspectionFrameObservationStatus.inactive:
+            raise DomainError(
+                "inactive_observation_system_managed",
+                "Inactive brood slot observations are managed from Hive Frame Slot status.",
+                422,
+            )
+        if observation_status == InspectionFrameObservationStatus.inspected:
+            if continuity_status not in {
+                FrameContinuityStatus.continuous_with_previous_observation,
+                FrameContinuityStatus.not_continuous_or_unknown,
+            }:
+                raise DomainError(
+                    "continuity_required_for_inspected",
+                    "Record whether the observed frame is continuous before marking it inspected.",
+                    422,
+                )
+        elif observation_status == InspectionFrameObservationStatus.skipped:
+            continuity_status = FrameContinuityStatus.not_continuous_or_unknown
+        elif observation_status == InspectionFrameObservationStatus.pending:
+            continuity_status = FrameContinuityStatus.pending
+        updated = observation.model_copy(
+            update={
+                "observation_status": observation_status,
+                "continuity_status": continuity_status,
+                "notes": notes,
+                "updated_at": self.clock(),
+            }
+        )
+        self.inspection_frame_observations[inspection_frame_observation_id] = updated
+        return updated
 
     def record_analysis_run(self, analysis_run: AnalysisRunResponse) -> AnalysisRunResponse:
         self.analysis_runs[analysis_run.analysis_run_id] = analysis_run

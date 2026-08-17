@@ -26,8 +26,10 @@ from hive_sight_core_api.models import (
     DatasetLabellingSessionResponse,
     DatasetVersionResponse,
     HiveConfigurationResponse,
+    HiveFrameSlotResponse,
     HiveResponse,
     HiveTreatmentCourseResponse,
+    InspectionFrameObservationResponse,
     InspectionPhotoResponse,
     InspectionResponse,
     ModelCandidateResponse,
@@ -49,7 +51,9 @@ MODEL_RECORD_TYPES: dict[str, type] = {
     "apiary": ApiaryResponse,
     "hive": HiveResponse,
     "hive_configuration": HiveConfigurationResponse,
+    "hive_frame_slot": HiveFrameSlotResponse,
     "inspection": InspectionResponse,
+    "inspection_frame_observation": InspectionFrameObservationResponse,
     "inspection_photo": InspectionPhotoResponse,
     "analysis_run": AnalysisRunResponse,
     "analysis_result": AnalysisResultResponse,
@@ -138,12 +142,35 @@ class PostgresProductDataStore(InMemoryProductDataStore):
         response = super().save_hive_configuration(configuration)
         self._persist_model("hive_configuration", response.hive_configuration_id, response)
         self._upsert_hive_configuration_projection(response)
+        for slot in self.list_hive_frame_slots_for_hive(response.hive_id):
+            self._persist_model("hive_frame_slot", slot.hive_frame_slot_id, slot)
         return response
 
     def save_inspection(self, inspection: InspectionResponse):
         response = super().save_inspection(inspection)
         self._persist_model("inspection", response.inspection_id, response)
         self._upsert_inspection_projection(response)
+        return response
+
+    def initialize_inspection_frame_observations(self, inspection: InspectionResponse):
+        before_ids = set(self.inspection_frame_observations)
+        observations = super().initialize_inspection_frame_observations(inspection)
+        for observation in observations:
+            if observation.inspection_frame_observation_id not in before_ids:
+                self._persist_model(
+                    "inspection_frame_observation",
+                    observation.inspection_frame_observation_id,
+                    observation,
+                )
+        return observations
+
+    def update_inspection_frame_observation(self, *args: Any, **kwargs: Any):
+        response = super().update_inspection_frame_observation(*args, **kwargs)
+        self._persist_model(
+            "inspection_frame_observation",
+            response.inspection_frame_observation_id,
+            response,
+        )
         return response
 
     def record_inspection_photo(self, *args: Any, **kwargs: Any):
@@ -463,8 +490,12 @@ class PostgresProductDataStore(InMemoryProductDataStore):
             self.hives[model.hive_id] = model
         elif record_type == "hive_configuration":
             self.hive_configurations[model.hive_id] = model
+        elif record_type == "hive_frame_slot":
+            self.hive_frame_slots[model.hive_frame_slot_id] = model
         elif record_type == "inspection":
             self.inspections[model.inspection_id] = model
+        elif record_type == "inspection_frame_observation":
+            self.inspection_frame_observations[model.inspection_frame_observation_id] = model
         elif record_type == "inspection_photo":
             self.inspection_photos[model.inspection_photo_id] = model
         elif record_type == "analysis_run":
@@ -723,9 +754,10 @@ class PostgresProductDataStore(InMemoryProductDataStore):
                     """
                     INSERT INTO hive_configurations (
                         id, hive_id, workspace_id, hive_type, frame_use, frame_standard_id, notes,
-                        status, effective_from, configured_by_user_id, configured_at, updated_at
+                        status, effective_from, configured_by_user_id, configured_at, updated_at,
+                        brood_slot_count
                     )
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """,
                     (
                         configuration.hive_configuration_id,
@@ -740,6 +772,7 @@ class PostgresProductDataStore(InMemoryProductDataStore):
                         configuration.configured_by_user_id,
                         configuration.configured_at,
                         configuration.updated_at,
+                        configuration.brood_slot_count,
                     ),
             )
 
@@ -819,9 +852,10 @@ class PostgresProductDataStore(InMemoryProductDataStore):
                 """
                     INSERT INTO inspection_photos (
                         id, workspace_id, source_image_id, inspection_id, upload_status,
-                        uploaded_at, uploaded_by_user_id
+                        uploaded_at, uploaded_by_user_id, inspection_frame_observation_id,
+                        hive_frame_slot_id, frame_side
                     )
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     ON CONFLICT (id) DO UPDATE SET upload_status = EXCLUDED.upload_status
                     """,
                 (
@@ -832,6 +866,9 @@ class PostgresProductDataStore(InMemoryProductDataStore):
                     photo.upload_status,
                     photo.uploaded_at,
                     photo.uploaded_by_user_id,
+                    photo.inspection_frame_observation_id,
+                    photo.hive_frame_slot_id,
+                    photo.frame_side,
                 ),
             )
 

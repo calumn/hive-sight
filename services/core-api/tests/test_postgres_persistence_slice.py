@@ -116,6 +116,154 @@ def test_slice_0035_migration_declares_product_photo_confidence_policy_shape() -
     assert "DROP COLUMN IF EXISTS advisor_evidence_eligible" in migration
 
 
+def test_slice_0036_migration_declares_hive_frame_slot_context_shape() -> None:
+    migration = (MIGRATIONS_DIR / "0036_hive_frame_slot_context.sql").read_text(
+        encoding="utf-8"
+    )
+
+    assert "brood_slot_count integer NOT NULL DEFAULT 10" in migration
+    assert "inspection_frame_observation_id uuid" in migration
+    assert "hive_frame_slot_id uuid" in migration
+    assert "frame_side text" in migration
+    assert "inspection_photos_frame_observation_idx" in migration
+    assert "inspection_photos_hive_frame_slot_idx" in migration
+
+
+@pytest.mark.skipif(
+    importlib.util.find_spec("psycopg") is None or not os.getenv("HIVESIGHT_TEST_DATABASE_URL"),
+    reason="Set HIVESIGHT_TEST_DATABASE_URL and install psycopg to run Postgres persistence integration.",
+)
+def test_postgres_store_survives_restart_for_hive_frame_slot_context() -> None:
+    database_url = os.environ["HIVESIGHT_TEST_DATABASE_URL"]
+    reset_database(database_url)
+    state = _build_postgres_state(database_url)
+    app.dependency_overrides[get_dev_state] = lambda: state
+    client = TestClient(app)
+
+    try:
+        workspace_id = client.get("/v1/dev/session", headers=_headers()).json()["workspace_id"]
+        terms = client.post(
+            "/v1/workspace-data-use-agreements/acceptances",
+            json={"workspace_id": workspace_id, "terms_version": "2026-08-17"},
+            headers=_headers(),
+        )
+        assert terms.status_code == 200
+        apiary_id = client.post(
+            "/v1/apiaries",
+            json={"workspace_id": workspace_id, "name": "Frame context apiary"},
+            headers=_headers(),
+        ).json()["apiary_id"]
+        hive_id = client.post(
+            "/v1/hives",
+            json={"apiary_id": apiary_id, "name": "Frame context hive"},
+            headers=_headers(),
+        ).json()["hive_id"]
+        configure_hive(
+            client,
+            workspace_id=workspace_id,
+            hive_id=hive_id,
+            headers=_headers(),
+            frame_standard_id="british_national_deep_brood",
+        )
+        configured = client.put(
+            f"/v1/hives/{hive_id}/configuration",
+            json={
+                "workspace_id": workspace_id,
+                "frame_standard_id": "british_national_deep_brood",
+                "brood_slot_count": 12,
+            },
+            headers=_headers(),
+        )
+        assert configured.status_code == 200
+        inspection_id = client.post(
+            "/v1/inspections",
+            json={
+                "hive_id": hive_id,
+                "inspection_date": str(date(2026, 8, 17)),
+                "intent": "varroa_assessment",
+            },
+            headers=_headers(),
+        ).json()["inspection_id"]
+        observations = client.get(
+            f"/v1/inspections/{inspection_id}/frame-observations?workspace_id={workspace_id}",
+            headers=_headers(),
+        ).json()["observations"]
+        slot_6 = next(
+            observation
+            for observation in observations
+            if observation["hive_frame_slot"]["slot_number"] == 6
+        )
+        inspected = client.patch(
+            f"/v1/inspection-frame-observations/{slot_6['inspection_frame_observation_id']}",
+            json={
+                "workspace_id": workspace_id,
+                "observation_status": "inspected",
+                "continuity_status": "continuous_with_previous_observation",
+            },
+            headers=_headers(),
+        )
+        assert inspected.status_code == 200
+        side_photo = client.post(
+            f"/v1/inspection-photos/intake?workspace_id={workspace_id}"
+            f"&inspection_id={inspection_id}"
+            f"&inspection_frame_observation_id={slot_6['inspection_frame_observation_id']}"
+            "&frame_side=side_a",
+            content=b"fake-image-bytes",
+            headers={
+                **_headers(),
+                "content-type": "image/jpeg",
+                "x-hivesight-filename": "slot-6-a.jpg",
+            },
+        )
+        assert side_photo.status_code == 202
+        reduced = client.put(
+            f"/v1/hives/{hive_id}/configuration",
+            json={
+                "workspace_id": workspace_id,
+                "frame_standard_id": "british_national_deep_brood",
+                "brood_slot_count": 10,
+            },
+            headers=_headers(),
+        )
+        assert reduced.status_code == 200
+    finally:
+        app.dependency_overrides.clear()
+
+    restarted_state = _build_postgres_state(database_url)
+    app.dependency_overrides[get_dev_state] = lambda: restarted_state
+    restarted_client = TestClient(app)
+    try:
+        restarted_slots = restarted_client.get(
+            f"/v1/hives/{hive_id}/frame-slots?workspace_id={workspace_id}",
+            headers=_headers(),
+        ).json()["hive_frame_slots"]
+        assert [slot["status"] for slot in restarted_slots if slot["slot_number"] in (11, 12)] == [
+            "archived",
+            "archived",
+        ]
+        restarted_observations = restarted_client.get(
+            f"/v1/inspections/{inspection_id}/frame-observations?workspace_id={workspace_id}",
+            headers=_headers(),
+        ).json()["observations"]
+        restarted_slot_6 = next(
+            observation
+            for observation in restarted_observations
+            if observation["hive_frame_slot"]["slot_number"] == 6
+        )
+        assert restarted_slot_6["observation_status"] == "inspected"
+        assert restarted_slot_6["continuity_status"] == "continuous_with_previous_observation"
+        restarted_photos = restarted_client.get(
+            f"/v1/inspections/{inspection_id}/photos?workspace_id={workspace_id}",
+            headers=_headers(),
+        ).json()["photos"]
+        assert restarted_photos[0]["inspection_frame_observation_id"] == (
+            slot_6["inspection_frame_observation_id"]
+        )
+        assert restarted_photos[0]["frame_side"] == "side_a"
+    finally:
+        app.dependency_overrides.clear()
+
+
 @pytest.mark.skipif(
     importlib.util.find_spec("psycopg") is None or not os.getenv("HIVESIGHT_TEST_DATABASE_URL"),
     reason="Set HIVESIGHT_TEST_DATABASE_URL and install psycopg to run Postgres persistence integration.",

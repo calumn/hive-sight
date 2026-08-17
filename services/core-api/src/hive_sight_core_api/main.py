@@ -96,17 +96,22 @@ from hive_sight_core_api.models import (
     FrameLevelVarroaResultSummaryResponse,
     FrameMiteCountRequest,
     FrameMiteCountResponse,
+    FrameSide,
     FrameStandardResponse,
     HeadUpNormalizedBeeCropPreviewResponse,
     HealthResponse,
     HiveConfigurationResponse,
     HiveConfigurationUpsertRequest,
     HiveCreateRequest,
+    HiveFrameSlotListResponse,
     HiveListResponse,
     HiveResponse,
     HiveTreatmentCourseListResponse,
     HiveTreatmentCourseResponse,
     InspectionCreateRequest,
+    InspectionFrameObservationListResponse,
+    InspectionFrameObservationResponse,
+    InspectionFrameObservationUpdateRequest,
     InspectionIntent,
     InspectionIntentUpdateRequest,
     InspectionListResponse,
@@ -427,6 +432,20 @@ def get_hive_configuration(
     )
 
 
+@app.get("/v1/hives/{hive_id}/frame-slots", response_model=HiveFrameSlotListResponse)
+def list_hive_frame_slots(
+    hive_id: UUID,
+    workspace_id: UUID,
+    user: AuthenticatedUserDep,
+    state: DevStateDep,
+) -> HiveFrameSlotListResponse:
+    return state.store.list_hive_frame_slots(
+        user=user,
+        workspace_id=workspace_id,
+        hive_id=hive_id,
+    )
+
+
 @app.post("/v1/inspections", response_model=InspectionResponse, status_code=201)
 def create_inspection(
     request: InspectionCreateRequest,
@@ -488,6 +507,43 @@ def list_inspection_photos(
     )
 
 
+@app.get(
+    "/v1/inspections/{inspection_id}/frame-observations",
+    response_model=InspectionFrameObservationListResponse,
+)
+def list_inspection_frame_observations(
+    inspection_id: UUID,
+    workspace_id: UUID,
+    user: AuthenticatedUserDep,
+    state: DevStateDep,
+) -> InspectionFrameObservationListResponse:
+    return state.store.list_inspection_frame_observations(
+        user=user,
+        workspace_id=workspace_id,
+        inspection_id=inspection_id,
+    )
+
+
+@app.patch(
+    "/v1/inspection-frame-observations/{inspection_frame_observation_id}",
+    response_model=InspectionFrameObservationResponse,
+)
+def update_inspection_frame_observation(
+    inspection_frame_observation_id: UUID,
+    request: InspectionFrameObservationUpdateRequest,
+    user: AuthenticatedUserDep,
+    state: DevStateDep,
+) -> InspectionFrameObservationResponse:
+    return state.store.update_inspection_frame_observation(
+        user=user,
+        workspace_id=request.workspace_id,
+        inspection_frame_observation_id=inspection_frame_observation_id,
+        observation_status=request.observation_status,
+        continuity_status=request.continuity_status,
+        notes=request.notes,
+    )
+
+
 @app.post("/v1/inspection-photos/intake", response_model=PhotoIntakeResponse, status_code=202)
 async def accept_inspection_photo(
     workspace_id: UUID,
@@ -495,6 +551,8 @@ async def accept_inspection_photo(
     request: Request,
     user: AuthenticatedUserDep,
     photo_access: InspectionPhotoAccessDep,
+    inspection_frame_observation_id: UUID | None = None,
+    frame_side: FrameSide | None = None,
     x_hivesight_filename: Annotated[str | None, Header(alias="x-hivesight-filename")] = None,
 ) -> PhotoIntakeResponse:
     content_type = request.headers.get("content-type", "")
@@ -506,6 +564,8 @@ async def accept_inspection_photo(
         filename=filename,
         content_type=content_type,
         body=await request.body(),
+        inspection_frame_observation_id=inspection_frame_observation_id,
+        frame_side=frame_side,
     )
 
 

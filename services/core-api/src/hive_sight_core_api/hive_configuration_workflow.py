@@ -59,6 +59,7 @@ class HiveConfigurationWorkflow:
             frame_use=frame_standard.frame_use,
             frame_standard_id=frame_standard.frame_standard_id,
             frame_standard=frame_standard,
+            brood_slot_count=request.brood_slot_count or 10,
             notes=notes,
             status=HiveConfigurationStatus.current,
             effective_from=request.effective_from or now.date(),
@@ -119,6 +120,7 @@ class HiveConfigurationWorkflow:
             intent=intent,
         )
         self.store.save_inspection(inspection)
+        self.store.initialize_inspection_frame_observations(inspection)
         return inspection
 
     def update_inspection_intent(

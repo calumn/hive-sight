@@ -78,6 +78,7 @@ export type HiveConfiguration = {
   frameUse: string;
   frameStandardId: string;
   frameStandard: FrameStandard;
+  broodSlotCount: number;
   notes: string | null;
   status: "current";
   effectiveFrom: string;
@@ -104,6 +105,9 @@ export type InspectionPhoto = {
   inspectionPhotoId: string;
   inspectionId: string;
   workspaceId: string;
+  inspectionFrameObservationId: string | null;
+  hiveFrameSlotId: string | null;
+  frameSide: FrameSide | null;
   originalObjectKey: string;
   filename: string;
   contentType: string;
@@ -111,6 +115,46 @@ export type InspectionPhoto = {
   uploadStatus: "accepted";
   uploadedByUserId: string;
   uploadedAt: string;
+};
+
+export type FrameSide = "side_a" | "side_b" | "unknown";
+
+export type HiveFrameSlot = {
+  hiveFrameSlotId: string;
+  hiveId: string;
+  workspaceId: string;
+  hiveConfigurationId: string | null;
+  frameUse: "brood";
+  slotNumber: number;
+  displayLabel: string;
+  status: "active" | "archived";
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type InspectionFrameObservationStatus = "pending" | "inspected" | "skipped" | "inactive";
+export type FrameContinuityStatus =
+  | "pending"
+  | "continuous_with_previous_observation"
+  | "not_continuous_or_unknown";
+
+export type InspectionFrameObservation = {
+  inspectionFrameObservationId: string;
+  inspectionId: string;
+  workspaceId: string;
+  hiveFrameSlotId: string;
+  hiveFrameSlot: HiveFrameSlot;
+  observationStatus: InspectionFrameObservationStatus;
+  continuityStatus: FrameContinuityStatus;
+  inspectionOrder: number | null;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type InspectionFrameObservationList = {
+  inspection: Inspection;
+  observations: InspectionFrameObservation[];
 };
 
 export type InspectionPhotoList = {
@@ -1334,12 +1378,14 @@ export async function upsertHiveConfiguration({
   workspaceId,
   hiveId,
   frameStandardId,
+  broodSlotCount,
   notes
 }: {
   devUserId: string;
   workspaceId: string;
   hiveId: string;
   frameStandardId: string;
+  broodSlotCount: number;
   notes: string;
 }): Promise<HiveConfiguration> {
   const trimmedNotes = notes.trim();
@@ -1349,6 +1395,7 @@ export async function upsertHiveConfiguration({
     body: JSON.stringify({
       workspace_id: workspaceId,
       frame_standard_id: frameStandardId,
+      brood_slot_count: broodSlotCount,
       notes: trimmedNotes.length > 0 ? trimmedNotes : null
     })
   });
@@ -1371,6 +1418,70 @@ export async function fetchHiveConfiguration({
   });
   await ensureOk(response);
   return parseHiveConfiguration(await response.json());
+}
+
+export async function fetchHiveFrameSlots({
+  devUserId,
+  workspaceId,
+  hiveId
+}: {
+  devUserId: string;
+  workspaceId: string;
+  hiveId: string;
+}): Promise<HiveFrameSlot[]> {
+  const params = new URLSearchParams({ workspace_id: workspaceId });
+  const response = await fetch(`${coreApiUrl}/v1/hives/${hiveId}/frame-slots?${params}`, {
+    headers: devAuthHeaders(devUserId)
+  });
+  await ensureOk(response);
+  const record = requireRecord(await response.json(), "Hive Frame Slot list response");
+  return requireArray(record.hive_frame_slots, "hive_frame_slots").map(parseHiveFrameSlot);
+}
+
+export async function fetchInspectionFrameObservations({
+  devUserId,
+  workspaceId,
+  inspectionId
+}: {
+  devUserId: string;
+  workspaceId: string;
+  inspectionId: string;
+}): Promise<InspectionFrameObservationList> {
+  const params = new URLSearchParams({ workspace_id: workspaceId });
+  const response = await fetch(`${coreApiUrl}/v1/inspections/${inspectionId}/frame-observations?${params}`, {
+    headers: devAuthHeaders(devUserId)
+  });
+  await ensureOk(response);
+  return parseInspectionFrameObservationList(await response.json());
+}
+
+export async function updateInspectionFrameObservation({
+  devUserId,
+  workspaceId,
+  inspectionFrameObservationId,
+  observationStatus,
+  continuityStatus
+}: {
+  devUserId: string;
+  workspaceId: string;
+  inspectionFrameObservationId: string;
+  observationStatus: InspectionFrameObservationStatus;
+  continuityStatus?: FrameContinuityStatus;
+}): Promise<InspectionFrameObservation> {
+  const response = await fetch(
+    `${coreApiUrl}/v1/inspection-frame-observations/${inspectionFrameObservationId}`,
+    {
+      method: "PATCH",
+      headers: jsonHeaders(devUserId),
+      body: JSON.stringify({
+        workspace_id: workspaceId,
+        observation_status: observationStatus,
+        continuity_status: continuityStatus ?? null
+      })
+    }
+  );
+  await ensureOk(response);
+  return parseInspectionFrameObservation(await response.json());
 }
 
 export async function createInspection({
@@ -1494,14 +1605,22 @@ export async function uploadInspectionPhoto({
   devUserId,
   workspaceId,
   inspectionId,
-  file
+  file,
+  inspectionFrameObservationId,
+  frameSide
 }: {
   devUserId: string;
   workspaceId: string;
   inspectionId: string;
   file: File;
+  inspectionFrameObservationId?: string;
+  frameSide?: FrameSide;
 }): Promise<PhotoIntake> {
   const params = new URLSearchParams({ workspace_id: workspaceId, inspection_id: inspectionId });
+  if (inspectionFrameObservationId && frameSide) {
+    params.set("inspection_frame_observation_id", inspectionFrameObservationId);
+    params.set("frame_side", frameSide);
+  }
   const response = await fetch(`${coreApiUrl}/v1/inspection-photos/intake?${params}`, {
     method: "POST",
     headers: {
@@ -2940,11 +3059,56 @@ function parseHiveConfiguration(value: unknown): HiveConfiguration {
     frameUse: requireString(record.frame_use, "frame_use"),
     frameStandardId: requireString(record.frame_standard_id, "frame_standard_id"),
     frameStandard: parseFrameStandard(record.frame_standard),
+    broodSlotCount: requireNumber(record.brood_slot_count, "brood_slot_count"),
     notes: optionalString(record.notes, "notes"),
     status: requireHiveConfigurationStatus(record.status),
     effectiveFrom: requireString(record.effective_from, "effective_from"),
     configuredByUserId: requireString(record.configured_by_user_id, "configured_by_user_id"),
     configuredAt: requireString(record.configured_at, "configured_at"),
+    updatedAt: requireString(record.updated_at, "updated_at")
+  };
+}
+
+function parseHiveFrameSlot(value: unknown): HiveFrameSlot {
+  const record = requireRecord(value, "Hive Frame Slot response");
+  return {
+    hiveFrameSlotId: requireString(record.hive_frame_slot_id, "hive_frame_slot_id"),
+    hiveId: requireString(record.hive_id, "hive_id"),
+    workspaceId: requireString(record.workspace_id, "workspace_id"),
+    hiveConfigurationId: optionalString(record.hive_configuration_id, "hive_configuration_id"),
+    frameUse: requireBroodFrameUse(record.frame_use),
+    slotNumber: requireNumber(record.slot_number, "slot_number"),
+    displayLabel: requireString(record.display_label, "display_label"),
+    status: requireHiveFrameSlotStatus(record.status),
+    createdAt: requireString(record.created_at, "created_at"),
+    updatedAt: requireString(record.updated_at, "updated_at")
+  };
+}
+
+function parseInspectionFrameObservationList(value: unknown): InspectionFrameObservationList {
+  const record = requireRecord(value, "Inspection Frame Observation list response");
+  return {
+    inspection: parseInspection(record.inspection),
+    observations: requireArray(record.observations, "observations").map(parseInspectionFrameObservation)
+  };
+}
+
+function parseInspectionFrameObservation(value: unknown): InspectionFrameObservation {
+  const record = requireRecord(value, "Inspection Frame Observation response");
+  return {
+    inspectionFrameObservationId: requireString(
+      record.inspection_frame_observation_id,
+      "inspection_frame_observation_id"
+    ),
+    inspectionId: requireString(record.inspection_id, "inspection_id"),
+    workspaceId: requireString(record.workspace_id, "workspace_id"),
+    hiveFrameSlotId: requireString(record.hive_frame_slot_id, "hive_frame_slot_id"),
+    hiveFrameSlot: parseHiveFrameSlot(record.hive_frame_slot),
+    observationStatus: requireInspectionFrameObservationStatus(record.observation_status),
+    continuityStatus: requireFrameContinuityStatus(record.continuity_status),
+    inspectionOrder: optionalNumber(record.inspection_order, "inspection_order"),
+    notes: optionalString(record.notes, "notes"),
+    createdAt: requireString(record.created_at, "created_at"),
     updatedAt: requireString(record.updated_at, "updated_at")
   };
 }
@@ -2996,6 +3160,12 @@ function parseInspectionPhoto(value: unknown): InspectionPhoto {
     inspectionPhotoId: requireString(photo.inspection_photo_id, "inspection_photo_id"),
     inspectionId: requireString(photo.inspection_id, "inspection_id"),
     workspaceId: requireString(photo.workspace_id, "workspace_id"),
+    inspectionFrameObservationId: optionalString(
+      photo.inspection_frame_observation_id,
+      "inspection_frame_observation_id"
+    ),
+    hiveFrameSlotId: optionalString(photo.hive_frame_slot_id, "hive_frame_slot_id"),
+    frameSide: optionalFrameSide(photo.frame_side),
     originalObjectKey: requireString(photo.original_object_key, "original_object_key"),
     filename: requireString(photo.filename, "filename"),
     contentType: requireString(photo.content_type, "content_type"),
@@ -4716,6 +4886,54 @@ function requireHiveConfigurationStatus(value: unknown): "current" {
     return value;
   }
   throw new Error("Core API response had an unexpected Hive Configuration status");
+}
+
+function requireBroodFrameUse(value: unknown): "brood" {
+  if (value === "brood") {
+    return value;
+  }
+  throw new Error("Core API response had an unexpected Hive Frame Slot use");
+}
+
+function requireHiveFrameSlotStatus(value: unknown): HiveFrameSlot["status"] {
+  if (value === "active" || value === "archived") {
+    return value;
+  }
+  throw new Error("Core API response had an unexpected Hive Frame Slot status");
+}
+
+function requireInspectionFrameObservationStatus(
+  value: unknown
+): InspectionFrameObservationStatus {
+  if (value === "pending" || value === "inspected" || value === "skipped" || value === "inactive") {
+    return value;
+  }
+  throw new Error("Core API response had an unexpected Inspection Frame Observation status");
+}
+
+function requireFrameContinuityStatus(value: unknown): FrameContinuityStatus {
+  if (
+    value === "pending" ||
+    value === "continuous_with_previous_observation" ||
+    value === "not_continuous_or_unknown"
+  ) {
+    return value;
+  }
+  throw new Error("Core API response had an unexpected Frame Continuity status");
+}
+
+function requireFrameSide(value: unknown): FrameSide {
+  if (value === "side_a" || value === "side_b" || value === "unknown") {
+    return value;
+  }
+  throw new Error("Core API response had an unexpected Frame Side");
+}
+
+function optionalFrameSide(value: unknown): FrameSide | null {
+  if (value === null) {
+    return null;
+  }
+  return requireFrameSide(value);
 }
 
 function requireAnalysisStatus(value: unknown): PhotoIntake["analysisRun"]["status"] {

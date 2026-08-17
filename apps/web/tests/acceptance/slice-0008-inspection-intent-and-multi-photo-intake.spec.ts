@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { fileURLToPath } from "node:url";
-import { createApiaryAndHive } from "./support/setup-workflow";
+import { createApiaryAndHive, prepareFirstBroodSlotForUpload } from "./support/setup-workflow";
 
 const fixtureImagePath = fileURLToPath(new URL("../fixtures/bee-frame-test.png", import.meta.url));
 
@@ -24,11 +24,14 @@ test("Beekeeper creates an Inspection with intent and sees repeated photo upload
   await page.getByTestId("inspection-intent-select").selectOption("varroa_assessment");
   await page.getByTestId("create-inspection-button").click();
   await expect(page.getByTestId("inspection-intent-badge")).toContainText("Varroa assessment");
+  await prepareFirstBroodSlotForUpload(page);
 
+  await page.getByTestId("inspection-photo-frame-side-select").selectOption("side_a");
   await page.getByTestId("inspection-photo-input").setInputFiles(fixtureImagePath);
   await page.getByTestId("upload-photo-button").click();
   await expect(page.getByTestId("inspection-photo-list-item")).toHaveCount(1);
 
+  await page.getByTestId("inspection-photo-frame-side-select").selectOption("side_b");
   await page.getByTestId("inspection-photo-input").setInputFiles(fixtureImagePath);
   await page.getByTestId("upload-photo-button").click();
   await expect(page.getByTestId("inspection-photo-list-item")).toHaveCount(2);
@@ -86,6 +89,7 @@ test("Beekeeper resumes a processed Varroa assessment after switching Users", as
   await page.getByTestId("inspection-date-input").fill("2026-08-04");
   await page.getByTestId("create-inspection-button").click();
   await expect(page.getByTestId("inspection-intent-badge")).toContainText("Varroa assessment");
+  await prepareFirstBroodSlotForUpload(page);
 
   await page.getByTestId("inspection-photo-input").setInputFiles(fixtureImagePath);
   await page.getByTestId("upload-photo-button").click();

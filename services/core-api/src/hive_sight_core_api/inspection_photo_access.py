@@ -12,7 +12,7 @@ from hive_sight_core_api.dev_store import (
     UploadPolicy,
     UserContext,
 )
-from hive_sight_core_api.models import AnalysisRunRequest, PhotoIntakeResponse
+from hive_sight_core_api.models import AnalysisRunRequest, FrameSide, PhotoIntakeResponse
 
 
 @dataclass(frozen=True)
@@ -31,6 +31,8 @@ class InspectionPhotoAccess:
         filename: str,
         content_type: str,
         body: bytes,
+        inspection_frame_observation_id: UUID | None = None,
+        frame_side: FrameSide | None = None,
     ) -> PhotoIntakeResponse:
         if self.store is None or self.object_storage is None or self.analysis_workflow is None:
             raise DomainError(
@@ -62,6 +64,8 @@ class InspectionPhotoAccess:
             content_type=content_type,
             size_bytes=len(body),
             uploaded_by_user_id=user.user_id,
+            inspection_frame_observation_id=inspection_frame_observation_id,
+            frame_side=frame_side,
             source_image_width_px=source_width_px,
             source_image_height_px=source_height_px,
             content_hash=sha256(body).hexdigest(),

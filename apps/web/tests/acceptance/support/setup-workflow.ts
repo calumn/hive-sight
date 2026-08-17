@@ -38,3 +38,13 @@ export async function createApiaryAndHive(page: Page, apiaryName: string, hiveNa
   await createApiary(page, apiaryName);
   await createHive(page, hiveName);
 }
+
+export async function prepareFirstBroodSlotForUpload(page: Page) {
+  await expect(page.getByTestId("brood-slot-coverage-panel")).toBeVisible();
+  await page
+    .getByTestId("frame-continuity-select")
+    .first()
+    .selectOption("continuous_with_previous_observation");
+  await page.getByTestId("mark-frame-observation-inspected-button").first().click();
+  await expect(page.getByTestId("inspection-frame-observation-select")).not.toHaveValue("");
+}

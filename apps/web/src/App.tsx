@@ -64,6 +64,7 @@ import {
   fetchHiveConfiguration,
   fetchHives,
   fetchHiveInspections,
+  fetchInspectionFrameObservations,
   fetchInspectionAnalysisRuns,
   fetchInspectionPhotos,
   fetchVarroaPhotoAnalyses,
@@ -102,6 +103,7 @@ import {
   toCoreApiContentUrl,
   updateTrainingCrop,
   updateTrainingCropEllipse,
+  updateInspectionFrameObservation,
   upsertHiveConfiguration,
   updateDatasetLabellingSessionMetadata,
   uploadInspectionPhoto,
@@ -133,6 +135,9 @@ import {
   type DevUser,
   type ImageQualityStatus,
   type Inspection,
+  type InspectionFrameObservation,
+  type FrameContinuityStatus,
+  type FrameSide,
   type InspectionIntent,
   type InspectionPhoto,
   type FrameStandard,
@@ -219,10 +224,15 @@ export function App() {
     "british_national_deep_brood"
   );
   const [hiveConfigurationNotes, setHiveConfigurationNotes] = useState("");
+  const [broodSlotCount, setBroodSlotCount] = useState(10);
   const [hiveConfiguration, setHiveConfiguration] = useState<HiveConfiguration | null>(null);
   const [trainingInspections, setTrainingInspections] = useState<Inspection[]>([]);
   const [inspection, setInspection] = useState<Inspection | null>(null);
   const [inspectionPhotos, setInspectionPhotos] = useState<InspectionPhoto[]>([]);
+  const [frameObservations, setFrameObservations] = useState<InspectionFrameObservation[]>([]);
+  const [selectedObservationId, setSelectedObservationId] = useState("");
+  const [selectedFrameSide, setSelectedFrameSide] = useState<FrameSide>("unknown");
+  const [continuityChoices, setContinuityChoices] = useState<Record<string, FrameContinuityStatus>>({});
   const [analysisDetail, setAnalysisDetail] = useState<AnalysisRunDetail | null>(null);
   const [photoAnalyses, setPhotoAnalyses] = useState<Record<string, VarroaPhotoAnalysis>>({});
   const [analysisEvidence, setAnalysisEvidence] = useState<AnalysisEvidence | null>(null);
@@ -345,14 +355,17 @@ export function App() {
     (standard) => standard.frameStandardId === selectedFrameStandardId
   );
   const hiveConfigurationNotesRequired = selectedFrameStandard?.status === "other";
+  const sanitizedBroodSlotCount = Math.max(1, Math.min(50, Math.trunc(broodSlotCount)));
   const canCreateHive = Boolean(
     apiary &&
       selectedFrameStandardId &&
+      sanitizedBroodSlotCount >= 1 &&
       (!hiveConfigurationNotesRequired || hiveConfigurationNotes.trim().length > 0)
   );
   const canConfigureSelectedHive = Boolean(
     hive &&
       selectedFrameStandardId &&
+      sanitizedBroodSlotCount >= 1 &&
       (!hiveConfigurationNotesRequired || hiveConfigurationNotes.trim().length > 0)
   );
   const canCreateInspection = Boolean(
@@ -360,9 +373,18 @@ export function App() {
       hiveConfiguration &&
       (inspectionIntent !== "training_data_collection" || session?.datasetCuratorCapability)
   );
-  const canUpload = Boolean(termsAccepted && inspection && file);
   const isTrainingDataCollection = inspection?.intent === "training_data_collection";
   const isVarroaAssessment = inspection?.intent === "varroa_assessment";
+  const selectedFrameObservation =
+    frameObservations.find(
+      (candidate) => candidate.inspectionFrameObservationId === selectedObservationId
+    ) ?? null;
+  const canUpload = Boolean(
+    termsAccepted &&
+      inspection &&
+      file &&
+      (!isVarroaAssessment || selectedFrameObservation?.observationStatus === "inspected")
+  );
   const showApiarySetupForm = showApiarySetup || apiaries.length === 0;
   const isConfiguringSelectedHive = Boolean(hive && !hiveConfiguration && hives.length > 0);
   const showHiveSetupForm =
@@ -449,11 +471,13 @@ export function App() {
       });
       setHiveConfiguration(configuration);
       setSelectedFrameStandardId(configuration.frameStandardId);
+      setBroodSlotCount(configuration.broodSlotCount);
       setHiveConfigurationNotes(configuration.notes ?? "");
     } catch (error) {
       const apiError = toApiError(error);
       if (apiError.code === "hive_configuration_required") {
         setHiveConfiguration(null);
+        setBroodSlotCount(10);
         setHiveConfigurationNotes("");
         return;
       }
@@ -532,6 +556,13 @@ export function App() {
     clearEvidenceImage();
     clearLabellingImage();
     setActionState({ kind: "idle" });
+    if (selectedInspection.intent === "varroa_assessment") {
+      await refreshInspectionFrameObservationsFor(workspaceId, selectedInspection, activeDevUserId);
+    } else {
+      setFrameObservations([]);
+      setSelectedObservationId("");
+      setContinuityChoices({});
+    }
     const listing = await fetchInspectionPhotos({
       devUserId: activeDevUserId,
       workspaceId,
@@ -646,6 +677,7 @@ export function App() {
         workspaceId: created.workspaceId,
         hiveId: created.hiveId,
         frameStandardId: selectedFrameStandardId,
+        broodSlotCount: sanitizedBroodSlotCount,
         notes: hiveConfigurationNotes
       });
       setHive(created);
@@ -666,6 +698,7 @@ export function App() {
         workspaceId: session.workspaceId,
         hiveId: hive.hiveId,
         frameStandardId: selectedFrameStandardId,
+        broodSlotCount: sanitizedBroodSlotCount,
         notes: hiveConfigurationNotes
       });
       setHiveConfiguration(configuration);
@@ -687,6 +720,12 @@ export function App() {
       });
       setInspection(created);
       setInspectionPhotos([]);
+      if (created.intent === "varroa_assessment" && session) {
+        await refreshInspectionFrameObservationsFor(session.workspaceId, created);
+      } else {
+        setFrameObservations([]);
+        setSelectedObservationId("");
+      }
       setAnalysisDetail(null);
       clearEvidenceImage();
       clearLabellingImage();
@@ -711,7 +750,11 @@ export function App() {
         devUserId,
         workspaceId: session.workspaceId,
         inspectionId: inspection.inspectionId,
-        file
+        file,
+        inspectionFrameObservationId: isVarroaAssessment
+          ? selectedFrameObservation?.inspectionFrameObservationId
+          : undefined,
+        frameSide: isVarroaAssessment ? selectedFrameSide : undefined
       });
       await refreshSession();
       await refreshInspectionPhotos();
@@ -734,6 +777,7 @@ export function App() {
     setInspection(listing.inspection);
     setInspectionPhotos(listing.photos);
     if (listing.inspection.intent === "varroa_assessment") {
+      await refreshInspectionFrameObservationsFor(session.workspaceId, listing.inspection);
       const entries = await Promise.all(
         listing.photos.map(async (photo) => {
           const runs = await fetchVarroaPhotoAnalyses({
@@ -744,6 +788,72 @@ export function App() {
       );
       setPhotoAnalyses(Object.fromEntries(entries.filter((entry) => entry[1])) as Record<string, VarroaPhotoAnalysis>);
     }
+  }
+
+  async function refreshInspectionFrameObservationsFor(
+    workspaceId: string,
+    selectedInspection: Inspection,
+    activeDevUserId = devUserId
+  ) {
+    const listing = await fetchInspectionFrameObservations({
+      devUserId: activeDevUserId,
+      workspaceId,
+      inspectionId: selectedInspection.inspectionId
+    });
+    setFrameObservations(listing.observations);
+    setSelectedObservationId((current) => {
+      const currentObservation = listing.observations.find(
+        (candidate) => candidate.inspectionFrameObservationId === current
+      );
+      if (currentObservation?.observationStatus === "inspected") {
+        return current;
+      }
+      return (
+        listing.observations.find(
+          (candidate) => candidate.observationStatus === "inspected"
+        )?.inspectionFrameObservationId ?? ""
+      );
+    });
+  }
+
+  async function onMarkObservationInspected(observation: InspectionFrameObservation) {
+    if (!session || !inspection) return;
+    const continuityStatus = continuityChoices[observation.inspectionFrameObservationId];
+    if (
+      continuityStatus !== "continuous_with_previous_observation" &&
+      continuityStatus !== "not_continuous_or_unknown"
+    ) {
+      setActionState({
+        kind: "blocked",
+        code: "continuity_required",
+        message: "Choose whether this frame is continuous with the previous observation first."
+      });
+      return;
+    }
+    await runAction("Recording brood slot inspection", async () => {
+      await updateInspectionFrameObservation({
+        devUserId,
+        workspaceId: session.workspaceId,
+        inspectionFrameObservationId: observation.inspectionFrameObservationId,
+        observationStatus: "inspected",
+        continuityStatus
+      });
+      await refreshInspectionFrameObservationsFor(session.workspaceId, inspection);
+      setSelectedObservationId(observation.inspectionFrameObservationId);
+    });
+  }
+
+  async function onMarkObservationSkipped(observation: InspectionFrameObservation) {
+    if (!session || !inspection) return;
+    await runAction("Skipping brood slot", async () => {
+      await updateInspectionFrameObservation({
+        devUserId,
+        workspaceId: session.workspaceId,
+        inspectionFrameObservationId: observation.inspectionFrameObservationId,
+        observationStatus: "skipped"
+      });
+      await refreshInspectionFrameObservationsFor(session.workspaceId, inspection);
+    });
   }
 
   async function onProcessAnalysis() {
@@ -1352,6 +1462,20 @@ export function App() {
                         ))}
                       </select>
                     </label>
+                    <label>
+                      <span>Brood slots</span>
+                      <input
+                        type="number"
+                        min={1}
+                        max={50}
+                        value={broodSlotCount}
+                        onChange={(event) =>
+                          setBroodSlotCount(Number.parseInt(event.target.value, 10) || 1)
+                        }
+                        required
+                        data-testid="hive-configuration-brood-slot-count-input"
+                      />
+                    </label>
                     {selectedFrameStandard ? (
                       <dl
                         className="compact-facts"
@@ -1465,8 +1589,66 @@ export function App() {
               </section>
             </div>
 
+            {isVarroaAssessment ? (
+              <BroodSlotCoveragePanel
+                observations={frameObservations}
+                photos={inspectionPhotos}
+                selectedObservationId={selectedObservationId}
+                selectedFrameSide={selectedFrameSide}
+                continuityChoices={continuityChoices}
+                actionWorking={actionState.kind === "working"}
+                onSelectObservation={setSelectedObservationId}
+                onSelectFrameSide={setSelectedFrameSide}
+                onSetContinuityChoice={(observationId, continuityStatus) =>
+                  setContinuityChoices((current) => ({
+                    ...current,
+                    [observationId]: continuityStatus
+                  }))
+                }
+                onMarkInspected={onMarkObservationInspected}
+                onMarkSkipped={onMarkObservationSkipped}
+              />
+            ) : null}
+
             <form className="upload-panel" onSubmit={onUpload}>
               <PanelHeading icon={<CloudUpload size={20} />} title="Photo upload" />
+              {isVarroaAssessment ? (
+                <div className="frame-side-picker" data-testid="frame-side-upload-context">
+                  <label>
+                    <span>Brood slot</span>
+                    <select
+                      value={selectedObservationId}
+                      onChange={(event) => setSelectedObservationId(event.target.value)}
+                      required
+                      data-testid="inspection-frame-observation-select"
+                    >
+                      <option value="">Select inspected slot</option>
+                      {frameObservations
+                        .filter((observation) => observation.observationStatus === "inspected")
+                        .map((observation) => (
+                          <option
+                            key={observation.inspectionFrameObservationId}
+                            value={observation.inspectionFrameObservationId}
+                          >
+                            {observation.hiveFrameSlot.displayLabel}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+                  <label>
+                    <span>Frame side</span>
+                    <select
+                      value={selectedFrameSide}
+                      onChange={(event) => setSelectedFrameSide(event.target.value as FrameSide)}
+                      data-testid="inspection-photo-frame-side-select"
+                    >
+                      <option value="unknown">Unknown side</option>
+                      <option value="side_a">Side A</option>
+                      <option value="side_b">Side B</option>
+                    </select>
+                  </label>
+                </div>
+              ) : null}
               <label className="file-picker">
                 <FileImage size={24} />
                 <span>{selectedFileLabel}</span>
@@ -1643,6 +1825,156 @@ function formatCapabilities(session: DevSession) {
 function RecordBadge({ value }: { value: string | undefined }) {
   return (
     <p className={value ? "record-badge ready" : "record-badge"}>{value ? value : "Pending"}</p>
+  );
+}
+
+function BroodSlotCoveragePanel({
+  observations,
+  photos,
+  selectedObservationId,
+  selectedFrameSide,
+  continuityChoices,
+  actionWorking,
+  onSelectObservation,
+  onSelectFrameSide,
+  onSetContinuityChoice,
+  onMarkInspected,
+  onMarkSkipped
+}: {
+  observations: InspectionFrameObservation[];
+  photos: InspectionPhoto[];
+  selectedObservationId: string;
+  selectedFrameSide: FrameSide;
+  continuityChoices: Record<string, FrameContinuityStatus>;
+  actionWorking: boolean;
+  onSelectObservation: (inspectionFrameObservationId: string) => void;
+  onSelectFrameSide: (frameSide: FrameSide) => void;
+  onSetContinuityChoice: (
+    inspectionFrameObservationId: string,
+    continuityStatus: FrameContinuityStatus
+  ) => void;
+  onMarkInspected: (observation: InspectionFrameObservation) => void;
+  onMarkSkipped: (observation: InspectionFrameObservation) => void;
+}) {
+  return (
+    <section
+      className="brood-slot-coverage-panel"
+      aria-label="Brood slot coverage"
+      data-testid="brood-slot-coverage-panel"
+    >
+      <div className="analysis-header">
+        <PanelHeading icon={<Check size={20} />} title="Brood slot coverage" />
+        <span className="analysis-status status-queued">
+          {observations.length} slot{observations.length === 1 ? "" : "s"}
+        </span>
+      </div>
+      <div className="brood-slot-grid" data-testid="brood-slot-observation-list">
+        {observations.map((observation) => {
+          const observationPhotos = photos.filter(
+            (photo) =>
+              photo.inspectionFrameObservationId === observation.inspectionFrameObservationId
+          );
+          const continuityChoice =
+            continuityChoices[observation.inspectionFrameObservationId] ?? "pending";
+          const inspected = observation.observationStatus === "inspected";
+          return (
+            <article
+              key={observation.inspectionFrameObservationId}
+              className={`brood-slot-row ${selectedObservationId === observation.inspectionFrameObservationId ? "selected" : ""}`}
+              data-testid="brood-slot-observation"
+            >
+              <div>
+                <strong>{observation.hiveFrameSlot.displayLabel}</strong>
+                <span>{formatObservationStatus(observation.observationStatus)}</span>
+              </div>
+              <div className="slot-evidence">
+                <span>{formatContinuityStatus(observation.continuityStatus)}</span>
+                {observationPhotos.length > 0 ? (
+                  observationPhotos.map((photo) => (
+                    <span key={photo.inspectionPhotoId}>
+                      {formatFrameSide(photo.frameSide)}: {photo.filename}
+                    </span>
+                  ))
+                ) : (
+                  <span>No side photos</span>
+                )}
+              </div>
+              {observation.observationStatus === "pending" ? (
+                <div className="slot-actions">
+                  <label>
+                    <span>Continuity</span>
+                    <select
+                      value={continuityChoice}
+                      onChange={(event) =>
+                        onSetContinuityChoice(
+                          observation.inspectionFrameObservationId,
+                          event.target.value as FrameContinuityStatus
+                        )
+                      }
+                      data-testid="frame-continuity-select"
+                    >
+                      <option value="pending">Choose</option>
+                      <option value="continuous_with_previous_observation">
+                        Continuous with previous
+                      </option>
+                      <option value="not_continuous_or_unknown">
+                        Not continuous or unknown
+                      </option>
+                    </select>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => onMarkInspected(observation)}
+                    disabled={actionWorking || continuityChoice === "pending"}
+                    data-testid="mark-frame-observation-inspected-button"
+                  >
+                    Inspected
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onMarkSkipped(observation)}
+                    disabled={actionWorking}
+                    data-testid="mark-frame-observation-skipped-button"
+                  >
+                    Skipped
+                  </button>
+                </div>
+              ) : inspected ? (
+                <div className="slot-actions">
+                  <button
+                    type="button"
+                    className={selectedObservationId === observation.inspectionFrameObservationId ? "selected" : ""}
+                    onClick={() => onSelectObservation(observation.inspectionFrameObservationId)}
+                    disabled={actionWorking}
+                    data-testid="select-frame-observation-for-upload-button"
+                  >
+                    Select for upload
+                  </button>
+                  <select
+                    value={
+                      selectedObservationId === observation.inspectionFrameObservationId
+                        ? selectedFrameSide
+                        : "unknown"
+                    }
+                    onChange={(event) => {
+                      onSelectObservation(observation.inspectionFrameObservationId);
+                      onSelectFrameSide(event.target.value as FrameSide);
+                    }}
+                    disabled={actionWorking}
+                    aria-label={`${observation.hiveFrameSlot.displayLabel} side`}
+                    data-testid="brood-slot-frame-side-select"
+                  >
+                    <option value="unknown">Unknown side</option>
+                    <option value="side_a">Side A</option>
+                    <option value="side_b">Side B</option>
+                  </select>
+                </div>
+              ) : null}
+            </article>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
@@ -1975,6 +2307,34 @@ function formatStagePolicyStatus(status: VarroaPhotoAnalysis["beeLocalisationPol
 
 function formatInspectionIntent(intent: InspectionIntent) {
   return intent === "training_data_collection" ? "Training data collection" : "Varroa assessment";
+}
+
+function formatObservationStatus(status: InspectionFrameObservation["observationStatus"]) {
+  const labels: Record<InspectionFrameObservation["observationStatus"], string> = {
+    pending: "Pending",
+    inspected: "Inspected",
+    skipped: "Skipped",
+    inactive: "Inactive"
+  };
+  return labels[status];
+}
+
+function formatContinuityStatus(status: FrameContinuityStatus) {
+  const labels: Record<FrameContinuityStatus, string> = {
+    pending: "Continuity pending",
+    continuous_with_previous_observation: "Continuous with previous",
+    not_continuous_or_unknown: "Not continuous or unknown"
+  };
+  return labels[status];
+}
+
+function formatFrameSide(side: FrameSide | null) {
+  const labels: Record<FrameSide, string> = {
+    side_a: "Side A",
+    side_b: "Side B",
+    unknown: "Unknown side"
+  };
+  return side ? labels[side] : "No side";
 }
 
 function formatInspectionStatus(

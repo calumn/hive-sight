@@ -223,6 +223,34 @@ class HiveConfigurationStatus(StrEnum):
     current = "current"
 
 
+class HiveFrameSlotStatus(StrEnum):
+    active = "active"
+    archived = "archived"
+
+
+class FrameUse(StrEnum):
+    brood = "brood"
+
+
+class InspectionFrameObservationStatus(StrEnum):
+    pending = "pending"
+    inspected = "inspected"
+    skipped = "skipped"
+    inactive = "inactive"
+
+
+class FrameContinuityStatus(StrEnum):
+    pending = "pending"
+    continuous_with_previous_observation = "continuous_with_previous_observation"
+    not_continuous_or_unknown = "not_continuous_or_unknown"
+
+
+class FrameSide(StrEnum):
+    side_a = "side_a"
+    side_b = "side_b"
+    unknown = "unknown"
+
+
 class HealthResponse(BaseModel):
     service: str
     status: str
@@ -354,6 +382,7 @@ class FrameStandardResponse(BaseModel):
 class HiveConfigurationUpsertRequest(BaseModel):
     workspace_id: UUID
     frame_standard_id: str = Field(min_length=1)
+    brood_slot_count: int | None = Field(default=None, ge=1, le=30)
     notes: str | None = Field(default=None, max_length=500)
     effective_from: date | None = None
 
@@ -366,6 +395,7 @@ class HiveConfigurationResponse(BaseModel):
     frame_use: str
     frame_standard_id: str
     frame_standard: FrameStandardResponse
+    brood_slot_count: int = 10
     notes: str | None = None
     status: HiveConfigurationStatus
     effective_from: date
@@ -412,6 +442,9 @@ class InspectionPhotoResponse(BaseModel):
     inspection_photo_id: UUID
     inspection_id: UUID
     workspace_id: UUID
+    inspection_frame_observation_id: UUID | None = None
+    hive_frame_slot_id: UUID | None = None
+    frame_side: FrameSide | None = None
     original_object_key: str
     filename: str
     content_type: str
@@ -424,6 +457,50 @@ class InspectionPhotoResponse(BaseModel):
 class InspectionPhotoListResponse(BaseModel):
     inspection: InspectionResponse
     photos: list[InspectionPhotoResponse]
+
+
+class HiveFrameSlotResponse(BaseModel):
+    hive_frame_slot_id: UUID
+    hive_id: UUID
+    workspace_id: UUID
+    hive_configuration_id: UUID | None = None
+    frame_use: FrameUse
+    slot_number: int
+    display_label: str
+    status: HiveFrameSlotStatus
+    created_at: datetime
+    updated_at: datetime
+
+
+class HiveFrameSlotListResponse(BaseModel):
+    hive_id: UUID
+    hive_frame_slots: list[HiveFrameSlotResponse]
+
+
+class InspectionFrameObservationResponse(BaseModel):
+    inspection_frame_observation_id: UUID
+    inspection_id: UUID
+    workspace_id: UUID
+    hive_frame_slot_id: UUID
+    hive_frame_slot: HiveFrameSlotResponse
+    observation_status: InspectionFrameObservationStatus
+    continuity_status: FrameContinuityStatus
+    inspection_order: int | None = None
+    notes: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class InspectionFrameObservationListResponse(BaseModel):
+    inspection: InspectionResponse
+    observations: list[InspectionFrameObservationResponse]
+
+
+class InspectionFrameObservationUpdateRequest(BaseModel):
+    workspace_id: UUID
+    observation_status: InspectionFrameObservationStatus
+    continuity_status: FrameContinuityStatus | None = None
+    notes: str | None = Field(default=None, max_length=500)
 
 
 class PhotoIntakeResponse(BaseModel):

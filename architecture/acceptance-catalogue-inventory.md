@@ -45,6 +45,7 @@ Legacy slice-history tests remain useful evidence. They should not be bulk-migra
 | varroa | Varroa Photo Analysis evidence and adapter readiness | `acceptance/features/varroa/varroa-photo-analysis-evidence-and-adapter-readiness.feature` | API | api-only | already canonical | Added by Slice 0033 for the safe adapter, persisted Photo Analysis, per-bee evidence, and Advisor-eligibility trust boundary. |
 | varroa | One-click Varroa Photo Analysis workflow | `acceptance/features/varroa/varroa-photo-analysis-workflow.feature` | API | api-only | already canonical | Slice 0034 product-photo workflow; browser interaction assertions remain in Playwright acceptance coverage rather than a Web BDD binding. |
 | varroa | Product Photo Analysis confidence policy | `acceptance/features/varroa/product-photo-analysis-confidence-policy.feature` | API | api-only | already canonical | Slice 0035 policy for development-only evidence, product-candidate evidence, confidence blocking, and coverage blocking. |
+| varroa | Hive frame slot inspection photo context | `acceptance/features/varroa/hive-frame-slot-inspection-photo-context.feature` | API | api-only | already canonical | Slice 0036 brood-slot observations, continuity evidence, skipped/inactive slots, and side-photo rules. Browser interaction assertions remain in Playwright acceptance coverage rather than a Web BDD binding. |
 | treatment | Advisor treatment recommendation intake | `acceptance/features/treatment/advisor-treatment-recommendation-intake.feature` | API | api-only | already canonical | Living API-bound catalogue feature for the Advisor recommendation intake and treatment evidence chain. |
 
 ## Canonical Core API BDD Bindings
@@ -56,6 +57,7 @@ Legacy slice-history tests remain useful evidence. They should not be bulk-migra
 | varroa | Varroa Photo Analysis evidence and adapter readiness | `services/core-api/tests/test_varroa_photo_analysis_api_bdd.py` | Core API | api-only | already canonical | Core API binding for the canonical Varroa Photo Analysis evidence and adapter readiness feature. |
 | varroa | One-click Varroa Photo Analysis workflow | `services/core-api/tests/test_varroa_photo_analysis_workflow_api_bdd.py` | Core API | api-only | already canonical | Core API binding for the Slice 0034 product-photo workflow. |
 | varroa | Product Photo Analysis confidence policy | `services/core-api/tests/test_product_photo_analysis_confidence_policy_api_bdd.py` | Core API | api-only | already canonical | Core API binding for Slice 0035 confidence-policy and Advisor evidence eligibility outcomes. |
+| varroa | Hive frame slot inspection photo context | `services/core-api/tests/test_hive_frame_slot_inspection_photo_context_api_bdd.py` | Core API | api-only | already canonical | Core API binding for Slice 0036 brood-slot observations, continuity, inactive/skipped slot handling, and side-photo integrity rules. |
 | treatment | Advisor treatment recommendation intake | `services/core-api/tests/test_advisor_treatment_recommendation_api_bdd.py` | Core API | api-only | already canonical | Core API binding for the canonical treatment recommendation intake feature. |
 
 ## Browser BDD Bindings
@@ -140,6 +142,7 @@ Legacy slice-history tests remain useful evidence. They should not be bulk-migra
 | model | Bee orientation training baseline | `apps/web/tests/acceptance/slice-0022-bee-orientation-training-baseline.spec.ts` | Web UI | web-only | keep as browser-specific coverage | Historical model workflow UI evidence. |
 | model | Bee orientation benchmark evaluation | `apps/web/tests/acceptance/slice-0024-bee-orientation-benchmark-evaluation.spec.ts` | Web UI | web-only | keep as browser-specific coverage | Browser workflow/interaction evidence. |
 | varroa | Varroa review outcome labelling | `apps/web/tests/acceptance/slice-0025-varroa-review-outcome-labelling.spec.ts` | Web UI | web-only | keep as browser-specific coverage | Retains visual, zoom, source-context, overlay, and marker-containment checks outside the shared Gherkin business outcome. |
+| varroa | Hive frame slot inspection photo context | `apps/web/tests/acceptance/slice-0036-hive-frame-slot-inspection-photo-context.spec.ts` | Web UI | web-only | keep as browser-specific coverage | Browser guard for pending brood-slot upload blocking, explicit inspected-slot selection, and side-photo evidence display. |
 
 ## Harness And Reporting Guards
 
