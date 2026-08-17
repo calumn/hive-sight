@@ -76,6 +76,28 @@ Revisit trigger:
 
 Before building corrective feedback, expert review, detector QA, user-facing evidence explanation, real adapter promotion, or any Advisor workflow that needs to explain why a photo-level product evidence result was trusted.
 
+## PARK-0060: Inspection Completion And Pending Brood Slot Closure
+
+Status: parked
+Date parked: 2026-08-17
+Source: Slice 0036 grilling
+Area: beekeeper workflow, inspection evidence coverage
+
+Context:
+
+Slice 0036 plans pending brood-slot observations but deliberately does not introduce a durable `Complete inspection` workflow. Pending brood slots should eventually block closing an inspection, because unresolved slots mean HiveSight does not know whether the beekeeper inspected, skipped, or failed to record evidence for those brood positions.
+
+Follow-on work:
+
+- Define what it means to complete a Training Data Collection Inspection versus a Varroa Assessment Inspection.
+- Block completion while active brood slot observations remain pending.
+- Decide whether to add a convenience action to mark all remaining pending brood slots as skipped.
+- Decide how completed inspections interact with Photo Analysis review, future Advisor evidence, and historical reanalysis.
+
+Revisit trigger:
+
+Before adding an Inspection completion action, inspection-level Varroa result, treatment comparison workflow, or any report that claims the Inspection's brood-slot coverage is complete.
+
 ## PARK-0001: UI-Level Gherkin Harness
 
 Status: promoted
