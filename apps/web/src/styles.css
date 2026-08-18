@@ -589,6 +589,26 @@ label span {
   padding: 10px;
 }
 
+.inspection-photo-preview {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #dce2d7;
+  border-radius: 6px;
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: 72px;
+  justify-content: center;
+  overflow: hidden;
+  width: 96px;
+}
+
+.inspection-photo-preview img {
+  display: block;
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+
 .photo-list strong {
   display: block;
   overflow-wrap: anywhere;

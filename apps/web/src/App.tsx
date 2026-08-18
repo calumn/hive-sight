@@ -207,6 +207,7 @@ type NormalizedPanOffset = {
 
 export function App() {
   const trainingCropPanelRef = useRef<HTMLDivElement | null>(null);
+  const inspectionPhotoInputRef = useRef<HTMLInputElement | null>(null);
   const [loadState, setLoadState] = useState<LoadState>({ kind: "loading" });
   const [selectedDevUserId, setSelectedDevUserId] = useState(() => {
     return window.localStorage.getItem(devUserStorageKey) ?? defaultDevUserId;
@@ -758,6 +759,10 @@ export function App() {
       });
       await refreshSession();
       await refreshInspectionPhotos();
+      setFile(null);
+      if (inspectionPhotoInputRef.current) {
+        inspectionPhotoInputRef.current.value = "";
+      }
       setAnalysisDetail(null);
       clearEvidenceImage();
       clearLabellingImage();
@@ -1653,6 +1658,7 @@ export function App() {
                 <FileImage size={24} />
                 <span>{selectedFileLabel}</span>
                 <input
+                  ref={inspectionPhotoInputRef}
                   type="file"
                   accept="image/jpeg,image/png,image/webp"
                   onChange={(event) => setFile(event.target.files?.[0] ?? null)}
@@ -2020,7 +2026,7 @@ function InspectionPhotoListPanel({
         <ul className="photo-list">
           {photos.map((photo) => (
             <li key={photo.inspectionPhotoId} data-testid="inspection-photo-list-item">
-              <FileImage size={18} />
+              <InspectionPhotoPreview devUserId={devUserId} photo={photo} />
               <div>
                 <strong>{photo.filename}</strong>
                 <p>
@@ -2053,6 +2059,54 @@ function InspectionPhotoListPanel({
         </ul>
       )}
     </section>
+  );
+}
+
+function InspectionPhotoPreview({
+  devUserId,
+  photo
+}: {
+  devUserId: string;
+  photo: InspectionPhoto;
+}) {
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    let objectUrl: string | null = null;
+    setFailed(false);
+    setImageUrl(null);
+    const viewUrl = `/v1/inspection-photos/${photo.inspectionPhotoId}/content?workspace_id=${photo.workspaceId}`;
+    void fetchInspectionPhotoObjectUrl({ devUserId, viewUrl })
+      .then((nextImageUrl) => {
+        if (cancelled) {
+          URL.revokeObjectURL(nextImageUrl);
+          return;
+        }
+        objectUrl = nextImageUrl;
+        setImageUrl(nextImageUrl);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setFailed(true);
+          setImageUrl(null);
+        }
+      });
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [devUserId, photo.inspectionPhotoId, photo.workspaceId]);
+
+  return (
+    <span className="inspection-photo-preview" data-testid="inspection-photo-preview">
+      {imageUrl && !failed ? (
+        <img src={imageUrl} alt={photo.filename} data-testid="inspection-photo-preview-image" />
+      ) : (
+        <FileImage size={20} />
+      )}
+    </span>
   );
 }
 

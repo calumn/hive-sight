@@ -32,6 +32,16 @@ test("Varroa assessment photos are attached to inspected brood slot sides", asyn
   await page.getByTestId("upload-photo-button").click();
 
   await expect(page.getByTestId("inspection-photo-list-item")).toHaveCount(1);
+  await expect(page.getByText("No photo selected")).toBeVisible();
+  await expect(page.getByTestId("inspection-photo-input")).toHaveValue("");
+  await expect(page.getByTestId("inspection-photo-preview-image")).toBeVisible();
+  await expect
+    .poll(async () =>
+      page
+        .getByTestId("inspection-photo-preview-image")
+        .evaluate((image) => (image as HTMLImageElement).naturalWidth)
+    )
+    .toBeGreaterThan(0);
   await expect(page.getByTestId("brood-slot-coverage-panel")).toContainText("Side A");
   await expect(page.getByTestId("brood-slot-coverage-panel")).toContainText("bee-frame-test.png");
 });
